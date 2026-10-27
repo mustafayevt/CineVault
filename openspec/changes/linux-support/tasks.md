@@ -50,7 +50,7 @@ Read this block once; every task below relies on it.
 
 ## 2. Tools on Linux
 
-- [ ] 2.1 Linux platform in the tools manifest code `[haiku]`
+- [x] 2.1 Linux platform in the tools manifest code `[haiku]`
   - After: 1.1. Parallel with wave 1.
   - Touch: `crates/cv-media/src/tools/manifest.rs` only.
   - Do NOT touch: `manifest.json`, `archive.rs`.
@@ -238,7 +238,7 @@ Read this block once; every task below relies on it.
 
 ## 5. Desktop shell and UI
 
-- [x] 5.1 Linux Tauri configuration `[haiku]`
+- [ ] 5.1 Linux Tauri configuration `[haiku]`
   - After: nothing. Wave 1.
   - Touch: new `src-tauri/tauri.linux.conf.json`, `src-tauri/src/chrome.rs` (tests and doc comment).
   - Do NOT touch: `tauri.conf.json`, the Windows or macOS config.
