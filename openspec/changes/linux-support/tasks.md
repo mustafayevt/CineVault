@@ -248,7 +248,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cinevault-app chrome`; `node scripts/check-bundle.mjs` still passes.
   - Commit: `feat(shell): add the Linux window and bundle configuration`
 
-- [ ] 5.2 Bundle check for Linux `[haiku]`
+- [x] 5.2 Bundle check for Linux `[haiku]`
   - After: 5.1. Wave 2.
   - Touch: `scripts/check-bundle.mjs` only.
   - Steps: read `tauri.linux.conf.json` (line 20 pattern); `need(linux, "tauri.linux.conf.json", ["appimage", "deb", "rpm"])`; include it in `configText` (line 92); require `release-linux.yml` in the list at line 107 **only if it exists** until 7.1 lands, then always (7.1 removes the condition); `--artifacts` on `process.platform === "linux"`: `[["appimage", ".AppImage"], ["deb", ".deb"], ["rpm", ".rpm"]]`.
