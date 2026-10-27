@@ -141,7 +141,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib library_ops::xdg_trash` on Windows compiles (tests are `#[cfg(unix)]`); LINUX CHECK same filter.
   - Commit: `feat(trash): send items to the freedesktop Trash by rename only`
 
-- [ ] 3.4 Use the Linux sender, exact path matching and the bin's name `[risky: needs Sonnet/Opus]`
+- [x] 3.4 Use the Linux sender, exact path matching and the bin's name `[risky: needs Sonnet/Opus]`
   - After: 3.1, 3.3. Wave 4.
   - Touch: `crates/cv-app/src/library_ops/trash_bin.rs`, `crates/cv-app/src/library_ops/policy_bin.rs` (strings only), `crates/cv-app/src/library_ops/mod.rs` (export `BIN_NAME`).
   - Do NOT touch: the macOS impl (line 280-345) logic, `send_or_fallback`'s control flow.

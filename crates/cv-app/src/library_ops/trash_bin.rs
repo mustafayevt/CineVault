@@ -1,7 +1,8 @@
 //! The system bin behind Delete and cross-drive moves, as traits so
 //! tests never touch the real one.
 //!
-//! * [`SystemTrash`] sends paths to the Recycle Bin (Windows) or the Trash (macOS).
+//! * [`SystemTrash`] sends paths to the Recycle Bin (Windows) or the Trash (macOS, and the
+//!   freedesktop Trash on Linux).
 //! * [`SystemBin`] also remembers where each path went ([`BinnedItem::bin_id`]), says whether it
 //!   is still there and puts it back. A restore never replaces anything: when the old path is
 //!   taken, or an item is no longer in the bin, nothing is restored and each problem is named.
@@ -12,6 +13,12 @@
 //!   `folder:<path in the trash folder>` and is restored by a rename. After a send, every item is
 //!   looked for in the bin, and one that left its place but is not there is reported.
 //!
+//! On Linux the send is CineVault's own ([`super::xdg_trash`]): one rename on the item's own file
+//! system into the Trash that file system uses, never the `trash` crate's send, which can fall
+//! back to a copy and a delete. A path that cannot be renamed into a Trash stays where it is and
+//! [`send_or_fallback`] moves it to the drive's trash folder. The listing, restore and Empty
+//! stay with `trash::os_limited`, working on the info files CineVault wrote.
+//!
 //! The Windows (and Linux) bin is read through `trash::os_limited`. macOS has no such listing in
 //! the crate, so the Trash folder of the volume is listed before and after the send, and a
 //! restore is a rename back on the same volume (checked by hand, see the manual checks).
@@ -21,9 +28,11 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use super::BIN_NAME;
 use super::bin_volumes::{SystemVolumes, bin_refusal};
 
-/// Sends files and folders to the system trash (the Recycle Bin on Windows, the Trash on macOS).
+/// Sends files and folders to the system trash (the Recycle Bin on Windows, the Trash on macOS
+/// and Linux).
 pub trait SystemTrash: Send + Sync {
     /// False for a path the system trash cannot take, such as a file on a network share. Such a
     /// path is not sent; the caller moves it to the data source's own trash folder instead.
@@ -32,7 +41,7 @@ pub trait SystemTrash: Send + Sync {
     /// Why the system trash cannot take `path`, in words; `None` when it can.
     fn refusal(&self, path: &Path) -> Option<String> {
         (!self.supports(path))
-            .then(|| "The Recycle Bin cannot take files from this location".to_owned())
+            .then(|| format!("The {BIN_NAME} cannot take files from this location"))
     }
 
     /// Moves every path to the trash. On an error some paths may already be there; the caller
@@ -154,6 +163,19 @@ impl SystemTrash for OsTrash {
     }
 
     fn send(&self, paths: &[PathBuf]) -> Result<(), String> {
+        send_paths(paths)
+    }
+}
+
+/// The system send. On Linux it is one rename into the Trash of the item's own file system;
+/// elsewhere the `trash` crate's send.
+fn send_paths(paths: &[PathBuf]) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        super::xdg_trash::send_all(paths)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
         trash::delete_all(paths).map_err(|error| error.to_string())
     }
 }
@@ -170,11 +192,11 @@ impl SystemBin for OsTrash {
             Err(error) => {
                 return SendOutcome {
                     sent: Vec::new(),
-                    error: Some(format!("the Recycle Bin could not be read: {error}")),
+                    error: Some(format!("the {BIN_NAME} could not be read: {error}")),
                 };
             }
         };
-        let error = trash::delete_all(paths).err().map(|e| e.to_string());
+        let error = send_paths(paths).err();
         let new_items: Vec<trash::TrashItem> = os_limited::list()
             .map(|items| {
                 items
@@ -225,7 +247,7 @@ impl SystemBin for OsTrash {
         let listed = trash::os_limited::list().map_err(|error| {
             vec![(
                 String::new(),
-                format!("the Recycle Bin could not be read: {error}"),
+                format!("the {BIN_NAME} could not be read: {error}"),
             )]
         })?;
         let mut problems = Vec::new();
@@ -257,7 +279,7 @@ impl SystemBin for OsTrash {
 
     fn purge(&self, items: &[BinnedItem]) -> Result<(), String> {
         let listed = trash::os_limited::list()
-            .map_err(|error| format!("the Recycle Bin could not be read: {error}"))?;
+            .map_err(|error| format!("the {BIN_NAME} could not be read: {error}"))?;
         // Only the bin's own entry recorded for each item, and only while it is still the
         // item that left that path: never another entry of the bin.
         let chosen: Vec<trash::TrashItem> = listed
@@ -477,7 +499,7 @@ pub fn send_or_fallback(
             if !here && !super::policy_bin::is_erased(item) {
                 tracing::warn!(path = %item.original, "a path sent to the bin is not in it");
                 notes.push(format!(
-                    "{} left its place but is not in the Recycle Bin; it may have been deleted \
+                    "{} left its place but is not in the {BIN_NAME}; it may have been deleted \
                      for good.",
                     item.original
                 ));
@@ -491,7 +513,7 @@ pub fn send_or_fallback(
                 .collect();
             if !left.is_empty() {
                 notes.push(format!(
-                    "The Recycle Bin refused ({error}); the files went to the library folder's \
+                    "The {BIN_NAME} refused ({error}); the files went to the library folder's \
                      trash folder."
                 ));
                 fallback.extend(left);
@@ -502,11 +524,10 @@ pub fn send_or_fallback(
         return Ok(Binned { items, notes });
     }
     if notes.is_empty() && !quiet {
-        notes.push(
-            "The Recycle Bin cannot take files from this location; they went to the library \
+        notes.push(format!(
+            "The {BIN_NAME} cannot take files from this location; they went to the library \
              folder's trash folder."
-                .to_owned(),
-        );
+        ));
     }
     let trash = source_root.join(cv_rename::exec::TRASH_DIR).join(batch);
     for path in fallback {
@@ -634,16 +655,12 @@ pub(crate) fn size_of(path: &Path) -> u64 {
         .unwrap_or(0)
 }
 
-/// Two paths name the same place, compared without regard to case, separators or the `\\?\`
-/// prefix.
+/// Two paths name the same place: separators, the `\?\` prefix and a trailing separator do not
+/// matter, and case matters only where file names are case-sensitive (Linux), where
+/// `Movie.mkv` and `movie.mkv` are two files.
 #[cfg_attr(target_os = "macos", allow(dead_code))]
 fn same_path(a: &Path, b: &Path) -> bool {
-    let norm = |p: &Path| {
-        let text = p.to_string_lossy().replace('/', "\\");
-        let text = text.strip_prefix("\\\\?\\").unwrap_or(&text).to_owned();
-        text.trim_end_matches('\\').to_lowercase()
-    };
-    norm(a) == norm(b)
+    cv_fs::paths::same_path(a, b)
 }
 
 /// A bin in a folder, for tests: items are renamed into it, can be "emptied", and a location can
@@ -655,6 +672,7 @@ pub(crate) mod fake {
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
+    use super::super::BIN_NAME;
     use super::super::bin_volumes::{BinVolumes, bin_refusal};
     use super::{BinnedItem, SendOutcome, SystemBin, SystemTrash, rename_back, size_of};
 
@@ -724,7 +742,9 @@ pub(crate) mod fake {
 
         fn refusal(&self, path: &Path) -> Option<String> {
             if !self.supports(path) {
-                return Some("The Recycle Bin cannot take files from this location".to_owned());
+                return Some(format!(
+                    "The {BIN_NAME} cannot take files from this location"
+                ));
             }
             let volumes = self.volumes.lock().unwrap().clone();
             volumes.and_then(|v| bin_refusal(v.as_ref(), path, size_of))
@@ -952,10 +972,7 @@ mod tests {
             send_or_fallback(bin.as_ref(), &[heat, small], &root, "b4").unwrap();
         assert_eq!(bin.names(), ["small.txt"], "the small file fits the bin");
         assert_eq!(items.len(), 2);
-        assert!(
-            notes[0].contains("larger than the Recycle Bin"),
-            "{notes:?}"
-        );
+        assert!(notes[0].contains("is larger than the"), "{notes:?}");
         assert!(
             root.join(".deletedByCineVault/b4/Heat (1995)/movie.mkv")
                 .is_file()
@@ -976,7 +993,10 @@ mod tests {
             1,
             "it is still recorded, so Undo can say what happened"
         );
-        assert!(notes[0].contains("not in the Recycle Bin"), "{notes:?}");
+        assert!(
+            notes[0].contains(&format!("not in the {BIN_NAME}")),
+            "{notes:?}"
+        );
         assert_eq!(present_all(bin.as_ref(), &items), [false]);
     }
 
@@ -1004,5 +1024,61 @@ mod tests {
         OsTrash.restore(&outcome.sent).unwrap();
         assert_eq!(std::fs::read(&file).unwrap(), b"cinevault live bin test");
         assert_eq!(OsTrash.present(&outcome.sent), [false]);
+    }
+
+    /// Names that differ only by case are two files where file names are case-sensitive, so a
+    /// Trash entry of one is never taken for the other.
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn same_path_keeps_case_on_linux() {
+        assert!(!same_path(
+            Path::new("/data/Movie.mkv"),
+            Path::new("/data/movie.mkv")
+        ));
+        assert!(same_path(
+            Path::new("/data/Movie.mkv"),
+            Path::new("/data/Movie.mkv/")
+        ));
+    }
+
+    /// The real freedesktop Trash of the user, opt-in: send a temp folder under `$HOME`, find it
+    /// there, put it back, send it again and erase only it.
+    /// `cargo test -p cv-app bin_live -- --ignored`.
+    #[test]
+    #[ignore = "uses the real Trash of the user"]
+    #[cfg(target_os = "linux")]
+    fn bin_live_round_trip_through_the_trash() {
+        // Under $HOME, so the item is on the file system of the home Trash.
+        let home = dirs::home_dir().expect("a home folder");
+        let dir = tempfile::Builder::new()
+            .prefix("cinevault-bin-live")
+            .tempdir_in(home)
+            .unwrap();
+        let folder = dir.path().join("Live Title (2000)");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("movie.mkv"), b"cinevault live bin test").unwrap();
+        let outcome = OsTrash.send_tracked(std::slice::from_ref(&folder));
+        assert!(outcome.error.is_none(), "{outcome:?}");
+        assert_eq!(outcome.sent.len(), 1);
+        assert!(!outcome.sent[0].bin_id.is_empty(), "{outcome:?}");
+        assert!(!folder.exists());
+        assert_eq!(OsTrash.present(&outcome.sent), [true]);
+        // Something at the old path blocks the restore and is left alone.
+        std::fs::create_dir_all(&folder).unwrap();
+        assert!(OsTrash.restore(&outcome.sent).is_err());
+        std::fs::remove_dir_all(&folder).unwrap();
+        OsTrash.restore(&outcome.sent).unwrap();
+        assert_eq!(
+            std::fs::read(folder.join("movie.mkv")).unwrap(),
+            b"cinevault live bin test"
+        );
+        assert_eq!(OsTrash.present(&outcome.sent), [false]);
+        // Empty touches only the item CineVault recorded.
+        let again = OsTrash.send_tracked(std::slice::from_ref(&folder));
+        assert!(again.error.is_none(), "{again:?}");
+        assert_eq!(OsTrash.present(&again.sent), [true]);
+        OsTrash.purge(&again.sent).unwrap();
+        assert_eq!(OsTrash.present(&again.sent), [false]);
+        assert!(!folder.exists());
     }
 }

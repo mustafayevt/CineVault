@@ -274,7 +274,13 @@ fn a_deleted_title_comes_back_from_the_bin_with_its_details_artwork_and_stage() 
     assert_eq!(lab.listed_movies(), 1, "a hidden title is in no list");
     let entry = lab.history().entry(entry_id).unwrap();
     assert_eq!(entry.kind, HistoryKind::Delete);
-    assert_eq!(entry.summary, "Deleted Heat (1995) to the Recycle Bin");
+    assert_eq!(
+        entry.summary,
+        format!(
+            "Deleted Heat (1995) to the {}",
+            crate::library_ops::BIN_NAME
+        )
+    );
     assert_eq!(entry.bytes, lab.history().bin_total().ok());
     assert!(entry.bytes.is_some_and(|b| b > 0));
 
@@ -315,9 +321,10 @@ fn an_emptied_bin_restores_nothing_and_the_entry_stays() {
     assert!(report.undone.is_empty());
     assert_eq!(report.left.len(), 1);
     assert!(
-        report.left[0]
-            .reason
-            .contains("no longer in the Recycle Bin"),
+        report.left[0].reason.contains(&format!(
+            "no longer in the {}",
+            crate::library_ops::BIN_NAME
+        )),
         "{report:?}"
     );
     assert!(lab.hidden(heat));
@@ -387,7 +394,7 @@ fn deleting_two_titles_restores_each_on_its_own() {
         .unwrap();
     assert_eq!(
         lab.history().entry(entry_id).unwrap().summary,
-        "Deleted 2 titles to the Recycle Bin"
+        format!("Deleted 2 titles to the {}", crate::library_ops::BIN_NAME)
     );
     // Ronin's old place is taken: Heat comes back, Ronin stays in the bin.
     fs::create_dir_all(lab.path("Ronin (1998)")).unwrap();

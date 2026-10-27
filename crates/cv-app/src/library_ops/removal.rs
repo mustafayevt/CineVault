@@ -522,11 +522,7 @@ fn method_of(items: &[BinnedItem]) -> DeleteMethod {
 
 /// The name of the system bin in a summary.
 pub(crate) const fn bin_name() -> &'static str {
-    if cfg!(target_os = "macos") {
-        "Trash"
-    } else {
-        "Recycle Bin"
-    }
+    super::BIN_NAME
 }
 
 /// "Godzilla (1998)".

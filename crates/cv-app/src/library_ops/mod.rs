@@ -13,7 +13,7 @@
 //!   writes a `.cinevaultignore` marker into the title's folder so the next scan skips it. The
 //!   library is only ever changed by this explicit call, never by a scan.
 //! * [`RemovalService::delete_with_files`] sends the files to the system bin (Recycle Bin, macOS
-//!   Trash) through [`SystemBin`], which remembers where each one went, and hides the titles under
+//!   Trash, freedesktop Trash on Linux, sent by one rename) through [`SystemBin`], which remembers where each one went, and hides the titles under
 //!   one History entry; History's Undo restores both. Where the bin cannot take a path (a network
 //!   share), the files go to `<data source>/.deletedByCineVault/<batch>/` instead. Files are never
 //!   deleted for good here, unless Settings › Deleted files is Delete permanently (chosen behind
@@ -80,6 +80,13 @@ pub use review::{
 pub use trash_bin::{
     BinError, Binned, BinnedItem, FOLDER_PREFIX, FolderOnly, NOT_IN_BIN, OsTrash, PATH_TAKEN,
     SendOutcome, SystemBin, SystemTrash, present_all, restore_all, send_or_fallback,
+};
+
+/// What the system bin is called in words: the Recycle Bin on Windows, the Trash elsewhere.
+pub const BIN_NAME: &str = if cfg!(windows) {
+    "Recycle Bin"
+} else {
+    "Trash"
 };
 
 /// The name of the marker file that hides a folder from scans.

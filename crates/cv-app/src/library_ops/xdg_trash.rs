@@ -10,8 +10,8 @@
 //! Choosing the Trash folder is [`super::xdg_dirs`]; reading, restoring and emptying what is
 //! sent here is the `trash` crate's job on the info files written here.
 
-// Nothing outside this file calls the sender yet, so the build would warn about unused code.
-#![allow(dead_code)]
+// Only the Linux build sends; on other Unix systems the sender is compiled for its tests.
+#![cfg_attr(not(target_os = "linux"), allow(dead_code))]
 
 use std::ffi::OsStr;
 use std::fs::{DirBuilder, OpenOptions};
