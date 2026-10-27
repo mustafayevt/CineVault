@@ -200,7 +200,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib library_ops::uncached`; LINUX CHECK same (run with `TMPDIR=$HOME/.cache/cv-tmp` so temp files are on ext4).
   - Commit: `feat(move): read copies back with O_DIRECT on Linux`
 
-- [ ] 4.2 Secret Service errors on Linux `[haiku]`
+- [x] 4.2 Secret Service errors on Linux `[haiku]`
   - After: 1.1. Wave 1.
   - Touch: `crates/cv-app/src/secrets.rs`, `crates/cv-app/src/secrets/tests.rs`.
   - Steps:

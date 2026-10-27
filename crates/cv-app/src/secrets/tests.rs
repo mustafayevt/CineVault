@@ -61,6 +61,75 @@ fn stored_values_are_registered_for_redaction_until_deleted() {
     assert!(redact::redact("GET /x/registered-token-abc123/y").contains("registered-token"));
 }
 
+#[test]
+fn recognises_a_secret_service_that_is_not_running() {
+    assert!(is_missing_service(
+        "The name org.freedesktop.secrets was not provided by any .service files"
+    ));
+    assert!(is_missing_service(
+        "org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable"
+    ));
+    assert!(is_missing_service(
+        "Failed to connect to the bus: Connection refused (os error 111)"
+    ));
+    assert!(is_missing_service("DBUS_SESSION_BUS_ADDRESS is not set"));
+    assert!(!is_missing_service(
+        "Platform secure storage failure: wrong password"
+    ));
+    assert!(!is_missing_service(""));
+}
+
+#[test]
+fn no_keyring_message_tells_the_user_what_to_do() {
+    assert_eq!(
+        SecretError::NoKeyring.to_string(),
+        "No system keyring is running. Install or unlock GNOME Keyring or KWallet, then try again."
+    );
+}
+
+#[test]
+fn a_missing_secret_service_maps_to_no_keyring_on_linux_only() {
+    let missing = keyring::Error::PlatformFailure(Box::new(std::io::Error::other(
+        "The name org.freedesktop.secrets was not provided by any .service files",
+    )));
+    let other = keyring::Error::PlatformFailure(Box::new(std::io::Error::other(
+        "Platform secure storage failure: wrong password",
+    )));
+    let locked = keyring::Error::NoStorageAccess(Box::new(std::io::Error::other("locked")));
+
+    let mapped = SecretError::from_keyring(missing);
+    let unmapped = SecretError::from_keyring(other);
+    let no_access = SecretError::from_keyring(locked);
+    if cfg!(target_os = "linux") {
+        assert!(matches!(mapped, SecretError::NoKeyring), "{mapped}");
+        assert!(matches!(no_access, SecretError::NoKeyring), "{no_access}");
+    } else {
+        assert!(matches!(mapped, SecretError::Store(_)), "{mapped}");
+        assert!(
+            matches!(no_access, SecretError::Unavailable(_)),
+            "{no_access}"
+        );
+    }
+    // Other platform failures keep their mapping on every OS.
+    assert!(matches!(unmapped, SecretError::Store(_)), "{unmapped}");
+}
+
+/// Needs a session with no Secret Service. In WSL run it as
+/// `env -u DBUS_SESSION_BUS_ADDRESS cargo test -p cv-app --lib -- --ignored no_secret_service`.
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "needs a session without a Secret Service"]
+fn no_secret_service_saving_says_no_keyring_is_running() {
+    let store = SecretStore::system_with_service(format!(
+        "CineVault-test-nokeyring-{}",
+        std::process::id()
+    ));
+    assert!(matches!(
+        store.set("tmdb.api_key", "cvtest-nokeyring-0001"),
+        Err(SecretError::NoKeyring)
+    ));
+}
+
 mod per_location {
     use std::fs;
 

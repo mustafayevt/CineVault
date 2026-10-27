@@ -1,8 +1,9 @@
 //! Secret storage in the operating system credential store.
 //!
-//! API keys, passwords and OAuth tokens live in Windows Credential Manager or the macOS Keychain
-//! (through the `keyring` crate), never in the settings file. Settings only hold non-secret
-//! facts such as "a TMDB key is configured", which the UI learns from [`SecretStore::contains`].
+//! API keys, passwords and OAuth tokens live in Windows Credential Manager, the macOS Keychain or
+//! the Secret Service on Linux (GNOME Keyring or KWallet), through the `keyring` crate, never in
+//! the settings file. Settings only hold non-secret facts such as "a TMDB key is configured",
+//! which the UI learns from [`SecretStore::contains`].
 //!
 //! Every value that passes through a [`SecretStore`] is registered with [`crate::redact`], so it
 //! is masked in logs even when it shows up somewhere no pattern rule would catch it.
@@ -12,6 +13,9 @@
 //!   under one service name per app (see [`SERVICE_NAME`]). A portable copy has a service of its
 //!   own ([`service_name_for`]), so it starts with no keys and never changes an installed copy's.
 //! * Windows limits one credential to about 1,200 characters. Provider keys and tokens fit.
+//! * Linux has no plain-text fallback. When no Secret Service answers (none running, or locked),
+//!   saving fails with [`SecretError::NoKeyring`] and the Settings page says so; no key is written
+//!   to a file.
 //! * [`SecretStore::in_memory`] exists for tests and for sessions where no credential store is
 //!   reachable; its contents vanish when the process ends.
 
@@ -89,6 +93,11 @@ pub enum SecretError {
     /// No credential store is reachable (no desktop session, locked or missing keychain).
     #[error("the system credential store is not available: {0}")]
     Unavailable(String),
+    /// On Linux, no Secret Service (GNOME Keyring or KWallet) is running or unlocked.
+    #[error(
+        "No system keyring is running. Install or unlock GNOME Keyring or KWallet, then try again."
+    )]
+    NoKeyring,
     /// The store rejected the request.
     #[error("credential store error: {0}")]
     Store(String),
@@ -97,11 +106,38 @@ pub enum SecretError {
     Invalid(String),
 }
 
+/// Whether a Secret Service failure says that no keyring is on the session bus: the service is
+/// not provided, or there is no session bus to reach it on. Pure, so it is tested on every OS.
+fn is_missing_service(text: &str) -> bool {
+    [
+        "org.freedesktop.secrets",
+        "ServiceUnknown",
+        "was not provided by any",
+        "DBUS_SESSION_BUS_ADDRESS",
+        "Connection refused",
+    ]
+    .iter()
+    .any(|marker| text.contains(marker))
+}
+
 impl SecretError {
     fn from_keyring(err: keyring::Error) -> Self {
         match err {
-            keyring::Error::NoStorageAccess(e) => Self::Unavailable(e.to_string()),
-            keyring::Error::PlatformFailure(e) => Self::Store(e.to_string()),
+            keyring::Error::NoStorageAccess(e) => {
+                if cfg!(target_os = "linux") {
+                    Self::NoKeyring
+                } else {
+                    Self::Unavailable(e.to_string())
+                }
+            }
+            keyring::Error::PlatformFailure(e) => {
+                let text = e.to_string();
+                if cfg!(target_os = "linux") && is_missing_service(&text) {
+                    Self::NoKeyring
+                } else {
+                    Self::Store(text)
+                }
+            }
             keyring::Error::TooLong(name, max) => {
                 Self::Invalid(format!("{name} is longer than the store allows ({max})"))
             }
@@ -149,7 +185,7 @@ pub trait SecretBackend: Send + Sync {
     fn delete(&self, account: &str) -> Result<bool, SecretError>;
 }
 
-/// The OS credential store (Windows Credential Manager, macOS Keychain).
+/// The OS credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service).
 #[derive(Debug, Clone)]
 pub struct KeyringBackend {
     service: String,
