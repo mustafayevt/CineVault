@@ -103,8 +103,9 @@ interface SuggestPanelProps<E extends HTMLElement> {
   empty?: ReactNode;
   /** A request is out: the rows shown are the last ones. */
   busy?: boolean;
-  /** Minimum width of the panel. */
+  /** Minimum and maximum width of the panel; it is as wide as its field in between. */
   minWidth?: number;
+  maxWidth?: number;
   className?: string;
 }
 
@@ -122,6 +123,7 @@ export function SuggestPanel<E extends HTMLElement>({
   empty,
   busy = false,
   minWidth = 320,
+  maxWidth = 10_000,
   className,
 }: SuggestPanelProps<E>) {
   const container = useFloatingContainer();
@@ -199,7 +201,7 @@ export function SuggestPanel<E extends HTMLElement>({
         position: "fixed",
         left: box.left,
         top: box.top,
-        width: Math.max(box.width, minWidth),
+        width: Math.min(maxWidth, Math.max(box.width, minWidth)),
         // Grows from the field's top edge; reduced motion shows it at once.
         ["--cv-origin" as string]: "50% 0",
         ...(reduced ? { animation: "none" } : {}),
@@ -214,7 +216,9 @@ export function SuggestPanel<E extends HTMLElement>({
         .filter((group) => group.items.length > 0)
         .map((group) => (
           <div key={group.id} role="group" aria-labelledby={`${headingId}-${group.id}`}>
-            <div className="flex h-6 items-center px-2.5 pt-1">
+            <div
+              className={cx("flex items-center px-2.5 pt-1", group.label === "" ? "hidden" : "h-6")}
+            >
               <span
                 id={`${headingId}-${group.id}`}
                 className="min-w-0 flex-1 truncate text-(length:--fs-11) font-(weight:--fw-600) tracking-wide text-text-muted uppercase"

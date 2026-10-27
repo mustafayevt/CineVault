@@ -41,3 +41,7 @@
 ## 11. Aspect ratio
 
 - [ ] 11.1 Check and fix aspect ratio detection so ratios wider than the frame are reported. Verified by cv-media tests.
+
+## 12. Torrent title picker
+
+- [x] 12.1 Typing in the Torrents search suggests titles from the metadata provider in the shared suggestion panel (owned titles marked), and releases are searched only after a title is picked; the picked title is a chip with an × to change it. Verified by the torrents page tests (typing starts no release search, picking does, changing the title clears the results).
