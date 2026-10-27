@@ -282,6 +282,91 @@ describe("the artwork picker page", () => {
       expect(lightbox()).toBeNull();
     });
 
+    describe("the full-size picture", () => {
+      function deferred() {
+        let resolve: (image: { key: string; thumbhash: null; ambient: null }) => void = () => {};
+        let reject: (error: Error) => void = () => {};
+        const promise = new Promise<{ key: string; thumbhash: null; ambient: null }>((ok, no) => {
+          resolve = ok;
+          reject = no;
+        });
+        return { promise, resolve, reject };
+      }
+      const layer = (name: string) =>
+        screen.getByTestId("art-lightbox").querySelector<HTMLImageElement>(`[data-layer=${name}]`);
+      async function openSecond(user: ReturnType<typeof userEvent.setup>) {
+        await waitTiles(4);
+        await user.dblClick((await tiles())[1] as HTMLElement);
+        return screen.findByTestId("art-lightbox");
+      }
+
+      it("shows the thumbnail at once and swaps to the original when it has loaded, with its real size", async () => {
+        const pending = deferred();
+        backend = createSyntheticArtworkBackend({ fullImage: () => pending.promise });
+        setArtworkBackend(backend);
+        const user = userEvent.setup();
+        renderPicker();
+        const open = await openSecond(user);
+
+        // The thumbnail is there, scaled to fit, and the spinner says the original is coming.
+        expect(layer("thumbnail")?.getAttribute("src")).toContain("/grid");
+        expect(layer("original")).toBeNull();
+        expect(
+          within(open).getByRole("status", { name: "Loading the full-size picture" }),
+        ).toBeVisible();
+        expect(open).toHaveAccessibleName(/^Poster · \d+×\d+ · .+/);
+
+        pending.resolve({ key: "a".repeat(32), thumbhash: null, ambient: null });
+        const original = await waitFor(() => {
+          const found = layer("original");
+          expect(found).not.toBeNull();
+          return found as HTMLImageElement;
+        });
+        expect(original.getAttribute("src")).toContain(`${"a".repeat(32)}/full`);
+        expect(original.className).toContain("opacity-0");
+        Object.defineProperty(original, "naturalWidth", { value: 2000 });
+        Object.defineProperty(original, "naturalHeight", { value: 3000 });
+        fireEvent.load(original);
+
+        await waitFor(() => expect(original.className).toContain("opacity-100"));
+        expect(screen.getByTestId("art-lightbox")).toHaveAccessibleName(/^Poster · 2000×3000 · /);
+        expect(within(open).queryByRole("status")).toBeNull();
+      });
+
+      it("keeps the thumbnail and says so when the original cannot be fetched", async () => {
+        backend = createSyntheticArtworkBackend({
+          fullImage: () => Promise.reject(new Error("offline")),
+        });
+        setArtworkBackend(backend);
+        const user = userEvent.setup();
+        renderPicker();
+        const open = await openSecond(user);
+
+        expect(await within(open).findByText(/did not load/)).toBeInTheDocument();
+        expect(layer("thumbnail")).not.toBeNull();
+        expect(layer("original")).toBeNull();
+        expect(within(open).queryByRole("status")).toBeNull();
+      });
+
+      it("fetches the originals of the neighbours after a rest, never all of the list", async () => {
+        const user = userEvent.setup();
+        renderPicker();
+        await openSecond(user);
+
+        await waitFor(() => expect(backend.fullRequests.length).toBeGreaterThanOrEqual(3));
+        expect(backend.fullRequests).toHaveLength(3);
+        expect(new Set(backend.fullRequests).size).toBe(3);
+        // Flicking to a neighbour asks for nothing again, and the next ones follow.
+        const before = backend.fullRequests.length;
+        await user.keyboard("{ArrowRight}");
+        expect(backend.fullRequests.slice(0, before)).toEqual(
+          backend.fullRequests.slice(0, before),
+        );
+        await waitFor(() => expect(backend.fullRequests.length).toBeGreaterThan(before));
+        expect(backend.fullRequests.length).toBeLessThanOrEqual(before + 1);
+      });
+    });
+
     it("appears at once, without the grow animation, under reduced motion", async () => {
       document.documentElement.dataset.motion = "reduced";
       try {

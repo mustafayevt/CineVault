@@ -265,6 +265,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             crate::artwork_stream_ipc::artwork_candidate_counts,
             crate::artwork_ipc::place_artwork,
             crate::artwork_ipc::place_extra_artwork,
+            crate::artwork_ipc::artwork_full_image,
             crate::artwork_ipc::download_missing_artwork,
             crate::artwork_ipc::fill_season_artwork,
             crate::play_ipc::play_item,

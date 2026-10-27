@@ -84,6 +84,9 @@ const STALE_TEMP: Duration = Duration::from_secs(60 * 60);
 
 const META_FILE: &str = "meta.json";
 
+/// File stem of the original image kept in an entry beside its thumbnails.
+const ORIGINAL_STEM: &str = "original";
+
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// How often [`write_atomic`] repeats a rename that failed (a file another program briefly holds).
@@ -353,6 +356,35 @@ impl ThumbCache {
         let bytes = fs::read(self.entry_dir(key).join(META_FILE)).ok()?;
         let meta: ThumbMeta = serde_json::from_slice(&bytes).ok()?;
         (meta.key == *key).then_some(meta)
+    }
+
+    /// Keeps the original file of an entry next to its thumbnails (`original.<ext>`), so a big
+    /// view can show it at full size. It counts toward the cache size, goes when the entry is
+    /// evicted or the cache is cleared, and never lands in a media folder. `ext` is `jpg`, `png`
+    /// or `webp`; the entry's own folder is made when it is not there.
+    pub fn store_original(
+        &self,
+        key: &ThumbKey,
+        bytes: &[u8],
+        ext: &str,
+    ) -> Result<PathBuf, ThumbError> {
+        if !matches!(ext, "jpg" | "png" | "webp") {
+            return Err(ThumbError::Decode(format!("unknown picture type {ext:?}")));
+        }
+        let dir = self.entry_dir(key);
+        fs::create_dir_all(&dir).map_err(io_err(&dir))?;
+        let path = dir.join(format!("{ORIGINAL_STEM}.{ext}"));
+        write_atomic(&path, bytes)?;
+        self.after_generation();
+        Ok(path)
+    }
+
+    /// The stored original of an entry (see [`Self::store_original`]), if it has one.
+    pub fn original_path(&self, key: &ThumbKey) -> Option<PathBuf> {
+        ["jpg", "png", "webp"]
+            .iter()
+            .map(|ext| self.entry_dir(key).join(format!("{ORIGINAL_STEM}.{ext}")))
+            .find(|path| path.is_file())
     }
 
     /// The WebP bytes of a cached thumbnail, or `None` if it is not cached.
@@ -1276,5 +1308,27 @@ mod tests {
             cache.ensure(&path, &[ThumbSize::Grid]),
             Err(ThumbError::Decode(_))
         ));
+    }
+
+    #[test]
+    fn an_original_is_kept_in_its_entry_and_leaves_with_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = cache(&dir.path().join("cache"), None);
+        let bytes = png_bytes(&poster(300, 450));
+        let key = cache.ensure_bytes(&bytes, &[ThumbSize::Grid]).unwrap().key;
+        assert_eq!(cache.original_path(&key), None);
+
+        let path = cache.store_original(&key, &bytes, "png").unwrap();
+
+        assert_eq!(cache.original_path(&key), Some(path.clone()));
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert!(path.starts_with(cache.root()), "inside the cache folder");
+        assert!(cache.usage().unwrap().bytes >= bytes.len() as u64);
+        assert!(matches!(
+            cache.store_original(&key, &bytes, "exe"),
+            Err(ThumbError::Decode(_))
+        ));
+        cache.remove(&key).unwrap();
+        assert_eq!(cache.original_path(&key), None);
     }
 }

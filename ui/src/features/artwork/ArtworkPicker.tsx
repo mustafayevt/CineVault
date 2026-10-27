@@ -27,6 +27,7 @@ import type { ArtworkCandidate } from "./artworkBackend";
 import {
   NO_TEXT,
   dimensions,
+  neighboursOf,
   slotAspect,
   withFramesSettled,
   withoutLowQuality,
@@ -476,12 +477,23 @@ export function ArtworkPicker({
         <ArtworkLightbox
           image={
             viewedCandidate !== null
-              ? { kind: "candidate", image: viewedCandidate.image }
+              ? {
+                  kind: "candidate",
+                  id: viewedCandidate.id,
+                  image: viewedCandidate.image,
+                  neighbours: neighboursOf(tiles, viewedCandidate.id),
+                }
               : { kind: "url", url: viewedUrl ?? "" }
           }
-          caption={
+          caption={(pixels) =>
             viewedCandidate !== null
-              ? [typeName(slot), dimensions(viewedCandidate), providerLabel(viewedCandidate, names)]
+              ? [
+                  typeName(slot),
+                  pixels !== null
+                    ? `${pixels.width}×${pixels.height}`
+                    : dimensions(viewedCandidate),
+                  providerLabel(viewedCandidate, names),
+                ]
                   .filter(Boolean)
                   .join(" · ")
               : [

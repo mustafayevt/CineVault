@@ -145,6 +145,12 @@ export interface ArtworkBackend {
    * season or an episode): the picker then searches each type itself.
    */
   counts: (itemId: string) => Promise<ArtworkSlotCount[] | null>;
+  /**
+   * Downloads the full-size original of a candidate (`id` of the candidate) into the image
+   * cache and answers with its key: `imageUrl(key, "full")` is then the picture itself, for the
+   * big view. An original fetched before answers at once.
+   */
+  fullImage: (candidateId: string) => Promise<ArtworkImage>;
   /** Fills the empty artwork types of the items from the providers. */
   downloadMissing: (itemIds: readonly string[]) => Promise<ArtworkRun>;
   /**
@@ -196,6 +202,7 @@ const tauriArtworkBackend: ArtworkBackend = {
     if (result.status === "error" && result.error.code === "unsupported") return null;
     return unwrap(result);
   },
+  fullImage: async (candidateId) => unwrap(await commands.artworkFullImage(candidateId)),
   downloadMissing: async (itemIds) => unwrap(await commands.downloadMissingArtwork([...itemIds])),
   fillSeasonArtwork: async (itemId, season) =>
     unwrap(await commands.fillSeasonArtwork(itemId, season)),

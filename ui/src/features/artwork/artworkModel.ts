@@ -161,3 +161,15 @@ export function fitKey(score: number): MessageKey {
   if (score >= 40) return "artwork.fit.good";
   return "artwork.fit.loose";
 }
+
+/** The ids of the images before and after `id` in `tiles`, which a Left or Right shows next. */
+export function neighboursOf(tiles: readonly Pick<ArtworkCandidate, "id">[], id: string): string[] {
+  const at = tiles.findIndex((tile) => tile.id === id);
+  if (at === -1 || tiles.length < 2) return [];
+  const next = tiles[(at + 1) % tiles.length]?.id;
+  const previous = tiles[(at - 1 + tiles.length) % tiles.length]?.id;
+  return [next, previous].filter(
+    (other, index, all): other is string =>
+      other !== undefined && other !== id && all.indexOf(other) === index,
+  );
+}

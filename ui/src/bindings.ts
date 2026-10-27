@@ -543,6 +543,13 @@ export const commands = {
 	 */
 	placeExtraArtwork: (itemId: string, slot: string, sources: string[]) => typedError<ArtworkPlacedDto, ArtworkCommandError>(__TAURI_INVOKE("place_extra_artwork", { itemId, slot, sources })),
 	/**
+	 *  Downloads the full-size original of a candidate (`candidate_id` is its `id`; a TMDB address
+	 *  is asked at `original`) into the image cache, never into a media folder, and returns its
+	 *  key. The big view of the picker then shows `imageUrl(key, "full")`: the file itself through
+	 *  `cv://img`, nothing over IPC. An original fetched before is not fetched again.
+	 */
+	artworkFullImage: (candidateId: string) => typedError<PosterDto, ArtworkCommandError>(__TAURI_INVOKE("artwork_full_image", { candidateId })),
+	/**
 	 *  Fills only the empty artwork types of the items from the providers (and the extras and
 	 *  portraits the settings ask for).
 	 */
@@ -778,7 +785,7 @@ export type ArtworkCandidateDto = {
 
 /**  Why a command did not do what was asked. */
 export type ArtworkCommandError = {
-	/**  Stable code: `storage`, `not_found`, `unsupported`, `no_folder` or `invalid`. */
+	/**  Stable code: `storage`, `not_found`, `unsupported`, `no_folder`, `invalid` or `download`. */
 	code: string,
 	/**  Plain sentence for the user. */
 	message: string,
@@ -1556,7 +1563,7 @@ export type EvidenceVerdictDto = "agree" | "conflict" | "unknown";
 
 /**  One live example of the templates. */
 export type ExampleDto = {
-	/**  `edition`, `no_hdr`, `colon` or `plain`. */
+	/**  `edition`, `no_hdr`, `colon`, `plain` or `episode`. */
 	kind: string,
 	title: string,
 	year: number,

@@ -7,7 +7,7 @@ import type {
   FakeProviderTransport,
 } from "../workspaces/fakeProviderTransport";
 import { ArtworkRequestError, CURRENT_PROVIDER } from "./artworkBackend";
-import type { ArtworkSlotCount } from "./artworkBackend";
+import type { ArtworkImage, ArtworkSlotCount } from "./artworkBackend";
 import type {
   ArtworkBackend,
   ArtworkCandidate,
@@ -291,6 +291,8 @@ export interface SyntheticArtworkBackend extends ArtworkBackend {
   readonly placed: readonly { itemId: string; slot: string; sources: string[] }[];
   /** The tokens of the placements that were undone. */
   readonly undone: readonly string[];
+  /** The candidates whose originals were asked for, oldest first. */
+  readonly fullRequests: readonly string[];
 }
 
 function nameOf(image: LocalImage): string {
@@ -303,10 +305,13 @@ export function createSyntheticArtworkBackend(
     year?: number | null;
     /** The counts of the types, as the backend's counts-only lookup returns them. */
     counts?: ArtworkSlotCount[];
+    /** Answers for the original of a candidate; by default a key of its own, at once. */
+    fullImage?: (candidateId: string) => Promise<ArtworkImage>;
   } = {},
 ): SyntheticArtworkBackend {
   const placed: { itemId: string; slot: string; sources: string[] }[] = [];
   const undone: string[] = [];
+  const fullRequests: string[] = [];
   const record = (itemId: string, slot: string, sources: string[]): ArtworkPlaced => {
     placed.push({ itemId, slot, sources });
     return { images: sources.length, problems: [], undo: `place-${placed.length}` };
@@ -315,6 +320,7 @@ export function createSyntheticArtworkBackend(
     available: true,
     placed,
     undone,
+    fullRequests,
     searchTransport: (onStart) => {
       const inner = perSearchTransport((request) =>
         createSyntheticArtworkStream(String(request.params?.slot ?? "poster")),
@@ -341,6 +347,12 @@ export function createSyntheticArtworkBackend(
       return Promise.resolve({ images: 1, problems: [], undo: null });
     },
     counts: () => Promise.resolve(options.counts ?? null),
+    fullImage: (candidateId) => {
+      fullRequests.push(candidateId);
+      if (options.fullImage !== undefined) return options.fullImage(candidateId);
+      const sum = Array.from(candidateId).reduce((all, char) => all + char.charCodeAt(0), 0);
+      return Promise.resolve({ key: hex(20_000 + sum), thumbhash: null, ambient: null });
+    },
     downloadMissing: (itemIds): Promise<ArtworkRun> =>
       Promise.resolve({ images: itemIds.length * 2, portraits: 0, skipped: 0 }),
     fillSeasonArtwork: (): Promise<ArtworkRun> =>

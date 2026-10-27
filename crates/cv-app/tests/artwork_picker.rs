@@ -1009,3 +1009,57 @@ async fn an_older_placement_is_not_undone_before_a_newer_one() {
     let report = rig.artwork.undo_entry(newer, None).await.unwrap();
     assert_eq!(report.undone, vec![item]);
 }
+
+#[tokio::test]
+async fn the_full_image_of_a_candidate_is_kept_in_the_cache_and_fetched_once() {
+    let rig = rig();
+    let url = "https://img.test/p-en.jpg";
+    let mut original = jpeg(2, 80, 120);
+    // Not the thumbnail's bytes: a bigger original at the same address.
+    original.extend_from_slice(b"padding that changes the hash");
+    rig.fetcher.insert(url, original.clone());
+
+    let first = rig.artwork.full_image(url).await.unwrap();
+
+    assert_eq!((first.width, first.height), (80, 120));
+    let path = rig.artwork.full_image_path(&first.key).unwrap();
+    assert!(path.starts_with(rig.thumbs.root()), "{}", path.display());
+    assert_eq!(fs::read(&path).unwrap(), original);
+    assert!(rig.thumbs.has(&first.key, ThumbSize::Grid));
+    assert_eq!(rig.fetcher.requests(), vec![url.to_owned()]);
+
+    // The second call answers from the cache and asks nobody.
+    let second = rig.artwork.full_image(url).await.unwrap();
+    assert_eq!(second, first);
+    assert_eq!(rig.fetcher.requests().len(), 1);
+
+    // An address that cannot be fetched, and one that is not a picture, are errors, not keys.
+    assert!(matches!(
+        rig.artwork.full_image("https://img.test/none.jpg").await,
+        Err(ArtworkError::Download(_))
+    ));
+    rig.fetcher
+        .insert("https://img.test/text.jpg", b"hello".to_vec());
+    assert!(matches!(
+        rig.artwork.full_image("https://img.test/text.jpg").await,
+        Err(ArtworkError::Download(_))
+    ));
+    assert!(matches!(
+        rig.artwork.full_image("not an address").await,
+        Err(ArtworkError::BadSource(_))
+    ));
+}
+
+#[tokio::test]
+async fn a_tmdb_candidate_is_fetched_at_its_original_size() {
+    let rig = rig();
+    let small = "https://image.test/t/p/w500/abc.jpg";
+    let big = "https://image.test/t/p/original/abc.jpg";
+    rig.fetcher.insert(small, jpeg(4, 50, 75));
+    rig.fetcher.insert(big, jpeg(5, 400, 600));
+
+    let full = rig.artwork.full_image(small).await.unwrap();
+
+    assert_eq!((full.width, full.height), (400, 600));
+    assert_eq!(rig.fetcher.requests(), vec![big.to_owned()]);
+}

@@ -83,6 +83,9 @@ pub enum ArtworkError {
     UnknownSlot,
     #[error("{0}")]
     BadSource(String),
+    /// The original of a candidate could not be fetched or is not a picture.
+    #[error("{0}")]
+    Download(String),
     #[error(transparent)]
     Db(#[from] cv_db::DbError),
     #[error("that placement cannot be undone any more")]
@@ -285,6 +288,40 @@ pub struct PickerOptions {
     /// Best fit first: the images the automatic selection would pick, in its order, then the rest
     /// by the provider's own score.
     pub candidates: Vec<PickerCandidate>,
+}
+
+/// The full-size original of a candidate, kept in the image cache.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FullImage {
+    /// Content key of the original; its file is [`ArtworkService::full_image_path`].
+    pub key: ThumbKey,
+    /// Pixels of the original.
+    pub width: u32,
+    pub height: u32,
+}
+
+/// The address of a TMDB image at its `original` size: `.../t/p/w500/x.jpg` becomes
+/// `.../t/p/original/x.jpg`. Any other address is returned as it is.
+fn original_url(url: &str) -> String {
+    const MARK: &str = "/t/p/";
+    let Some(at) = url.find(MARK) else {
+        return url.to_owned();
+    };
+    let rest = &url[at + MARK.len()..];
+    match rest.split_once('/') {
+        Some((size, tail)) if is_tmdb_size(size) => {
+            format!("{}{MARK}original/{tail}", &url[..at])
+        }
+        _ => url.to_owned(),
+    }
+}
+
+/// `w185`, `h632`, ...: a width or height bound in TMDB's image addresses.
+fn is_tmdb_size(text: &str) -> bool {
+    let mut chars = text.chars();
+    matches!(chars.next(), Some('w' | 'h'))
+        && !text[1..].is_empty()
+        && text[1..].bytes().all(|b| b.is_ascii_digit())
 }
 
 /// A candidate that was downloaded into the thumbnail cache.
@@ -1111,6 +1148,77 @@ impl ArtworkService {
             .collect()
     }
 
+    /// Fetches the full-size original of a candidate into the image cache (beside its thumbnails,
+    /// never into a media folder) for the picker's big view, and returns where it is kept. A
+    /// TMDB address of a smaller size is asked at `original`. An original fetched before is not
+    /// fetched again.
+    ///
+    /// # Errors
+    /// The address is not usable, the download failed or the answer is not a picture.
+    pub async fn full_image(&self, source: &str) -> Result<FullImage, ArtworkError> {
+        let url = original_url(&source_url(source)?);
+        let known = self
+            .previews
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&url)
+            .cloned();
+        if let Some(preview) = known
+            && self.thumbs.original_path(&preview.key).is_some()
+        {
+            return Ok(FullImage {
+                key: preview.key,
+                width: preview.width,
+                height: preview.height,
+            });
+        }
+        let bytes = self
+            .fetcher
+            .fetch(&url)
+            .await
+            .map_err(|error| ArtworkError::Download(error.to_string()))?;
+        let thumbs = Arc::clone(&self.thumbs);
+        let stored = tokio::task::spawn_blocking(move || {
+            let info = cv_artwork::download::picture::inspect(&bytes)
+                .map_err(|error| ArtworkError::Download(error.to_string()))?;
+            let ensured = thumbs
+                .ensure_bytes(&bytes, &[ThumbSize::Grid])
+                .map_err(|error| ArtworkError::Download(error.to_string()))?;
+            if thumbs.original_path(&ensured.key).is_none() {
+                thumbs
+                    .store_original(&ensured.key, &bytes, info.ext)
+                    .map_err(|error| ArtworkError::Download(error.to_string()))?;
+            }
+            Ok::<_, ArtworkError>(Preview {
+                key: ensured.key,
+                width: ensured.meta.source_width,
+                height: ensured.meta.source_height,
+            })
+        })
+        .await
+        .map_err(|_| ArtworkError::Worker)??;
+        let full = FullImage {
+            key: stored.key.clone(),
+            width: stored.width,
+            height: stored.height,
+        };
+        remember_preview(
+            &mut self
+                .previews
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            url,
+            stored,
+        );
+        Ok(full)
+    }
+
+    /// The file of an original kept by [`Self::full_image`].
+    #[must_use]
+    pub fn full_image_path(&self, key: &ThumbKey) -> Option<PathBuf> {
+        self.thumbs.original_path(key)
+    }
+
     /// Downloads the candidates into the thumbnail cache, a few at a time, and returns what could
     /// be fetched, by URL. What an earlier call fetched is not fetched again.
     async fn previews(&self, urls: Vec<String>) -> HashMap<String, Preview> {
@@ -1412,5 +1520,17 @@ mod preview_tests {
         assert_eq!(previews.len(), MAX_PREVIEWS);
         remember_preview(&mut previews, "https://i.test/new.jpg".into(), preview());
         assert_eq!(previews.len(), 1);
+    }
+
+    #[test]
+    fn a_tmdb_size_in_an_address_becomes_the_original() {
+        let at = |size: &str| format!("https://image.tmdb.org/t/p/{size}/abc.jpg");
+        assert_eq!(original_url(&at("w500")), at("original"));
+        assert_eq!(original_url(&at("h632")), at("original"));
+        assert_eq!(original_url(&at("original")), at("original"));
+        assert_eq!(original_url(&at("wide")), at("wide"));
+        let other = "https://assets.fanart.tv/fanart/movies/1/moviebackground/x.jpg";
+        assert_eq!(original_url(other), other);
+        assert_eq!(original_url("file:///C:/x/p.jpg"), "file:///C:/x/p.jpg");
     }
 }

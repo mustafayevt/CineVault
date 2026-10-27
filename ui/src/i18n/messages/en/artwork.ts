@@ -158,6 +158,8 @@ export const artwork = {
   "artworkPicker.expand": "Expand preview",
   "artworkPicker.lightbox.hint":
     "Press Esc or click anywhere to close. Left and Right show the other images.",
+  "artworkPicker.lightbox.loading": "Loading the full-size picture",
+  "artworkPicker.lightbox.failed": "showing the preview, the full-size picture did not load",
   "artworkPicker.preview.none":
     "Click an image to preview it. Nothing changes until you press Use this.",
   "artworkPicker.fact.size": "Size",

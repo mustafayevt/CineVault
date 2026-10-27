@@ -17,6 +17,7 @@ use specta::Type;
 use tauri::State;
 
 use crate::boot::Boot;
+use crate::img_ipc::ImageState;
 use crate::library_ipc::{PosterDto, poster_dto};
 
 /// Held in Tauri state. When the app services could not start, every command answers with a
@@ -48,7 +49,7 @@ impl ArtworkState {
 /// Why a command did not do what was asked.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct ArtworkCommandError {
-    /// Stable code: `storage`, `not_found`, `unsupported`, `no_folder` or `invalid`.
+    /// Stable code: `storage`, `not_found`, `unsupported`, `no_folder`, `invalid` or `download`.
     pub code: String,
     /// Plain sentence for the user.
     pub message: String,
@@ -70,6 +71,7 @@ impl From<ArtworkError> for ArtworkCommandError {
             ArtworkError::Unsupported | ArtworkError::UnknownSlot => "unsupported",
             ArtworkError::NoFolder => "no_folder",
             ArtworkError::BadSource(_) => "invalid",
+            ArtworkError::Download(_) => "download",
             ArtworkError::UndoGone | ArtworkError::UndoStale(_) => "undo_gone",
             ArtworkError::Db(_) | ArtworkError::Worker => "storage",
             ArtworkError::Busy(_) => "busy",
@@ -238,6 +240,26 @@ pub async fn place_artwork(
     Ok(placed_dto(&outcome))
 }
 
+/// Downloads the full-size original of a candidate (`candidate_id` is its `id`; a TMDB address
+/// is asked at `original`) into the image cache, never into a media folder, and returns its
+/// key. The big view of the picker then shows `imageUrl(key, "full")`: the file itself through
+/// `cv://img`, nothing over IPC. An original fetched before is not fetched again.
+#[tauri::command]
+#[specta::specta]
+pub async fn artwork_full_image(
+    state: State<'_, ArtworkState>,
+    images: State<'_, ImageState>,
+    candidate_id: String,
+) -> CommandResult<PosterDto> {
+    let service = state.get()?;
+    let full = service.full_image(&candidate_id).await?;
+    let path = service.full_image_path(&full.key).ok_or_else(|| {
+        ArtworkCommandError::new("download", "The full-size picture could not be kept.")
+    })?;
+    images.sources().manual().register(full.key.clone(), path);
+    Ok(poster_dto(state.thumbs.as_deref(), &full.key))
+}
+
 /// Replaces the extra fanart or the extra thumbs of an item with the chosen images. The old
 /// extras go to the trash folder of the data source.
 #[tauri::command]
@@ -337,6 +359,7 @@ mod tests {
             (ArtworkError::UnknownSlot, "unsupported"),
             (ArtworkError::NoFolder, "no_folder"),
             (ArtworkError::BadSource("nope".to_owned()), "invalid"),
+            (ArtworkError::Download("404".to_owned()), "download"),
             (ArtworkError::Worker, "storage"),
         ];
         for (error, code) in cases {
