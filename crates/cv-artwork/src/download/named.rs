@@ -104,17 +104,14 @@ pub async fn download_named_image(
     report
 }
 
-/// The absolute files for an extension, each once (letter case ignored).
+/// The absolute files for an extension, each once (letter case ignored except on Linux, where
+/// `Poster.jpg` and `poster.jpg` are two files).
 fn absolute(request: &NamedImage<'_>, ext: &str) -> Vec<PathBuf> {
     let mut found: Vec<PathBuf> = Vec::new();
     for name in (request.names)(ext) {
         let mut path = request.base.to_path_buf();
         path.extend(name.split('/').filter(|part| !part.is_empty()));
-        let same = |other: &PathBuf| {
-            other
-                .to_string_lossy()
-                .eq_ignore_ascii_case(&path.to_string_lossy())
-        };
+        let same = |other: &PathBuf| cv_fs::paths::same_path(other, &path);
         if !found.iter().any(same) {
             found.push(path);
         }
@@ -193,6 +190,17 @@ mod tests {
             data_source: None,
             replace,
         }
+    }
+
+    #[test]
+    fn names_differing_only_in_case_are_one_target_only_where_the_platform_folds_case() {
+        let dir = tempfile::tempdir().unwrap();
+        let list: NameList = &|ext| vec![format!("Poster.{ext}"), format!("poster.{ext}")];
+        let targets = absolute(&request(dir.path(), "https://img/x", false, list), "jpg");
+        assert_eq!(
+            targets.len(),
+            if cv_fs::paths::CASE_SENSITIVE { 2 } else { 1 }
+        );
     }
 
     #[tokio::test]

@@ -181,7 +181,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-fs` and `cargo test -p cv-app --lib nfo artwork actions trash_folders`; LINUX CHECK the same.
   - Commit: `fix(app): compare file paths case-sensitively on Linux`
 
-- [ ] 3.8 Case-sensitive comparisons in cv-nfo, cv-artwork, cv-scan and cv-db on Linux `[risky: needs Sonnet/Opus]`
+- [x] 3.8 Case-sensitive comparisons in cv-nfo, cv-artwork, cv-scan and cv-db on Linux `[risky: needs Sonnet/Opus]`
   - After: 3.1. Wave 2.
   - Touch: `crates/cv-nfo/src/ownership.rs` (line 109), `crates/cv-artwork/src/download/record.rs` (line 17), `crates/cv-artwork/src/download/named.rs` (line 116), `crates/cv-scan/src/rescan/build.rs` (`path_key`, line 16), `crates/cv-scan/src/rescan/mod.rs` (`is_under`, line 260), `crates/cv-db/src/repo/library_review.rs` (`fold`, line 100). The `cv-fs` dependency of cv-scan and cv-db comes from 1.1.
   - Do NOT touch: `crates/cv-db/src/repo/search.rs` (text search, not paths), anything in `cv-app`.

@@ -14,9 +14,9 @@ use cv_domain::{ItemId, MediaFile, MediaFileType};
 
 use super::engine::{DownloadReport, WrittenImage};
 
+/// Whether two paths are the same file: separators are ignored, and so is case except on Linux.
 fn same_path(a: &Path, b: &Path) -> bool {
-    let normal = |p: &Path| p.to_string_lossy().replace('\\', "/");
-    normal(a).eq_ignore_ascii_case(&normal(b))
+    cv_fs::paths::same_path(a, b)
 }
 
 fn file_entry(kind: MediaFileType, path: &Path) -> MediaFile {
@@ -113,4 +113,19 @@ pub fn record(db: &Database, item_id: ItemId, report: &DownloadReport) -> DbResu
         }
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn paths_differing_only_in_case_are_one_file_only_where_the_platform_folds_case() {
+        let (a, b) = (
+            Path::new("/m/Heat/Poster.jpg"),
+            Path::new(r"\m\Heat\poster.jpg"),
+        );
+        assert_eq!(same_path(a, b), !cv_fs::paths::CASE_SENSITIVE);
+        assert!(same_path(a, Path::new(r"\m\Heat\Poster.jpg")));
+    }
 }

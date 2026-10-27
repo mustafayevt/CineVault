@@ -107,8 +107,7 @@ pub fn is_managed_nfo_text(text: &str) -> bool {
 }
 
 fn same_path(a: &Path, b: &Path) -> bool {
-    a.to_string_lossy()
-        .eq_ignore_ascii_case(&b.to_string_lossy())
+    cv_fs::paths::same_path(a, b)
 }
 
 /// The managed NFOs that an item no longer wants.
@@ -116,8 +115,9 @@ fn same_path(a: &Path, b: &Path) -> bool {
 /// `candidates` are the paths the item could have written under any naming choice (including
 /// names from before a rename); `keep` are the paths of the configured naming set. A file is
 /// stale when it is a candidate, is not in `keep` and is managed. Paths compare without regard to
-/// case, because Windows and macOS volumes do. A candidate that does not exist, or is foreign, an
-/// empty file or a pointer, is left alone, and so is every file that is not a candidate.
+/// case where the volumes do (Windows and macOS), and exactly on Linux. A candidate that does not
+/// exist, or is foreign, an empty file or a pointer, is left alone, and so is every file that is
+/// not a candidate.
 pub fn stale_nfos(candidates: &[PathBuf], keep: &[PathBuf]) -> Vec<PathBuf> {
     let mut stale: Vec<PathBuf> = Vec::new();
     for path in candidates {
@@ -254,14 +254,35 @@ Title.......: Movie Name
             .map(|n| path(n))
             .collect();
 
+        // The naming set spells the name in another case: the same file where the platform
+        // folds case (Windows, macOS), another file on Linux.
         let keep = vec![path("heat (1995).NFO")];
-        assert_eq!(stale_nfos(&candidates, &keep), [path("movie.nfo")]);
+        let expected = if cv_fs::paths::CASE_SENSITIVE {
+            vec![path("Heat (1995).nfo"), path("movie.nfo")]
+        } else {
+            vec![path("movie.nfo")]
+        };
+        assert_eq!(stale_nfos(&candidates, &keep), expected);
         // Not candidates: the release note and another movie's file are never listed, whatever
         // the naming set is.
         assert!(stale_nfos(&candidates, &candidates).is_empty());
         assert_eq!(
             stale_nfos(&candidates, &[]),
             [path("Heat (1995).nfo"), path("movie.nfo")]
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn on_linux_a_name_in_another_case_is_not_the_kept_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let (upper, lower) = (dir.path().join("Movie.nfo"), dir.path().join("movie.nfo"));
+        fs::write(&upper, "<movie><title>Heat</title></movie>").unwrap();
+        fs::write(&lower, "<movie><title>Heat</title></movie>").unwrap();
+        // Keeping `movie.nfo` must not protect `Movie.nfo`, a second file of its own.
+        assert_eq!(
+            stale_nfos(&[upper.clone(), lower.clone()], &[lower]),
+            [upper]
         );
     }
 }

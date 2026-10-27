@@ -35,7 +35,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use cv_db::repo::data_sources::list_sources;
 use cv_db::repo::drive_facts::{
-    SourceQuality, SourceUsage, source_quality, source_usage, sources_last_seen,
+    SourceQuality, SourceUsage, source_key, source_quality, source_usage, sources_last_seen,
 };
 use cv_db::{Database, DbError};
 use cv_domain::{DataSource, SourceKind};
@@ -799,10 +799,9 @@ fn group(sources: &[DataSource], facts: &Facts<'_>, volumes: &dyn Volumes) -> Ve
             drives.len() - 1
         });
         let drive = &mut drives[at];
-        // The usage and quality tables group folders by `lower(data_source)` in cv-db, so this
-        // lookup folds case on every platform. On Linux two folders that differ only by case
-        // therefore share their figures until those queries keep case too.
-        let root = source.path.to_lowercase();
+        // The usage and quality tables are keyed like this in cv-db: folded to lower case where
+        // file names ignore case, as stored on Linux.
+        let root = source_key(&source.path);
         let usage = facts.usage.get(&root).copied().unwrap_or_default();
         drive.folders.push(DriveFolder {
             source_id: source.id,

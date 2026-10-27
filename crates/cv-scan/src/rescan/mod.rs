@@ -247,9 +247,17 @@ fn load_state(
     })
 }
 
-/// The `/` separated, lower-case form of a path without a trailing separator.
+/// The `/` separated form of a path without a trailing separator, lower-cased where the
+/// platform's file names ignore case (Windows and macOS; not Linux).
 fn folded(path: &str) -> String {
-    let mut text = path.trim().replace('\\', "/").to_lowercase();
+    folded_with(path, cv_fs::paths::CASE_SENSITIVE)
+}
+
+fn folded_with(path: &str, case_sensitive: bool) -> String {
+    let mut text = path.trim().replace('\\', "/");
+    if !case_sensitive {
+        text = text.to_lowercase();
+    }
     while text.len() > 1 && text.ends_with('/') {
         text.pop();
     }
@@ -540,4 +548,23 @@ pub fn rescan_all(
     }
     refresh_detached(db)?;
     Ok(reports)
+}
+
+#[cfg(test)]
+mod fold_tests {
+    use super::*;
+
+    #[test]
+    fn folding_keeps_case_only_when_asked_to() {
+        assert_eq!(folded_with(r" D:\Movies\ ", false), "d:/movies");
+        assert_eq!(folded_with(r" D:\Movies\ ", true), "D:/Movies");
+    }
+
+    #[test]
+    fn a_folder_with_another_case_is_under_the_root_only_where_the_platform_folds_case() {
+        let folds = !cv_fs::paths::CASE_SENSITIVE;
+        assert_eq!(is_under("/lib/Movies/Heat", "/lib/movies"), folds);
+        assert!(is_under("/lib/Movies/Heat", "/lib/Movies"));
+        assert!(!is_under("/lib/Movies2/Heat", "/lib/Movies"));
+    }
 }

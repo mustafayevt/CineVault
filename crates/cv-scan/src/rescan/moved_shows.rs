@@ -204,10 +204,14 @@ mod tests {
             ),
             Some("D:\\TV\\Dark\\Season 01".to_owned())
         );
-        assert_eq!(
-            rebase("d:/tv/dark (2017)", "D:\\TV\\Dark (2017)", "D:\\TV\\Dark"),
-            Some("D:\\TV\\Dark".to_owned())
-        );
+        // The same folder spelled in another case follows it where file names ignore case
+        // (Windows, macOS), and is another folder on Linux.
+        let other_case = rebase("d:/tv/dark (2017)", "D:\\TV\\Dark (2017)", "D:\\TV\\Dark");
+        if cv_fs::paths::CASE_SENSITIVE {
+            assert_eq!(other_case, None);
+        } else {
+            assert_eq!(other_case, Some("D:\\TV\\Dark".to_owned()));
+        }
         assert_eq!(
             rebase(
                 "D:\\TV\\Dark (2017) 2\\x.mkv",
