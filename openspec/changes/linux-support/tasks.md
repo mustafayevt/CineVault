@@ -326,7 +326,7 @@ Read this block once; every task below relies on it.
 
 ## 7. Release flow
 
-- [ ] 7.1 Linux release and CI workflows `[haiku]`
+- [x] 7.1 Linux release and CI workflows `[haiku]`
   - After: 5.2. Wave 3.
   - Touch: `.github/workflows/release-build.yml`, new `.github/workflows/release-linux.yml`, `.github/workflows/ci.yml`, `scripts/check-bundle.mjs` (drop the "only if it exists" condition from 5.2), `AGENTS.md` (Commands and Releases: add `release-linux.yml`, `gh workflow run release-linux.yml`, "Release (Linux)").
   - Steps:
