@@ -298,6 +298,7 @@ Read this block once; every task below relies on it.
   - Tests: table tests for every OS × input combination (copy the existing `install_method` tests near line 300).
   - Accept: `cargo test -p cv-app --lib updates`; `cargo check -p cinevault-app` (callers still compile).
   - Commit: `feat(updates): choose how a Linux copy installs an update`
+  - BLOCKED: adding `InstallMethod::ReplaceAppImage` breaks `cargo check -p cinevault-app` with E0004 at `src-tauri/src/updates_ipc.rs:438`, the exhaustive `match` on the install method, which is outside this task's touch list. The `install_method` callers at lines 137 and 436 compile only if `install_method` keeps its `windows: bool` signature, so the new TargetOs function needs another name. The install.rs side passed the cv-app tests and clippy when tried. Needs a decision: allow a one-arm change in `updates_ipc.rs` in this task, or move the variant into 6.3.
 
 - [ ] 6.2 Replace the AppImage with the verified download `[risky: needs Sonnet/Opus]`
   - After: 6.1. Wave 2.
