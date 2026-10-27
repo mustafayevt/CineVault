@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   Eye,
   EyeOff,
+  FileSearch,
   FileText,
   FolderOpen,
   Image,
@@ -27,6 +28,7 @@ export type TitleActionId =
   | "artwork"
   | "move"
   | "rewrite-nfo"
+  | "reload-media-info"
   | "edit"
   | "remove"
   | "ignore"
@@ -107,6 +109,12 @@ export const TITLE_ACTIONS: Readonly<Record<TitleActionId, TitleActionDef>> = {
     short: "title.menu.rewriteNfo",
     full: "title.menu.rewriteNfo",
   },
+  "reload-media-info": {
+    id: "reload-media-info",
+    icon: FileSearch,
+    short: "library.act.reloadMediaInfo",
+    full: "library.act.reloadMediaInfo",
+  },
   edit: {
     id: "edit",
     icon: SquarePen,
@@ -156,6 +164,7 @@ export const BAR_ORDER: readonly TitleActionId[] = [
 /** Behind the bar's More button. */
 export const MORE_ORDER: readonly TitleActionId[] = [
   "rewrite-nfo",
+  "reload-media-info",
   "edit",
   "remove",
   "ignore",
@@ -165,7 +174,17 @@ export const MORE_ORDER: readonly TitleActionId[] = [
 /** The right-click menu: groups divided by a separator. Every action of the bar and More is here. */
 export const MENU_GROUPS: readonly (readonly TitleActionId[])[] = [
   ["open", "play", "open-folder"],
-  ["rename", "scrape", "artwork", "move", "rewrite-nfo", "edit", "remove", "ignore"],
+  [
+    "rename",
+    "scrape",
+    "artwork",
+    "move",
+    "rewrite-nfo",
+    "reload-media-info",
+    "edit",
+    "remove",
+    "ignore",
+  ],
   ["delete", "delete-permanently"],
 ];
 

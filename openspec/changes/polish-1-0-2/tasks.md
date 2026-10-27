@@ -45,3 +45,7 @@
 ## 12. Torrent title picker
 
 - [x] 12.1 Typing in the Torrents search suggests titles from the metadata provider in the shared suggestion panel (owned titles marked), and releases are searched only after a title is picked; the picked title is a chip with an × to change it. Verified by the torrents page tests (typing starts no release search, picking does, changing the title clears the results).
+
+## 13. Reload media info
+
+- [x] 13.1 A "Reload media info" button beside Scan folders (selection, or the whole list after a confirmation), and the action in the right-click menu, the selection bar's More menu and the title page ⋯ menu, over the existing `run_item_action` command (a normal cancellable background job). Verified by a cv-app test that only the given titles are re-read and their stale details replaced, and by the reload button tests.

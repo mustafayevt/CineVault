@@ -6,6 +6,21 @@ export const library = {
   "library.type.tv": "TV shows",
   "library.type.collections": "Collections",
   "library.scan": "Scan folders now",
+  "library.reloadMedia.label": "Reload media info",
+  "library.reloadMedia.confirm.movies":
+    "Reload media info for {count, plural, one {# movie} other {# movies}}? This reads every file again and can take a few minutes.",
+  "library.reloadMedia.confirm.shows":
+    "Reload media info for {count, plural, one {# TV show} other {# TV shows}}? This reads every file again and can take a few minutes.",
+  "library.reloadMedia.cancel": "Cancel",
+  "library.reloadMedia.go": "Reload",
+  "library.reloadMedia.started":
+    "Reloading media info for {count, plural, one {# title} other {# titles}}…",
+  "library.reloadMedia.failed": "Could not reload media info: {message}",
+  "library.reloadMedia.someFailed":
+    "{count, plural, one {# title} other {# titles}} could not be read again",
+  "library.reloadMedia.source": "Media info",
+  "library.reloadMedia.desktopOnly": "Media info is read by the desktop app.",
+  "library.act.reloadMediaInfo": "Reload media info",
   "library.filters.label": "Filters",
   "library.drive.label": "Filter by drive",
   "library.drive.chip": "Drive: {value}",

@@ -5,6 +5,7 @@ import { t } from "../../i18n/catalog";
 import { filesStateOf, playBlockedFor } from "../detail/filesState";
 import { openMoveTo } from "../move-to/moveToStore";
 import { useOpenFolder } from "../detail/useOpenFolder";
+import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { playTitle } from "../playback/usePlay";
 import { requestDelete, requestPermanentDelete } from "../delete/deleteActions";
@@ -127,6 +128,10 @@ export function useLibraryActions(targets: readonly TitleTarget[]): TitleActionS
       },
       "rewrite-nfo": {
         onSelect: () => void runNfoAction("rewrite", selectionScope(ids)),
+        disabledReason: none,
+      },
+      "reload-media-info": {
+        onSelect: () => void reloadMediaInfo(ids),
         disabledReason: none,
       },
       edit: {

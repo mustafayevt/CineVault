@@ -83,6 +83,7 @@ describe("title actions", () => {
     const moreNames = names(more);
     expect(moreNames).toEqual([
       "Rewrite NFO",
+      "Reload media info",
       "Edit details",
       "Remove from library (keep files)",
       "Ignore this folder",
@@ -103,6 +104,7 @@ describe("title actions", () => {
       "Artwork…",
       "Move to…",
       "Rewrite NFO",
+      "Reload media info",
       "Edit details",
       "Remove from library (keep files)",
       "Ignore this folder",

@@ -6,6 +6,7 @@ import { Menu, MenuRadioGroup, MenuRadioItem } from "../../components/Menu";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { ReloadMediaInfoButton } from "../mediainfo/ReloadMediaInfoButton";
 import type { LibrarySortKey } from "./libraryBackend";
 import { SORT_CHOICES, SORT_KEYS, SORT_LABEL, sortChoiceOf } from "./sortChoices";
 import type { SortChoice } from "./sortChoices";
@@ -32,7 +33,7 @@ interface LibraryToolbarProps {
 /**
  * The toolbar: the Movies | TV shows | Collections
  * switch with counts, then at the right the sort menu (grid) or the Columns menu (table), the
- * grid and table switch and the scan button. 48px high with the section hairline under it, on the
+ * grid and table switch, Reload media info and the scan button. 48px high with the section hairline under it, on the
  * 24px content inset, controls on one centre line.
  */
 export function LibraryToolbar({
@@ -128,6 +129,7 @@ export function LibraryToolbar({
           />
         </>
       )}
+      {titles && <ReloadMediaInfoButton />}
       <IconButton
         icon={RefreshCw}
         aria-label={t("library.scan")}

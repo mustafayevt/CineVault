@@ -8,6 +8,7 @@ import { requestDelete, requestPermanentDelete } from "../delete/deleteActions";
 import { filesStateOf, playBlockedFor } from "../detail/filesState";
 import { useOpenFolder } from "../detail/useOpenFolder";
 import { shortLabel, TITLE_ACTIONS } from "../library/titleActions";
+import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { openMoveTo } from "../move-to/moveToStore";
 import { playTitle } from "../playback/usePlay";
@@ -17,7 +18,14 @@ import { removeTitlesFromLibrary } from "./removeTitles";
 export type HeaderActionId = "play" | "scrape" | "rename" | "move" | "open-folder" | "delete";
 /** What the ⋯ menu holds. */
 export type MenuActionId =
-  "edit" | "artwork" | "show-nfo" | "rewrite-nfo" | "remove" | "ignore" | "delete-permanently";
+  | "edit"
+  | "artwork"
+  | "show-nfo"
+  | "rewrite-nfo"
+  | "reload-media-info"
+  | "remove"
+  | "ignore"
+  | "delete-permanently";
 
 export interface TitleAction<Id extends string> {
   id: Id;
@@ -132,6 +140,12 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
           label: shortLabel("rewrite-nfo"),
           icon: TITLE_ACTIONS["rewrite-nfo"].icon,
           onSelect: () => void runNfoAction("rewrite", selectionScope([id])),
+        },
+        {
+          id: "reload-media-info",
+          label: shortLabel("reload-media-info"),
+          icon: TITLE_ACTIONS["reload-media-info"].icon,
+          onSelect: () => void reloadMediaInfo([id]),
         },
         {
           id: "remove",

@@ -81,3 +81,21 @@ The poster grid SHALL offer a size control in the toolbar that changes the minim
 #### Scenario: Bigger posters
 - **WHEN** the user raises the poster size and restarts the app
 - **THEN** the grid opens with the larger posters
+
+### Requirement: Reload media info from the Library
+The Library toolbar SHALL show a "Reload media info" icon button right beside "Scan folders now" for Movies and TV shows. With titles selected it SHALL reload those titles; with none selected it SHALL ask "Reload media info for N movies? This reads every file again and can take a few minutes." under the button, with Cancel and Reload, and reload every title of the current list on Reload.
+
+#### Scenario: Whole list
+- **WHEN** nothing is selected, the Movies list holds 180 titles and the user presses "Reload media info" and then Reload
+- **THEN** a background job re-reads the details of the 180 movies, shown in the sidebar progress card
+
+#### Scenario: Selection
+- **WHEN** two titles are selected and the user presses "Reload media info"
+- **THEN** those two titles are reloaded at once, with no question
+
+### Requirement: Reload media info in the menus
+"Reload media info" SHALL also be in the right-click menu and the More menu of the selection bar, acting on the selected titles. Scan folders now SHALL keep reading changed files only.
+
+#### Scenario: Right-click
+- **WHEN** the user right-clicks a title and chooses "Reload media info"
+- **THEN** that title's file details are read again as a background job

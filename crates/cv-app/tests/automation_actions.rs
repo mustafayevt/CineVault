@@ -1234,6 +1234,69 @@ async fn an_unreadable_video_is_marked_and_only_reload_media_info_reads_it_again
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn reload_media_info_reads_only_the_titles_it_is_given_and_clears_their_stale_details() {
+    let rig = Rig::new();
+    let reads = Arc::new(AtomicUsize::new(0));
+    let fail = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let source: ReaderSource = {
+        let (reads, fail) = (Arc::clone(&reads), Arc::clone(&fail));
+        Arc::new(move || {
+            Ok(Arc::new(Switch {
+                reads: Arc::clone(&reads),
+                fail: Arc::clone(&fail),
+            }) as Arc<dyn MediaReader>)
+        })
+    };
+    rig.services.scan().set_media_reader(source);
+    rig.add_source(SourceKind::Movie, "movies");
+    rig.movie("movies", "heat.1995.1080p");
+    rig.movie("movies", "alien.1979.1080p");
+    let scanned = rig
+        .run(Rig::plan(EntityKind::Movie, false, &[(Step::Update, None)]))
+        .await;
+    assert!(scanned.succeeded(), "{scanned:?}");
+    assert_eq!(
+        reads.load(Ordering::SeqCst),
+        2,
+        "both were read by the scan"
+    );
+
+    // Both titles now hold details that are out of date.
+    let ids = rig.movie_ids();
+    assert_eq!(ids.len(), 2);
+    for id in &ids {
+        let id = ItemId(*id);
+        rig.services
+            .db()
+            .write(move |tx| {
+                let mut item = get_item(tx, id)?.expect("item");
+                item.core.media_files[0].width = 1;
+                update_item(tx, &item)
+            })
+            .unwrap();
+    }
+
+    // Reloading the first one reads that title again and no other.
+    let report = rig
+        .run(ItemAction::ReloadMediaInfo.plan(EntityKind::Movie, &ids[..1]))
+        .await;
+    let reloaded = step(&report, Step::MediaInfo);
+    assert_eq!(reloaded.status, StepStatus::Done, "{reloaded:?}");
+    assert_eq!(reloaded.counts["titles"], 1, "{reloaded:?}");
+    assert_eq!(reads.load(Ordering::SeqCst), 3, "one more read, not two");
+    assert_eq!(
+        rig.item(ItemId(ids[0])).core.media_files[0].width,
+        1920,
+        "the stale value was replaced by what the file says"
+    );
+    assert_eq!(
+        rig.item(ItemId(ids[1])).core.media_files[0].width,
+        1,
+        "the other title was left as it was"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn reload_media_info_keeps_the_stored_details_when_mediainfo_is_missing() {
     let rig = Rig::new();
     let (id, _dir) = library_with_one_movie(&rig).await;
