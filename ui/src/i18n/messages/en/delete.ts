@@ -1,8 +1,8 @@
 /** English strings of the delete area. Merged with the other areas in `../../catalog.ts`. */
 export const deleteMessages = {
-  // Delete to the Recycle Bin (spec title-deletion)
-  "delete.toast.one": "Deleted {title} to the Recycle Bin",
-  "delete.toast.many": "Deleted {count} titles to the Recycle Bin",
+  // Delete to the bin (spec title-deletion); `{bin}` is the Recycle Bin or the Trash, by platform
+  "delete.toast.one": "Deleted {title} to the {bin}",
+  "delete.toast.many": "Deleted {count} titles to the {bin}",
   "delete.toast.folder.one": "Deleted {title} to the library folder's trash folder",
   "delete.toast.folder.many": "Deleted {count} titles to the library folder's trash folder",
   "delete.toast.erased.one": "Erased {title}: Deleted files are set to Delete permanently",
@@ -12,11 +12,11 @@ export const deleteMessages = {
     "{count, plural, one {# title was not deleted} other {# titles were not deleted}}",
   "delete.failed": "{subject} could not be deleted",
 
-  // The Delete confirmation (Recycle Bin and trash-folder modes)
+  // The Delete confirmation (bin and trash-folder modes)
   "delete.confirm.title.one": "Delete “{title}”?",
   "delete.confirm.title.many": "Delete {count} titles?",
   "delete.confirm.body.bin":
-    "{count, plural, one {The folder goes} other {The folders go}} to the Recycle Bin. You can undo this from History.",
+    "{count, plural, one {The folder goes} other {The folders go}} to the {bin}. You can undo this from History.",
   "delete.confirm.body.folder":
     "{count, plural, one {The folder goes to the trash folder on its drive} other {The folders go to the trash folder on their drives}}. You can undo this from History.",
   "delete.confirm.body.custom":
@@ -34,7 +34,7 @@ export const deleteMessages = {
   "delete.dialog.title":
     "{count, plural, one {Delete # title permanently?} other {Delete # titles permanently?}}",
   "delete.dialog.body":
-    "{count, plural, one {Its folder and all} other {Their folders and all}} {files} erased from disk. This skips the Recycle Bin and cannot be undone.",
+    "{count, plural, one {Its folder and all} other {Their folders and all}} {files} erased from disk. This skips the {bin} and cannot be undone.",
   "delete.dialog.files": "{count, plural, one {# file is} other {# files are}}",
   "delete.dialog.reading": "Reading what these titles hold",
   "delete.dialog.planFailed":
@@ -47,7 +47,7 @@ export const deleteMessages = {
   "delete.dialog.typeBefore": "Type",
   "delete.dialog.typeAfter": "to confirm",
   "delete.dialog.field": "Type DELETE to confirm",
-  "delete.dialog.toBin": "Send to Recycle Bin instead",
+  "delete.dialog.toBin": "Send to {bin} instead",
   "delete.dialog.cancel": "Cancel",
   "delete.dialog.confirm": "Delete permanently",
 

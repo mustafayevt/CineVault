@@ -7,12 +7,20 @@ import {
 } from "@tanstack/react-router";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ContextMenu } from "../../components/ContextMenu";
+import { restorePlatform, stubPlatform } from "../../test/platform";
 import { LibrarySelectionBar } from "./LibrarySelectionBar";
 import { TitleContextMenu } from "./TitleContextMenu";
-import { BAR_ORDER, HEADER_ORDER, MENU_GROUPS, MORE_ORDER, TITLE_ACTIONS } from "./titleActions";
+import {
+  BAR_ORDER,
+  HEADER_ORDER,
+  MENU_GROUPS,
+  MORE_ORDER,
+  TITLE_ACTIONS,
+  fullLabel,
+} from "./titleActions";
 import { useLibraryActions } from "./useLibraryActions";
 import type { TitleTarget } from "./useLibraryActions";
 
@@ -60,6 +68,17 @@ async function renderPage(targets: readonly TitleTarget[]) {
 const four = [target("1", "Heat"), target("2", "Alien"), target("3", "Dune"), target("4", "Jaws")];
 
 const names = (items: HTMLElement[]) => items.map((item) => item.textContent?.trim() ?? "");
+
+beforeEach(() => stubPlatform("windows"));
+afterEach(() => restorePlatform());
+
+describe("the name of the bin in the actions", () => {
+  it("says Recycle Bin on Windows and Trash on Linux", () => {
+    expect(fullLabel("delete", 1)).toBe("Delete to Recycle Bin");
+    stubPlatform("linux");
+    expect(fullLabel("delete", 1)).toBe("Delete to Trash");
+  });
+});
 
 describe("title actions", () => {
   it("lists the bar as Rename, Scrape, Artwork, Move, Delete and More with the count and size", async () => {

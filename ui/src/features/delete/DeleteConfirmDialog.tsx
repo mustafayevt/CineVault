@@ -13,6 +13,8 @@ import { currentLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import type { RemovalPlan } from "../library-ops/libraryOpsBackend";
 import type { DeletedMode } from "../settings/DeletedFilesSection";
 import { useSetting, useSettingsStore } from "../settings/settingsStore";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { deleteToBin, useDeleteStore } from "./deleteActions";
 import type { DeleteTarget } from "./deleteActions";
 
@@ -51,7 +53,7 @@ function bodyOf(mode: DeletedMode, count: number, folder: string): string {
       ? t("delete.confirm.body.customUnset", { count })
       : t("delete.confirm.body.custom", { count, folder });
   }
-  return t("delete.confirm.body.bin", { count });
+  return t("delete.confirm.body.bin", { count, bin: binName(detectPlatform()) });
 }
 
 function Confirmation({

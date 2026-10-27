@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { restoreLayout, stubLayout } from "../../test/layout";
+import { restorePlatform, stubPlatform } from "../../test/platform";
 import { DrivesPage } from "./DrivesPage";
 import { setDrivesBackend } from "./drivesBackend";
 import type { DrivesBackend } from "./drivesBackend";
@@ -59,10 +60,12 @@ function backendOf(overview: () => DrivesOverview): DrivesBackend & { fire: () =
 
 beforeEach(() => {
   stubLayout();
+  stubPlatform("windows");
   window.localStorage.clear();
 });
 afterEach(() => {
   restoreLayout();
+  restorePlatform();
   setDrivesBackend(null);
   vi.useRealTimers();
 });
@@ -155,6 +158,14 @@ describe("the drive numbers", () => {
     const shares = qualityShares({ p2160: 38, p1080: 89, p720: 12, sd: 0 });
     expect(shares.map((share) => share.id)).toEqual(["2160p", "1080p", "720p"]);
     expect(shares.reduce((sum, share) => sum + share.percent, 0)).toBeCloseTo(100);
+  });
+
+  it("names the bin the Trash on Linux, on a drive card", async () => {
+    stubPlatform("linux");
+    setDrivesBackend(backendOf(() => syntheticDrives()));
+    renderDrives();
+    const media = await screen.findByRole("button", { name: "Show the titles on D: Media" });
+    expect(within(media).getByText("In the Trash from CineVault")).toBeVisible();
   });
 
   it("writes how long ago a drive was seen", () => {

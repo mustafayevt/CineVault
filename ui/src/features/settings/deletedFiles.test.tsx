@@ -2,14 +2,17 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { restorePlatform, stubPlatform } from "../../test/platform";
 import { moveSpeedText, timeLeftText } from "../library-ops/moveModel";
 import { DeletedFilesSection } from "./DeletedFilesSection";
 import { useSettingsStore } from "./settingsStore";
 
 beforeEach(() => {
+  stubPlatform("windows");
   useSettingsStore.setState({ values: {}, status: "ready" });
 });
 afterEach(() => {
+  restorePlatform();
   useSettingsStore.setState({ values: {}, status: "ready" });
 });
 
@@ -20,6 +23,13 @@ describe("Settings › Deleted files", () => {
     expect(screen.getByRole("radio", { name: /^Recycle Bin/ })).toBeChecked();
     await user.click(screen.getByRole("radio", { name: /Trash folder on each drive/ }));
     expect(useSettingsStore.getState().values["files.deleted-mode"]).toBe("folder");
+  });
+
+  it("starts on the Trash on Linux, and its help line says so", () => {
+    stubPlatform("linux");
+    render(<DeletedFilesSection />);
+    expect(screen.getByRole("radio", { name: /^Trash\s*Undo brings them back/ })).toBeChecked();
+    expect(screen.queryByText(/Recycle Bin/)).toBeNull();
   });
 
   it("switches Ask before deleting, which stays on and locked under Delete permanently", async () => {

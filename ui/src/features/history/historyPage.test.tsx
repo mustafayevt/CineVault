@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HistoryEntryDto, HistoryTitleDto } from "../../bindings";
 import { queryClient } from "../../queryClient";
 import { restoreLayout, stubLayout } from "../../test/layout";
+import { restorePlatform, stubPlatform } from "../../test/platform";
 import { useToastStore } from "../toasts/toastStore";
 import { setHistoryBackend } from "./historyBackend";
 import type { HistoryBackend } from "./historyBackend";
@@ -145,6 +146,7 @@ function renderPage() {
 let backend: Fake;
 beforeEach(() => {
   stubLayout();
+  stubPlatform("windows");
   queryClient.clear();
   backend = fake();
   setHistoryBackend(backend);
@@ -152,6 +154,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   restoreLayout();
+  restorePlatform();
   setHistoryBackend(null);
 });
 
@@ -170,6 +173,14 @@ describe("the History page", () => {
     expect(screen.getByRole("region", { name: "Yesterday" })).toBeInTheDocument();
     expect(await screen.findByTestId("bin-total")).toHaveTextContent("21.5 GB in Recycle Bin");
     expect(screen.getByRole("heading", { name: "History", level: 1 })).toBeInTheDocument();
+  });
+
+  it("names the bin the Trash on Linux, in the header total and its tip", async () => {
+    stubPlatform("linux");
+    renderPage();
+    const total = await screen.findByTestId("bin-total");
+    expect(total).toHaveTextContent("21.5 GB in Trash");
+    expect(total).toHaveAttribute("title", "What CineVault sent to the Trash that is still there");
   });
 
   it("offers one action per kind: Undo all, Undo, Restore, Undone and No undo", async () => {

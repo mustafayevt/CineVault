@@ -219,7 +219,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib drives`; LINUX CHECK same.
   - Commit: `feat(drives): name Linux drives by their mount point`
 
-- [ ] 4.4 Rename recovery waits for unmounted Linux drives `[risky: needs Sonnet/Opus]`
+- [x] 4.4 Rename recovery waits for unmounted Linux drives `[risky: needs Sonnet/Opus]`
   - After: 3.1. Wave 3.
   - Touch: `crates/cv-app/src/organize/startup.rs` only.
   - Steps: `volume_root` (line 78): after the `/Volumes/<name>` branch, on every OS map `/media/…`, `/run/media/…`, `/mnt/…` through `cv_fs::paths::linux_mount_root`. `volume_reachable` (line 102): on `target_os = "linux"` require `root.is_dir() && cv_fs::paths::is_mount_point(&root)`; other systems unchanged. Read `cv_rename::exec::recover_with` and say in the commit body what an unreachable volume causes (deferral) and that no write happens below an unreachable root.
@@ -263,16 +263,15 @@ Read this block once; every task below relies on it.
   - Accept: `bun run lint && bun run typecheck && bun run format:check && bun run test` in `ui/`.
   - Commit: `feat(ui): recognise Linux for window chrome and the theme label`
 
-- [ ] 5.4 One name for the bin per platform `[haiku]`
+- [x] 5.4 One name for the bin per platform `[haiku]`
   - After: 5.3. Wave 2.
-  - Touch: `ui/src/i18n/messages/en/{artwork,delete,drives,history,library,scrape,settings}.ts` (only strings that say "Recycle Bin"), `ui/src/features/delete/deleteActions.ts`, `ui/src/features/delete/PermanentDeleteDialog.tsx`, `ui/src/features/drives/drivesModel.ts`, `ui/src/features/drives/EmptyTrashDialog.tsx`, `ui/src/features/history/HistoryPage.tsx`, `ui/src/features/history/historyBackend.ts`, `ui/src/features/move-to/runMove.ts`, `ui/src/features/settings/DeletedFilesSection.tsx`, new `ui/src/features/shell/binName.ts` (+ test).
+  - Touch: `ui/src/i18n/messages/en/{artwork,common,delete,drives,history,library,scrape,settings}.ts` (only strings that say "Recycle Bin"), `ui/src/features/delete/{deleteActions,DeleteConfirmDialog,PermanentDeleteDialog}.tsx`, `ui/src/features/artwork/ArtworkPicker.tsx`, `ui/src/features/drives/{DriveCard,EmptyTrashDialog}.tsx`, `ui/src/features/history/HistoryPage.tsx`, `ui/src/features/library/titleActions.ts`, `ui/src/features/scrape/NowAfterCard.tsx`, `ui/src/features/settings/DeletedFilesSection.tsx`, `ui/src/routes/GalleryPageFloating.tsx`, new `ui/src/features/shell/binName.ts` (+ test), new `ui/src/test/platform.ts` (`stubPlatform`, so tests state the platform), and the affected tests.
   - Do NOT touch: `ui/src/bindings.ts` (generated), synthetic/gallery fixtures unless a test needs them.
   - Note: the main checkout has uncommitted edits in `ui/src/i18n/messages/en/library.ts`; keep the change to that file to the one string so the later merge is trivial.
   - Steps: `binName(platform)` returns "Recycle Bin" for `windows` and "Trash" otherwise; replace "Recycle Bin" in each message by `{bin}` and pass `bin: binName(detectPlatform())` where the message is formatted. Windows output must be byte-identical. "Delete to Recycle Bin" becomes "Delete to {bin}".
   - Tests: `binName` unit test; one rendered message per platform (copy an existing i18n/message test); `ui/src/i18n/verbs.test.ts` still passes.
   - Accept: UI checks as in 5.3.
   - Commit: `feat(ui): call the bin Trash on macOS and Linux`
-  - BLOCKED: the touch list misses files that must change with it. Five call sites outside it pass the changed keys and would show a literal `{bin}`: `ui/src/features/artwork/ArtworkPicker.tsx` (`artworkPicker.use.tip`), `ui/src/features/delete/DeleteConfirmDialog.tsx` (`delete.confirm.body.bin`), `ui/src/features/drives/DriveCard.tsx` (`drivesPage.card.bin`), `ui/src/features/library/titleActions.ts` (`library.act.delete`), `ui/src/features/scrape/NowAfterCard.tsx` (`matchPicker.compare.filesAfter`). Also, jsdom reports the platform as `other`, so the bin reads "Trash" in tests: seven existing tests in `delete/delete.test.tsx`, `history/historyPage.test.tsx`, `movie/moviePage.test.tsx` and `settings/deletedFiles.test.tsx` expect "Recycle Bin" and would need updating, or a Windows user agent in `ui/src/test/setup.ts`. Widen the touch list to cover these, then run this task again.
 
 - [x] 5.5 WebKitGTK CSS prefixes `[haiku]`
   - After: nothing. Wave 1.

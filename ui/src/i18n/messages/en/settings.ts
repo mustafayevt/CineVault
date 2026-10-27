@@ -99,7 +99,7 @@ export const settings = {
     "Where Delete, a move's originals, rename leftovers and replaced artwork or NFO files go. Shift+Delete always erases, after its confirmation.",
   "settings.files.deleted-mode.keywords":
     "delete, deleted, recycle bin, trash, bin, erase, permanently, replaced, leftovers, originals",
-  "settings.files.deleted-mode.option.bin": "Recycle Bin",
+  "settings.files.deleted-mode.option.bin": "{bin}",
   "settings.files.deleted-mode.option.folder": "Trash folder on each drive",
   "settings.files.deleted-mode.option.custom": "Custom trash folder…",
   "settings.files.deleted-mode.option.erase": "Delete permanently",
@@ -113,7 +113,7 @@ export const settings = {
   "settings.delete.confirm.keywords": "delete, confirm, ask, confirmation, dialog, prompt",
   "settings.files.auto-empty-days.title": "Empty trash folders automatically",
   "settings.files.auto-empty-days.description":
-    "Erases what has been in CineVault's own trash folders longer than this. Never touches the Recycle Bin.",
+    "Erases what has been in CineVault's own trash folders longer than this. Never touches the {bin}.",
   "settings.files.auto-empty-days.keywords": "empty, trash, automatically, days, clean, erase, old",
   "settings.files.auto-empty-days.option.off": "Off",
   "settings.files.auto-empty-days.option.7": "After 7 days",
@@ -664,9 +664,9 @@ export const settings = {
   "settingsPage.appearance.title": "Appearance",
   "settingsPage.deleted.title": "Deleted files",
   "settingsPage.deleted.help.bin":
-    "Undo brings them back. A drive without a Recycle Bin uses its .deletedByCineVault folder.",
+    "Undo brings them back. A drive without a {bin} uses its .deletedByCineVault folder.",
   "settingsPage.deleted.help.folder":
-    "Always the .deletedByCineVault folder on the file's own drive; the Recycle Bin is never used.",
+    "Always the .deletedByCineVault folder on the file's own drive; the {bin} is never used.",
   "settingsPage.deleted.help.custom":
     "A folder you choose, for files on its drive; files on other drives go to their own drive's trash folder.",
   "settingsPage.deleted.help.erase":

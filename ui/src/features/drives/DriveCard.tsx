@@ -8,6 +8,8 @@ import { Tag } from "../../components/Tag";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { agoText, nameParts, qualityShares, trashTotal, usedShare } from "./drivesModel";
 import type { Drive, DriveFolder } from "./drivesModel";
 
@@ -166,7 +168,10 @@ export function DriveCard({ drive, selected, now, onSelect, onEmpty }: DriveCard
             <TrashLine label={t("drivesPage.card.trash")} bytes={drive.trashBytes} />
           ) : null}
           {drive.binBytes > 0 ? (
-            <TrashLine label={t("drivesPage.card.bin")} bytes={drive.binBytes} />
+            <TrashLine
+              label={t("drivesPage.card.bin", { bin: binName(detectPlatform()) })}
+              bytes={drive.binBytes}
+            />
           ) : null}
           {drive.customTrash === null ? null : (
             <TrashLine

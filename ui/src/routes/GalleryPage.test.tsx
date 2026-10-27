@@ -1,8 +1,9 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { restorePlatform, stubPlatform } from "../test/platform";
 import { GalleryPage } from "./GalleryPage";
 
 /**
@@ -23,7 +24,20 @@ function panel(name: (typeof THEMES)[number]): HTMLElement {
   return screen.getByRole("region", { name });
 }
 
+beforeEach(() => stubPlatform("windows"));
+afterEach(() => restorePlatform());
+
 describe("component gallery", () => {
+  it("names the Trash in the menu on Linux", async () => {
+    stubPlatform("linux");
+    const user = userEvent.setup();
+    render(<GalleryPage />);
+    await user.click(within(panel("Light theme")).getByRole("button", { name: "Actions" }));
+    const menu = await screen.findByRole("menu", { name: "Title actions" });
+    expect(within(menu).getByRole("menuitem", { name: /Delete to Trash/ })).toBeInTheDocument();
+    expect(within(menu).queryByText(/Recycle Bin/)).toBeNull();
+  });
+
   it("has a dark and a light column", () => {
     const { container } = render(<GalleryPage />);
     expect(

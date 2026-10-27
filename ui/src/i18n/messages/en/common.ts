@@ -6,6 +6,10 @@ export const common = {
   "common.undo": "Undo",
   "common.unknownSize": "Unknown size",
 
+  // The bin deleted files go to, named per platform (shell/binName)
+  "common.bin.recycle": "Recycle Bin",
+  "common.bin.trash": "Trash",
+
   // Status vocabulary (StatusTag): a glyph plus one of these words
   "status.done": "Done",
   "status.waiting": "Waiting",

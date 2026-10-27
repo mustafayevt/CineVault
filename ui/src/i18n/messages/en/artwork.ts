@@ -173,7 +173,7 @@ export const artwork = {
   "artworkPicker.current.of": "Current {type}",
   "artworkPicker.current.none": "No {type} yet",
   "artworkPicker.use": "Use this",
-  "artworkPicker.use.tip": "The current {type} goes to the Recycle Bin. Undo from History.",
+  "artworkPicker.use.tip": "The current {type} goes to the {bin}. Undo from History.",
   "artworkPicker.use.tipNew": "Writes the {type} file now. Undo from History.",
   "artworkPicker.use.none": "Choose an image first",
   "artworkPicker.use.same": "This is the current image",

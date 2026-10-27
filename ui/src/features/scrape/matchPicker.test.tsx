@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { restoreLayout, stubLayout } from "../../test/layout";
+import { restorePlatform, stubPlatform } from "../../test/platform";
 import { handleEscape } from "../shell/escStack";
 import { setLibraryBackend } from "../library/libraryBackend";
 import { createSyntheticBackend } from "../library/syntheticLibrary";
@@ -51,6 +52,7 @@ let backend: ReturnType<typeof createSyntheticScrapeBackend>;
 
 beforeEach(() => {
   stubLayout();
+  stubPlatform("windows");
   window.localStorage.clear();
   useToastStore.setState({ toasts: [], history: [] });
   // The title the item is linked to, scored like the search results.
@@ -80,6 +82,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   restoreLayout();
+  restorePlatform();
   setScrapeBackend(null);
   setReviewBackend(null);
   setLibraryBackend(null);
@@ -129,6 +132,14 @@ describe("the match picker", () => {
     expect(
       within(card).getByText(/^Runtime differs from your file by \d+ minutes$/),
     ).toBeInTheDocument();
+  });
+
+  it("says the Trash for replaced files on Linux", async () => {
+    stubPlatform("linux");
+    renderPicker();
+    const card = await screen.findByRole("region", { name: "What will change" });
+    await waitFor(() => expect(within(card).getByText("After")).toBeInTheDocument());
+    expect(within(card).getByText(/Replaced \(old files to Trash\)/)).toBeInTheDocument();
   });
 
   it("takes a pasted TMDB link as the one exact result and chooses it", async () => {

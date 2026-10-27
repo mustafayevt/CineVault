@@ -6,6 +6,8 @@ import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { HISTORY_KEY } from "../history/historyBackend";
 import { notify } from "../notifications/notificationStore";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { showToast } from "../toasts/toastStore";
 import { EraseConfirmDialog } from "../trash/EraseConfirmDialog";
 import { DRIVES_KEY, currentDrivesBackend } from "./drivesBackend";
@@ -20,12 +22,13 @@ interface EmptyTrashDialogProps {
 
 /**
  * Empty… of a drive, or Empty all trash folders (spec `drives` "Empty a drive's trash"): the
- * typed confirmation with the batches of the trash folders and what CineVault sent to the
- * Recycle Bin, each with its size, and the total. Erasing refreshes the drives and History
+ * typed confirmation with the batches of the trash folders and what CineVault sent to the bin,
+ * each with its size, and the total. Erasing refreshes the drives and History
  * (entries whose files were erased lose their Undo).
  */
 export function EmptyTrashDialog({ driveId, name, onClose }: EmptyTrashDialogProps) {
   const format = useFormat();
+  const bin = binName(detectPlatform());
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const contents = useQuery({
@@ -79,7 +82,7 @@ export function EmptyTrashDialog({ driveId, name, onClose }: EmptyTrashDialogPro
             ? t("drivesPage.trash.readFailed")
             : entries.length === 0
               ? t("drivesPage.trash.nothing")
-              : t("drivesPage.trash.body", { size: format.size(total) })
+              : t("drivesPage.trash.body", { size: format.size(total), bin })
       }
       confirmLabel={t("drivesPage.trash.confirm")}
       canConfirm={!busy && entries.length > 0}
@@ -103,7 +106,7 @@ export function EmptyTrashDialog({ driveId, name, onClose }: EmptyTrashDialogPro
               <div className="min-w-0">
                 <div className="text-(length:--fs-11) font-(weight:--fw-600) tracking-[0.06em] text-text-muted uppercase">
                   {entry.kind === "bin"
-                    ? t("drivesPage.trash.inBin")
+                    ? t("drivesPage.trash.inBin", { bin })
                     : t("drivesPage.trash.inFolder")}
                 </div>
                 <div

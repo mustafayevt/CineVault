@@ -34,6 +34,8 @@ import { Skeleton } from "../components/Skeleton";
 import { SpaceBar } from "../components/SpaceBar";
 import { Toast, ToastStack } from "../components/Toast";
 import { Tooltip } from "../components/Tooltip";
+import { binName } from "../features/shell/binName";
+import { detectPlatform } from "../features/shell/platform";
 import { cx } from "../lib/cx";
 import { useColumnLabel } from "./galleryTheme";
 import { Group, Row, Stage } from "./GalleryPageParts";
@@ -74,6 +76,7 @@ function StaticItem({
 const keepFocus = (event: Event) => event.preventDefault();
 
 function MenuItems({ highlight = false }: { highlight?: boolean }) {
+  const bin = binName(detectPlatform());
   return (
     <>
       <MenuItem icon={FolderPen} shortcut="F2">
@@ -92,7 +95,7 @@ function MenuItems({ highlight = false }: { highlight?: boolean }) {
       <MenuSeparator />
       <MenuLabel>Danger</MenuLabel>
       <MenuItem icon={Trash2} danger shortcut="Del">
-        Delete to Recycle Bin
+        Delete to {bin}
       </MenuItem>
     </>
   );
@@ -100,6 +103,7 @@ function MenuItems({ highlight = false }: { highlight?: boolean }) {
 
 /** Menu, Popover, Tooltip and the right-click menu, open so their surfaces can be seen. */
 export function FloatingSections() {
+  const bin = binName(detectPlatform());
   return (
     <Group
       title="Menu, ContextMenu, Popover, Tooltip, Dialog"
@@ -122,7 +126,7 @@ export function FloatingSections() {
             <div className="mx-1.5 my-1 h-px bg-line-section" />
             <div className="type-section-label flex h-7 items-center px-2.5">Danger</div>
             <StaticItem icon={Trash2} danger shortcut="Del">
-              Delete to Recycle Bin
+              Delete to {bin}
             </StaticItem>
           </div>
         </Stage>
@@ -199,6 +203,7 @@ function DialogDemo() {
   // The dialog is drawn inside this stage (a transformed box holds `fixed` children), so it can be
   // opened here without covering the gallery.
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
+  const bin = binName(detectPlatform());
   return (
     <Row label="Dialog: radius 14, scrim, focus trapped (opens inside this frame)">
       <FloatingContainerContext value={stage}>
@@ -209,8 +214,8 @@ function DialogDemo() {
         >
           <Dialog
             trigger={<Button>Delete titles…</Button>}
-            title="Move 3 titles to the Recycle Bin?"
-            description="Their folders go to the Recycle Bin. History can undo it."
+            title={`Move 3 titles to the ${bin}?`}
+            description={`Their folders go to the ${bin}. History can undo it.`}
             className="w-[360px]"
             footer={
               <>
@@ -218,7 +223,7 @@ function DialogDemo() {
                   Cancel
                 </Button>
                 <Button size="lg" variant="danger" icon={Trash2}>
-                  Move to Recycle Bin
+                  Move to {bin}
                 </Button>
               </>
             }

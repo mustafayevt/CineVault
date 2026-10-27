@@ -5,6 +5,8 @@ import { Icon } from "../../components/Icon";
 import { SectionLabel } from "../../components/SectionLabel";
 import { t } from "../../i18n/catalog";
 import { cx } from "../../lib/cx";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { runtimeGap, runtimeText } from "./candidateText";
 import type { ScrapeStreamHit } from "./scrapeBackend";
 import { hitName } from "./scrapeModel";
@@ -115,7 +117,7 @@ export function NowAfterCard({ subject, hit, sameMatch }: NowAfterCardProps) {
             }
             after={
               subject.metadataFiles > 0
-                ? t("matchPicker.compare.filesAfter")
+                ? t("matchPicker.compare.filesAfter", { bin: binName(detectPlatform()) })
                 : t(
                     subject.kind === "movie"
                       ? "scrapePage.change.filesMovie"
