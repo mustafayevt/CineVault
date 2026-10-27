@@ -192,7 +192,7 @@ Read this block once; every task below relies on it.
 
 ## 4. Platform services
 
-- [ ] 4.1 Uncached read-back with `O_DIRECT` on Linux `[haiku]`
+- [x] 4.1 Uncached read-back with `O_DIRECT` on Linux `[haiku]`
   - After: 1.1. Wave 1.
   - Touch: `crates/cv-app/src/library_ops/uncached.rs` only.
   - Steps: in `open_uncached` (line 131) add a `#[cfg(target_os = "linux")]` block shaped like the Windows one (lines 132-145): `std::os::unix::fs::OpenOptionsExt::custom_flags(rustix::fs::OFlags::DIRECT.bits() as i32)`, `read(true)`; on success return `AlignedReader::new(file, native, block)`. The rest (fallback open, `fall_back` on `EINVAL`) stays. Update the module doc (lines 1-13) and the "Uncached read-back" wording.

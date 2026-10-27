@@ -3,14 +3,17 @@
 //!
 //! Right after a copy is written, most of it is still in the system's file cache: a normal read
 //! would compare the cache with the original and could miss a write the disk got wrong. On
-//! Windows the copy is opened with `FILE_FLAG_NO_BUFFERING`, which reads from the device. Such a
-//! handle takes reads only of whole sectors, into memory aligned to the sector size, at aligned
+//! Windows the copy is opened with `FILE_FLAG_NO_BUFFERING`, on Linux with `O_DIRECT` (a safe
+//! open option, through `rustix`'s flag constant); both read from the device. Such a handle
+//! takes reads only of whole sectors, into memory aligned to the sector size, at aligned
 //! offsets: [`AlignedReader`] reads whole aligned blocks into an aligned part of an
 //! over-allocated buffer (found with `align_offset`, no `unsafe`) and hands the bytes out as a
 //! normal reader. The last block of a file is read whole as well; the system returns only the
-//! bytes the file has. Where the flag is refused (a share, a device with larger sectors), the
-//! reader falls back to a normal read from the same offset. Elsewhere (macOS) the read is a
-//! normal one: switching the cache off there needs a call this workspace keeps out (`unsafe`).
+//! bytes the file has. Where the flag is refused at open (a share, a file system without direct
+//! I/O such as some FUSE mounts), the file is opened normally; where a read is refused (a device
+//! with larger sectors), the reader falls back to a normal read from the same offset. Elsewhere
+//! (macOS) the read is a normal one: switching the cache off there needs a call this workspace
+//! keeps out (`unsafe`).
 
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -146,6 +149,19 @@ pub fn open_uncached(native: &Path, block: usize) -> io::Result<Box<dyn Read + S
             return Ok(Box::new(AlignedReader::new(file, native, block)));
         }
     }
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        // `O_DIRECT`: the same aligned reads, from the device. A file system that refuses it
+        // at open falls through to the normal open below.
+        if let Ok(file) = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(rustix::fs::OFlags::DIRECT.bits() as i32)
+            .open(native)
+        {
+            return Ok(Box::new(AlignedReader::new(file, native, block)));
+        }
+    }
     let file = File::open(native)?;
     let mut reader = AlignedReader::new(file, native, block);
     reader.plain = true;
@@ -222,5 +238,26 @@ mod tests {
         assert!(reader.window >= 10_000);
         let at = reader.buffer[reader.start..].as_ptr() as usize;
         assert_eq!(at % ALIGN, 0);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_copy_on_tmpfs_still_reads_back_whole() {
+        // `/dev/shm` is tmpfs, which older kernels refuse `O_DIRECT` on: the open then falls
+        // back to a normal read. Either way every byte must come back, the last partial block
+        // included. Without `/dev/shm` there is nothing to check.
+        let Ok(dir) = tempfile::Builder::new()
+            .prefix("cv-uncached-")
+            .tempdir_in("/dev/shm")
+        else {
+            return;
+        };
+        for len in [1, 2 * ALIGN, 3 * 8192 + 5] {
+            let path = dir.path().join(format!("f{len}.bin"));
+            let data = pattern(len);
+            std::fs::write(&path, &data).unwrap();
+            let back = read_all(&path, 8192);
+            assert!(back == data, "content of length {len} on tmpfs");
+        }
     }
 }
