@@ -280,7 +280,7 @@ Read this block once; every task below relies on it.
   - Accept: UI checks; `bun run build` succeeds; `grep -c` of `-webkit-backdrop-filter` equals that of `backdrop-filter:` lines in the touched files.
   - Commit: `style(ui): add WebKit backdrop-filter prefixes for Linux web views`
 
-- [ ] 5.6 Instance lock backstop on Linux `[haiku]`
+- [x] 5.6 Instance lock backstop on Linux `[haiku]`
   - After: nothing. Wave 1.
   - Touch: new `src-tauri/src/instance_lock.rs`, `src-tauri/src/boot.rs`, `src-tauri/src/lib.rs` or `main.rs` (module line only; check which declares modules).
   - Steps: `pub fn acquire(data_root: &Path) -> Result<Option<std::fs::File>, String>` using `fs4::fs_std::FileExt::try_lock_exclusive` on `<root>/instance.lock` (`fs4` comes from 1.1); `Ok(None)` means another process holds it. In `Boot::start` (boot.rs line 25), right after the data location resolves and only on `target_os = "linux"`: hold the file in the `Boot` struct; when held elsewhere, show "CineVault is already running." with `tauri_plugin_dialog` (or log and return `Self::failed` if no app handle is available there — read how `failed` is shown) and exit cleanly.
