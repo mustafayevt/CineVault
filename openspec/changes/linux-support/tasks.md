@@ -172,7 +172,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-rename`; LINUX CHECK `cargo test -p cv-rename`.
   - Commit: `fix(rename): compare paths case-sensitively on Linux`
 
-- [ ] 3.7 Case-sensitive comparisons in cv-app and cv-fs on Linux `[risky: needs Sonnet/Opus]`
+- [x] 3.7 Case-sensitive comparisons in cv-app and cv-fs on Linux `[risky: needs Sonnet/Opus]`
   - After: 3.1. Wave 2.
   - Touch: `crates/cv-fs/src/volume.rs` (`inside`, line 172), `crates/cv-app/src/nfo/service.rs` (`same_path`, line 727), `crates/cv-app/src/artwork/collection.rs` (lines 74-78), `crates/cv-app/src/artwork/seasons.rs` (line 169), `crates/cv-app/src/actions/cleanup.rs` (lines 148, 325, 344), `crates/cv-app/src/trash_folders.rs` (line 99), `crates/cv-app/src/nfo/readback.rs` (line 344), `crates/cv-app/src/nfo/rewrite.rs` (line 465).
   - Do NOT touch: `library_ops/*` (3.4 owns `trash_bin.rs`), `drives.rs` (4.3), `title_guard.rs` and `secrets.rs` (they key files of the app itself; leave them).

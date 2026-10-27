@@ -166,21 +166,22 @@ fn season_folder(show_dir: &Path, episodes: &[&Item]) -> String {
     let Some(dir) = dirs.into_iter().next() else {
         return String::new();
     };
-    let lower = |p: &Path| p.to_string_lossy().to_lowercase().replace('\\', "/");
-    let (dir_text, show_text) = (lower(&dir), lower(show_dir));
-    let show_text = show_text.trim_end_matches('/');
-    match dir_text.strip_prefix(show_text) {
-        Some(rest) if rest.starts_with('/') => {
-            // The original spelling, not the lower-cased one.
-            let skip = show_dir.components().count();
-            dir.components()
-                .skip(skip)
-                .map(|c| c.as_os_str().to_string_lossy().into_owned())
-                .collect::<Vec<_>>()
-                .join("/")
-        }
-        _ => String::new(),
+    below_show(show_dir, &dir)
+}
+
+/// `dir` relative to the show folder with `/`; empty when it is the show folder or not below it.
+/// Case counts only where the platform's file names keep it (Linux).
+fn below_show(show_dir: &Path, dir: &Path) -> String {
+    if !cv_fs::paths::is_within(dir, show_dir) || cv_fs::paths::same_path(dir, show_dir) {
+        return String::new();
     }
+    // The original spelling, not the comparison key.
+    let skip = show_dir.components().count();
+    dir.components()
+        .skip(skip)
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// Whether the item has a file of `kind` on disk.
@@ -638,4 +639,27 @@ fn add(outcome: &mut ArtworkOutcome, report: &cv_artwork::download::DownloadRepo
             .iter()
             .map(|f| format!("{}: {}", f.what, f.reason)),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_season_folder_is_found_below_the_show_folder_by_the_platforms_case_rules() {
+        let show = Path::new("/tv/Show");
+        assert_eq!(
+            below_show(show, Path::new("/tv/Show/Season 01")),
+            "Season 01"
+        );
+        assert_eq!(below_show(show, Path::new("/tv/Show")), "");
+        assert_eq!(below_show(show, Path::new("/tv/Show2/Season 01")), "");
+        // `/tv/show` is the same folder where case is folded, and another one on Linux.
+        let expected = if cv_fs::paths::CASE_SENSITIVE {
+            ""
+        } else {
+            "Season 01"
+        };
+        assert_eq!(below_show(show, Path::new("/tv/show/Season 01")), expected);
+    }
 }

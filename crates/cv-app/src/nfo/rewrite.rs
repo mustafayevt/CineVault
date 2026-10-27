@@ -462,7 +462,7 @@ impl NfoService {
                 continue;
             };
             files
-                .entry(video.path().to_string_lossy().to_lowercase())
+                .entry(cv_fs::paths::key(&video.path()))
                 .or_default()
                 .push(episode);
         }

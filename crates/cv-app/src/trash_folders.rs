@@ -96,7 +96,7 @@ pub fn trash_dirs(roots: &[PathBuf]) -> Vec<PathBuf> {
         .iter()
         .map(|root| root.join(TRASH_DIR))
         .filter(|dir| is_plain_dir(dir))
-        .filter(|dir| seen.insert(dir.to_string_lossy().to_lowercase()))
+        .filter(|dir| seen.insert(cv_fs::paths::key(dir)))
         .collect()
 }
 

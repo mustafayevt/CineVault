@@ -260,3 +260,15 @@ fn a_batch_erased_only_in_part_still_switches_off_the_undo_of_its_delete() {
     assert_eq!(row.undo_state, UndoState::None);
     drop(held);
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn library_folders_that_differ_only_in_case_keep_their_own_trash_folders_on_linux() {
+    let dir = tempfile::tempdir().unwrap();
+    let (upper, lower) = (dir.path().join("Movies"), dir.path().join("movies"));
+    for root in [&upper, &lower] {
+        fs::create_dir_all(root.join(TRASH_DIR)).unwrap();
+    }
+    let dirs = trash_dirs(&[upper.clone(), lower.clone()]);
+    assert_eq!(dirs, [upper.join(TRASH_DIR), lower.join(TRASH_DIR)]);
+}
