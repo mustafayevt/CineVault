@@ -36,7 +36,7 @@
 
 ## 10. Release notes
 
-- [ ] 10.1 Show the offered version's release notes in the update prompt and Settings › Updates. Verified by an updates test.
+- [x] 10.1 Show the offered version's release notes in the update prompt and Settings › Updates. Verified by an updates test.
 
 ## 11. Aspect ratio
 

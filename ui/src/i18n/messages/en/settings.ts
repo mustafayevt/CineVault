@@ -688,6 +688,7 @@ export const settings = {
   "settingsPage.appearance.sizeOption": "{percent}%",
   "settingsPage.updates.title": "Updates",
   "settingsPage.updates.version": "CineVault {version}",
+  "settingsPage.updates.whatsNew": "What's new in {version}",
   "settingsPage.updates.checkNow": "Check now",
   "settingsPage.updates.checking": "Checking for updates…",
   "settingsPage.updates.notChecked": "Not checked yet",

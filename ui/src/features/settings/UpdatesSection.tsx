@@ -3,6 +3,7 @@ import { Switch } from "../../components/Switch";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { lastCheckText } from "../updates/lastCheck";
+import { ReleaseNotes } from "../updates/ReleaseNotes";
 import { useUpdateStore } from "../updates/updateStore";
 import { useAppVersion } from "../updates/useAppVersion";
 import { useNow } from "../drives/useNow";
@@ -97,12 +98,15 @@ function UpdateButtons() {
 
 /**
  * Settings, Updates (spec `app-shell` "Version and update check in Settings" and "Install updates
- * when the app closes"): the version, the result of the last check, Check now and the switch.
+ * when the app closes"): the version, the result of the last check, Check now and the switch,
+ * and "What's new in X" with the release notes while a newer version is offered.
  */
 export function UpdatesSection() {
   const version = useAppVersion();
   const status = useStatusLine();
   const installOnClose = useSettingsStore((state) => state.values[INSTALL_ON_CLOSE_KEY] === true);
+  // The notes of the version that is offered, until it is installed or the offer goes.
+  const offer = useUpdateStore((state) => state.offer);
   return (
     <SettingsSection id="updates" title={t("settingsPage.updates.title")}>
       <FormRow
@@ -128,6 +132,7 @@ export function UpdatesSection() {
           />
         </div>
       </FormRow>
+      {offer === null ? null : <ReleaseNotes offer={offer} />}
     </SettingsSection>
   );
 }
