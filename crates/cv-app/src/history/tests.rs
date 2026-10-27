@@ -714,3 +714,17 @@ fn undo_of_a_move_brings_the_title_back_and_the_library_follows() {
         UndoState::Undone
     );
 }
+
+#[test]
+fn a_place_is_named_by_its_drive_or_mount_point() {
+    assert_eq!(place_name(r"d:\Movies\Heat"), "D:");
+    assert_eq!(place_name("/home/alex/Movies/"), "/home/alex/Movies");
+    // A Linux drive is named by where it is mounted; the same text elsewhere is just a path.
+    let mounted = place_name("/media/alex/Films/Movies/Heat");
+    if cfg!(target_os = "linux") {
+        assert_eq!(mounted, "/media/alex/Films");
+        assert_eq!(place_name("/mnt/nas/Movies"), "/mnt/nas");
+    } else {
+        assert_eq!(mounted, "/media/alex/Films/Movies/Heat");
+    }
+}

@@ -223,11 +223,19 @@ pub(crate) fn titles_word(n: usize) -> String {
     }
 }
 
-/// The short name of a place for a summary: the drive of a Windows path (`D:`), else the path.
+/// The short name of a place for a summary: the drive of a Windows path (`D:`), the mount point
+/// of a Linux drive (`/media/alex/Films`), else the path.
 pub(crate) fn place_name(path: &str) -> String {
     let bytes = path.as_bytes();
     if bytes.len() >= 2 && bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
         return path[..2].to_uppercase();
+    }
+    if cfg!(target_os = "linux") {
+        // A folder on the system drive has no mount point of its own and keeps its path.
+        let mount = cv_fs::paths::linux_mount_root(path);
+        if mount != "/" {
+            return mount;
+        }
     }
     path.trim_end_matches(['\\', '/']).to_owned()
 }
