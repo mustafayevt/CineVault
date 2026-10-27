@@ -163,7 +163,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib library_ops`; LINUX CHECK same.
   - Commit: `test(trash): cover Linux refusals and fallbacks of the deleted-files policy`
 
-- [ ] 3.6 Case-sensitive comparisons in the renamer on Linux `[risky: needs Sonnet/Opus]`
+- [x] 3.6 Case-sensitive comparisons in the renamer on Linux `[risky: needs Sonnet/Opus]`
   - After: 3.1. Wave 2.
   - Touch: `crates/cv-rename/src/exec/fs.rs` only (`cv-fs` is already a dependency of cv-rename).
   - Do NOT touch: `crates/cv-rename/src/conflict/mod.rs` (its `case_insensitive` is already `cfg!(any(windows, target_os = "macos"))` at line 219).

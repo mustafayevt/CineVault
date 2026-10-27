@@ -389,6 +389,9 @@ fn a_crash_at_every_point_of_a_cross_volume_batch_leaves_a_consistent_state() {
     crash_everywhere(shared_folder_scenario, true);
 }
 
+// Only where the volume folds case: on a case-sensitive one (Linux) a case-only rename of a free
+// name is a plain rename, with no temporary name.
+#[cfg(any(windows, target_os = "macos"))]
 #[test]
 fn a_crash_in_a_case_only_rename_never_leaves_the_temporary_name() {
     crash_everywhere(case_scenario, false);
@@ -897,6 +900,9 @@ fn a_copy_that_does_not_match_keeps_the_original_and_rolls_the_item_back() {
 
 // ---- case ----------------------------------------------------------------------------------
 
+// Only where the volume folds case: on a case-sensitive one (Linux) a case-only rename of a free
+// name is a plain rename, with no temporary name.
+#[cfg(any(windows, target_os = "macos"))]
 #[test]
 fn a_case_only_rename_goes_through_a_temporary_name() {
     let (tree, items) = case_scenario();
