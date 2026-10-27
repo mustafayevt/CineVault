@@ -129,7 +129,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib library_ops::bin_volumes library_ops::xdg_dirs`; LINUX CHECK same filters.
   - Commit: `feat(trash): decide on Linux which volumes can keep Trash items`
 
-- [ ] 3.3 Rename-only freedesktop Trash sender `[risky: needs Sonnet/Opus]`
+- [x] 3.3 Rename-only freedesktop Trash sender `[risky: needs Sonnet/Opus]`
   - After: 3.2. Wave 3.
   - Touch: new `crates/cv-app/src/library_ops/xdg_trash.rs`, `crates/cv-app/src/library_ops/mod.rs` (module line only).
   - Do NOT touch: `trash_bin.rs` (3.4 wires it), `bin_volumes.rs`, `xdg_dirs.rs` beyond calling it.
@@ -272,6 +272,7 @@ Read this block once; every task below relies on it.
   - Tests: `binName` unit test; one rendered message per platform (copy an existing i18n/message test); `ui/src/i18n/verbs.test.ts` still passes.
   - Accept: UI checks as in 5.3.
   - Commit: `feat(ui): call the bin Trash on macOS and Linux`
+  - BLOCKED: the touch list misses files that must change with it. Five call sites outside it pass the changed keys and would show a literal `{bin}`: `ui/src/features/artwork/ArtworkPicker.tsx` (`artworkPicker.use.tip`), `ui/src/features/delete/DeleteConfirmDialog.tsx` (`delete.confirm.body.bin`), `ui/src/features/drives/DriveCard.tsx` (`drivesPage.card.bin`), `ui/src/features/library/titleActions.ts` (`library.act.delete`), `ui/src/features/scrape/NowAfterCard.tsx` (`matchPicker.compare.filesAfter`). Also, jsdom reports the platform as `other`, so the bin reads "Trash" in tests: seven existing tests in `delete/delete.test.tsx`, `history/historyPage.test.tsx`, `movie/moviePage.test.tsx` and `settings/deletedFiles.test.tsx` expect "Recycle Bin" and would need updating, or a Windows user agent in `ui/src/test/setup.ts`. Widen the touch list to cover these, then run this task again.
 
 - [x] 5.5 WebKitGTK CSS prefixes `[haiku]`
   - After: nothing. Wave 1.

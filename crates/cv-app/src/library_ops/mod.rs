@@ -44,6 +44,8 @@ pub(crate) mod trash_bin;
 pub(crate) mod uncached;
 mod volume;
 pub(crate) mod xdg_dirs;
+#[cfg(unix)]
+pub(crate) mod xdg_trash;
 
 use cv_db::DbError;
 use cv_domain::{Item, ItemDetail, ItemId};
