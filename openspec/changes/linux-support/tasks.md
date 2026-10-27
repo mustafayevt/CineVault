@@ -273,7 +273,7 @@ Read this block once; every task below relies on it.
   - Accept: UI checks as in 5.3.
   - Commit: `feat(ui): call the bin Trash on macOS and Linux`
 
-- [ ] 5.5 WebKitGTK CSS prefixes `[haiku]`
+- [x] 5.5 WebKitGTK CSS prefixes `[haiku]`
   - After: nothing. Wave 1.
   - Touch: hand-written CSS with `backdrop-filter`: `ui/src/features/title/title.css`, and any `.css` under `ui/src/styles` that sets it (search `backdrop-filter` in `*.css`); not `.tsx` (Tailwind adds prefixes).
   - Steps: next to each `backdrop-filter: X;` add `-webkit-backdrop-filter: X;` before it. No colour or value changes.
