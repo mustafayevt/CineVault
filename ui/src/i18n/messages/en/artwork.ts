@@ -155,6 +155,9 @@ export const artwork = {
   "artworkPicker.link.close": "Close the address field",
   "artworkPicker.drop": "Drop an image to use it as the {type}",
   "artworkPicker.preview": "Preview",
+  "artworkPicker.expand": "Expand preview",
+  "artworkPicker.lightbox.hint":
+    "Press Esc or click anywhere to close. Left and Right show the other images.",
   "artworkPicker.preview.none":
     "Click an image to preview it. Nothing changes until you press Use this.",
   "artworkPicker.fact.size": "Size",

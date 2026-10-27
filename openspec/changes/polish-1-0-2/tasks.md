@@ -24,7 +24,7 @@
 
 ## 7. Big artwork preview
 
-- [ ] 7.1 Expand button, double-click and Space open a large preview; click or Esc closes it. Verified by an artwork picker test.
+- [x] 7.1 Expand button, double-click and Space open a large preview; click or Esc closes it. Verified by an artwork picker test.
 
 ## 8. Episode expand animation
 

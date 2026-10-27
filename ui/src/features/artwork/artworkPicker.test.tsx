@@ -189,15 +189,17 @@ describe("the artwork picker page", () => {
     );
   });
 
-  it("applies with a double click and with Enter, and keeps the current image as it is", async () => {
+  it("applies with Enter, and keeps the current image as it is", async () => {
     const user = userEvent.setup();
     renderPicker();
     await waitTiles(4);
-    await user.dblClick((await tiles())[1] as HTMLElement);
+    const list = await screen.findByRole("listbox", { name: "Images" });
+    await user.click((await tiles())[1] as HTMLElement);
+    list.focus();
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(backend.placed).toHaveLength(1));
 
     await waitTiles(4);
-    const list = await screen.findByRole("listbox", { name: "Images" });
     list.focus();
     await user.keyboard("{ArrowRight}{Enter}");
     await waitFor(() => expect(backend.placed).toHaveLength(2));
@@ -207,6 +209,93 @@ describe("the artwork picker page", () => {
       "aria-disabled",
       "true",
     );
+  });
+
+  describe("the large preview", () => {
+    const lightbox = () => screen.queryByTestId("art-lightbox");
+
+    it("opens from a double click without choosing or writing anything, and any click closes it", async () => {
+      const user = userEvent.setup();
+      renderPicker();
+      await waitTiles(4);
+      const list = await screen.findByRole("listbox", { name: "Images" });
+      await user.dblClick((await tiles())[2] as HTMLElement);
+      const open = await screen.findByTestId("art-lightbox");
+      // Under the picture: the type, the size and where it came from.
+      expect(open).toHaveAccessibleName(/^Poster · \d+×\d+ · .+/);
+      expect(within(open).queryByRole("button")).toBeNull();
+      expect(backend.placed).toHaveLength(0);
+      await user.click(open);
+      expect(lightbox()).toBeNull();
+      expect(backend.placed).toHaveLength(0);
+      expect(list).toBeInTheDocument();
+    });
+
+    it("opens with Space on the chosen image and closes with Esc without leaving the picker", async () => {
+      const user = userEvent.setup();
+      const router = renderPicker();
+      await waitTiles(4);
+      const list = await screen.findByRole("listbox", { name: "Images" });
+      await user.click((await tiles())[1] as HTMLElement);
+      list.focus();
+      await user.keyboard(" ");
+      expect(await screen.findByTestId("art-lightbox")).toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      expect(lightbox()).toBeNull();
+      expect(router.state.location.pathname).toBe("/artwork");
+      // Focus is where it was: the grid answers the keys again, with the choice kept.
+      expect(list).toHaveFocus();
+      expect((await tiles())[1]).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("flicks through the images of the type with the arrow keys, never changing the choice", async () => {
+      const user = userEvent.setup();
+      renderPicker();
+      await waitTiles(4);
+      const list = await screen.findByRole("listbox", { name: "Images" });
+      await user.click((await tiles())[1] as HTMLElement);
+      list.focus();
+      await user.keyboard(" ");
+      const first = (await screen.findByTestId("art-lightbox"))
+        .querySelector("img")
+        ?.getAttribute("src");
+      await user.keyboard("{ArrowRight}");
+      const second = screen.getByTestId("art-lightbox").querySelector("img")?.getAttribute("src");
+      expect(second).not.toBe(first);
+      await user.keyboard("{ArrowLeft}");
+      expect(screen.getByTestId("art-lightbox").querySelector("img")?.getAttribute("src")).toBe(
+        first,
+      );
+      await user.keyboard("{Escape}");
+      expect((await tiles())[1]).toHaveAttribute("aria-selected", "true");
+      expect(backend.placed).toHaveLength(0);
+    });
+
+    it("opens from the expand button of the preview pane", async () => {
+      const user = userEvent.setup();
+      renderPicker();
+      await waitTiles(4);
+      await user.click((await tiles())[1] as HTMLElement);
+      await user.click(within(preview()).getByRole("button", { name: "Expand preview" }));
+      expect(await screen.findByTestId("art-lightbox")).toBeInTheDocument();
+      await user.click(document.body);
+      expect(lightbox()).toBeNull();
+    });
+
+    it("appears at once, without the grow animation, under reduced motion", async () => {
+      document.documentElement.dataset.motion = "reduced";
+      try {
+        const user = userEvent.setup();
+        renderPicker();
+        await waitTiles(4);
+        await user.dblClick((await tiles())[1] as HTMLElement);
+        const open = await screen.findByTestId("art-lightbox");
+        expect(open.style.animation).toBe("none");
+        expect(open.querySelector("figure")?.style.animation).toBe("none");
+      } finally {
+        delete document.documentElement.dataset.motion;
+      }
+    });
   });
 
   it("filters by language and sorts by size", async () => {

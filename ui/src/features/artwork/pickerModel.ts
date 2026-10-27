@@ -1,7 +1,8 @@
 import { t } from "../../i18n/catalog";
 import type { MessageKey } from "../../i18n/catalog";
 import type { ArtworkCandidate } from "./artworkBackend";
-import { isExtraSlot, languageOf, pixels, slotLabelKey } from "./artworkModel";
+import { FRAMES_PROVIDER, isExtraSlot, languageOf, pixels, slotLabelKey } from "./artworkModel";
+import { providerName } from "../workspaces/providerNames";
 
 /** The artwork types in the order of the type strip. */
 const STRIP_ORDER: readonly string[] = [
@@ -127,4 +128,14 @@ export function hasLanguage(candidate: ArtworkCandidate, value: string): boolean
 export function typeName(slot: string): string {
   const key = typeLabelKey(slot) ?? slotLabelKey(slot);
   return key === null ? slot : t(key);
+}
+
+/** The name of where an image came from: the provider, "Frames from the video", or "Current". */
+export function providerLabel(
+  candidate: ArtworkCandidate,
+  names: Readonly<Record<string, string>>,
+): string {
+  if (candidate.provider === FRAMES_PROVIDER) return t("artworkPicker.source.frames");
+  if (candidate.provider === "current") return t("artworkPicker.source.current");
+  return names[candidate.provider] ?? providerName(candidate.provider);
 }
