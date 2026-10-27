@@ -241,6 +241,7 @@ pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
 }
 
 /// Why [`rename_no_replace`] could not put a file back without risking another one.
+#[cfg(target_os = "linux")]
 const NO_SAFE_RENAME: &str = "this file system cannot move it back without the risk of replacing \
     a file that appears at the same moment";
 
