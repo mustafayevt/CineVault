@@ -309,7 +309,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib updates` (Windows compiles); LINUX CHECK same.
   - Commit: `feat(updates): replace a Linux AppImage with the verified update`
 
-- [ ] 6.3 Wire Linux updates into the app `[risky: needs Sonnet/Opus]`
+- [x] 6.3 Wire Linux updates into the app `[risky: needs Sonnet/Opus]`
   - After: 6.2. Wave 3.
   - Touch: `src-tauri/src/updates_ipc.rs`, `crates/cv-app/src/updates/install.rs` (`install_on_close` only).
   - Steps: "Update now" (updates_ipc.rs around line 436): `ReplaceAppImage { target }` → status "Installing CineVault <version>…", `replace_appimage`, then spawn `target` (plain `Command::new(target).spawn()`) and quit through the same shutdown path the silent setup uses; `OpenInstaller(LinuxPackage)` → open the public releases page URL (the constant the update service already knows; else `https://github.com/mustafayevt/CineVault-releases/releases/latest`) with the opener's URL call, show the reason. Install-on-close (line 137): pass the Linux start function so `ReplaceAppImage` replaces and relaunches on close. At start-up, when `APPIMAGE` is set, call `remove_stale_parts` on its folder (boot or updates state init; one line).

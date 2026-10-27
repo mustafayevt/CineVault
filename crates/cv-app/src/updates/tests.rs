@@ -921,6 +921,62 @@ fn a_copy_that_cannot_update_itself_installs_nothing_on_close() {
 }
 
 #[test]
+fn an_appimage_is_replaced_on_close_and_a_package_install_is_left_alone() {
+    use std::path::Path;
+
+    let f = fixture(true);
+    publish(&f, "1.2.0", b"installer");
+    offer_of(f.service.check_now(NOW).expect("check"));
+    confirmed_download(&f, "1.2.0").expect("download");
+    f.settings
+        .set(INSTALL_ON_CLOSE_KEY, json!(true))
+        .expect("on");
+    let started = Started::default();
+    let replaced = Started::default();
+    let exe = tempfile::tempdir().expect("exe");
+    let appimage = Path::new("/apps/CineVault.AppImage");
+    let on_close =
+        |method: InstallMethod,
+         replace: &dyn Fn(&VerifiedInstaller, &Path) -> Result<(), UpdateError>| {
+            install_on_close_with(
+                &f.service,
+                exe.path(),
+                &|_, _| method.clone(),
+                &started.starter(),
+                replace,
+            )
+        };
+
+    // An AppImage that can replace itself: the replace runs on that file and nothing else starts.
+    let target = InstallMethod::ReplaceAppImage {
+        target: appimage.to_path_buf(),
+    };
+    match on_close(target.clone(), &replaced.starter()) {
+        CloseUpdate::Started { version } => assert_eq!(version, "1.2.0"),
+        other => panic!("expected the replace to run, got {other:?}"),
+    }
+    let ran = replaced.0.lock().expect("replaced").clone();
+    assert_eq!(ran.len(), 1);
+    assert_eq!(ran[0].1, appimage);
+    assert_eq!(started.count(), 0);
+
+    // A replace that fails leaves the update on offer and the app closing as usual.
+    let failing = |_: &VerifiedInstaller, _: &Path| Err(UpdateError::ChecksumMismatch);
+    let failed = on_close(target, &failing);
+    assert!(
+        matches!(failed, CloseUpdate::Failed(UpdateError::ChecksumMismatch)),
+        "{failed:?}"
+    );
+
+    // A package install is handed nothing on close.
+    let package = InstallMethod::OpenInstaller(OpenReason::LinuxPackage);
+    let nothing = on_close(package, &replaced.starter());
+    assert!(matches!(nothing, CloseUpdate::Nothing), "{nothing:?}");
+    assert_eq!(replaced.count(), 1);
+    assert_eq!(started.count(), 0);
+}
+
+#[test]
 fn a_newer_release_replaces_the_waiting_installer_and_a_download_is_not_repeated() {
     let f = fixture(true);
     publish(&f, "1.2.0", b"first installer");

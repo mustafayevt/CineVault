@@ -514,21 +514,99 @@ pub fn install_on_close(
     windows: bool,
     start: &dyn Fn(&VerifiedInstaller, &Path) -> Result<(), UpdateError>,
 ) -> CloseUpdate {
+    install_on_close_with(
+        service,
+        exe_dir,
+        &|exe_dir, installer| install_method(exe_dir, installer, windows),
+        start,
+        // This way of choosing never names an AppImage, so there is nothing to replace.
+        &|_, _| {
+            Err(UpdateError::Io(
+                "there is no AppImage to replace".to_owned(),
+            ))
+        },
+    )
+}
+
+/// [`install_on_close`] for every system. `choose` picks the install method from the folder of
+/// the running executable and the downloaded file (`install_method_for_current` in the app);
+/// `start` runs the Windows setup over a folder; `replace` puts the download over the AppImage
+/// at a path and arranges for the new one to start (`replace_appimage_and_relaunch` in the app).
+/// A failed replace changes nothing, so the app closes as usual and the update stays on offer.
+pub fn install_on_close_with(
+    service: &super::UpdateService,
+    exe_dir: &Path,
+    choose: &dyn Fn(&Path, &Path) -> InstallMethod,
+    start: &dyn Fn(&VerifiedInstaller, &Path) -> Result<(), UpdateError>,
+    replace: &dyn Fn(&VerifiedInstaller, &Path) -> Result<(), UpdateError>,
+) -> CloseUpdate {
     let Some(installer) = service.installer_for_close() else {
         return CloseUpdate::Nothing;
     };
-    match install_method(exe_dir, installer.path(), windows) {
-        InstallMethod::SilentSetup { install_dir } => match start(&installer, &install_dir) {
-            Ok(()) => CloseUpdate::Started {
-                version: installer.version().to_owned(),
-            },
-            Err(error) => CloseUpdate::Failed(error),
+    let done = |result: Result<(), UpdateError>| match result {
+        Ok(()) => CloseUpdate::Started {
+            version: installer.version().to_owned(),
         },
-        // An AppImage is not replaced on close yet: nothing here starts the new file.
-        InstallMethod::ReplaceAppImage { .. } | InstallMethod::OpenInstaller(_) => {
-            CloseUpdate::Nothing
-        }
+        Err(error) => CloseUpdate::Failed(error),
+    };
+    match choose(exe_dir, installer.path()) {
+        InstallMethod::SilentSetup { install_dir } => done(start(&installer, &install_dir)),
+        InstallMethod::ReplaceAppImage { target } => done(replace(&installer, &target)),
+        InstallMethod::OpenInstaller(_) => CloseUpdate::Nothing,
     }
+}
+
+/// Replaces the AppImage at `target` with the verified download ([`replace_appimage`]) and sets
+/// up the start of the new file for when this process has exited. The start has to wait: a
+/// second copy started while this one still runs would hand over to it and quit. The waiting
+/// helper outlives the app (its own process group) and gives up waiting after a minute.
+///
+/// # Errors
+/// What [`replace_appimage`] returns (the app is not changed then), or [`UpdateError::Io`] when
+/// the new version is in place but could not be set to start; the message says so.
+#[cfg(unix)]
+pub fn replace_appimage_and_relaunch(
+    installer: &VerifiedInstaller,
+    target: &Path,
+) -> Result<(), UpdateError> {
+    replace_appimage(installer, target)?;
+    start_after_exit(target, std::process::id()).map_err(|error| {
+        UpdateError::Io(format!(
+            "The new version is installed but could not be started ({error}); start CineVault again yourself."
+        ))
+    })
+}
+
+/// Starts `program` once the process `pid` has exited (or after a minute, whichever is first).
+#[cfg(unix)]
+fn start_after_exit(program: &Path, pid: u32) -> std::io::Result<()> {
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+
+    // `exec "$@"` runs the program as given, so a path with spaces needs no quoting.
+    let mut helper = Command::new("/bin/sh");
+    helper
+        .arg("-c")
+        .arg(
+            "pid=$1; shift; n=0; \
+             while kill -0 \"$pid\" 2>/dev/null && [ \"$n\" -lt 300 ]; do sleep 0.2; n=$((n+1)); done; \
+             exec \"$@\"",
+        )
+        .arg("sh")
+        .arg(pid.to_string())
+        .arg(program)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        // The AppImage runtime sets these for the copy it starts; the new one must not see the
+        // old copy's mount.
+        .env_remove("APPDIR")
+        .env_remove("APPIMAGE")
+        .env_remove("ARGV0")
+        .env_remove("OWD")
+        // Its own group: closing the terminal or the app's group does not end it.
+        .process_group(0);
+    helper.spawn().map(drop)
 }
 
 /// The setup's command line after the program: the fixed switches, then `/D=<folder>`, which
@@ -991,6 +1069,81 @@ mod tests {
             );
             // A missing folder is not an error.
             remove_stale_parts(&dir.path().join("missing"));
+        }
+
+        /// A program that writes `marker` when it starts, to see that and when it ran.
+        fn marker_program(dir: &Path, marker: &Path) -> PathBuf {
+            let program = dir.join("new.AppImage");
+            std::fs::write(
+                &program,
+                format!(
+                    "#!/bin/sh
+echo started > '{}'
+",
+                    marker.display()
+                ),
+            )
+            .expect("program");
+            std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755))
+                .expect("mode");
+            program
+        }
+
+        fn wait_for(path: &Path) -> bool {
+            for _ in 0..100 {
+                if path.is_file() {
+                    return true;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            false
+        }
+
+        #[test]
+        fn the_new_copy_starts_once_the_old_process_has_exited() {
+            let dir = tempfile::tempdir().expect("dir");
+            let marker = dir.path().join("marker");
+            let program = marker_program(dir.path(), &marker);
+
+            // The old process is still running: nothing starts yet.
+            let mut running = std::process::Command::new("sleep")
+                .arg("2")
+                .spawn()
+                .expect("sleep");
+            start_after_exit(&program, running.id()).expect("waiting");
+            std::thread::sleep(std::time::Duration::from_millis(600));
+            assert!(!marker.exists(), "started while the old process ran");
+
+            // It exits: the new copy starts.
+            running.kill().expect("kill");
+            running.wait().expect("reaped");
+            assert!(wait_for(&marker), "the new copy never started");
+        }
+
+        #[test]
+        fn a_program_in_a_folder_with_spaces_starts() {
+            let dir = tempfile::tempdir().expect("dir");
+            let spaced = dir.path().join("my apps");
+            std::fs::create_dir(&spaced).expect("folder");
+            let marker = dir.path().join("marker");
+            let program = marker_program(&spaced, &marker);
+            let mut gone = std::process::Command::new("true").spawn().expect("true");
+            let pid = gone.id();
+            gone.wait().expect("reaped");
+            start_after_exit(&program, pid).expect("started");
+            assert!(wait_for(&marker), "the new copy never started");
+        }
+
+        #[test]
+        fn a_failed_replace_starts_nothing() {
+            let (dir, target, installer) = setup(b"new version");
+            std::fs::write(installer.path(), b"changed!!!!").expect("tamper");
+            let marker = dir.path().join("marker");
+            let error = replace_appimage_and_relaunch(&installer, &target).expect_err("changed");
+            assert!(!error.to_string().contains("is installed"), "{error}");
+            assert_eq!(std::fs::read(&target).expect("read"), b"old version");
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            assert!(!marker.exists());
         }
     }
 }
