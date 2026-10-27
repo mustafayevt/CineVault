@@ -211,7 +211,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib secrets`; LINUX CHECK `cargo test -p cv-app --lib secrets`; in WSL without a keyring (`env -u DBUS_SESSION_BUS_ADDRESS`), a tiny test `#[ignore]` saving a key returns `NoKeyring`.
   - Commit: `feat(secrets): use the Secret Service on Linux and say when none is running`
 
-- [ ] 4.3 Drives on Linux `[haiku]`
+- [x] 4.3 Drives on Linux `[haiku]`
   - After: 3.1. Wave 2.
   - Touch: `crates/cv-app/src/drives.rs`, `crates/cv-app/src/drives/tests.rs`.
   - Steps: `volume_key` (line 181): before returning `"/"`, use `cv_fs::paths::linux_mount_root` for paths starting with `/media/`, `/run/media/`, `/mnt/` on every OS (pure; a Windows path never starts so). `is_under` (line 230): `cv_fs::paths::is_within`. Label (line 272): on Linux use the mount point's last part when `disk.name()` is empty or starts with `/dev/`. Key comparisons at lines 515-610 and 773-778 that lower-case: use `cv_fs::paths::key`. Docs at lines 7-9.

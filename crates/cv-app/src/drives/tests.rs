@@ -43,6 +43,24 @@ fn a_folder_is_grouped_by_the_volume_its_path_names() {
     assert_eq!(volume_key("//nas/media/Shows"), r"\\nas\media");
     assert_eq!(volume_key("/Volumes/Media/Films"), "/Volumes/Media");
     assert_eq!(volume_key("/home/me/Movies"), "/");
+    // A Linux mount point is its own drive; any other Linux path is on the root drive.
+    assert_eq!(volume_key("/media/alex/Films/Movies"), "/media/alex/Films");
+    assert_eq!(
+        volume_key("/run/media/alex/Films/TV"),
+        "/run/media/alex/Films"
+    );
+    assert_eq!(volume_key("/mnt/nas/x"), "/mnt/nas");
+    assert_eq!(volume_key("/home/alex/x"), "/");
+    assert_eq!(volume_key("/media/alex"), "/");
+}
+
+#[test]
+fn a_linux_mount_is_named_by_its_device_or_else_by_its_last_part() {
+    assert_eq!(linux_label("/dev/sdb1", "/media/alex/Films"), "Films");
+    assert_eq!(linux_label("", "/mnt/nas"), "nas");
+    assert_eq!(linux_label("/dev/nvme0n1p2", "/"), "");
+    assert_eq!(linux_label("", "/"), "");
+    assert_eq!(linux_label("server:/export", "/mnt/nas"), "server:/export");
 }
 
 // ---- grouping -----------------------------------------------------------------------------------
@@ -256,6 +274,71 @@ fn a_drive_answers_when_one_of_its_folders_does() {
     rig.answers.0.lock().unwrap().insert(rig.ids[2], false);
     let overview = rig.service.overview().unwrap();
     assert!(!overview.drives[0].online);
+}
+
+#[test]
+fn linux_mount_points_group_their_folders_by_the_mount() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Arc::new(Database::open(dir.path().join("library.db")).unwrap());
+    let ids: Vec<i64> = [
+        "/media/alex/Films/Movies",
+        "/media/alex/Films/TV",
+        "/mnt/nas/Movies",
+    ]
+    .into_iter()
+    .map(|path| {
+        db.write(move |tx| insert_source(tx, SourceKind::Movie, path))
+            .unwrap()
+            .id
+    })
+    .collect();
+    let volumes = Fake::new(&[
+        volume("/media/alex/Films", "Films", DriveKind::Hdd, 2 * TB, TB),
+        volume("/mnt/nas", "nas", DriveKind::Network, 16 * TB, 9 * TB),
+    ]);
+    let answers = Arc::new(Answers(Mutex::new(
+        ids.iter().map(|id| (*id, true)).collect(),
+    )));
+    let service = DrivesService::with(db, volumes, answers);
+
+    let overview = service.overview().unwrap();
+    let found: Vec<(&str, &str, usize)> = overview
+        .drives
+        .iter()
+        .map(|d| (d.id.as_str(), d.name.as_str(), d.folders.len()))
+        .collect();
+    assert_eq!(
+        found,
+        [("/media/alex/Films", "Films", 2), ("/mnt/nas", "nas", 1)]
+    );
+    assert!(overview.drives.iter().all(|d| d.online));
+}
+
+#[test]
+fn mount_points_that_differ_only_by_case_are_two_drives_on_linux_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Arc::new(Database::open(dir.path().join("library.db")).unwrap());
+    let ids: Vec<i64> = ["/media/alex/Films/Movies", "/media/alex/films/TV"]
+        .into_iter()
+        .map(|path| {
+            db.write(move |tx| insert_source(tx, SourceKind::Movie, path))
+                .unwrap()
+                .id
+        })
+        .collect();
+    let volumes = Fake::new(&[
+        volume("/media/alex/Films", "Films", DriveKind::Hdd, 2 * TB, TB),
+        volume("/media/alex/films", "films", DriveKind::Hdd, 2 * TB, TB),
+    ]);
+    let answers = Arc::new(Answers(Mutex::new(
+        ids.iter().map(|id| (*id, true)).collect(),
+    )));
+    let service = DrivesService::with(db, volumes, answers);
+
+    // Linux keeps case in names, so the two mounts are two drives; Windows and macOS fold it.
+    let overview = service.overview().unwrap();
+    let expected = if cv_fs::paths::CASE_SENSITIVE { 2 } else { 1 };
+    assert_eq!(overview.drives.len(), expected);
 }
 
 // ---- telling the interface ----------------------------------------------------------------------

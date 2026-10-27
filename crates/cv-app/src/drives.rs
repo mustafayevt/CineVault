@@ -5,9 +5,10 @@
 //! # Which drive a folder is on
 //!
 //! A library folder belongs to the volume that holds it: a Windows drive letter (`D:`), a share
-//! (`\\nas\media`) or a macOS mount point (`/Volumes/Media`). Two folders on one volume are one
-//! drive with two folders. The numbers come from the operating system ([`SystemVolumes`]); a
-//! share or mapped drive the system list does not show is asked for its space directly.
+//! (`\\nas\media`), a macOS mount point (`/Volumes/Media`) or a Linux mount point
+//! (`/media/alex/Films`, `/run/media/alex/Films`, `/mnt/nas`). Two folders on one volume are one
+//! drive with two folders. The numbers come from the operating system ([`SystemVolumes`]); a share
+//! or mapped drive the system list does not show is asked for its space directly.
 //!
 //! # Low on space
 //!
@@ -197,12 +198,39 @@ pub fn volume_key(path: &str) -> String {
         let name = rest.split('/').next().unwrap_or_default();
         return format!("/Volumes/{name}");
     }
+    // A Linux mount point (`/media/<user>/<name>`, `/run/media/<user>/<name>`, `/mnt/<name>`) is
+    // its own drive. Any other path is on the root drive.
+    let mount = cv_fs::paths::linux_mount_root(text);
+    if mount != "/" {
+        return mount;
+    }
     "/".to_owned()
 }
 
 /// Whether a key is a network share (`\\server\share`).
 fn is_share(key: &str) -> bool {
     key.starts_with(r"\\")
+}
+
+/// The name of a Linux mount. The device is shown when it has a name of its own (a share such as
+/// `server:/export`); a device path such as `/dev/sdb1` says nothing a person reads, so the last
+/// part of the mount point is used instead (`/media/alex/Films` is "Films").
+fn linux_label(device: &str, mount: &str) -> String {
+    if device.is_empty() || device.starts_with("/dev/") {
+        mount
+            .rsplit('/')
+            .find(|part| !part.is_empty())
+            .unwrap_or_default()
+            .to_owned()
+    } else {
+        device.to_owned()
+    }
+}
+
+/// The comparison key of a drive id or volume key. Case is kept on Linux, where `Films` and
+/// `films` are two mount points, and folded on Windows and macOS.
+fn drive_key(text: &str) -> String {
+    cv_fs::paths::key(Path::new(text))
 }
 
 /// The volumes of this computer from the operating system, with a direct question for a share or
@@ -224,14 +252,6 @@ impl Default for SystemVolumes {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Whether `path` is below `mount` (letter case ignored on Windows, which the drive letters are).
-fn is_under(path: &Path, mount: &Path) -> bool {
-    let norm = |p: &Path| p.to_string_lossy().replace('\\', "/").to_lowercase();
-    let (path, mount) = (norm(path), norm(mount));
-    let mount = mount.trim_end_matches('/');
-    path == mount || path.starts_with(&format!("{mount}/"))
 }
 
 fn network_file_system(name: &str) -> bool {
@@ -257,7 +277,7 @@ impl Volumes for SystemVolumes {
             let found = disks
                 .list()
                 .iter()
-                .filter(|disk| is_under(target, disk.mount_point()))
+                .filter(|disk| cv_fs::paths::is_within(target, disk.mount_point()))
                 .max_by_key(|disk| disk.mount_point().as_os_str().len());
             if let Some(disk) = found {
                 let kind = if network_file_system(&disk.file_system().to_string_lossy()) {
@@ -269,11 +289,15 @@ impl Volumes for SystemVolumes {
                 } else {
                     DriveKind::Hdd
                 };
-                // Windows and macOS name a volume by its label; elsewhere the name is a device.
+                // Windows and macOS name a volume by its label; Linux names it by its device, so
+                // the mount's own name stands in for the label.
                 let label = if cfg!(any(windows, target_os = "macos")) {
                     disk.name().to_string_lossy().into_owned()
                 } else {
-                    String::new()
+                    linux_label(
+                        &disk.name().to_string_lossy(),
+                        &disk.mount_point().to_string_lossy(),
+                    )
                 };
                 // The key of a mount point on macOS is the mount; on Windows the drive letter.
                 let key = if cfg!(windows) || is_share(&key) {
@@ -513,10 +537,11 @@ impl DrivesService {
 
 impl DrivesService {
     fn key_of(&self, path: &str) -> String {
-        self.volumes
+        let volume = self
+            .volumes
             .locate(path)
-            .map_or_else(|| volume_key(path), |v| v.key)
-            .to_lowercase()
+            .map_or_else(|| volume_key(path), |v| v.key);
+        drive_key(&volume)
     }
 
     fn custom_folder(&self) -> Option<PathBuf> {
@@ -526,8 +551,9 @@ impl DrivesService {
 
     /// The trash folders and recorded bin items of every drive, or of the drive `id`.
     fn trash_of(&self, drives: &[Drive], id: Option<&str>) -> Result<TrashContents, DbError> {
-        let wanted =
-            |drive: &Drive| drive.online && id.is_none_or(|id| drive.id.eq_ignore_ascii_case(id));
+        let wanted = |drive: &Drive| {
+            drive.online && id.is_none_or(|id| drive_key(&drive.id) == drive_key(id))
+        };
         let mut dirs: Vec<PathBuf> = Vec::new();
         for drive in drives.iter().filter(|d| wanted(d)) {
             let roots: Vec<PathBuf> = drive
@@ -541,9 +567,7 @@ impl DrivesService {
             let key = self.key_of(&custom.to_string_lossy());
             // Only CineVault's own sub-folder of the custom folder, never its other entries.
             let own = cv_fs::volume::custom_trash_root(&custom);
-            if drives
-                .iter()
-                .any(|d| wanted(d) && d.id.to_lowercase() == key)
+            if drives.iter().any(|d| wanted(d) && drive_key(&d.id) == key)
                 && !dirs.iter().any(|d| cv_fs::volume::inside(d, &own))
             {
                 dirs.extend(crate::trash_folders::trash_dirs(&[custom]));
@@ -557,7 +581,7 @@ impl DrivesService {
         let keys: Vec<String> = drives
             .iter()
             .filter(|d| wanted(d))
-            .map(|d| d.id.to_lowercase())
+            .map(|d| drive_key(&d.id))
             .collect();
         let recorded: Vec<crate::trash_folders::BinEntry> =
             crate::trash_folders::recorded_bin_items(&self.db)?
@@ -583,7 +607,7 @@ impl DrivesService {
             let key = self.key_of(&custom.to_string_lossy());
             if let Some(drive) = drives
                 .iter_mut()
-                .find(|d| d.online && d.id.to_lowercase() == key)
+                .find(|d| d.online && drive_key(&d.id) == key)
             {
                 drive.custom_trash = Some((custom.to_string_lossy().into_owned(), 0));
             }
@@ -593,7 +617,7 @@ impl DrivesService {
             let is_custom = custom.as_ref().is_some_and(|c| {
                 cv_fs::volume::inside(&batch.trash, &cv_fs::volume::custom_trash_root(c))
             });
-            if let Some(drive) = drives.iter_mut().find(|d| d.id.to_lowercase() == key) {
+            if let Some(drive) = drives.iter_mut().find(|d| drive_key(&d.id) == key) {
                 if is_custom {
                     if let Some((_, bytes)) = drive.custom_trash.as_mut() {
                         *bytes += batch.bytes;
@@ -605,7 +629,7 @@ impl DrivesService {
         }
         for entry in &contents.bin {
             let key = self.key_of(&entry.item.original);
-            if let Some(drive) = drives.iter_mut().find(|d| d.id.to_lowercase() == key) {
+            if let Some(drive) = drives.iter_mut().find(|d| drive_key(&d.id) == key) {
                 drive.bin_bytes += entry.item.size;
             }
         }
@@ -770,11 +794,14 @@ fn group(sources: &[DataSource], facts: &Facts<'_>, volumes: &dyn Volumes) -> Ve
         let key = volume
             .as_ref()
             .map_or_else(|| volume_key(&source.path), |v| v.key.clone());
-        let at = *by_key.entry(key.to_lowercase()).or_insert_with(|| {
+        let at = *by_key.entry(drive_key(&key)).or_insert_with(|| {
             drives.push(new_drive(&key, volume.as_ref()));
             drives.len() - 1
         });
         let drive = &mut drives[at];
+        // The usage and quality tables group folders by `lower(data_source)` in cv-db, so this
+        // lookup folds case on every platform. On Linux two folders that differ only by case
+        // therefore share their figures until those queries keep case too.
         let root = source.path.to_lowercase();
         let usage = facts.usage.get(&root).copied().unwrap_or_default();
         drive.folders.push(DriveFolder {
