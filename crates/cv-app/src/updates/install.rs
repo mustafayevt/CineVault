@@ -6,6 +6,8 @@
 //! running copy without the wizard pages or the old uninstaller, keeps the shortcuts and pins,
 //! and starts the new version. Every other case (a portable copy, an MSI install, a build run
 //! from a folder, macOS) hands the installer to the operating system as before, and says why.
+//! On Linux, an AppImage copy is marked to replace itself with the verified download
+//! (`InstallMethod::ReplaceAppImage`); a package install is handed over with the reason.
 //!
 //! Only a [`VerifiedInstaller`] can be started, and only [`super::UpdateService::download`]
 //! makes one: a file that matched the size and SHA-256 of a signed manifest, inside the update
@@ -125,6 +127,29 @@ fn open_locked(path: &Path) -> std::io::Result<File> {
     File::open(path)
 }
 
+/// The system an update is installed on. [`install_method_for_os`] takes it as a parameter, so
+/// every branch is tested on every platform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetOs {
+    Windows,
+    MacOs,
+    Linux,
+}
+
+impl TargetOs {
+    /// The system this build runs on. Unix systems other than macOS count as Linux.
+    #[must_use]
+    pub fn current() -> Self {
+        if cfg!(windows) {
+            Self::Windows
+        } else if cfg!(target_os = "macos") {
+            Self::MacOs
+        } else {
+            Self::Linux
+        }
+    }
+}
+
 /// Why an update is handed to the operating system instead of being installed in place.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenReason {
@@ -136,6 +161,9 @@ pub enum OpenReason {
     NotSetupFile,
     /// macOS: the disk image opens and the app is dragged to Applications.
     NotWindows,
+    /// Linux, but not an AppImage that can replace itself: a `.deb` or `.rpm` install, an
+    /// unpacked build, or an AppImage in a folder the user cannot write.
+    LinuxPackage,
 }
 
 impl OpenReason {
@@ -155,6 +183,9 @@ impl OpenReason {
             Self::NotWindows => {
                 "The disk image was opened. Drag CineVault to Applications to replace this version."
             }
+            Self::LinuxPackage => {
+                "This copy was installed from a package, so it cannot replace itself. The release page was opened; download the new .deb or .rpm there."
+            }
         }
     }
 
@@ -166,6 +197,7 @@ impl OpenReason {
             Self::NotSetupInstall => "not_setup_install",
             Self::NotSetupFile => "not_setup_file",
             Self::NotWindows => "not_windows",
+            Self::LinuxPackage => "linux_package",
         }
     }
 }
@@ -178,15 +210,73 @@ pub enum InstallMethod {
     SilentSetup { install_dir: PathBuf },
     /// Hand the installer to the operating system, which shows its own steps.
     OpenInstaller(OpenReason),
+    /// Replace the AppImage at `target` with the verified download.
+    ReplaceAppImage { target: PathBuf },
 }
 
 /// Picks how to install `installer` for the copy whose executable sits in `exe_dir`. `windows`
-/// is whether this is Windows (a parameter, so both sides are tested everywhere).
+/// is whether this is Windows (a parameter, so both sides are tested everywhere). Anything else
+/// is treated as macOS, as before; [`install_method_for_current`] picks the system itself.
 #[must_use]
 pub fn install_method(exe_dir: &Path, installer: &Path, windows: bool) -> InstallMethod {
-    if !windows {
-        return InstallMethod::OpenInstaller(OpenReason::NotWindows);
+    let os = if windows {
+        TargetOs::Windows
+    } else {
+        TargetOs::MacOs
+    };
+    install_method_for_os(exe_dir, installer, os, None, false)
+}
+
+/// Picks how to install on the system this build runs on. The AppImage path is the `APPIMAGE`
+/// variable the AppImage runtime sets; its folder must take a new file for the copy to replace
+/// itself.
+#[must_use]
+pub fn install_method_for_current(exe_dir: &Path, installer: &Path) -> InstallMethod {
+    let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
+    let writable = appimage
+        .as_deref()
+        .and_then(Path::parent)
+        .is_some_and(dir_is_writable);
+    install_method_for_os(
+        exe_dir,
+        installer,
+        TargetOs::current(),
+        appimage.as_deref(),
+        writable,
+    )
+}
+
+/// Picks how to install `installer` for the copy whose executable sits in `exe_dir`, on `os`.
+/// `appimage` is the AppImage path, if the runtime set one, and `appimage_dir_writable` says
+/// whether its folder can take a new file. All of it is an input, so each branch is testable on
+/// any platform.
+#[must_use]
+pub fn install_method_for_os(
+    exe_dir: &Path,
+    installer: &Path,
+    os: TargetOs,
+    appimage: Option<&Path>,
+    appimage_dir_writable: bool,
+) -> InstallMethod {
+    match os {
+        TargetOs::Windows => windows_install_method(exe_dir, installer),
+        TargetOs::MacOs => InstallMethod::OpenInstaller(OpenReason::NotWindows),
+        // An AppImage replaces itself only when the runtime named an existing file and its folder
+        // takes a new file; every other Linux copy is a package install.
+        TargetOs::Linux => match appimage {
+            Some(target) if appimage_dir_writable && target.is_file() => {
+                InstallMethod::ReplaceAppImage {
+                    target: target.to_path_buf(),
+                }
+            }
+            _ => InstallMethod::OpenInstaller(OpenReason::LinuxPackage),
+        },
     }
+}
+
+/// The Windows choice: a portable copy and a download that is not the setup are handed over, and
+/// a copy the setup installed is updated in place.
+fn windows_install_method(exe_dir: &Path, installer: &Path) -> InstallMethod {
     // Portable mode wins, as it does for the data folder.
     if exe_dir.join(PORTABLE_MARKER).is_file() {
         return InstallMethod::OpenInstaller(OpenReason::Portable);
@@ -204,6 +294,23 @@ pub fn install_method(exe_dir: &Path, installer: &Path, windows: bool) -> Instal
     InstallMethod::SilentSetup {
         install_dir: exe_dir.to_path_buf(),
     }
+}
+
+/// Whether a new file can be created in `dir`. The probe is removed at once; its name carries
+/// the process id, so a probe left behind by a crash cannot make the folder look read-only.
+fn dir_is_writable(dir: &Path) -> bool {
+    let probe = dir.join(format!(".cv-write-test-{}", std::process::id()));
+    let Ok(file) = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+    else {
+        return false;
+    };
+    // Closed before the removal: Windows does not delete a file that is still open.
+    drop(file);
+    let _ = std::fs::remove_file(&probe);
+    true
 }
 
 /// What the close of the app did about an update.
@@ -239,7 +346,10 @@ pub fn install_on_close(
             },
             Err(error) => CloseUpdate::Failed(error),
         },
-        InstallMethod::OpenInstaller(_) => CloseUpdate::Nothing,
+        // An AppImage is not replaced on close yet: nothing here starts the new file.
+        InstallMethod::ReplaceAppImage { .. } | InstallMethod::OpenInstaller(_) => {
+            CloseUpdate::Nothing
+        }
     }
 }
 
@@ -429,5 +539,103 @@ mod tests {
             b"the real installer"
         );
         drop(held);
+    }
+
+    #[test]
+    fn linux_replaces_an_appimage_only_when_it_is_a_file_in_a_writable_folder() {
+        let dir = tempfile::tempdir().expect("dir");
+        let image = dir.path().join("CineVault.AppImage");
+        std::fs::write(&image, b"").expect("image");
+        let folder = dir.path().join("unpacked");
+        std::fs::create_dir(&folder).expect("folder");
+        let missing = dir.path().join("gone.AppImage");
+        let installer = Path::new("CineVault_1.2.0_amd64.AppImage");
+        let package = InstallMethod::OpenInstaller(OpenReason::LinuxPackage);
+
+        assert_eq!(
+            install_method_for_os(
+                dir.path(),
+                installer,
+                TargetOs::Linux,
+                Some(image.as_path()),
+                true
+            ),
+            InstallMethod::ReplaceAppImage {
+                target: image.clone()
+            }
+        );
+        // Not named by the runtime, not a file, or in a folder the user cannot write: a package.
+        assert_eq!(
+            install_method_for_os(dir.path(), installer, TargetOs::Linux, None, true),
+            package
+        );
+        assert_eq!(
+            install_method_for_os(
+                dir.path(),
+                installer,
+                TargetOs::Linux,
+                Some(missing.as_path()),
+                true
+            ),
+            package
+        );
+        assert_eq!(
+            install_method_for_os(
+                dir.path(),
+                installer,
+                TargetOs::Linux,
+                Some(folder.as_path()),
+                true
+            ),
+            package
+        );
+        assert_eq!(
+            install_method_for_os(
+                dir.path(),
+                installer,
+                TargetOs::Linux,
+                Some(image.as_path()),
+                false
+            ),
+            package
+        );
+    }
+
+    #[test]
+    fn windows_and_macos_ignore_the_appimage_inputs() {
+        let dir = tempfile::tempdir().expect("dir");
+        std::fs::write(dir.path().join(SETUP_UNINSTALLER), b"").expect("uninstaller");
+        let image = dir.path().join("CineVault.AppImage");
+        std::fs::write(&image, b"").expect("image");
+        let setup = Path::new("CineVault-setup.exe");
+        for appimage in [None, Some(image.as_path())] {
+            for writable in [false, true] {
+                assert!(matches!(
+                    install_method_for_os(dir.path(), setup, TargetOs::Windows, appimage, writable),
+                    InstallMethod::SilentSetup { .. }
+                ));
+                assert_eq!(
+                    install_method_for_os(dir.path(), setup, TargetOs::MacOs, appimage, writable),
+                    InstallMethod::OpenInstaller(OpenReason::NotWindows)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_package_reason_has_its_sentence_and_code() {
+        assert_eq!(OpenReason::LinuxPackage.code(), "linux_package");
+        assert_eq!(
+            OpenReason::LinuxPackage.message(),
+            "This copy was installed from a package, so it cannot replace itself. The release page was opened; download the new .deb or .rpm there."
+        );
+    }
+
+    #[test]
+    fn a_folder_is_writable_when_a_file_can_be_created_and_no_probe_is_left() {
+        let dir = tempfile::tempdir().expect("dir");
+        assert!(dir_is_writable(dir.path()));
+        assert_eq!(std::fs::read_dir(dir.path()).expect("list").count(), 0);
+        assert!(!dir_is_writable(&dir.path().join("missing")));
     }
 }

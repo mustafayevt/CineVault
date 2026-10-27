@@ -477,6 +477,13 @@ async fn download_and_start(
                 reason: Some(reason.message().to_owned()),
             })
         }
+        // The app does not replace its AppImage yet: the update is not installed, and the
+        // reason is returned instead of opening the downloaded file.
+        InstallMethod::ReplaceAppImage { .. } => Err(UpdateCommandError {
+            code: "launch".to_owned(),
+            message: "This copy cannot replace its AppImage yet, so the update was not installed."
+                .to_owned(),
+        }),
     }
 }
 
