@@ -291,7 +291,9 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
           <span className="sr-only">CineVault</span>
         </div>
         <div data-tauri-drag-region className="h-full min-w-0 flex-1" />
-        {platform === "windows" ? <CaptionButtons windowApi={api} maximized={maximized} /> : null}
+        {platform === "windows" || platform === "linux" ? (
+          <CaptionButtons windowApi={api} maximized={maximized} />
+        ) : null}
       </header>
       <div data-testid="onboarding-scroll" className="flex min-h-0 flex-1 overflow-y-auto">
         <main className="m-auto flex w-[728px] max-w-full flex-col gap-[22px] px-6 py-6">

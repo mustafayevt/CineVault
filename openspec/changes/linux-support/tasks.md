@@ -255,7 +255,7 @@ Read this block once; every task below relies on it.
   - Accept: `node scripts/check-bundle.mjs` passes; temporarily removing `"rpm"` from the Linux targets makes it fail (revert).
   - Commit: `build(bundle): check the Linux bundle configuration`
 
-- [ ] 5.3 Linux platform in the UI `[haiku]`
+- [x] 5.3 Linux platform in the UI `[haiku]`
   - After: nothing. Wave 1.
   - Touch: `ui/src/features/shell/platform.ts`, `ui/src/features/shell/platform.test.ts`, `ui/src/features/shell/TitleBar.tsx`, `ui/src/features/onboarding/OnboardingPage.tsx`, `ui/src/features/settings/AppearanceSection.tsx`, `ui/src/i18n/messages/en/settings.ts` (one new key only).
   - Steps: `Platform` = `"windows" | "macos" | "linux" | "other"`; `platformFromUserAgent`: `/Android/` → other, `/Linux|X11/` → linux. `TitleBar.tsx` line 96 and `OnboardingPage.tsx` line 294: show `CaptionButtons` for `windows` or `linux`. Appearance (line 31): `linux` → new key `settingsPage.appearance.matchSystem` = "Match system" (add after line 680). Search the UI for other `platform === "windows"` checks and treat `linux` like Windows where it is about window chrome or Ctrl shortcuts; list them in the commit body.

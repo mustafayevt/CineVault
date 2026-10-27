@@ -678,6 +678,7 @@ export const settings = {
   "settingsPage.appearance.dark": "Dark",
   "settingsPage.appearance.match": "Match Windows",
   "settingsPage.appearance.matchMac": "Match macOS",
+  "settingsPage.appearance.matchSystem": "Match system",
   "settingsPage.appearance.size": "Size",
   "settingsPage.appearance.size.hint": "Ctrl + and Ctrl − change it, Ctrl 0 resets.",
   "settingsPage.appearance.size.hintMac": "⌘ + and ⌘ − change it, ⌘ 0 resets.",

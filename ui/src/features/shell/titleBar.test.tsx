@@ -90,6 +90,19 @@ describe("the title bar", () => {
     expect(group.parentElement).toHaveAttribute("data-tauri-drag-region");
   });
 
+  it("puts the same caption buttons on Linux and wires them", async () => {
+    const api = fakeWindow();
+    renderBar("linux", "/library", api);
+    expect(await screen.findByText("Ctrl F")).toBeInTheDocument();
+    const group = await screen.findByRole("group", { name: "Window controls" });
+    expect(group.parentElement).toHaveAttribute("data-tauri-drag-region");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Minimize" }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(api.minimize).toHaveBeenCalled();
+    expect(api.close).toHaveBeenCalled();
+  });
+
   it("gives the maximize button the id the native snap-layout region targets", async () => {
     renderBar("windows", "/library");
     expect(MAXIMIZE_BUTTON_ID).toBe("cv-caption-maximize");
