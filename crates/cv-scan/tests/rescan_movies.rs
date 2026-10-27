@@ -622,3 +622,26 @@ fn a_title_gets_its_added_date_and_its_video_the_files_modified_time_and_keeps_t
     // Dune's date is when its file was created, no later than the scan's clock.
     assert!(added("Dune") > added("Heat") && added("Dune") <= 1_800_000_000_000);
 }
+
+#[test]
+fn a_drive_that_is_not_mounted_is_not_read_even_with_a_movie_in_its_folder() {
+    let lib = two_movies();
+    lib.rescan();
+    let hash_files = lib.count("media_file");
+    // The drive is unplugged, yet its mount-point folder still holds a movie of its own.
+    lib.put("Stray (2001)/Stray (2001).mkv", "x");
+
+    let mut options = lib.options();
+    options.movies.drive_is_mounted = |_| false;
+    let report = cv_scan::rescan::rescan_source(&lib.db, &lib.source, &options).expect("rescan");
+
+    assert_eq!(report.skipped, Some(Skipped::SourceUnavailable));
+    assert!(
+        report.new_items.is_empty(),
+        "the stray movie is not a title"
+    );
+    assert!(report.availability.became_missing.is_empty());
+    assert_eq!(lib.count("item"), 2);
+    assert_eq!(lib.count("media_file"), hash_files);
+    assert_eq!(lib.count("fingerprint"), 3, "fingerprints are kept");
+}

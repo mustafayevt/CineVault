@@ -614,3 +614,37 @@ fn tv_three_digit_season_episode_names_keep_the_season_reading() {
         ]
     );
 }
+
+/// A stand-in for a drive that is not mounted.
+fn unmounted(_: &Path) -> bool {
+    false
+}
+
+#[test]
+fn a_source_on_a_drive_that_is_not_mounted_is_unreadable_even_with_files_in_it() {
+    // The mount-point folder of an unplugged drive can hold files of its own: it is not the library.
+    let dir = source(&["Heat (1995)/Heat (1995).mkv"]);
+    let options = WalkOptions {
+        drive_is_mounted: unmounted,
+        ..WalkOptions::default()
+    };
+    let report = scan_movie_source(dir.path(), None, &options);
+    assert!(report.movies.is_empty());
+    assert_eq!(report.problems.len(), 1);
+    assert_eq!(report.problems[0].kind, ProblemKind::SourceUnavailable);
+    assert!(report.source_unreliable(dir.path()));
+
+    let tv = source(&["Show/Show.S01E01.mkv"]);
+    let options = WalkOptions {
+        drive_is_mounted: unmounted,
+        ..WalkOptions::tv_defaults()
+    };
+    let report = scan_tv_source(tv.path(), None, &options);
+    assert!(report.shows.is_empty());
+    assert_eq!(report.problems[0].kind, ProblemKind::SourceUnavailable);
+    assert!(report.source_unreliable(tv.path()));
+
+    // The same folders on a mounted drive are read.
+    let report = scan_movie_source(dir.path(), None, &WalkOptions::default());
+    assert_eq!(titles(&report), ["Heat"]);
+}

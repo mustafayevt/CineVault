@@ -107,6 +107,25 @@ pub fn is_mount_point(path: &Path) -> bool {
     }
 }
 
+/// Whether the drive that holds `path` is really there. On Linux a path under `/media`,
+/// `/run/media` or `/mnt` belongs to a mount point (see [`linux_mount_root`]); when the drive is
+/// unplugged that folder stays behind, empty or not, on the system drive, and must not pass for
+/// the drive. True when a file system is mounted on it, and for any other path (the system
+/// drive is always there). Always true off Linux.
+#[must_use]
+pub fn drive_is_mounted(path: &Path) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        let root = linux_mount_root(&path.to_string_lossy());
+        root == "/" || is_mount_point(Path::new(&root))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = path;
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +239,15 @@ mod tests {
         std::fs::create_dir(&sub).expect("sub folder");
         assert!(!is_mount_point(&sub));
         assert!(!is_mount_point(&dir.path().join("missing")));
+    }
+
+    #[test]
+    fn a_drive_that_is_not_mounted_is_not_there() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        // The system drive and a made-up drive.
+        assert!(drive_is_mounted(dir.path()));
+        assert!(drive_is_mounted(Path::new(r"D:\Movies")));
+        let unplugged = Path::new("/mnt/cinevault-test-drive-that-is-not-there/Movies");
+        assert_eq!(drive_is_mounted(unplugged), !cfg!(target_os = "linux"));
     }
 }
