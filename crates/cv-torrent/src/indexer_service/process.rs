@@ -211,11 +211,13 @@ impl Guard {
 }
 
 /// Polls the app's process; when it is gone, ends the child's process group (`$2`).
+/// `kill -s NAME` rather than `kill -NAME`: the `/bin/sh` of Debian and Ubuntu (dash) refuses a
+/// negative group after `kill -TERM --`, so the group would never have been ended there.
 #[cfg(unix)]
 const WATCHDOG_SCRIPT: &str = r#"while kill -0 "$1" 2>/dev/null; do sleep 2; done
-kill -TERM -- "-$2" 2>/dev/null
+kill -s TERM -- "-$2" 2>/dev/null
 sleep 3
-kill -KILL -- "-$2" 2>/dev/null"#;
+kill -s KILL -- "-$2" 2>/dev/null"#;
 
 /// What the app needs of a started service, so the code that manages it can be tested without a
 /// process.
@@ -559,8 +561,8 @@ mod tests {
     #[test]
     fn the_watchdog_waits_for_the_app_then_ends_the_group() {
         assert!(WATCHDOG_SCRIPT.contains(r#"kill -0 "$1""#));
-        assert!(WATCHDOG_SCRIPT.contains(r#"kill -TERM -- "-$2""#));
-        assert!(WATCHDOG_SCRIPT.contains(r#"kill -KILL -- "-$2""#));
+        assert!(WATCHDOG_SCRIPT.contains(r#"kill -s TERM -- "-$2""#));
+        assert!(WATCHDOG_SCRIPT.contains(r#"kill -s KILL -- "-$2""#));
     }
 
     #[cfg(target_os = "linux")]
