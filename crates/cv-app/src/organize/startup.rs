@@ -74,7 +74,8 @@ pub fn retry_deferred_recovery(db: Arc<Database>, report: &RecoveryReport) {
 }
 
 /// The root of the volume `path` is on: `D:\`, `\\server\share\`, `/Volumes/<name>` on macOS,
-/// otherwise `/`.
+/// `/media/<user>/<name>`, `/run/media/<user>/<name>` or `/mnt/<name>` for a Linux mount point
+/// (found by the path alone, so a drive that is unplugged still has a root), otherwise `/`.
 fn volume_root(path: &Path) -> PathBuf {
     let mut components = path.components();
     match components.next() {
@@ -91,8 +92,9 @@ fn volume_root(path: &Path) -> PathBuf {
             {
                 root.push(first);
                 root.push(name);
+                return root;
             }
-            root
+            PathBuf::from(cv_fs::paths::linux_mount_root(&path.to_string_lossy()))
         }
         _ => PathBuf::new(),
     }
@@ -101,7 +103,29 @@ fn volume_root(path: &Path) -> PathBuf {
 /// Whether the drive of `path` is there. A relative path counts as reachable.
 fn volume_reachable(path: &Path) -> bool {
     let root = volume_root(path);
-    root.as_os_str().is_empty() || std::fs::metadata(&root).is_ok()
+    root.as_os_str().is_empty() || reachable_root(&root)
+}
+
+/// Whether the volume root `root` can be worked on. On Linux an unplugged drive leaves its empty
+/// mount-point folder behind on the system drive, and that folder answers like a drive would, so
+/// the root must really be a mount point; recovery then waits instead of reading the empty
+/// folder as "the files are gone".
+fn reachable_root(root: &Path) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        reachable_when_mounted(root, cv_fs::paths::is_mount_point)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        std::fs::metadata(root).is_ok()
+    }
+}
+
+/// `root` is a folder and `is_mount` says a file system is mounted on it. The mount test is a
+/// parameter so tests can stand in for a mount table.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn reachable_when_mounted(root: &Path, is_mount: impl Fn(&Path) -> bool) -> bool {
+    root.is_dir() && is_mount(root)
 }
 
 #[cfg(test)]
@@ -128,6 +152,53 @@ mod tests {
             PathBuf::from("/Volumes/Media")
         );
         assert_eq!(volume_root(Path::new("/home/me/x.mkv")), PathBuf::from("/"));
+    }
+
+    #[test]
+    fn a_linux_mount_point_is_its_own_root() {
+        assert_eq!(
+            volume_root(Path::new("/media/alex/Films/Movies/Heat.mkv")),
+            PathBuf::from("/media/alex/Films")
+        );
+        assert_eq!(
+            volume_root(Path::new("/run/media/alex/Films/TV/x.mkv")),
+            PathBuf::from("/run/media/alex/Films")
+        );
+        assert_eq!(
+            volume_root(Path::new("/mnt/nas/Movies/x.mkv")),
+            PathBuf::from("/mnt/nas")
+        );
+        assert_eq!(
+            volume_root(Path::new("/home/alex/Movies/x.mkv")),
+            PathBuf::from("/")
+        );
+    }
+
+    #[test]
+    fn a_folder_with_nothing_mounted_on_it_is_not_reachable() {
+        let dir = tempfile::tempdir().unwrap();
+        // The empty folder an unplugged drive leaves behind: it exists, nothing is mounted on it.
+        assert!(!reachable_when_mounted(dir.path(), |_| false));
+        // The same folder once the drive is plugged in.
+        assert!(reachable_when_mounted(dir.path(), |_| true));
+        // A mount that is not there at all, or is a file, is never reachable.
+        assert!(!reachable_when_mounted(&dir.path().join("gone"), |_| true));
+        let file = dir.path().join("file");
+        std::fs::write(&file, b"x").unwrap();
+        assert!(!reachable_when_mounted(&file, |_| true));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_real_folder_on_the_system_drive_is_not_a_mount_point() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!reachable_root(dir.path()));
+        assert!(reachable_root(Path::new("/")));
+        // Under a mount-shaped path with nothing mounted there, recovery waits.
+        assert!(!volume_reachable(Path::new(
+            "/mnt/cinevault-test-drive-that-is-not-there/Movies/x.mkv"
+        )));
+        assert!(volume_reachable(&dir.path().join("Heat.mkv")));
     }
 
     #[test]
