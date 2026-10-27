@@ -11,6 +11,9 @@ import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import type { QualityTier } from "../../components/QualityBadge";
+import { SuggestPanel } from "../search/SuggestPanel";
+import type { SuggestItem } from "../search/SuggestPanel";
+import { useCombobox } from "../search/useCombobox";
 import { ReleaseTable } from "./ReleaseTable";
 import type { OwnedCopy } from "./ReleaseTable";
 import {
@@ -92,11 +95,13 @@ function Rows() {
 }
 
 /**
- * `/torrents` (spec `torrent-search`): one search field. After a 400 ms pause in
- * typing the best matching movie or show is named above the results (with a menu to pick another)
- * and its releases list as the sources answer, with resolution chips and counts, a sortable table,
- * and a hint against the copy the library already holds. The route carries a confirmed title
- * (`?title=movie:123`, from a collection or a title page) or the typed text (`?q=`).
+ * `/torrents` (spec `torrent-search`): one search field. After a short pause in typing the field
+ * suggests titles (movies and shows from the metadata provider, the ones you own marked), and no
+ * release is searched until one is picked. The picked title shows as a chip above the results
+ * with an × to change it, and its releases list as the sources answer, with resolution chips and
+ * counts, a sortable table, and a hint against the copy the library already holds. The route
+ * carries a confirmed title (`?title=movie:123`, from a collection or a title page) or the typed
+ * text (`?q=`).
  */
 function TorrentsContent() {
   const search = useSearch({ strict: false }) as TorrentsSearch;
@@ -112,22 +117,55 @@ function TorrentsContent() {
   // The route's title leads until the person types; then the search of the text does.
   const [typed, setTyped] = useState(false);
   const useRoute = routed !== null && !typed;
-  const match = useTitleMatch(text, !useRoute);
-
-  // The best match once the title search has settled; a pick overrides it until the next search.
-  const [best, setBest] = useState<TitleHit | null>(null);
+  // The title the person picked from the suggestions. Nothing is searched before this.
   const [picked, setPicked] = useState<TitleHit | null>(null);
-  const settledBest = match.short ? null : match.settled ? (match.hits[0] ?? null) : undefined;
-  if (settledBest !== undefined && settledBest?.id !== best?.id) {
-    setBest(settledBest);
-    setPicked(null);
-  }
-  const hit = picked ?? best;
+  // The suggestions are looked up while no title is chosen.
+  const match = useTitleMatch(text, !useRoute && picked === null);
+
+  const hit = picked;
   const ref: TitleRef | null = useRoute
     ? routed
     : hit === null
       ? null
       : { kind: hit.kind === "show" ? "show" : "movie", tmdbId: hit.tmdbId };
+
+  // The suggestions keep their last rows while the next search is out, so the list never blinks.
+  const suggesting = ref === null;
+  const [kept, setKept] = useState<readonly TitleHit[]>([]);
+  const fresh = suggesting ? match.hits : [];
+  if (match.short && kept.length > 0) setKept([]);
+  else if (fresh.length > 0 && fresh !== kept) setKept(fresh);
+  const suggested: readonly TitleHit[] =
+    !suggesting || match.short ? [] : fresh.length > 0 || match.settled ? fresh : kept;
+  const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
+  const pick = (choice: TitleHit) => {
+    setPicked(choice);
+    setText(titleName(choice));
+    setTyped(true);
+  };
+  const combobox = useCombobox({
+    anchor,
+    ids: suggested.map((choice) => choice.id),
+    showing: suggesting && !match.short && (suggested.length > 0 || match.settled),
+    onSelect: (id) => {
+      const choice = suggested.find((entry) => entry.id === id);
+      if (choice !== undefined) pick(choice);
+    },
+  });
+  const suggestions: SuggestItem[] = suggested.map((choice) => ({
+    id: choice.id,
+    label: titleName(choice),
+    poster:
+      choice.posterKey === null ? null : { key: choice.posterKey, thumbhash: null, ambient: null },
+    meta: t(choice.kind === "show" ? "torrents.title.show" : "torrents.title.movie"),
+    badge:
+      choice.inLibrary === null ? undefined : (
+        <span className="flex shrink-0 items-center gap-1 text-(length:--fs-12) text-ok">
+          <Icon icon={Check} size={14} />
+          {t("torrentsPage.suggest.owned")}
+        </span>
+      ),
+  }));
 
   const details = useTitleDetails(ref ?? { kind: "movie", tmdbId: 0 }, ref !== null);
   const known = ref !== null && details.data?.tmdbId === ref.tmdbId ? details.data : null;
@@ -139,13 +177,20 @@ function TorrentsContent() {
   // The confirmed title goes into the address, so a reload or a copied link opens it again.
   const param = ref === null ? undefined : titleParam(ref);
   useEffect(() => {
-    if (param === undefined || param === search.title) return;
+    if (param === undefined) {
+      // The title was changed by typing: the address stops naming it.
+      if (search.title !== undefined && typed) {
+        void navigate({ to: "/torrents", search: {} as TorrentsSearch, replace: true });
+      }
+      return;
+    }
+    if (param === search.title) return;
     void navigate({
       to: "/torrents",
       search: { title: param } as TorrentsSearch,
       replace: true,
     });
-  }, [param, search.title, navigate]);
+  }, [param, search.title, typed, navigate]);
 
   const target = ref === null ? null : targetOf(ref, search, routed);
   const releases = useReleaseSearch(target);
@@ -184,12 +229,11 @@ function TorrentsContent() {
   const clear = () => {
     setText("");
     setTyped(true);
-    setBest(null);
     setPicked(null);
     void navigate({ to: "/torrents", search: {} as TorrentsSearch, replace: true });
   };
 
-  const searching = ref === null ? !match.short && !match.settled : releases.searching;
+  const searching = ref === null ? false : releases.searching;
   const inLibrary = known?.inLibrary ?? null;
   const copyTitle = known === null ? "" : titleName(known);
   const ownedLine =
@@ -213,21 +257,11 @@ function TorrentsContent() {
 
   let body: React.ReactNode;
   if (ref === null) {
-    body = match.short ? (
+    // Nothing is searched until a title is picked: the field's suggestions do the finding.
+    body = (
       <Message>
         <p className="m-0">{t("torrentsPage.idle")}</p>
       </Message>
-    ) : match.failed ? (
-      <Message role="alert">
-        <p className="m-0 text-text">{t("torrents.picker.failed")}</p>
-        <Button onClick={match.retry}>{t("torrents.retryAll")}</Button>
-      </Message>
-    ) : match.settled ? (
-      <Message role="status">
-        <p className="m-0">{t("torrents.picker.nothing", { query: text.trim() })}</p>
-      </Message>
-    ) : (
-      <Rows />
     );
   } else if (matching.length === 0) {
     body = releases.searching ? (
@@ -274,54 +308,87 @@ function TorrentsContent() {
           aria-hidden="true"
           className="absolute right-0 bottom-0 left-0 h-px bg-line-section"
         />
-        <Field
-          type="text"
-          role="searchbox"
-          autoComplete="off"
-          spellCheck={false}
-          ref={field}
-          height="search"
-          icon={Search}
-          aria-label={t("torrentsPage.field")}
-          placeholder={t("torrentsPage.placeholder")}
-          value={shownText}
-          boxClassName="[&_input]:text-(length:--fs-16)"
-          onChange={(event) => {
-            setText(event.target.value);
-            setTyped(true);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && shownText !== "") {
-              event.preventDefault();
-              event.stopPropagation();
-              clear();
+        <div ref={setAnchor}>
+          <Field
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            ref={field}
+            height="search"
+            icon={Search}
+            aria-label={t("torrentsPage.field")}
+            placeholder={t("torrentsPage.placeholder")}
+            value={shownText}
+            boxClassName="[&_input]:text-(length:--fs-16)"
+            {...combobox.fieldProps}
+            onChange={(event) => {
+              setText(event.target.value);
+              setTyped(true);
+              // A new text is a new title: the old one and its releases go.
+              setPicked(null);
+              combobox.typed();
+            }}
+            onKeyDown={(event) => {
+              combobox.fieldProps.onKeyDown(event);
+              if (event.defaultPrevented) return;
+              if (event.key === "Enter" && suggesting && suggested[0] !== undefined) {
+                // Enter with nothing highlighted takes the best suggestion.
+                event.preventDefault();
+                combobox.select(suggested[0].id);
+              } else if (event.key === "Escape" && shownText !== "") {
+                event.preventDefault();
+                event.stopPropagation();
+                clear();
+              }
+            }}
+            trailing={
+              <>
+                <span
+                  aria-live="polite"
+                  className="shrink-0 text-(length:--fs-12) whitespace-nowrap text-text-muted"
+                >
+                  {countText}
+                </span>
+                {shownText === "" ? null : (
+                  <IconButton
+                    aria-label={t("torrentsPage.clear")}
+                    icon={X}
+                    size="sm"
+                    onClick={clear}
+                  />
+                )}
+              </>
             }
-          }}
-          trailing={
-            <>
-              <span
-                aria-live="polite"
-                className="shrink-0 text-(length:--fs-12) whitespace-nowrap text-text-muted"
-              >
-                {countText}
-              </span>
-              {shownText === "" ? null : (
-                <IconButton
-                  aria-label={t("torrentsPage.clear")}
-                  icon={X}
-                  size="sm"
-                  onClick={clear}
-                />
-              )}
-            </>
-          }
-        />
+          />
+          <SuggestPanel
+            combobox={combobox}
+            label={t("torrentsPage.suggest.label")}
+            groups={[{ id: "titles", label: "", items: suggestions }]}
+            term={text.trim()}
+            maxWidth={720}
+            {...(match.settled && suggested.length === 0
+              ? {
+                  empty: match.failed ? (
+                    <span className="flex items-center gap-3">
+                      <span className="text-text">{t("torrents.picker.failed")}</span>
+                      <Button size="sm" onClick={match.retry}>
+                        {t("torrents.retryAll")}
+                      </Button>
+                    </span>
+                  ) : (
+                    t("torrents.picker.nothing", { query: text.trim() })
+                  ),
+                }
+              : {})}
+          />
+        </div>
         <TitleLine
           name={name}
           kind={ref?.kind ?? "movie"}
-          choices={useRoute ? [] : match.hits}
-          currentId={hit?.id ?? ""}
-          onPick={setPicked}
+          onChange={() => {
+            clear();
+            field.current?.focus();
+          }}
         />
         <div className="flex h-6 items-center gap-1.5">
           <div

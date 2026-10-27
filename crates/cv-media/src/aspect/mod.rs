@@ -16,8 +16,9 @@
 //!    mean, or the next wider entry) and the rounded ratios vote. The most common is the primary
 //!    ratio. In accurate mode a second format holding at least 6 % of the votes is the secondary
 //!    ratio, and [`MultiFormat`] can make the taller or wider format the primary.
-//! 5. [`AspectDetection::apply_to`] stores the result on the file, only when the detected ratio
-//!    is not wider than the one MediaInfo reports for the frame.
+//! 5. [`AspectDetection::apply_to`] stores the result on the file as measured. A picture is often
+//!    wider than its frame: a 2.39:1 film in a 16:9 frame has black bars above and below, and the
+//!    ratio of the visible picture is the one to show, not the frame's.
 //!
 //! ISO images are skipped ([`AspectError::IsoNotSupported`]). A missing FFmpeg is a typed
 //! error ([`AspectError::Tool`], see [`AspectError::settings_link`]) so the UI can offer the
@@ -40,10 +41,6 @@ use crate::tools::{Cancel, ToolError, ToolId, ToolsManager};
 
 /// Where the app sends the user to download FFmpeg or set its path.
 pub const TOOLS_SETTINGS_LINK: &str = "/settings/tools";
-
-/// A detected ratio may be this much wider than the frame's own ratio before it is refused
-/// (measurement noise of a pixel or two).
-const FRAME_TOLERANCE: f32 = 0.01;
 
 /// The user's aspect-ratio detection settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -201,23 +198,18 @@ pub struct AspectDetection {
 impl AspectDetection {
     /// Stores the result on `file` and returns whether it was stored.
     ///
-    /// A detected ratio wider than the frame itself is impossible (the picture cannot be wider
-    /// than the frame it sits in), so it is not applied and the MediaInfo ratio stays. When the
-    /// frame ratio is unknown the result is applied. The secondary ratio is only touched by
-    /// accurate runs, which are the only ones that look for it.
+    /// The measured shape of the picture replaces the ratio MediaInfo reported for the frame,
+    /// wider or narrower: black bars above and below make a picture wider than its frame (a
+    /// 2.39:1 film in a 1.78:1 frame is the ordinary case), and bars at the sides make it
+    /// narrower. Only a failed detection (no ratio) leaves the file as it was. The secondary
+    /// ratio is only touched by accurate runs, which are the only ones that look for it.
     pub fn apply_to(&self, file: &mut MediaFile) -> bool {
-        let frame = file.aspect_ratio;
-        let fits = |ratio: f32| frame <= 0.0 || ratio <= frame + FRAME_TOLERANCE;
-        if self.primary <= 0.0 || !fits(self.primary) {
+        if self.primary <= 0.0 {
             return false;
         }
         file.aspect_ratio = self.primary;
         if self.mode == ArdMode::Accurate {
-            file.aspect_ratio2 = if self.secondary > 0.0 && fits(self.secondary) {
-                self.secondary
-            } else {
-                0.0
-            };
+            file.aspect_ratio2 = self.secondary.max(0.0);
         }
         true
     }
@@ -343,28 +335,32 @@ mod tests {
 
     #[test]
     fn a_ratio_narrower_than_the_frame_is_applied() {
-        let mut f = file(1.78, 0.0);
-        assert!(!detection(ArdMode::Standard, 2.35, 0.0).apply_to(&mut f));
-        assert!((f.aspect_ratio - 1.78).abs() < f32::EPSILON);
-
         let mut f = file(2.39, 0.0);
         assert!(detection(ArdMode::Standard, 1.78, 0.0).apply_to(&mut f));
         assert!((f.aspect_ratio - 1.78).abs() < f32::EPSILON);
     }
 
     #[test]
-    fn a_measurement_a_hair_over_the_frame_still_counts() {
+    fn a_ratio_wider_than_the_frame_is_applied_as_measured() {
+        // A scope film in a 16:9 frame: black bars above and below, so the picture is wider.
         let mut f = file(1.78, 0.0);
-        assert!(detection(ArdMode::Fast, 1.78, 0.0).apply_to(&mut f));
-        let mut f = file(1.777, 0.0);
-        assert!(detection(ArdMode::Fast, 1.78, 0.0).apply_to(&mut f));
+        assert!(detection(ArdMode::Standard, 2.39, 0.0).apply_to(&mut f));
+        assert!((f.aspect_ratio - 2.39).abs() < f32::EPSILON);
     }
 
     #[test]
-    fn an_unknown_frame_ratio_accepts_the_result() {
-        let mut f = file(0.0, 0.0);
-        assert!(detection(ArdMode::Standard, 2.39, 0.0).apply_to(&mut f));
-        assert!((f.aspect_ratio - 2.39).abs() < f32::EPSILON);
+    fn a_letterboxed_crop_of_a_full_hd_frame_is_stored_as_2_39() {
+        // What cropdetect prints for a 1920x1080 frame with bars above and below, as FFmpeg
+        // writes it: read, measured and rounded onto the list the way a detection does.
+        let output = "[Parsed_cropdetect_0 @ 0x1] x1:0 x2:1919 y1:138 y2:941 w:1920 h:804 x:0 y:138 pts:0 t:0.000000 limit:0.1 crop=1920:804:0:138";
+        let crop = ffmpeg::last_crop(output).expect("a picture");
+        let settings = ArdSettings::default();
+        #[allow(clippy::cast_precision_loss)]
+        let measured = crop.width as f32 / crop.height as f32;
+        let primary = settings.ratios.round(measured, settings.round_up);
+        let mut f = file(1.78, 0.0);
+        assert!(detection(ArdMode::Standard, primary, 0.0).apply_to(&mut f));
+        assert!((f.aspect_ratio - 2.39).abs() < 0.005, "{}", f.aspect_ratio);
     }
 
     #[test]
@@ -381,10 +377,10 @@ mod tests {
     }
 
     #[test]
-    fn a_secondary_wider_than_the_frame_is_dropped() {
+    fn a_secondary_wider_than_the_frame_is_kept() {
         let mut f = file(2.0, 0.0);
         assert!(detection(ArdMode::Accurate, 1.78, 2.39).apply_to(&mut f));
-        assert!(f.aspect_ratio2.abs() < f32::EPSILON);
+        assert!((f.aspect_ratio2 - 2.39).abs() < f32::EPSILON);
     }
 
     #[test]

@@ -193,6 +193,9 @@ pub struct ScannedFile {
     pub size_bytes: u64,
     /// Modification time, epoch milliseconds.
     pub modified_ms: i64,
+    /// Creation (birth) time, epoch milliseconds; 0 where the platform or the file system gives
+    /// none. It dates a title in the library ("Date added").
+    pub created_ms: i64,
     /// The file's identity (inode and device) where the platform gives it for free, else empty.
     /// A rescan uses it to tell a replaced file from an edited one.
     pub file_id: String,

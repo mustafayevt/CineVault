@@ -1,6 +1,8 @@
 import { create } from "zustand";
 
 import type { LibraryChip, LibraryQuery, LibrarySortKey } from "./libraryBackend";
+import { POSTER_SIZES } from "./gridGeometry";
+import type { PosterSize } from "./gridGeometry";
 import { DEFAULT_HIDDEN_COLUMNS } from "./libraryColumns";
 
 /** The three things the Library switches between (`/library?type=`). */
@@ -51,6 +53,9 @@ interface LibraryStore {
   type: LibraryType;
   movies: TypeState;
   tv: TypeState;
+  /** How wide the posters of the grid are; one choice for Movies and TV shows. */
+  posterSize: PosterSize;
+  setPosterSize: (size: PosterSize) => void;
   setType: (type: LibraryType) => void;
   setView: (type: TitleType, view: LibraryView) => void;
   setSort: (type: TitleType, sort: readonly LibrarySortKey[]) => void;
@@ -68,6 +73,7 @@ const STORAGE_KEY = "cinevault.library.v1";
  */
 interface Saved {
   type?: LibraryType;
+  posterSize?: unknown;
   columns?: number;
   movies?: Partial<Pick<TypeState, "view" | "sort" | "hiddenColumns">>;
   tv?: Partial<Pick<TypeState, "view" | "sort" | "hiddenColumns">>;
@@ -119,22 +125,30 @@ function stateFrom(saved: Saved["movies"], columnsVersion: number | undefined): 
   };
 }
 
-function initial(): Pick<LibraryStore, "type" | "movies" | "tv"> {
+function isPosterSize(value: unknown): value is PosterSize {
+  return typeof value === "string" && value in POSTER_SIZES;
+}
+
+type Persisted = Pick<LibraryStore, "type" | "movies" | "tv" | "posterSize">;
+
+function initial(): Persisted {
   const saved = readSaved();
   return {
+    posterSize: isPosterSize(saved.posterSize) ? saved.posterSize : "m",
     type: isType(saved.type) ? saved.type : "movies",
     movies: stateFrom(saved.movies, saved.columns),
     tv: stateFrom(saved.tv, saved.columns),
   };
 }
 
-function save(state: Pick<LibraryStore, "type" | "movies" | "tv">): void {
+function save(state: Persisted): void {
   const part = (s: TypeState) => ({ view: s.view, sort: s.sort, hiddenColumns: s.hiddenColumns });
   try {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         type: state.type,
+        posterSize: state.posterSize,
         columns: COLUMNS_VERSION,
         movies: part(state.movies),
         tv: part(state.tv),
@@ -155,6 +169,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => {
   return {
     ...initial(),
     setType: (type) => update(() => ({ type })),
+    setPosterSize: (posterSize) => update(() => ({ posterSize })),
     setView: (type, view) => patch(type, { view }),
     setSort: (type, sort) => patch(type, { sort }),
     setFilters: (type, change) =>
@@ -175,8 +190,8 @@ export function resetLibraryStore(): void {
   useLibraryStore.setState({ ...initialFresh() });
 }
 
-function initialFresh(): Pick<LibraryStore, "type" | "movies" | "tv"> {
-  return { type: "movies", movies: FRESH, tv: FRESH };
+function initialFresh(): Persisted {
+  return { type: "movies", movies: FRESH, tv: FRESH, posterSize: "m" };
 }
 
 // ---- Filters to a query -------------------------------------------------------------------------

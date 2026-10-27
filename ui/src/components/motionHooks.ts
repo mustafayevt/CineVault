@@ -11,7 +11,7 @@ const REDUCED_QUERY = "(prefers-reduced-motion: reduce)";
  * Whether motion is reduced right now: the Motion setting writes `data-motion` on the root
  * (`reduced` or `full`); without it the system preference decides, as in motion.css.
  */
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   if (typeof document === "undefined") return false;
   const setting = document.documentElement.dataset.motion;
   if (setting === "reduced") return true;

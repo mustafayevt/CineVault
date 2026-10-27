@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../components/Button";
 import { useListSelection } from "../../components/useListSelection";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { clearReloadScope, publishReloadScope } from "../mediainfo/reloadScope";
 import { usePreferredSource } from "../ratings/preference";
 import { parseQuery } from "../search/queryParser";
 import { isTextField } from "../delete/deleteKeys";
@@ -101,6 +102,13 @@ export function TitlesView({ type, text, onClearText }: TitlesViewProps) {
     [selection.selected, listing.seen, type],
   );
   const actions = useLibraryActions(targets);
+
+  // The toolbar's Reload media info button acts on the selection, or on this whole list.
+  const selectedIds = useMemo(() => [...selection.selected], [selection.selected]);
+  useEffect(() => {
+    publishReloadScope({ type, selected: selectedIds, all: keys });
+  }, [type, selectedIds, keys]);
+  useEffect(() => clearReloadScope, []);
 
   const filtered = baseChips.length > 0 || typed.text !== "" || state.filters.problems !== "any";
   const everything = useQuery({

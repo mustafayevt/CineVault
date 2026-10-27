@@ -6,10 +6,12 @@ import { Menu, MenuRadioGroup, MenuRadioItem } from "../../components/Menu";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { ReloadMediaInfoButton } from "../mediainfo/ReloadMediaInfoButton";
 import type { LibrarySortKey } from "./libraryBackend";
 import { SORT_CHOICES, SORT_KEYS, SORT_LABEL, sortChoiceOf } from "./sortChoices";
 import type { SortChoice } from "./sortChoices";
 import type { LibraryType, LibraryView } from "./libraryStore";
+import type { PosterSize } from "./gridGeometry";
 import { LibraryColumnItems } from "./LibraryColumnItems";
 import type { ColumnChoice } from "./LibraryColumnItems";
 
@@ -20,6 +22,9 @@ interface LibraryToolbarProps {
   onType: (type: LibraryType) => void;
   view: LibraryView;
   onView: (view: LibraryView) => void;
+  /** How wide the grid's posters are; the control shows only in the grid view. */
+  posterSize: PosterSize;
+  onPosterSize: (size: PosterSize) => void;
   sort: readonly LibrarySortKey[];
   onSort: (sort: readonly LibrarySortKey[]) => void;
   /** The table's columns for the Columns menu. */
@@ -32,7 +37,7 @@ interface LibraryToolbarProps {
 /**
  * The toolbar: the Movies | TV shows | Collections
  * switch with counts, then at the right the sort menu (grid) or the Columns menu (table), the
- * grid and table switch and the scan button. 48px high with the section hairline under it, on the
+ * grid and table switch, Reload media info and the scan button. 48px high with the section hairline under it, on the
  * 24px content inset, controls on one centre line.
  */
 export function LibraryToolbar({
@@ -41,6 +46,8 @@ export function LibraryToolbar({
   onType,
   view,
   onView,
+  posterSize,
+  onPosterSize,
   sort,
   onSort,
   columns,
@@ -117,6 +124,18 @@ export function LibraryToolbar({
       {titles && (
         <>
           <span aria-hidden="true" className="h-[18px] w-px bg-line-section" />
+          {view === "grid" && (
+            <SegmentedControl<PosterSize>
+              aria-label={t("library.posterSize.label")}
+              value={posterSize}
+              onChange={onPosterSize}
+              options={[
+                { value: "s", label: "S", ariaLabel: t("library.posterSize.small") },
+                { value: "m", label: "M", ariaLabel: t("library.posterSize.medium") },
+                { value: "l", label: "L", ariaLabel: t("library.posterSize.large") },
+              ]}
+            />
+          )}
           <SegmentedControl<LibraryView>
             aria-label={t("library.view.label")}
             value={view}
@@ -128,6 +147,7 @@ export function LibraryToolbar({
           />
         </>
       )}
+      {titles && <ReloadMediaInfoButton />}
       <IconButton
         icon={RefreshCw}
         aria-label={t("library.scan")}

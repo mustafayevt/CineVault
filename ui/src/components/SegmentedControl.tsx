@@ -10,7 +10,7 @@ export interface SegmentOption<T extends string> {
   /** Visible text. Leave out for an icon-only segment, which then needs `ariaLabel`. */
   label?: string;
   icon?: LucideIcon;
-  /** Accessible name for icon-only segments. */
+  /** Accessible name for icon-only segments; a segment with a short label ("S") may give a longer one. */
   ariaLabel?: string;
   /** A count shown after the label in muted tabular figures ("New 21"). */
   count?: number | string;
@@ -91,7 +91,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             data-index={index}
             aria-pressed={active}
-            aria-label={iconOnly ? option.ariaLabel : undefined}
+            aria-label={option.ariaLabel}
             tabIndex={index === activeIndex ? 0 : -1}
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => onKeyDown(event, index)}

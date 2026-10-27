@@ -965,6 +965,7 @@ mod tests {
             is_dir: false,
             size_bytes: size,
             modified_ms: mtime,
+            created_ms: 0,
             file_id: id.into(),
             stacking: 0,
             stacking_marker: String::new(),

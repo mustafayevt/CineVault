@@ -153,7 +153,7 @@ describe("the first-run setup", () => {
     expect(await screen.findByText("Works")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
-    await heading("Add your ratings keys");
+    await heading("Add your optional keys");
     await user.click(screen.getByRole("button", { name: "Skip this step" }));
 
     await heading("How should folders and files be named?");
@@ -195,7 +195,7 @@ describe("the first-run setup", () => {
     for (const title of [
       "Where are your movies and shows?",
       "Add your TMDB key",
-      "Add your ratings keys",
+      "Add your optional keys",
       "How should folders and files be named?",
     ]) {
       await heading(title);

@@ -128,3 +128,65 @@ export function moveColumn(
   next.splice(target, 0, id);
   return next;
 }
+
+/** A header's resting place in the header row, in CSS pixels from the row's left edge. */
+export interface DropSlot {
+  id: string;
+  left: number;
+  width: number;
+  /** Stays where it is and takes no part in a drag. */
+  fixed: boolean;
+}
+
+export interface DropPlan {
+  /** The whole displayed order if the dragged column were dropped now. */
+  order: string[];
+  /** How far each other column slides from its resting place (0 when it stays). */
+  shifts: Map<string, number>;
+  /** Where the lifted header is drawn: the pointer's place, kept among the movable columns. */
+  dragLeft: number;
+  /** The left edge of the place the dragged column would take. */
+  dropLeft: number;
+}
+
+/**
+ * Where a dragged header lands. `wantedLeft` is where the pointer would put its left edge; the
+ * column is kept between the first and last movable column, and takes the place whose middle its
+ * own middle has crossed. Judged against resting places, so the answer does not flicker while the
+ * others slide. Null for a fixed or unknown column.
+ */
+export function planDrop(
+  slots: readonly DropSlot[],
+  dragId: string,
+  wantedLeft: number,
+): DropPlan | null {
+  const drag = slots.find((slot) => slot.id === dragId);
+  if (drag === undefined || drag.fixed) return null;
+  const movable = slots.filter((slot) => !slot.fixed);
+  const first = movable[0];
+  const last = movable.at(-1);
+  if (first === undefined || last === undefined) return null;
+  const dragLeft = Math.max(first.left, Math.min(wantedLeft, last.left + last.width - drag.width));
+  const middle = dragLeft + drag.width / 2;
+  const others = movable.filter((slot) => slot.id !== dragId);
+  const farRight = last.left + last.width - drag.width;
+  // Pushed against either end it lands at that end, whatever the widths of the others.
+  const before =
+    dragLeft <= first.left
+      ? 0
+      : dragLeft >= farRight
+        ? others.length
+        : others.filter((slot) => slot.left + slot.width / 2 < middle).length;
+  const sequence = [...others.slice(0, before), drag, ...others.slice(before)];
+  let next = 0;
+  const ordered = slots.map((slot) => (slot.fixed ? slot : (sequence[next++] ?? slot)));
+  let x = slots[0]?.left ?? 0;
+  let dropLeft = drag.left;
+  const shifts = new Map<string, number>();
+  for (const slot of ordered) {
+    if (slot.id === dragId) dropLeft = x;
+    else shifts.set(slot.id, x - slot.left);
+    x += slot.width;
+  }
+  return { order: ordered.map((slot) => slot.id), shifts, dragLeft, dropLeft };
+}

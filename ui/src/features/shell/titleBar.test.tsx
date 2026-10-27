@@ -51,7 +51,7 @@ describe("the title bar", () => {
     expect(bar).toHaveAttribute("data-tauri-drag-region");
     expect(bar.className).toContain("h-[38px]");
     expect(bar.className).toContain("bg-transparent");
-    const search = screen.getByRole("searchbox", { name: "Search library" });
+    const search = screen.getByRole("combobox", { name: "Search library" });
     expect(search).toHaveAttribute("placeholder", "Search movies, shows, people");
     const wrapper = search.closest("form")?.firstElementChild;
     expect(wrapper?.className).toContain("w-[440px]");
@@ -123,7 +123,7 @@ describe("the title bar", () => {
   it("opens the Library with ?q= on Enter", async () => {
     const router = renderBar("windows", "/history");
     const user = userEvent.setup();
-    await user.type(await screen.findByRole("searchbox"), "blade runner{Enter}");
+    await user.type(await screen.findByRole("combobox"), "blade runner{Enter}");
     await waitFor(() => expect(router.state.location.pathname).toBe("/library"));
     expect(router.state.location.search).toEqual({ q: "blade runner" });
   });
@@ -131,14 +131,14 @@ describe("the title bar", () => {
   it("keeps the Library's other choices when searching from the Library", async () => {
     const router = renderBar("windows", "/library?view=table");
     const user = userEvent.setup();
-    await user.type(await screen.findByRole("searchbox"), "heat{Enter}");
+    await user.type(await screen.findByRole("combobox"), "heat{Enter}");
     await waitFor(() => expect(router.state.location.search).toMatchObject({ q: "heat" }));
     expect(router.state.location.search).toMatchObject({ view: "table" });
   });
 
   it("shows the query of the address and clears it with Esc", async () => {
     const router = renderBar("windows", "/library?q=heat");
-    const field = await screen.findByRole("searchbox");
+    const field = await screen.findByRole("combobox");
     expect(field).toHaveValue("heat");
     await userEvent.setup().type(field, "{Escape}");
     expect(field).toHaveValue("");
@@ -147,7 +147,7 @@ describe("the title bar", () => {
 
   it("follows the address when it changes", async () => {
     const router = renderBar("windows", "/library");
-    const field = await screen.findByRole("searchbox");
+    const field = await screen.findByRole("combobox");
     await act(() => router.navigate({ to: "/library", search: { q: "alien" } as never }));
     await waitFor(() => expect(field).toHaveValue("alien"));
   });
@@ -155,7 +155,7 @@ describe("the title bar", () => {
   it("takes focus with its text selected on Ctrl+F", async () => {
     const remove = installDesktopGuards();
     renderBar("windows", "/library?q=heat");
-    const field = await screen.findByRole<HTMLInputElement>("searchbox");
+    const field = await screen.findByRole<HTMLInputElement>("combobox");
     await userEvent.setup().keyboard("{Control>}f{/Control}");
     expect(field).toHaveFocus();
     expect(field.selectionStart).toBe(0);

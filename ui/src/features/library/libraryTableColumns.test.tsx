@@ -209,6 +209,37 @@ describe("the synthetic backend orders like the real one", () => {
   });
 });
 
+describe("the Stage column", () => {
+  it("has a visible Stage header that sorts, and labelled tags instead of a bare tick", async () => {
+    const { user, grid } = await toTable();
+    const stage = header(grid, "Stage");
+    expect(stage).toHaveTextContent("Stage");
+    await user.click(within(stage).getByRole("button", { name: "Stage" }));
+    expect(useLibraryStore.getState().movies.sort).toEqual([{ field: "stage", descending: false }]);
+    expect(sorted(grid)).toEqual(["Stage:ascending"]);
+    const tags = Array.from(grid.querySelectorAll<HTMLElement>("[role=gridcell] [data-stage]"));
+    expect(tags.length).toBeGreaterThan(5);
+    const words = new Set(tags.map((tag) => tag.textContent));
+    expect(["New", "Scraped", "Renamed"].some((word) => words.has(word))).toBe(true);
+  });
+
+  it("is information, not a control: an arrow cursor and the app tooltip, never a native title", async () => {
+    const { grid } = await toTable();
+    const tag = grid.querySelector<HTMLElement>("[role=gridcell] [data-stage]");
+    expect(tag).not.toBeNull();
+    expect(tag?.className).toContain("cursor-default");
+    expect(grid.querySelectorAll("[role=gridcell] [title]")).toHaveLength(0);
+  });
+
+  it("keeps the warning colour for a title that needs attention", async () => {
+    const { grid } = await toTable();
+    const warn = grid.querySelector<HTMLElement>('[role=gridcell] [data-stage="attention"]');
+    // The synthetic library has unmatched titles near the top of the list.
+    expect(warn?.className ?? "").toContain("text-warn");
+    expect(warn).toHaveTextContent(/Not matched|Uncertain|Files missing/);
+  });
+});
+
 describe("the column chooser", () => {
   it("starts with the usual columns; Date added and File modified are off", async () => {
     const { grid } = await toTable();

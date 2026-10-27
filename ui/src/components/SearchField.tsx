@@ -40,7 +40,8 @@ export function SearchField({
       }
       onKeyDown={(event) => {
         onKeyDown?.(event);
-        if (event.key === "Escape" && onClear !== undefined && hasText) {
+        // A handler that already used the Esc (closing a suggestion list) keeps the text.
+        if (event.key === "Escape" && !event.defaultPrevented && onClear !== undefined && hasText) {
           event.preventDefault();
           event.stopPropagation();
           onClear();

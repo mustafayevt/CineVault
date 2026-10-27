@@ -12,6 +12,7 @@ pub mod collections;
 pub mod curation;
 pub mod data_location;
 pub mod data_sources;
+pub mod date_added;
 pub mod deleted_files;
 pub mod drives;
 pub mod edit;

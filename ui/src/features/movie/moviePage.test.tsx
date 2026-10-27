@@ -100,23 +100,32 @@ afterEach(() => {
 });
 
 describe("the Movie page header", () => {
-  it("lists Play, Scrape, Rename, Move, Open folder and Delete in order, with a menu after them", async () => {
+  it("lists Play, Scrape, Rename, Move, Open folder and Change artwork in order, with a menu after them", async () => {
     renderMovie();
     const bar = await screen.findByRole("toolbar", { name: "Title actions" });
     const names = within(bar)
       .getAllByRole("button")
       .map((button) => button.textContent ?? button.getAttribute("aria-label"));
-    expect(names).toEqual(["Play", "Scrape", "Rename", "Move", "Open folder", "Delete", ""]);
+    expect(names).toEqual([
+      "Play",
+      "Scrape",
+      "Rename",
+      "Move",
+      "Open folder",
+      "Change artwork",
+      "",
+    ]);
     expect(within(bar).getByRole("button", { name: /More actions/ })).toBeInTheDocument();
   });
 
-  it("asks first, then sends the title to the Recycle Bin, answers with an Undo toast and returns to the Library", async () => {
+  it("asks first from Delete… in the ⋯ menu, then sends the title to the Recycle Bin, answers with an Undo toast and returns to the Library", async () => {
     const history = createSyntheticHistoryBackend();
     const deleteTitles = vi.spyOn(history, "deleteTitles");
     setHistoryBackend(history);
     const { router } = renderMovie();
     const bar = await screen.findByRole("toolbar", { name: "Title actions" });
-    await userEvent.click(within(bar).getByRole("button", { name: "Delete" }));
+    await userEvent.click(within(bar).getByRole("button", { name: /More actions/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete…" }));
     const dialog = await screen.findByRole("dialog", { name: /^Delete “.*”\?$/ });
     expect(deleteTitles).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
@@ -190,17 +199,32 @@ describe("the Movie page artwork buttons", () => {
     expect(router.state.location.searchStr).toMatch(/type="?fanart/);
   });
 
-  it("keeps the Change artwork link and adds Artwork… to the ⋯ menu with no type", async () => {
+  it("opens the picker with no type from the header's Change artwork button, and the ⋯ menu has no Artwork… item", async () => {
     const user = userEvent.setup();
     const { router } = renderMovie();
-    expect(await screen.findByRole("link", { name: "Change artwork" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /More actions/ }));
-    await user.click(screen.getByRole("menuitem", { name: "Artwork…" }));
+    const bar = await screen.findByRole("toolbar", { name: "Title actions" });
+    await user.click(within(bar).getByRole("button", { name: "Change artwork" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/artwork"));
     expect(decodeURIComponent(router.state.location.searchStr)).toMatch(
       new RegExp(`ids="?${SYNTHETIC_MOVIE_ID}"?`),
     );
     expect(router.state.location.searchStr).not.toContain("type=");
+  });
+
+  it("ends the ⋯ menu with Delete… in the danger colour, after a divider", async () => {
+    const user = userEvent.setup();
+    renderMovie();
+    await user.click(await screen.findByRole("button", { name: /More actions/ }));
+    const items = screen.getAllByRole("menuitem");
+    expect(items.at(-1)).toHaveTextContent("Delete…");
+    expect(items.at(-1)?.className).toContain("text-danger");
+    expect(screen.queryByRole("menuitem", { name: "Artwork…" })).toBeNull();
+    expect(items.slice(0, 4).map((item) => item.textContent)).toEqual([
+      "Edit details",
+      "Show NFO",
+      "Rewrite NFO",
+      "Reload media info",
+    ]);
   });
 });
 

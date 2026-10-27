@@ -16,7 +16,7 @@ describe("the responsibility notice of Torrent search", () => {
     const notice = await screen.findByTestId("torrent-notice");
     expect(notice).toHaveTextContent("Torrent search finds releases on public sites.");
     expect(notice).toHaveTextContent("You are responsible for what you download and share.");
-    expect(screen.queryByRole("searchbox", { name: "Search torrents" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Search torrents" })).toBeNull();
     expect(backend.titleStarts).toEqual([]);
     expect(backend.releaseStarts).toEqual([]);
     expect(sourcesStatus).not.toHaveBeenCalled();
@@ -30,12 +30,12 @@ describe("the responsibility notice of Torrent search", () => {
     await settleSettingSaves();
     expect(useSettingsStore.getState().values["torrents.notice-accepted"]).toBe(true);
     await waitFor(() => expect(screen.queryByTestId("torrent-notice")).toBeNull());
-    expect(await screen.findByRole("searchbox", { name: "Search torrents" })).toBeVisible();
+    expect(await screen.findByRole("combobox", { name: "Search torrents" })).toBeVisible();
   });
 
   it("is not shown again once accepted", async () => {
     await renderTorrents("/torrents");
     expect(screen.queryByTestId("torrent-notice")).toBeNull();
-    expect(await screen.findByRole("searchbox", { name: "Search torrents" })).toBeVisible();
+    expect(await screen.findByRole("combobox", { name: "Search torrents" })).toBeVisible();
   });
 });

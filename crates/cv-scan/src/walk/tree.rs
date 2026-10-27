@@ -24,6 +24,8 @@ pub(super) struct Entry {
     pub name: String,
     pub size: u64,
     pub modified_ms: i64,
+    /// Creation (birth) time, epoch milliseconds; 0 when the file system gives none.
+    pub created_ms: i64,
     /// The file's identity where the platform gives it for free (inode and device on Unix),
     /// else empty.
     pub file_id: String,
@@ -339,6 +341,10 @@ fn entry_from(
         .and_then(|m| m.modified().ok())
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
+    let created_ms = meta
+        .and_then(|m| m.created().ok())
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
     let file_id = meta
         .filter(|m| m.is_file())
         .map(file_id_of)
@@ -349,6 +355,7 @@ fn entry_from(
         name,
         size,
         modified_ms,
+        created_ms,
         file_id,
         is_dir,
     }

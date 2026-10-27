@@ -8,16 +8,24 @@ import { requestDelete, requestPermanentDelete } from "../delete/deleteActions";
 import { filesStateOf, playBlockedFor } from "../detail/filesState";
 import { useOpenFolder } from "../detail/useOpenFolder";
 import { shortLabel, TITLE_ACTIONS } from "../library/titleActions";
+import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { openMoveTo } from "../move-to/moveToStore";
 import { playTitle } from "../playback/usePlay";
 import { removeTitlesFromLibrary } from "./removeTitles";
 
-/** The header buttons, in order: Play · Scrape · Rename · Move · Open folder · Delete. */
-export type HeaderActionId = "play" | "scrape" | "rename" | "move" | "open-folder" | "delete";
+/** The header buttons, in order: Play · Scrape · Rename · Move · Open folder · Change artwork. */
+export type HeaderActionId = "play" | "scrape" | "rename" | "move" | "open-folder" | "artwork";
 /** What the ⋯ menu holds. */
 export type MenuActionId =
-  "edit" | "artwork" | "show-nfo" | "rewrite-nfo" | "remove" | "ignore" | "delete-permanently";
+  | "edit"
+  | "show-nfo"
+  | "rewrite-nfo"
+  | "reload-media-info"
+  | "remove"
+  | "ignore"
+  | "delete-permanently"
+  | "delete";
 
 export interface TitleAction<Id extends string> {
   id: Id;
@@ -47,7 +55,8 @@ export interface TitleActionsInput {
 }
 
 /**
- * The actions of a title page: the six header buttons and the ⋯ menu, built once so the Movie page
+ * The actions of a title page: the six header buttons and the ⋯ menu (Edit details, Show NFO,
+ * Rewrite NFO, Reload media info, Remove from library, Ignore, then Delete… last), built once so the Movie page
  * and the show page say the same things in the same order. Their icons, names and order come from
  * the one list in `features/library/titleActions.ts`, which the Library's selection bar and
  * right-click menu read too.  */
@@ -103,11 +112,10 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
           disabledReason: folder === "" ? t("title.openFolder.none") : undefined,
         },
         {
-          id: "delete",
-          label: shortLabel("delete"),
-          icon: TITLE_ACTIONS["delete"].icon,
-          onSelect: () => requestDelete([{ id, title }], { onDone: leave }),
-          danger: true,
+          id: "artwork",
+          label: t("title.action.changeArtwork"),
+          icon: TITLE_ACTIONS["artwork"].icon,
+          onSelect: () => void navigate({ to: "/artwork", search: { ids: id } as never }),
         },
       ],
       menu: [
@@ -120,18 +128,18 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
               ? navigate({ to: "/movies/$movieId/edit", params: { movieId: id } })
               : navigate({ to: "/tv/$showId/edit", params: { showId: id } })),
         },
-        {
-          id: "artwork",
-          label: t(TITLE_ACTIONS["artwork"].full),
-          icon: TITLE_ACTIONS["artwork"].icon,
-          onSelect: () => void navigate({ to: "/artwork", search: { ids: id } as never }),
-        },
         { id: "show-nfo", label: t("title.menu.showNfo"), icon: FileText, onSelect: onShowNfo },
         {
           id: "rewrite-nfo",
           label: shortLabel("rewrite-nfo"),
           icon: TITLE_ACTIONS["rewrite-nfo"].icon,
           onSelect: () => void runNfoAction("rewrite", selectionScope([id])),
+        },
+        {
+          id: "reload-media-info",
+          label: shortLabel("reload-media-info"),
+          icon: TITLE_ACTIONS["reload-media-info"].icon,
+          onSelect: () => void reloadMediaInfo([id]),
         },
         {
           id: "remove",
@@ -150,6 +158,14 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
           label: shortLabel("delete-permanently"),
           icon: TITLE_ACTIONS["delete-permanently"].icon,
           onSelect: () => requestPermanentDelete([{ id, title }], { onDone: leave }),
+          danger: true,
+        },
+        {
+          // Asks first, then sends the title to the Deleted files destination; Delete… is last.
+          id: "delete",
+          label: t("title.menu.delete"),
+          icon: TITLE_ACTIONS["delete"].icon,
+          onSelect: () => requestDelete([{ id, title }], { onDone: leave }),
           danger: true,
         },
       ],

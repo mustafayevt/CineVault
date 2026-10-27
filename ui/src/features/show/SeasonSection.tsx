@@ -1,9 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
+import { useReducedMotion } from "../../components/motionHooks";
 import { Tag } from "../../components/Tag";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
@@ -40,24 +41,25 @@ interface EpisodeListProps {
  */
 function EpisodeList({ detail, season, openId, onOpen }: EpisodeListProps) {
   const format = useFormat();
+  const reduced = useReducedMotion();
   const rows = rowsOf(detail, season);
-  // The panel that is closing stays mounted until its height has animated away.
+  // The panel that is closing stays mounted until its height has animated away. This is worked
+  // out while rendering (not in an effect), so the panel never unmounts for a frame between
+  // "open" and "closing", which would skip the closing animation.
   const [closing, setClosing] = useState<string | null>(null);
   const [shown, setShown] = useState<string | null>(null);
-  const previous = useRef<string | null>(null);
+  const [seen, setSeen] = useState<string | null>(openId);
+  if (seen !== openId) {
+    setSeen(openId);
+    // A panel mounts closed and flips open on the next frame, so its height animates.
+    setShown(null);
+    setClosing(seen !== null && seen !== openId ? seen : null);
+  }
   useEffect(() => {
-    const before = previous.current;
-    previous.current = openId;
-    if (before !== null && before !== openId) {
-      setClosing(before);
-      const timer = window.setTimeout(() => {
-        setClosing(null);
-        setShown(null);
-      }, CLOSE_MS);
-      return () => window.clearTimeout(timer);
-    }
-  }, [openId]);
-  // The opening panel mounts closed and flips open on the next frame, so its height animates.
+    if (closing === null) return;
+    const timer = window.setTimeout(() => setClosing(null), CLOSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [closing]);
   useEffect(() => {
     if (openId === null) return;
     const frame = window.requestAnimationFrame(() => setShown(openId));
@@ -121,6 +123,11 @@ function EpisodeList({ detail, season, openId, onOpen }: EpisodeListProps) {
             : row.kind === "episode"
               ? null
               : row.missing.first_aired;
+        // The card's frame and tint fade in with the panel (at once with reduced motion); the rows
+        // below follow the panel's height track, so nothing jumps.
+        const glide = reduced
+          ? ""
+          : "transition-[background-color,box-shadow] duration-(--dur-expand) ease-(--ease-out)";
         const cells = (
           <>
             <span className="text-text-muted tabular-nums">{row.number}</span>
@@ -138,12 +145,25 @@ function EpisodeList({ detail, season, openId, onOpen }: EpisodeListProps) {
                     event.stopPropagation();
                     onOpen(open ? null : episode.id);
                   }}
-                  className="min-w-0 max-w-full truncate bg-transparent p-0 text-left text-inherit"
+                  className="flex min-w-0 max-w-full items-center gap-1.5 bg-transparent p-0 text-left text-inherit"
                 >
-                  {name}
+                  <Icon
+                    icon={ChevronRight}
+                    size={14}
+                    className={cx(
+                      "shrink-0 text-text-muted",
+                      !reduced && "transition-transform duration-(--dur-expand) ease-(--ease-out)",
+                      open && "rotate-90",
+                    )}
+                  />
+                  <span className="min-w-0 truncate">{name}</span>
                 </button>
               ) : (
-                name
+                <span className="flex items-center gap-1.5">
+                  {/* Keeps the name in line with the episodes that open. */}
+                  <span aria-hidden="true" className="inline-block w-3.5 shrink-0" />
+                  <span className="min-w-0 truncate">{name}</span>
+                </span>
               )}
             </span>
             <span className="truncate text-text-2">
@@ -169,9 +189,11 @@ function EpisodeList({ detail, season, openId, onOpen }: EpisodeListProps) {
             data-testid={episode === null ? undefined : "episode-row"}
             data-state={open ? "open" : undefined}
             className={cx(
-              "overflow-hidden",
-              keep &&
-                "my-1 rounded-(--r-10) border border-solid border-line-edge bg-surface-card shadow-[inset_2px_0_0_var(--gold)]",
+              "overflow-hidden rounded-(--r-10)",
+              glide,
+              open
+                ? "bg-surface-card shadow-[inset_0_0_0_1px_var(--line-edge),inset_2px_0_0_var(--gold)]"
+                : "bg-transparent shadow-[inset_0_0_0_1px_transparent,inset_2px_0_0_transparent]",
             )}
           >
             {/* The whole row opens the episode; its title button is the keyboard route. */}
@@ -182,8 +204,7 @@ function EpisodeList({ detail, season, openId, onOpen }: EpisodeListProps) {
               className={cx(
                 "grid h-(--h-row) items-center px-3.5 text-(length:--fs-13)",
                 COLUMNS,
-                !keep && "border-b border-solid border-line-row",
-                keep && "border-b border-solid border-line-row",
+                "border-b border-solid border-line-row",
                 episode !== null && "cv-hoverable cursor-pointer hover:bg-surface-card",
               )}
             >

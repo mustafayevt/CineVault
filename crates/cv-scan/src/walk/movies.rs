@@ -612,6 +612,7 @@ pub(super) fn scanned_file_of(entry: &Entry, kind: T, disc_file: bool) -> Scanne
         is_dir: entry.is_dir,
         size_bytes: entry.size,
         modified_ms: entry.modified_ms,
+        created_ms: entry.created_ms,
         file_id: entry.file_id.clone(),
         stacking: number,
         stacking_marker: marker,

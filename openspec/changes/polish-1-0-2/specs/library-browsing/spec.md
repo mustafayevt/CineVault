@@ -37,14 +37,39 @@ Columns SHALL be resizable by dragging the header edge, which has a hit area at 
 ## ADDED Requirements
 
 ### Requirement: Spotlight search
-Typing in the title-bar search SHALL open a dropdown under it with instant results grouped as Movies, TV shows and People, a "See all results for <text>" row and, while the field is empty, the recent searches. The Up and Down arrows SHALL move through the rows, Enter SHALL open the chosen row (a title page, a person's page or the Library search), and Esc SHALL close the dropdown.
+Typing in the title-bar search SHALL open a panel under the field that updates about 80 ms after the last keystroke and keeps the previous rows on screen until the new ones arrive. It SHALL list the best match as "Top hit", then only the groups that have hits among "Movies", "TV shows", "Collections" and "People", about five rows each, and end with "See all N results →". The panel SHALL appear at once under reduced motion.
 
 #### Scenario: Instant results
 - **WHEN** the user types "blade"
-- **THEN** matching movies and shows appear grouped, and Enter on the first opens its page
+- **THEN** matching movies and shows appear grouped under "Top hit", "Movies" and "TV shows", with "See all N results →" last
+
+### Requirement: Spotlight rows
+A title row of the panel SHALL show a small poster, the title with the typed letters marked, the type and year, and its stage. A title that matches only through typo forgiveness SHALL be labelled "Similar".
+
+#### Scenario: Typo result
+- **WHEN** the user types "blde" and the search forgives it to find "Blade Runner"
+- **THEN** the row reads "Blade Runner" with the subtle label "Similar"
+
+### Requirement: Spotlight keys
+The Up and Down arrows SHALL move through the rows of the panel and wrap. Enter SHALL open the highlighted row (a title page, a collection, or the Library filtered to a person), and with no row highlighted SHALL search the Library as before. The first Esc SHALL close the panel and the second SHALL clear the field, and a press outside SHALL close it. The field SHALL be a combobox and the panel its listbox for screen readers.
+
+#### Scenario: Open the highlighted row
+- **WHEN** the user types "blade", presses Down and then Enter
+- **THEN** the page of the first row opens
+
+#### Scenario: Enter without a highlighted row
+- **WHEN** the user types "blade" and presses Enter without using the arrow keys
+- **THEN** the Library opens with the search "blade"
+
+### Requirement: Spotlight recents
+With the field empty and focused the panel SHALL list up to six recent searches and up to six recently opened titles, each list with a "Clear" button.
+
+#### Scenario: Recent searches
+- **WHEN** the user focuses the empty field after searching for "heat"
+- **THEN** "heat" is listed under "Recent searches", and choosing it searches again
 
 ### Requirement: Date added is the file's creation time
-A title's "Date added" SHALL be the creation time of its main file when it is first inserted, falling back to the scan time when the file system gives none. Titles whose date added equals the library's first-scan time SHALL be repaired once from their file's creation time.
+A title's "Date added" SHALL be the creation time of its main file when it is first inserted, falling back to the scan time when the file system gives none. A show SHALL take the date of its oldest episode file, and a date SHALL never be later than the scan that found the title. Titles that share one identical date (at least ten) SHALL be dated once from their files at the next scan, and titles with their own dates SHALL be left alone.
 
 #### Scenario: Old file added today
 - **WHEN** a movie file created last year is scanned for the first time today
@@ -56,3 +81,21 @@ The poster grid SHALL offer a size control in the toolbar that changes the minim
 #### Scenario: Bigger posters
 - **WHEN** the user raises the poster size and restarts the app
 - **THEN** the grid opens with the larger posters
+
+### Requirement: Reload media info from the Library
+The Library toolbar SHALL show a "Reload media info" icon button right beside "Scan folders now" for Movies and TV shows. With titles selected it SHALL reload those titles; with none selected it SHALL ask "Reload media info for N movies? This reads every file again and can take a few minutes." under the button, with Cancel and Reload, and reload every title of the current list on Reload.
+
+#### Scenario: Whole list
+- **WHEN** nothing is selected, the Movies list holds 180 titles and the user presses "Reload media info" and then Reload
+- **THEN** a background job re-reads the details of the 180 movies, shown in the sidebar progress card
+
+#### Scenario: Selection
+- **WHEN** two titles are selected and the user presses "Reload media info"
+- **THEN** those two titles are reloaded at once, with no question
+
+### Requirement: Reload media info in the menus
+"Reload media info" SHALL also be in the right-click menu and the More menu of the selection bar, acting on the selected titles. Scan folders now SHALL keep reading changed files only.
+
+#### Scenario: Right-click
+- **WHEN** the user right-clicks a title and chooses "Reload media info"
+- **THEN** that title's file details are read again as a background job

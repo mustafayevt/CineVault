@@ -9,8 +9,8 @@ import { mergeTitleHits } from "./torrentModel";
 
 /** The fewest characters that start a search. */
 const MIN_QUERY = 2;
-/** The pause after the last keystroke before a search starts (spec `torrent-search`). */
-const TYPING_PAUSE_MS = 400;
+/** The pause after the last keystroke before the suggestions are looked up. */
+const TYPING_PAUSE_MS = 250;
 
 export interface TitleMatch {
   /** The titles found, best match first; hits of equal fit keep their arrival order. */

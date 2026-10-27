@@ -8,7 +8,8 @@ import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { CachedImage } from "../images/CachedImage";
 import { usePreferOriginalTitle } from "./displayTitle";
-import { gridGeometry } from "./gridGeometry";
+import { gridGeometry, POSTER_SIZES } from "./gridGeometry";
+import { useLibraryStore } from "./libraryStore";
 import { cardTitle, problemNote, qualityTier, stageBadgeOf, yearText } from "./titleFacts";
 import type { LibraryRow } from "./libraryBackend";
 import type { ListViewProps } from "./viewTypes";
@@ -68,7 +69,8 @@ export function PosterGrid({
     return () => observer.disconnect();
   }, []);
 
-  const { columns, cellWidth, rowHeight } = gridGeometry(width);
+  const posterSize = useLibraryStore((store) => store.posterSize);
+  const { columns, cellWidth, rowHeight } = gridGeometry(width, POSTER_SIZES[posterSize]);
   const total = listing.total;
   const rowCount = Math.ceil(total / columns);
 
@@ -95,6 +97,21 @@ export function PosterGrid({
   useEffect(() => {
     virtualizer.measure();
   }, [rowHeight, virtualizer]);
+
+  // A new poster size keeps the same title at the top: without this the list would jump to wherever
+  // the old scroll position falls among the new, taller or shorter rows.
+  const topIndex = useRef(0);
+  const lastSize = useRef(posterSize);
+  useEffect(() => {
+    if (lastSize.current !== posterSize) {
+      lastSize.current = posterSize;
+      virtualizer.scrollToIndex(Math.floor(topIndex.current / columns), { align: "start" });
+    }
+  }, [posterSize, columns, virtualizer]);
+  // Declared after the effect above, so that one still sees the top title of the previous layout.
+  useEffect(() => {
+    topIndex.current = firstRow * columns;
+  });
 
   const currentIndex = selection.currentIndex;
   useEffect(() => {

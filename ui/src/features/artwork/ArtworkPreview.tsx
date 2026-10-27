@@ -1,25 +1,18 @@
-import { FileImage } from "lucide-react";
+import { FileImage, Maximize2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Icon } from "../../components/Icon";
+import { IconButton } from "../../components/IconButton";
 import { SectionLabel } from "../../components/SectionLabel";
 import { t } from "../../i18n/catalog";
 import { activeLocale } from "../../i18n/locale";
 import { cx } from "../../lib/cx";
 import { DetailImage } from "../detail/DetailImage";
-import { providerName } from "../workspaces/providerNames";
 import { artworkLanguageLabel, popularityWords } from "./artworkLabels";
 import type { ArtworkCandidate } from "./artworkBackend";
 import type { ArtworkChoice } from "./artworkApply";
-import {
-  FRAMES_PROVIDER,
-  dimensions,
-  languageOf,
-  popularityOf,
-  slotAspect,
-  slotFitsWhole,
-} from "./artworkModel";
-import { savedAs, typeName } from "./pickerModel";
+import { dimensions, languageOf, popularityOf, slotAspect, slotFitsWhole } from "./artworkModel";
+import { providerLabel, savedAs, typeName } from "./pickerModel";
 
 interface ArtworkPreviewProps {
   slot: string;
@@ -34,6 +27,8 @@ interface ArtworkPreviewProps {
   width?: number | string;
   /** The heading over the image: "Preview", "Preview · Fanart". */
   heading?: string;
+  /** Opens the picture large; the expand button shows on hover and focus while there is one. */
+  onExpand?: () => void;
 }
 
 /** The image of a choice at its real shape, however it came. */
@@ -41,18 +36,34 @@ function Picture({
   slot,
   chosen,
   fallback,
+  onExpand,
 }: {
   slot: string;
   chosen: ArtworkChoice | null;
   fallback: ArtworkCandidate | null;
+  onExpand?: (() => void) | undefined;
 }) {
   const whole = slotFitsWhole(slot);
   const tall = slotAspect(slot) === "2 / 3";
   const frame = cx(
-    "relative overflow-hidden rounded-(--r-10) bg-surface-well shadow-floating",
+    "group/picture relative overflow-hidden rounded-(--r-10) bg-surface-well shadow-floating",
     tall ? "h-[clamp(220px,calc(100vh-430px),480px)] self-center" : "w-full",
   );
   const style = { aspectRatio: slotAspect(slot) };
+  // Shown while the pointer is over the picture or the button has the keyboard focus.
+  const expand =
+    onExpand === undefined ? null : (
+      <IconButton
+        icon={Maximize2}
+        size="sm"
+        aria-label={t("artworkPicker.expand")}
+        onClick={onExpand}
+        className={cx(
+          "absolute top-2 right-2 z-10 bg-surface-floating opacity-0 transition-opacity duration-(--dur-hover)",
+          "group-hover/picture:opacity-100 focus-visible:opacity-100",
+        )}
+      />
+    );
   if (chosen?.kind === "candidate" || (chosen === null && fallback !== null)) {
     const candidate =
       chosen?.kind === "candidate" ? chosen.candidate : (fallback as ArtworkCandidate);
@@ -63,6 +74,7 @@ function Picture({
           size="hero"
           className={whole ? "object-contain" : "object-cover"}
         />
+        {expand}
       </div>
     );
   }
@@ -76,6 +88,7 @@ function Picture({
           draggable={false}
           className={cx("absolute inset-0 size-full", whole ? "object-contain" : "object-cover")}
         />
+        {expand}
       </div>
     );
   }
@@ -113,18 +126,12 @@ export function ArtworkPreview({
   actions,
   width = 420,
   heading,
+  onExpand,
 }: ArtworkPreviewProps) {
   const locale = activeLocale();
   const candidate = chosen?.kind === "candidate" ? chosen.candidate : null;
   const shown = chosen === null ? current : candidate;
-  const provider =
-    shown === null
-      ? ""
-      : shown.provider === FRAMES_PROVIDER
-        ? t("artworkPicker.source.frames")
-        : shown.provider === "current"
-          ? t("artworkPicker.source.current")
-          : (names[shown.provider] ?? providerName(shown.provider));
+  const provider = shown === null ? "" : providerLabel(shown, names);
   const popularity = candidate === null ? null : popularityOf(candidate);
   const type = typeName(slot).toLowerCase();
   return (
@@ -134,7 +141,7 @@ export function ArtworkPreview({
       className="flex shrink-0 flex-col gap-3.5 overflow-y-auto border-l border-solid border-line-section bg-surface-card px-6 py-[18px]"
     >
       <SectionLabel className="mb-0">{heading ?? t("artworkPicker.preview")}</SectionLabel>
-      <Picture slot={slot} chosen={chosen} fallback={current} />
+      <Picture slot={slot} chosen={chosen} fallback={current} onExpand={onExpand} />
       <dl className="m-0 grid grid-cols-[96px_minmax(0,1fr)] gap-y-[5px]">
         {shown === null && chosen === null ? (
           <p className="col-span-2 m-0 text-text-muted">{t("artworkPicker.preview.none")}</p>

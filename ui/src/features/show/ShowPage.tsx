@@ -7,6 +7,7 @@ import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { PathText } from "../../components/PathText";
+import { useRememberOpened } from "../search/recents";
 import { useClearNewOnOpen } from "../curation/newFlagActions";
 import { displayTitle, usePreferOriginalTitle } from "../library/displayTitle";
 import { DetailRequestError } from "../detail/detailBackend";
@@ -86,6 +87,13 @@ function ShowView({ detail }: { detail: ShowDetail }) {
   const backend = currentTvBackend();
   const heading = displayTitle(detail.title, detail.original_title, usePreferOriginalTitle());
   const nfoId = useId();
+  useRememberOpened({
+    kind: "show",
+    id: detail.id,
+    title: heading,
+    year: detail.year,
+    poster: detail.poster,
+  });
   const [nfoOpen, setNfoOpen] = useState(false);
   const { seasons, specials } = useMemo(() => listedSeasons(detail), [detail]);
   const first = openingSeason(seasons);

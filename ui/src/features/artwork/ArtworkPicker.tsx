@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../components/Button";
@@ -13,6 +13,7 @@ import { activeLocale } from "../../i18n/locale";
 import { cx } from "../../lib/cx";
 import { ProviderNotes } from "../scrape/CandidateList";
 import { ArtworkFooter } from "./ArtworkFooter";
+import { ArtworkLightbox } from "./ArtworkLightbox";
 import { ArtworkTile } from "./ArtworkGrid";
 import { tileMinWidth, useGridColumns } from "./gridLayout";
 import { ArtworkPreview } from "./ArtworkPreview";
@@ -23,8 +24,21 @@ import { choiceOfImage, releaseChoice } from "./artworkChoice";
 import { dropAttributes, useFileDrop, useNativeFileDrop } from "./artworkDrop";
 import { artworkLanguageLabel } from "./artworkLabels";
 import type { ArtworkCandidate } from "./artworkBackend";
-import { NO_TEXT, withFramesSettled, withoutLowQuality, FRAMES_PROVIDER } from "./artworkModel";
-import { hasLanguage, languageChoices, sortForPicker, typeName } from "./pickerModel";
+import {
+  NO_TEXT,
+  dimensions,
+  slotAspect,
+  withFramesSettled,
+  withoutLowQuality,
+  FRAMES_PROVIDER,
+} from "./artworkModel";
+import {
+  hasLanguage,
+  languageChoices,
+  providerLabel,
+  sortForPicker,
+  typeName,
+} from "./pickerModel";
 import type { PickerSort } from "./pickerModel";
 import { useArtworkSlots } from "./useArtworkSlots";
 
@@ -69,8 +83,10 @@ function languageLabel(value: string): string {
  * The artwork picker for one title: the type strip with its
  * counts, the language chips and sort menu, the grid of images with the current one pinned first,
  * "Use a file on this PC…" and "From a link…", and the large preview. A click only chooses and
- * shows the image in the preview; "Use this", Enter or a double click writes it. A picture dropped
- * anywhere on the page joins the preview the same way. Nothing is written until then.
+ * shows the image in the preview; "Use this" or Enter writes it. A double click on an image, Space
+ * on the chosen one, or the expand button on the preview opens it large (look only, nothing is
+ * chosen). A picture dropped anywhere on the page joins the preview the same way. Nothing is
+ * written until then.
  */
 export function ArtworkPicker({
   itemId,
@@ -97,6 +113,12 @@ export function ArtworkPicker({
   /** A picture of the user's (file, link) chosen instead of a candidate. */
   const [other, setOther] = useState<ArtworkChoice | null>(null);
   const applying = useRef(false);
+  /**
+   * The picture open large: a candidate's id, or `null` for whatever the preview pane shows. Only
+   * looks; it never changes what is chosen.
+   */
+  const [viewing, setViewing] = useState<{ id: string | null } | null>(null);
+  const closeViewing = useCallback(() => setViewing(null), []);
 
   const items = useMemo(() => state?.items ?? [], [state]);
   const online = (state?.providers ?? []).some(
@@ -213,6 +235,30 @@ export function ArtworkPicker({
   const currents = Object.fromEntries(
     Object.entries(states).map(([key, value]) => [key, placed[key] ?? value.current]),
   );
+  // What the large view shows: the candidate it was opened on, else what the preview pane shows.
+  const viewedCandidate =
+    viewing === null
+      ? null
+      : viewing.id !== null
+        ? (tiles.find((candidate) => candidate.id === viewing.id) ?? null)
+        : chosen?.kind === "candidate"
+          ? chosen.candidate
+          : chosen === null
+            ? current
+            : null;
+  const viewedUrl =
+    viewing !== null && viewing.id === null && (chosen?.kind === "file" || chosen?.kind === "link")
+      ? chosen.url
+      : null;
+  const stepViewing = useCallback(
+    (delta: -1 | 1) => {
+      const at = tiles.findIndex((candidate) => candidate.id === viewedCandidate?.id);
+      if (at === -1 || tiles.length < 2) return;
+      const next = tiles[(at + delta + tiles.length) % tiles.length];
+      if (next !== undefined) setViewing({ id: next.id });
+    },
+    [tiles, viewedCandidate],
+  );
   const useTip =
     current === null
       ? t("artworkPicker.use.tipNew", { type })
@@ -282,6 +328,17 @@ export function ArtworkPicker({
               }
               tabIndex={0}
               onKeyDown={(event) => {
+                // Space looks at the chosen image large instead of toggling it: the picker
+                // chooses one image, so there is nothing to toggle.
+                if (
+                  event.key === " " &&
+                  selection.current !== null &&
+                  keys.includes(selection.current)
+                ) {
+                  event.preventDefault();
+                  setViewing({ id: selection.current });
+                  return;
+                }
                 if (selection.onKeyDown(event)) {
                   event.preventDefault();
                   releaseChoice(other);
@@ -311,7 +368,7 @@ export function ArtworkPicker({
                       setOther(null);
                       pointer.onClick(event);
                     }}
-                    onDoubleClick={pointer.onDoubleClick}
+                    onDoubleClick={() => setViewing({ id: candidate.id })}
                   />
                 );
               })}
@@ -353,6 +410,7 @@ export function ArtworkPicker({
           current={current}
           names={names}
           width={batchMode ? "clamp(400px, 34vw, 520px)" : 420}
+          onExpand={() => setViewing({ id: null })}
           {...(batchMode ? { heading: `${t("artworkPicker.preview")} · ${typeName(slot)}` } : {})}
           actions={
             batch === undefined ? (
@@ -414,6 +472,28 @@ export function ArtworkPicker({
           {t("artworkPicker.drop", { type })}
         </div>
       </div>
+      {viewing !== null && (viewedCandidate !== null || viewedUrl !== null) ? (
+        <ArtworkLightbox
+          image={
+            viewedCandidate !== null
+              ? { kind: "candidate", image: viewedCandidate.image }
+              : { kind: "url", url: viewedUrl ?? "" }
+          }
+          caption={
+            viewedCandidate !== null
+              ? [typeName(slot), dimensions(viewedCandidate), providerLabel(viewedCandidate, names)]
+                  .filter(Boolean)
+                  .join(" · ")
+              : [
+                  typeName(slot),
+                  chosen?.kind === "file" ? chosen.name : t("artworkPicker.source.link"),
+                ].join(" · ")
+          }
+          aspect={slotAspect(slot)}
+          onClose={closeViewing}
+          {...(viewedCandidate === null ? {} : { onStep: stepViewing })}
+        />
+      ) : null}
     </div>
   );
 }

@@ -31,27 +31,109 @@ describe("the Torrents page search", () => {
     const user = userEvent.setup();
     await renderTorrents("/torrents?q=dune", backend, false);
     expect(await screen.findByTestId("torrent-notice")).toBeVisible();
-    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
     expect(backend.titleStarts).toHaveLength(0);
     await user.click(screen.getByRole("button", { name: "Got it" }));
-    expect(await screen.findByRole("searchbox", { name: "Search torrents" })).toBeVisible();
+    expect(await screen.findByRole("combobox", { name: "Search torrents" })).toBeVisible();
   });
 
-  it("finds the best match after the typing pause, names it and lists its releases", async () => {
+  it("suggests titles after the typing pause and searches no releases while typing", async () => {
     const backend = spiedBackend({ failing: [] });
     const user = userEvent.setup();
     await renderTorrents("/torrents", backend);
-    const field = await screen.findByRole("searchbox", { name: "Search torrents" });
+    const field = await screen.findByRole("combobox", { name: "Search torrents" });
     expect(screen.getByText("Type a movie or show to see its releases.")).toBeVisible();
     await user.type(field, "blade runner");
-    // No search while the typing goes on (the pause is 400 ms).
+    // No title lookup while the typing goes on (the pause is short but real).
     expect(backend.titleStarts).toHaveLength(0);
-    await waitFor(() => expect(backend.titleStarts.length).toBeGreaterThan(0), { timeout: 3000 });
+    const panel = await screen.findByRole(
+      "listbox",
+      { name: "Title suggestions" },
+      { timeout: 3000 },
+    );
     expect(backend.titleStarts.at(-1)?.query).toBe("blade runner");
-    expect((await screen.findAllByText("Blade Runner 2049 (2017)")).length).toBeGreaterThan(0);
+    // Titles, not torrents: poster rows with the type, the owned one marked.
+    const owned = await within(panel).findByRole("option", { name: /Blade Runner 2049 \(2017\)/ });
+    expect(owned).toHaveTextContent("In your library");
+    expect(within(panel).getAllByRole("option").length).toBeGreaterThan(1);
+    // Give a wrongly started search time to show itself.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(backend.releaseStarts).toHaveLength(0);
+    expect(screen.queryByRole("grid", { name: "Releases" })).toBeNull();
+    expect(screen.getByText("Type a movie or show to see its releases.")).toBeVisible();
+  });
+
+  it("starts the release search of exactly the picked title, and shows it as a chip", async () => {
+    const backend = spiedBackend({ failing: [] });
+    const user = userEvent.setup();
+    await renderTorrents("/torrents", backend);
+    await user.type(await screen.findByRole("combobox"), "blade runner");
+    await user.click(await screen.findByRole("option", { name: /Blade Runner 2049 \(2017\)/ }));
     await waitFor(() => expect(backend.releaseStarts.length).toBeGreaterThan(0), { timeout: 3000 });
+    expect(backend.releaseStarts.at(-1)?.params).toMatchObject({ kind: "movie", tmdbId: 1 });
+    const chip = await screen.findByTestId("picked-title");
+    expect(chip).toHaveTextContent("Blade Runner 2049 (2017)");
+    expect(chip).toHaveTextContent("Movie");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("combobox")).toHaveValue("Blade Runner 2049 (2017)");
     expect((await dataRows()).length).toBeGreaterThan(3);
     expect(await screen.findByText(/^\d+ results? · \d+ sources?$/)).toBeVisible();
+  });
+
+  it("takes the best suggestion with Enter when none is highlighted", async () => {
+    const backend = spiedBackend({ failing: [] });
+    const user = userEvent.setup();
+    await renderTorrents("/torrents", backend);
+    await user.type(await screen.findByRole("combobox"), "heat");
+    await screen.findByRole("option", { name: /Heat \(1995\)/ });
+    expect(backend.releaseStarts).toHaveLength(0);
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(backend.releaseStarts.length).toBeGreaterThan(0), { timeout: 3000 });
+    expect(await screen.findByTestId("picked-title")).toHaveTextContent("Heat (1995)");
+  });
+
+  it("picks with the arrow keys and Enter", async () => {
+    const backend = spiedBackend({ failing: [] });
+    const user = userEvent.setup();
+    await renderTorrents("/torrents", backend);
+    await user.type(await screen.findByRole("combobox"), "blade");
+    const options = await screen.findAllByRole("option");
+    expect(options.length).toBeGreaterThan(1);
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(screen.getByRole("combobox")).toHaveAttribute("aria-activedescendant", options[1]?.id);
+    const second = options[1]?.getAttribute("aria-label") ?? "";
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(backend.releaseStarts.length).toBeGreaterThan(0), { timeout: 3000 });
+    expect((await screen.findByTestId("picked-title")).textContent).toContain(
+      second.split(",")[0] ?? "",
+    );
+  });
+
+  it("clears the results when the title is changed with the chip's ×", async () => {
+    const backend = spiedBackend({ failing: [] });
+    const user = userEvent.setup();
+    await renderTorrents("/torrents?title=movie:1", backend);
+    expect((await dataRows()).length).toBeGreaterThan(3);
+    await user.click(screen.getByRole("button", { name: "Change title" }));
+    await waitFor(() => expect(screen.queryByRole("grid", { name: "Releases" })).toBeNull());
+    expect(screen.queryByTestId("picked-title")).toBeNull();
+    expect(screen.getByRole("combobox")).toHaveValue("");
+    expect(screen.getByRole("combobox")).toHaveFocus();
+    expect(screen.getByText("Type a movie or show to see its releases.")).toBeVisible();
+  });
+
+  it("drops the title and its results when the field is edited after a pick", async () => {
+    const backend = spiedBackend({ failing: [] });
+    const user = userEvent.setup();
+    const { router } = await renderTorrents("/torrents", backend);
+    await user.type(await screen.findByRole("combobox"), "heat");
+    await user.click(await screen.findByRole("option", { name: /Heat \(1995\)/ }));
+    await dataRows();
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ title: "movie:3" }));
+    await user.type(screen.getByRole("combobox"), "x");
+    await waitFor(() => expect(screen.queryByRole("grid", { name: "Releases" })).toBeNull());
+    expect(screen.queryByTestId("picked-title")).toBeNull();
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
   });
 
   it("opens with the title of the address and searches its releases at once", async () => {
@@ -65,7 +147,7 @@ describe("the Torrents page search", () => {
   it("says when nothing was found", async () => {
     const user = userEvent.setup();
     await renderTorrents("/torrents", spiedBackend({ failing: [] }));
-    await user.type(await screen.findByRole("searchbox"), "zzzzqqqq");
+    await user.type(await screen.findByRole("combobox"), "zzzzqqqq");
     expect(
       await screen.findByText("Nothing found for “zzzzqqqq”", {}, { timeout: 4000 }),
     ).toBeVisible();

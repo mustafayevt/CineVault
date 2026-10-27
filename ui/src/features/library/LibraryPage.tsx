@@ -37,6 +37,7 @@ export function LibraryPage() {
   const type = routed ?? remembered;
   const store = useLibraryStore.getState();
   const state = useLibraryStore((all) => (type === "collections" ? all.movies : all[type]));
+  const posterSize = useLibraryStore((all) => all.posterSize);
   const scanning = useScanUiStore((scan) => scan.starting);
 
   const counts = useQuery({
@@ -79,6 +80,8 @@ export function LibraryPage() {
         onType={goTo}
         view={state.view}
         onView={(view) => titles && store.setView(type, view)}
+        posterSize={posterSize}
+        onPosterSize={store.setPosterSize}
         sort={state.sort}
         onSort={(sort) => titles && store.setSort(type, sort)}
         columns={SWITCHABLE_COLUMNS.map((id) => ({

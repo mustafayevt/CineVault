@@ -1,7 +1,8 @@
 import { Check, TriangleAlert } from "lucide-react";
 
-import { t } from "../i18n/catalog";
 import { cx } from "../lib/cx";
+import { stageWord } from "./stageWord";
+import { Tooltip } from "./Tooltip";
 
 /** A title's stage, or `attention` for a title that needs the user (not matched, needs review). */
 export type StageBadgeKind = "new" | "scraped" | "renamed" | "attention";
@@ -13,29 +14,10 @@ interface StageBadgeProps {
   className?: string;
 }
 
-/**
- * The stage glyph of a row or poster corner: a green check for Scraped and Renamed, an orange
- * warning for what needs attention, a hollow muted dot for New. Always named (role img + label),
- * so state is never colour alone.
- */
-export function StageBadge({ stage, label, className }: StageBadgeProps) {
-  const name =
-    label ??
-    (stage === "new"
-      ? t("stage.new")
-      : stage === "scraped"
-        ? t("stage.scraped")
-        : stage === "renamed"
-          ? t("stage.renamed")
-          : t("stage.flag.needsReview"));
+/** The glyph alone: a green check, an orange warning, or a hollow muted dot. */
+export function StageGlyph({ stage }: { stage: StageBadgeKind }) {
   return (
-    <span
-      role="img"
-      aria-label={name}
-      title={name}
-      data-stage={stage}
-      className={cx("inline-flex size-4 shrink-0 items-center justify-center", className)}
-    >
+    <>
       {stage === "new" && (
         <span
           aria-hidden="true"
@@ -60,6 +42,31 @@ export function StageBadge({ stage, label, className }: StageBadgeProps) {
           className="text-warn"
         />
       )}
-    </span>
+    </>
+  );
+}
+
+/**
+ * The stage glyph of a row or poster corner: a green check for Scraped and Renamed, an orange
+ * warning for what needs attention, a hollow muted dot for New. Always named (role img + label),
+ * so state is never colour alone. The name is also its tooltip (the app's, never a native one),
+ * and the glyph is not a control, so the pointer stays an arrow over it.
+ */
+export function StageBadge({ stage, label, className }: StageBadgeProps) {
+  const name = label ?? stageWord(stage);
+  return (
+    <Tooltip content={name}>
+      <span
+        role="img"
+        aria-label={name}
+        data-stage={stage}
+        className={cx(
+          "inline-flex size-4 shrink-0 cursor-default items-center justify-center",
+          className,
+        )}
+      >
+        <StageGlyph stage={stage} />
+      </span>
+    </Tooltip>
   );
 }

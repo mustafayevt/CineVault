@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
@@ -11,6 +12,9 @@ import { t } from "../i18n/catalog";
 import { cx } from "../lib/cx";
 import { ContextMenu } from "./ContextMenu";
 import { Icon } from "./Icon";
+import { MenuSeparator } from "./Menu";
+import { MenuItem } from "./MenuItem";
+import { beginHeaderDrag, beginResize, measureColumn } from "./tableInteractions";
 import {
   arrangeColumns,
   clampWidth,
@@ -87,20 +91,13 @@ interface TableProps<T, K extends ListKey> {
 }
 
 const HEADER_HEIGHT = 30;
-const DRAG_THRESHOLD = 4;
-
-interface Drag {
-  id: string;
-  startX: number;
-  moved: boolean;
-  /** Where the header would land in the displayed order. */
-  to: number;
-}
 
 /**
  * The one table: virtualised rows, a sticky 30px header in 12/600
- * muted text with sort arrows, columns the user can resize (drag the edge, or arrows on its handle)
- * and reorder (drag a header, or Alt+Left/Right), remembered under `storageKey`. Rows are 34px with
+ * muted text with sort arrows, columns the user can resize (drag the edge, double-click it to fit
+ * the content, or arrows on its handle) and reorder (drag a header, "Move left/right" in the header
+ * menu, or Alt+Left/Right), remembered under `storageKey`. Drags move the DOM directly and commit
+ * once on release (see `tableInteractions`), so the rows never render while the pointer moves. Rows are 34px with
  * a hairline; hover and pressed take the next rungs, a selected row the gold tint, the current row a
  * 2px gold edge. Selection follows `useListSelection`; the menu key and right-click open `menu`.
  * The first and last columns sit on the 24px content inset.
@@ -124,11 +121,14 @@ export function Table<T, K extends ListKey>({
 }: TableProps<T, K>) {
   const id = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<TableLayout>(() => readLayout(storageKey));
-  const [live, setLive] = useState<{ id: string; width: number } | null>(null);
-  const [drag, setDrag] = useState<Drag | null>(null);
+  const headerGroupRef = useRef<HTMLDivElement>(null);
+  const bodyGroupRef = useRef<HTMLDivElement>(null);
+  const markerRef = useRef<HTMLDivElement>(null);
+  const cancelDrag = useRef<(() => void) | null>(null);
   const suppressClick = useRef(false);
+  // A drag that is still going when the table goes away is ended, not left holding the window.
+  useEffect(() => () => cancelDrag.current?.(), []);
 
   const saveLayout = (next: TableLayout) => {
     setLayout(next);
@@ -136,6 +136,7 @@ export function Table<T, K extends ListKey>({
   };
 
   const [menuOnHeader, setMenuOnHeader] = useState(false);
+  const [menuColumn, setMenuColumn] = useState<string | null>(null);
 
   // A sortable column is never narrower than its label and sort arrow need.
   const floored = useMemo(
@@ -151,23 +152,21 @@ export function Table<T, K extends ListKey>({
       }),
     [columns],
   );
-  const arranged = useMemo(() => arrangeColumns(floored, layout), [floored, layout]);
+  // A column the user gave a width stops taking the room left over: its edge then follows the pointer.
+  const arranged = useMemo(
+    () =>
+      arrangeColumns(floored, layout).map((column) =>
+        column.grow === true && layout.widths[column.id] !== undefined
+          ? { ...column, grow: false }
+          : column,
+      ),
+    [floored, layout],
+  );
   const fixedIds = useMemo(
     () => new Set(columns.filter((c) => c.fixed === true).map((c) => c.id)),
     [columns],
   );
-  const shown = useMemo(() => {
-    const sized = arranged.map((c) => (live?.id === c.id ? { ...c, width: live.width } : c));
-    if (drag === null || !drag.moved) return sized;
-    const order = moveColumn(
-      sized.map((c) => c.id),
-      fixedIds,
-      drag.id,
-      drag.to,
-    );
-    if (order === null) return sized;
-    return order.flatMap((columnId) => sized.filter((c) => c.id === columnId));
-  }, [arranged, live, drag, fixedIds]);
+  const shown = arranged;
   const totalWidth = shown.reduce((sum, c) => sum + c.width, 0);
 
   // TanStack Virtual returns functions the compiler cannot memoize; this component opts out of it.
@@ -207,80 +206,59 @@ export function Table<T, K extends ListKey>({
   const resizeTo = (columnId: string, width: number, min?: number) =>
     saveLayout({ ...layout, widths: { ...layout.widths, [columnId]: clampWidth(width, min) } });
 
-  /**
-   * Where a dragged header would be inserted, from the pointer's x over the columns' resting
-   * places (not the live order, which would move under the pointer while it drags).
-   */
-  const dropIndex = (clientX: number): number => {
-    const left = headerRef.current?.getBoundingClientRect().left ?? 0;
-    let edge = left;
-    let index = 0;
-    for (const column of arranged) {
-      if (clientX >= edge + column.width / 2) index += 1;
-      edge += column.width;
-    }
-    return index;
-  };
-
   const startHeaderDrag = (columnId: string, event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || fixedIds.has(columnId)) return;
     if ((event.target as HTMLElement).closest('[role="separator"]') !== null) return;
+    const grid = scrollRef.current;
+    if (grid === null) return;
     // Window listeners, not pointer capture: a press that does not move stays a click on the
     // header's sort button.
-    const from = arranged.findIndex((c) => c.id === columnId);
-    let state: Drag = { id: columnId, startX: event.clientX, moved: false, to: from };
-    const move = (moveEvent: PointerEvent) => {
-      const moved = state.moved || Math.abs(moveEvent.clientX - state.startX) > DRAG_THRESHOLD;
-      if (!moved) return;
-      const over = dropIndex(moveEvent.clientX);
-      state = { ...state, moved, to: over > from ? over - 1 : over };
-      setDrag(state);
-    };
-    const end = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
-      setDrag(null);
-      if (!state.moved) return;
-      suppressClick.current = true;
-      const order = moveColumn(
-        arranged.map((c) => c.id),
-        fixedIds,
-        state.id,
-        state.to,
-      );
-      if (order !== null) persistOrder(order);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
+    cancelDrag.current?.();
+    cancelDrag.current = beginHeaderDrag({
+      grid,
+      marker: markerRef.current,
+      columnId,
+      columns: arranged.map((c) => ({ id: c.id, width: c.width, fixed: fixedIds.has(c.id) })),
+      startX: event.clientX,
+      onEnd: (dragged) => {
+        cancelDrag.current = null;
+        if (!dragged) return;
+        // The click that follows a drag's release is not a sort.
+        suppressClick.current = true;
+        window.setTimeout(() => (suppressClick.current = false), 0);
+      },
+      onCommit: (order) => flushSync(() => persistOrder(order)),
+    });
   };
 
   const startResize = (
     column: (typeof arranged)[number],
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
-    if (event.button !== 0) return;
+    const grid = scrollRef.current;
+    if (event.button !== 0 || grid === null) return;
     event.preventDefault();
     event.stopPropagation();
-    const handle = event.currentTarget;
-    handle.setPointerCapture?.(event.pointerId);
-    const startX = event.clientX;
-    let latest = column.width;
-    const move = (moveEvent: PointerEvent) => {
-      latest = clampWidth(column.width + moveEvent.clientX - startX, column.minWidth);
-      setLive({ id: column.id, width: latest });
-    };
-    const end = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", end);
-      handle.removeEventListener("pointercancel", end);
-      setLive(null);
-      if (latest !== column.width) resizeTo(column.id, latest, column.minWidth);
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
+    const header = event.currentTarget.closest<HTMLElement>("[data-column]");
+    beginResize({
+      grid,
+      handle: event.currentTarget,
+      pointerId: event.pointerId,
+      columnId: column.id,
+      startX: event.clientX,
+      startWidth: header?.getBoundingClientRect().width || column.width,
+      minWidth: column.minWidth ?? MIN_COLUMN_WIDTH,
+      groups: [headerGroupRef.current, bodyGroupRef.current],
+      totalWidth,
+      onCommit: (width) => flushSync(() => resizeTo(column.id, width, column.minWidth)),
+    });
+  };
+
+  const fitColumn = (column: (typeof arranged)[number]) => {
+    const grid = scrollRef.current;
+    if (grid === null) return;
+    const width = measureColumn(grid, column.id);
+    if (width > 0) resizeTo(column.id, width, column.minWidth);
   };
 
   const onSort = (column: TableColumn<T>) => {
@@ -338,17 +316,31 @@ export function Table<T, K extends ListKey>({
       onKeyDown={onGridKeyDown}
       className={cx(
         "relative min-h-0 overflow-auto bg-surface-window text-(length:--fs-13) text-text outline-none",
+        // While a header is dragged the whole table shows the grabbing hand.
+        "[&[data-reordering]_*]:cursor-grabbing! [&[data-resizing]_*]:cursor-col-resize!",
         className,
       )}
     >
-      <div role="rowgroup" className="sticky top-0 z-10" style={{ minWidth: totalWidth }}>
+      <div
+        ref={headerGroupRef}
+        role="rowgroup"
+        className="sticky top-0 z-10"
+        style={{ minWidth: totalWidth }}
+      >
         <div
-          ref={headerRef}
           role="row"
           aria-rowindex={1}
           data-table-header=""
-          className="flex h-(--h-thead) border-b border-solid border-line-section bg-surface-window"
+          className="relative flex h-(--h-thead) border-b border-solid border-line-section bg-surface-window select-none"
         >
+          {/* Where the dragged header would land; moved by the drag, hidden otherwise. */}
+          <div
+            ref={markerRef}
+            aria-hidden="true"
+            data-drop-marker=""
+            style={{ display: "none" }}
+            className="pointer-events-none absolute top-0 left-0 z-30 h-full w-0.5 bg-gold"
+          />
           {shown.map((column, index) => {
             const sorted = sort?.column === column.id ? sort.direction : null;
             const last = index === shown.length - 1;
@@ -370,7 +362,7 @@ export function Table<T, K extends ListKey>({
                         : "descending"
                 }
                 data-column={column.id}
-                data-dragging={drag?.moved === true && drag.id === column.id ? "" : undefined}
+                data-col={column.id}
                 onPointerDown={(event) => startHeaderDrag(column.id, event)}
                 onKeyDown={(event) => {
                   if (!event.altKey || column.fixed === true) return;
@@ -384,7 +376,7 @@ export function Table<T, K extends ListKey>({
                   !last &&
                     shown[index + 1]?.bare !== true &&
                     "border-r border-solid border-line-row",
-                  "data-[dragging]:bg-surface-card",
+                  "data-[lifted]:z-20 data-[lifted]:bg-surface-card data-[lifted]:shadow-floating",
                 )}
               >
                 {column.sortable === true ? (
@@ -437,15 +429,8 @@ export function Table<T, K extends ListKey>({
                     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
                     tabIndex={0}
                     onPointerDown={(event) => startResize(column, event)}
-                    onDoubleClick={() => {
-                      // Double-clicking the edge gives the column its default width back.
-                      const widths = Object.fromEntries(
-                        Object.entries(layout.widths).filter(
-                          ([columnId]) => columnId !== column.id,
-                        ),
-                      );
-                      saveLayout({ ...layout, widths });
-                    }}
+                    // Double-clicking the edge fits the column to its widest visible content.
+                    onDoubleClick={() => fitColumn(column)}
                     onKeyDown={(event) => {
                       const direction =
                         event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -455,9 +440,9 @@ export function Table<T, K extends ListKey>({
                       resizeTo(column.id, column.width + direction * RESIZE_STEP, column.minWidth);
                     }}
                     className={cx(
-                      "absolute top-0 z-10 h-full w-2 cursor-col-resize outline-none",
+                      "absolute top-0 z-10 h-full w-2.5 cursor-col-resize touch-none outline-none",
                       "focus-visible:bg-gold-tint-edge hover:bg-line-edge",
-                      last ? "right-0" : "-right-1",
+                      last ? "right-0" : "-right-[5px]",
                     )}
                   />
                 )}
@@ -470,6 +455,7 @@ export function Table<T, K extends ListKey>({
         <div className="px-6 py-4 text-text-muted">{empty}</div>
       ) : (
         <div
+          ref={bodyGroupRef}
           role="rowgroup"
           className="relative"
           style={{ height: virtualizer.getTotalSize() + bottomRoom, minWidth: totalWidth }}
@@ -517,9 +503,11 @@ export function Table<T, K extends ListKey>({
                     key={column.id}
                     role="gridcell"
                     aria-colindex={index + 1}
+                    data-col={column.id}
                     style={columnStyle(column)}
                     className={cx(
-                      "flex h-full min-w-0 items-center overflow-hidden whitespace-nowrap",
+                      "relative flex h-full min-w-0 items-center overflow-hidden whitespace-nowrap",
+                      "data-[lifted]:z-10 data-[lifted]:bg-surface-card",
                       edgePadding(index),
                       cellAlign(column.align),
                     )}
@@ -535,13 +523,52 @@ export function Table<T, K extends ListKey>({
     </div>
   );
 
+  // "Move left" and "Move right" for the column that was right-clicked: the keyboard path to a
+  // reorder, next to the column chooser. Fixed columns and the ends of the row have nothing to move to.
+  const menuIds = arranged.map((c) => c.id);
+  const menuIndex = menuColumn === null ? -1 : menuIds.indexOf(menuColumn);
+  const canMove = (delta: -1 | 1) =>
+    menuColumn !== null && moveColumn(menuIds, fixedIds, menuColumn, menuIndex + delta) !== null;
+  const moveItems =
+    menuColumn === null || fixedIds.has(menuColumn) ? null : (
+      <>
+        <MenuItem
+          icon={ArrowLeft}
+          disabledReason={canMove(-1) ? undefined : t("library.table.firstPlace")}
+          onSelect={() => moveBy(menuColumn, -1)}
+        >
+          {t("library.table.moveLeft")}
+        </MenuItem>
+        <MenuItem
+          icon={ArrowRight}
+          disabledReason={canMove(1) ? undefined : t("library.table.lastPlace")}
+          onSelect={() => moveBy(menuColumn, 1)}
+        >
+          {t("library.table.moveRight")}
+        </MenuItem>
+        <MenuSeparator />
+      </>
+    );
+
   if (menu === undefined && headerMenu === undefined) return grid;
   return (
     <ContextMenu
-      menu={menuOnHeader && headerMenu !== undefined ? headerMenu : menu}
+      menu={
+        menuOnHeader && headerMenu !== undefined ? (
+          <>
+            {moveItems}
+            {headerMenu}
+          </>
+        ) : (
+          menu
+        )
+      }
       onTarget={(target) => {
         const onHeader = target.closest("[data-table-header]") !== null;
         setMenuOnHeader(onHeader);
+        setMenuColumn(
+          onHeader ? (target.closest<HTMLElement>("[data-column]")?.dataset.column ?? null) : null,
+        );
         if (onHeader) return;
         const key = keyOfElement(target);
         if (key !== null) selection.target(key);
