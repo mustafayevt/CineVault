@@ -40,7 +40,7 @@
 
 ## 11. Aspect ratio
 
-- [ ] 11.1 Check and fix aspect ratio detection so ratios wider than the frame are reported. Verified by cv-media tests.
+- [x] 11.1 Check and fix aspect ratio detection so ratios wider than the frame are reported. Verified by cv-media tests.
 
 ## 12. Torrent title picker
 
