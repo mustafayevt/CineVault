@@ -13,6 +13,6 @@ export function destinationOf(pathname: string): Destination | null {
   if (under("/drives")) return "drives";
   if (under("/torrents")) return "torrents";
   if (under("/history")) return "history";
-  if (under("/settings")) return "settings";
+  if (under("/settings") || under("/release-notes")) return "settings";
   return null;
 }

@@ -2,6 +2,8 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { MotionConfig } from "motion/react";
 import { useMemo } from "react";
 
+import { WhatsNewCard } from "../changelog/WhatsNewCard";
+import { useWhatsNew } from "../changelog/useWhatsNew";
 import { DeleteConfirmDialog } from "../delete/DeleteConfirmDialog";
 import { PermanentDeleteDialog } from "../delete/PermanentDeleteDialog";
 import { JobAnnouncer } from "../jobs/JobAnnouncer";
@@ -70,6 +72,7 @@ export function AppShell({ platform = defaultPlatform, windowApi }: AppShellProp
   useRefreshDuringScan();
   useUndoShortcut(platform);
   useUpdateChecks();
+  useWhatsNew();
   useRouteFocus();
   const history = useNavigationHistory();
   useDesktopGuards({ back: history.back, forward: history.forward });
@@ -114,6 +117,7 @@ export function AppShell({ platform = defaultPlatform, windowApi }: AppShellProp
         <MoveToHost />
         <DeleteConfirmDialog />
         <PermanentDeleteDialog />
+        <WhatsNewCard />
         <ToastViewport platform={platform} />
         <JobAnnouncer />
       </div>

@@ -10,6 +10,8 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     host: "127.0.0.1",
+    // CHANGELOG.md at the repository root is bundled into the app (`?raw` import).
+    fs: { allow: [".."] },
   },
   build: {
     target: "es2022",

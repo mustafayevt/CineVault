@@ -697,4 +697,18 @@ export const settings = {
   "settingsPage.updates.on": "checked {date} at {time}",
   "settingsPage.updates.downloading": "Downloading CineVault {version} · {percent}%",
   "settingsPage.updates.installOnClose": "Install updates when I close the app",
+  "settingsPage.updates.releaseNotes": "Release notes",
+  "settingsPage.updates.releaseNotes.hint": "What changed in each version of CineVault",
+  "settingsPage.updates.releaseNotes.open": "See all changes",
+
+  // What's new after an update, and the release notes page
+  "changelog.whatsNew.title": "Updated to CineVault {version}",
+  "changelog.whatsNew.subtitle": "What's new",
+  "changelog.whatsNew.seeAll": "See all changes",
+  "changelog.page.title": "Release notes",
+  "changelog.page.back": "Back",
+  "changelog.page.intro": "What changed in each version of CineVault.",
+  "changelog.page.version": "Version {version}",
+  "changelog.page.unreleased": "Coming next",
+  "changelog.page.current": "Installed",
 } as const;

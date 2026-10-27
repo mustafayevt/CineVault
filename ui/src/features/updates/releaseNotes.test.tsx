@@ -112,3 +112,19 @@ describe("the release notes in Settings, Updates", () => {
     expect(screen.queryByTestId("release-notes")).toBeNull();
   });
 });
+
+describe("links in bundled notes", () => {
+  it("are read only when asked for, and only for https addresses", () => {
+    const text =
+      "See [the page](https://example.test/a) and [bad](javascript:alert(1)) and **bold**";
+    expect(spansOf(text).some((span) => span.href !== undefined)).toBe(false);
+    const spans = spansOf(text, { links: true });
+    expect(spans.filter((span) => span.href !== undefined)).toEqual([
+      { text: "the page", bold: false, href: "https://example.test/a" },
+    ]);
+    expect(spans.map((span) => span.text).join("")).toBe(
+      "See the page and [bad](javascript:alert(1)) and bold",
+    );
+    expect(spans.at(-1)).toEqual({ text: "bold", bold: true });
+  });
+});

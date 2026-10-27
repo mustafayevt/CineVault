@@ -36,6 +36,7 @@ import {
 import { downloadTools, queueRecommendedTools } from "./setupTools";
 import { FoldersStep, NamingStep, RatingsStep, Stepper, TmdbStep } from "./SetupSteps";
 import type { Step } from "./SetupSteps";
+import { markCurrentVersionSeen } from "../changelog/whatsNew";
 import { useFolderDrop } from "./useFolderDrop";
 
 /** The setting that remembers the first-run setup was finished or left. */
@@ -247,6 +248,8 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
         }
       }
       useSettingsStore.getState().set(ONBOARDING_DONE_KEY, true);
+      // A new install has nothing to catch up on: the version it starts with counts as seen.
+      await markCurrentVersionSeen();
       await settleSettingSaves();
       // In the background: the scan reads the video details as soon as MediaInfo is there.
       const queued = await queueRecommendedTools();

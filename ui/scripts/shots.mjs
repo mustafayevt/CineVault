@@ -99,6 +99,7 @@ const ALL_ROUTES = [
   "/torrents?title=movie:1",
   "/torrents?title=show:1&season=1&episode=2",
   "/history",
+  "/release-notes",
   "/settings",
   "/welcome",
   "/gallery",

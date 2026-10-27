@@ -9,10 +9,12 @@ export type NotesBlock =
   | { kind: "paragraph"; text: string }
   | { kind: "list"; items: string[] };
 
-/** A part of a line: plain text, or text in bold. */
+/** A part of a line: plain text, text in bold, or (only where links are allowed) a link. */
 export interface NotesSpan {
   text: string;
   bold: boolean;
+  /** An https address; set only when `spansOf` was asked for links. */
+  href?: string;
 }
 
 const HEADING = /^#{1,6}\s+(.*)$/;
@@ -66,8 +68,10 @@ export function parseNotes(notes: string): NotesBlock[] {
   return blocks;
 }
 
-/** A line cut into plain and `**bold**` parts. An unclosed `**` stays as typed. */
-export function spansOf(text: string): NotesSpan[] {
+const LINK = /\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g;
+
+/** Bold and plain parts of a piece of text with no links in it. */
+function boldSpans(text: string): NotesSpan[] {
   const spans: NotesSpan[] = [];
   const parts = text.split("**");
   // An odd number of markers leaves the last one unmatched: it is text, not bold.
@@ -79,5 +83,23 @@ export function spansOf(text: string): NotesSpan[] {
       spans.push({ text: (index === closed ? "**" : "") + part, bold: false });
     }
   });
+  return spans;
+}
+
+/**
+ * A line cut into plain and `**bold**` parts. An unclosed `**` stays as typed. With
+ * `links` on, `[text](https://address)` also becomes a link span; only https addresses count,
+ * anything else stays text. Notes from the update channel are read with links off.
+ */
+export function spansOf(text: string, options: { links?: boolean } = {}): NotesSpan[] {
+  if (options.links !== true) return boldSpans(text);
+  const spans: NotesSpan[] = [];
+  let last = 0;
+  for (const match of text.matchAll(LINK)) {
+    spans.push(...boldSpans(text.slice(last, match.index)));
+    spans.push({ text: match[1] ?? "", bold: false, href: match[2] ?? "" });
+    last = match.index + match[0].length;
+  }
+  spans.push(...boldSpans(text.slice(last)));
   return spans;
 }

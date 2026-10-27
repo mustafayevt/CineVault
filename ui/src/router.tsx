@@ -10,6 +10,7 @@ import { ArtworkPage } from "./features/artwork/ArtworkPage";
 import { validateArtworkSearch } from "./features/artwork/artworkSearch";
 import { DrivesPage } from "./features/drives/DrivesPage";
 import { HistoryPage } from "./features/history/HistoryPage";
+import { ReleaseNotesPage } from "./features/changelog/ReleaseNotesPage";
 import { LibraryPage } from "./features/library/LibraryPage";
 import { MovieEditPage, ShowEditPage } from "./features/edit/EditDetailsPage";
 import { MoviePage } from "./features/movie/MoviePage";
@@ -157,6 +158,12 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
+const releaseNotesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/release-notes",
+  component: ReleaseNotesPage,
+});
+
 const welcomeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/welcome",
@@ -240,6 +247,7 @@ const routeTree = rootRoute.addChildren([
   torrentsRoute,
   historyRoute,
   settingsRoute,
+  releaseNotesRoute,
   welcomeRoute,
   ...devRoutes,
   legacySeasonRoute,

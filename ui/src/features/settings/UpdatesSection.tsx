@@ -1,3 +1,5 @@
+import { useRouter } from "@tanstack/react-router";
+
 import { Button } from "../../components/Button";
 import { Switch } from "../../components/Switch";
 import { t } from "../../i18n/catalog";
@@ -107,6 +109,8 @@ export function UpdatesSection() {
   const installOnClose = useSettingsStore((state) => state.values[INSTALL_ON_CLOSE_KEY] === true);
   // The notes of the version that is offered, until it is installed or the offer goes.
   const offer = useUpdateStore((state) => state.offer);
+  // Without a router (a section drawn on its own) the link has nowhere to go and is left out.
+  const router = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
   return (
     <SettingsSection id="updates" title={t("settingsPage.updates.title")}>
       <FormRow
@@ -133,6 +137,20 @@ export function UpdatesSection() {
         </div>
       </FormRow>
       {offer === null ? null : <ReleaseNotes offer={offer} />}
+      {router === undefined ? null : (
+        <FormRow
+          label={t("settingsPage.updates.releaseNotes")}
+          hint={t("settingsPage.updates.releaseNotes.hint")}
+        >
+          <Button
+            onClick={() => {
+              void router.navigate({ to: "/release-notes" });
+            }}
+          >
+            {t("settingsPage.updates.releaseNotes.open")}
+          </Button>
+        </FormRow>
+      )}
     </SettingsSection>
   );
 }
