@@ -1,12 +1,13 @@
 //! Reads for the library operations that move, remove or delete titles: which items
 //! make up a title, which files they own, and whether anyone else shares the title's folder.
 //!
-//! Paths are absolute in the native syntax and compared without regard to case, like the rest of
-//! the library paths.
+//! Paths are absolute in the native syntax and compared the way the platform compares file names:
+//! without regard to case on Windows and macOS, exactly on Linux (see [`super::path_case`]).
 
 use cv_domain::ItemId;
 use rusqlite::{Connection, OptionalExtension, params};
 
+use super::path_case::fold;
 use crate::error::DbResult;
 
 /// A file recorded for a title.
@@ -32,14 +33,12 @@ impl OwnedFile {
     }
 }
 
-/// True when `path` is `root` or lies below it, ignoring case and the kind of separator.
+/// True when `path` is `root` or lies below it, ignoring the kind of separator and, where file
+/// names ignore case (Windows, macOS), the case.
 #[must_use]
 pub fn lies_under(path: &str, root: &str) -> bool {
-    let fold = |text: &str| {
-        text.trim_end_matches(['\\', '/'])
-            .to_lowercase()
-            .replace('\\', "/")
-    };
+    let fold =
+        |text: &str| cv_fs::paths::fold_name(text.trim_end_matches(['\\', '/'])).replace('\\', "/");
     let (path, root) = (fold(path), fold(root));
     path == root
         || path
@@ -89,10 +88,10 @@ pub fn files_of_items(conn: &Connection, ids: &[ItemId]) -> DbResult<Vec<OwnedFi
 /// `column` is the folder or lies below it, as an SQL condition over `?1` (the folder without a
 /// trailing separator) and `?2` (its length in characters).
 fn under(column: &str) -> String {
-    format!(
-        "(lower({column}) = lower(?1) \
-          OR lower(substr({column}, 1, ?2 + 1)) IN (lower(?1) || '\\', lower(?1) || '/'))"
-    )
+    let own = fold(column);
+    let head = fold(&format!("substr({column}, 1, ?2 + 1)"));
+    let folder = fold("?1");
+    format!("({own} = {folder} OR {head} IN ({folder} || '\\', {folder} || '/'))")
 }
 
 /// The items outside the tree of `root` that live in `folder` or below it: an item whose own
@@ -337,10 +336,12 @@ mod tests {
             1,
         )
         .unwrap();
-        assert_eq!(
-            delete_fingerprints_under(&conn, r"d:\movies\heat").unwrap(),
-            2
-        );
+        // Another spelling of the folder is the same folder on Windows and macOS, and another
+        // folder on Linux, where it removes nothing.
+        let wrong_case = delete_fingerprints_under(&conn, r"d:\movies\heat").unwrap();
+        assert_eq!(wrong_case, if cv_fs::paths::CASE_SENSITIVE { 0 } else { 2 });
+        let exact = delete_fingerprints_under(&conn, r"D:\Movies\Heat").unwrap();
+        assert_eq!(exact, if cv_fs::paths::CASE_SENSITIVE { 2 } else { 0 });
         assert_eq!(
             crate::repo::fingerprint::count_fingerprints(&conn).unwrap(),
             1

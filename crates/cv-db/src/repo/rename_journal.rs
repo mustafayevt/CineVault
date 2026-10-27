@@ -13,6 +13,7 @@
 use rusqlite::{Connection, Row, params};
 
 use super::library_ops::lies_under;
+use super::path_case::fold;
 use crate::error::DbResult;
 
 /// Told about every path change the library followed, after it is committed.
@@ -387,7 +388,7 @@ fn split_path(path: &str) -> (&str, &str) {
     }
 }
 
-/// Points the `media_file` rows of the file at `from` to `to`. Matching ignores ASCII case, like
+/// Points the `media_file` rows of the file at `from` to `to`. Matching ignores ASCII case (not on Linux), like
 /// the volumes CineVault runs on. Returns the number of `media_file` rows changed.
 ///
 /// When the file is a video and its item's folder (`item.path`) is the folder the video leaves,
@@ -398,15 +399,28 @@ pub fn repoint_file(conn: &Connection, from: &str, to: &str) -> DbResult<u64> {
     let (old_dir, old_name) = split_path(from);
     let (new_dir, new_name) = split_path(to);
     conn.execute(
-        "UPDATE item SET path = ?1 \
-         WHERE lower(path) = lower(?2) AND ?1 <> ?2 AND id IN ( \
-             SELECT item_id FROM media_file \
-             WHERE kind = 'video' AND lower(directory) = lower(?2) AND lower(filename) = lower(?3))",
+        &format!(
+            "UPDATE item SET path = ?1 \
+             WHERE {path} = {dir2} AND ?1 <> ?2 AND id IN ( \
+                 SELECT item_id FROM media_file \
+                 WHERE kind = 'video' AND {directory} = {dir2} AND {filename} = {name3})",
+            path = fold("path"),
+            directory = fold("directory"),
+            filename = fold("filename"),
+            dir2 = fold("?2"),
+            name3 = fold("?3"),
+        ),
         params![new_dir, old_dir, old_name],
     )?;
     let changed = conn.execute(
-        "UPDATE media_file SET directory = ?1, filename = ?2 \
-         WHERE lower(directory) = lower(?3) AND lower(filename) = lower(?4)",
+        &format!(
+            "UPDATE media_file SET directory = ?1, filename = ?2 \
+             WHERE {directory} = {dir3} AND {filename} = {name4}",
+            directory = fold("directory"),
+            filename = fold("filename"),
+            dir3 = fold("?3"),
+            name4 = fold("?4"),
+        ),
         params![new_dir, new_name, old_dir, old_name],
     )?;
     Ok(u64::try_from(changed).unwrap_or(u64::MAX))
@@ -424,8 +438,10 @@ pub fn repoint_folder(conn: &Connection, from: &str, to: &str) -> DbResult<u64> 
         changed += conn.execute(
             &format!(
                 "UPDATE {table} SET {column} = ?1 || substr({column}, ?2 + 1) \
-                 WHERE lower(substr({column}, 1, ?2)) = lower(?3) \
-                   AND (length({column}) = ?2 OR substr({column}, ?2 + 1, 1) IN ('\\', '/'))"
+                 WHERE {head} = {old3} \
+                   AND (length({column}) = ?2 OR substr({column}, ?2 + 1, 1) IN ('\\', '/'))",
+                head = fold(&format!("substr({column}, 1, ?2)")),
+                old3 = fold("?3"),
             ),
             params![new, old_len, old],
         )?;
@@ -479,15 +495,21 @@ fn reassign_data_sources(conn: &Connection, folder: &str) -> DbResult<()> {
 }
 
 /// The id of the library item that owns the file at `path` (absolute, native separators), if
-/// the library knows the file. Matching ignores ASCII case, like [`repoint_file`]. Organize asks
+/// the library knows the file. Matching follows the platform like [`repoint_file`]. Organize asks
 /// it to tell a destination another item owns from a stray file.
 pub fn owner_of_file(conn: &Connection, path: &str) -> DbResult<Option<i64>> {
     let (dir, name) = split_path(path);
     let found = conn
         .query_row(
-            "SELECT item_id FROM media_file \
-             WHERE lower(directory) = lower(?1) AND lower(filename) = lower(?2) \
-             ORDER BY id LIMIT 1",
+            &format!(
+                "SELECT item_id FROM media_file \
+                 WHERE {} = {} AND {} = {} \
+                 ORDER BY id LIMIT 1",
+                fold("directory"),
+                fold("?1"),
+                fold("filename"),
+                fold("?2"),
+            ),
             params![dir, name],
             |row| row.get(0),
         )
@@ -500,14 +522,22 @@ pub fn owner_of_file(conn: &Connection, path: &str) -> DbResult<Option<i64>> {
 }
 
 /// The id of the library item that owns the folder at `path` (absolute): the item whose folder it
-/// is, or one with a file directly inside it. Matching ignores ASCII case.
+/// is, or one with a file directly inside it. Matching follows the platform like [`repoint_file`].
 pub fn owner_of_folder(conn: &Connection, path: &str) -> DbResult<Option<i64>> {
     let folder = path.trim_end_matches(['\\', '/']);
     for sql in [
-        "SELECT id FROM item WHERE lower(path) = lower(?1) ORDER BY id LIMIT 1",
-        "SELECT item_id FROM media_file WHERE lower(directory) = lower(?1) ORDER BY id LIMIT 1",
+        format!(
+            "SELECT id FROM item WHERE {} = {} ORDER BY id LIMIT 1",
+            fold("path"),
+            fold("?1")
+        ),
+        format!(
+            "SELECT item_id FROM media_file WHERE {} = {} ORDER BY id LIMIT 1",
+            fold("directory"),
+            fold("?1")
+        ),
     ] {
-        match conn.query_row(sql, [folder], |row| row.get(0)) {
+        match conn.query_row(&sql, [folder], |row| row.get(0)) {
             Ok(id) => return Ok(Some(id)),
             Err(rusqlite::Error::QueryReturnedNoRows) => {}
             Err(other) => return Err(other.into()),
@@ -660,17 +690,31 @@ mod tests {
     }
 
     #[test]
-    fn repoint_file_follows_one_file_and_ignores_case() {
+    fn repoint_file_follows_one_file_and_ignores_case_only_where_names_do() {
         let conn = memory_db();
         let id = insert_item(&conn, &movie("D:\\Movies\\Heat", "heat.mkv")).unwrap();
         let other = insert_item(&conn, &movie("D:\\Movies\\Heat", "other.mkv")).unwrap();
+        // On Linux `D:\movies\HEAT\Heat.MKV` is another file than the stored one: nothing moves.
         let n = repoint_file(
             &conn,
             "D:\\movies\\HEAT\\Heat.MKV",
             "D:\\Movies\\Heat\\Heat (1995).mkv",
         )
         .unwrap();
-        assert_eq!(n, 1);
+        let moved = &get_item(&conn, id).unwrap().unwrap().core.media_files[0];
+        if cv_fs::paths::CASE_SENSITIVE {
+            assert_eq!(n, 0);
+            assert_eq!(moved.filename, "heat.mkv");
+            let n = repoint_file(
+                &conn,
+                "D:\\Movies\\Heat\\heat.mkv",
+                "D:\\Movies\\Heat\\Heat (1995).mkv",
+            )
+            .unwrap();
+            assert_eq!(n, 1);
+        } else {
+            assert_eq!(n, 1);
+        }
         let moved = &get_item(&conn, id).unwrap().unwrap().core.media_files[0];
         assert_eq!(moved.filename, "Heat (1995).mkv");
         let kept = &get_item(&conn, other).unwrap().unwrap().core.media_files[0];
@@ -746,21 +790,32 @@ mod tests {
     }
 
     #[test]
-    fn owners_are_found_by_file_and_by_folder_ignoring_case() {
+    fn owners_are_found_by_file_and_by_folder_with_the_platforms_case_rule() {
         let conn = memory_db();
         let heat =
             insert_item(&conn, &movie("D:\\Movies\\Heat (1995)", "Heat (1995).mkv")).unwrap();
+        // The same names, spelled as stored: found everywhere.
+        assert_eq!(
+            owner_of_file(&conn, "D:\\Movies\\Heat (1995)\\Heat (1995).mkv").unwrap(),
+            Some(heat.0)
+        );
+        assert_eq!(
+            owner_of_folder(&conn, "D:\\Movies\\Heat (1995)\\").unwrap(),
+            Some(heat.0)
+        );
+        // Another case names the same file on Windows and macOS, and another file on Linux.
+        let same = (!cv_fs::paths::CASE_SENSITIVE).then_some(heat.0);
         assert_eq!(
             owner_of_file(&conn, "d:\\movies\\heat (1995)\\HEAT (1995).mkv").unwrap(),
-            Some(heat.0)
+            same
+        );
+        assert_eq!(
+            owner_of_folder(&conn, "D:\\MOVIES\\Heat (1995)\\").unwrap(),
+            same
         );
         assert_eq!(
             owner_of_file(&conn, "D:\\Movies\\Heat (1995)\\other.mkv").unwrap(),
             None
-        );
-        assert_eq!(
-            owner_of_folder(&conn, "D:\\MOVIES\\Heat (1995)\\").unwrap(),
-            Some(heat.0)
         );
         assert_eq!(owner_of_folder(&conn, "D:\\Movies\\Nothing").unwrap(), None);
     }
