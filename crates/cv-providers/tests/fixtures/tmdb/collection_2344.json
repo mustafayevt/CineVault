@@ -1,0 +1,33 @@
+{
+  "id": 2344,
+  "name": "The Matrix Collection",
+  "overview": "A hacker discovers reality is a simulation.",
+  "poster_path": "/matrix-poster.jpg",
+  "backdrop_path": "/matrix-fanart.jpg",
+  "parts": [
+    {
+      "id": 603,
+      "title": "The Matrix",
+      "original_title": "The Matrix",
+      "overview": "One.",
+      "release_date": "1999-03-30",
+      "poster_path": "/m1.jpg"
+    },
+    {
+      "id": 604,
+      "title": "The Matrix Reloaded",
+      "original_title": "The Matrix Reloaded",
+      "overview": "Two.",
+      "release_date": "2003-05-15",
+      "poster_path": "/m2.jpg"
+    },
+    {
+      "id": 605,
+      "title": "The Matrix Revolutions",
+      "original_title": "The Matrix Revolutions",
+      "overview": "Three.",
+      "release_date": "2003-11-05",
+      "poster_path": "/m3.jpg"
+    }
+  ]
+}

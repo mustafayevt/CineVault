@@ -1,0 +1,27 @@
+{
+  "note": "A long-running anime in the shape TheTVDB lists it: six aired seasons whose episodes are also numbered 1..152 across the show (absolute) and in blocks of 13 (DVD). Every case is worked out by hand from the season sizes. The show and its titles are made up.",
+  "show": "Skyward Blades",
+  "tvdb": "999001",
+  "seasons": [
+    { "season": 1, "episodes": 26 },
+    { "season": 2, "episodes": 26 },
+    { "season": 3, "episodes": 26 },
+    { "season": 4, "episodes": 25 },
+    { "season": 5, "episodes": 25 },
+    { "season": 6, "episodes": 24 }
+  ],
+  "specials": 3,
+  "dvdBlock": 13,
+  "cases": [
+    { "file": "Skyward Blades - 001.mkv", "absolute": 1, "aired": [1, 1], "dvd": [1, 1] },
+    { "file": "Skyward Blades - 026.mkv", "absolute": 26, "aired": [1, 26], "dvd": [2, 13] },
+    { "file": "Skyward Blades - 027.mkv", "absolute": 27, "aired": [2, 1], "dvd": [3, 1] },
+    { "file": "Skyward Blades - 052.mkv", "absolute": 52, "aired": [2, 26], "dvd": [4, 13] },
+    { "file": "Skyward Blades - 103.mkv", "absolute": 103, "aired": [4, 25], "dvd": [8, 12] },
+    { "file": "Skyward Blades - 104.mkv", "absolute": 104, "aired": [5, 1], "dvd": [8, 13] },
+    { "file": "Skyward Blades - 128.mkv", "absolute": 128, "aired": [5, 25], "dvd": [10, 11] },
+    { "file": "Skyward Blades - 129.mkv", "absolute": 129, "aired": [6, 1], "dvd": [10, 12] },
+    { "file": "Skyward Blades - 137.mkv", "absolute": 137, "aired": [6, 9], "dvd": [11, 7] },
+    { "file": "[Fansub] Skyward Blades - 152 [1080p][A1B2C3D4].mkv", "absolute": 152, "aired": [6, 24], "dvd": [12, 9] }
+  ]
+}

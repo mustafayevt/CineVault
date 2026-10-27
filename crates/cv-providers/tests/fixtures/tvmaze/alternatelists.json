@@ -1,0 +1,22 @@
+[
+  {
+    "id": 31,
+    "url": "https://www.tvmaze.com/alternatelists/31",
+    "name": "DVD order",
+    "dvd_release": true,
+    "verbatim_order": false,
+    "country": null,
+    "network": null,
+    "webChannel": null
+  },
+  {
+    "id": 32,
+    "url": "https://www.tvmaze.com/alternatelists/32",
+    "name": "Streaming order",
+    "dvd_release": false,
+    "verbatim_order": true,
+    "country": null,
+    "network": null,
+    "webChannel": null
+  }
+]

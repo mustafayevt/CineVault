@@ -1,0 +1,30 @@
+/*
+ * The Library grid: the poster the keyboard is on shows the focus ring, but only while the grid
+ * itself has keyboard focus (:focus-visible), never after a mouse click. Tokens only.
+ */
+.cv-poster-grid:focus-visible .cv-poster-cell[data-current="true"] [data-testid="poster-frame"] {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+/* A selected poster keeps its gold outline: the keyboard ring goes outside it, on a window-coloured gap. */
+.cv-poster-grid:focus-visible
+  .cv-poster-cell[data-current="true"]
+  [data-selected="true"]
+  [data-testid="poster-frame"] {
+  outline-color: var(--gold);
+  box-shadow:
+    0 0 0 7px var(--surface-window),
+    0 0 0 9px var(--focus-ring);
+}
+
+/* SCRIM: the fade from a collection artwork into the card colour of its pane, so its name keeps contrast. */
+.cv-collection-fade {
+  background: linear-gradient(180deg, transparent 40%, var(--surface-card) 100%);
+}
+
+/* The collection tile the keyboard is on, while the grid has keyboard focus. */
+.cv-collection-grid:focus-visible .cv-collection-tile[data-current="true"] .cv-collection-stack {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+}

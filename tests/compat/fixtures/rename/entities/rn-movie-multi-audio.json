@@ -1,0 +1,60 @@
+{
+  "folder": "multi",
+  "title": "Signal Fire",
+  "year": 2012,
+  "mediaSource": "UHD_BLURAY",
+  "edition": "DIRECTORS_CUT",
+  "spokenLanguages": "en, fr, de",
+  "imdbId": "tt2222222",
+  "tmdbId": 22222,
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Signal Fire.mkv",
+      "videoCodec": "hevc",
+      "videoWidth": 3840,
+      "videoHeight": 1608,
+      "aspectRatio": 2.39,
+      "duration": 6000,
+      "hdrFormat": "HDR10+",
+      "bitDepth": 10,
+      "frameRate": 25.0,
+      "videoBitRate": 9500000,
+      "video3DFormat": "3D SBS",
+      "filesize": 8589934592,
+      "audio": [
+        {
+          "codec": "DTSHD-MA",
+          "language": "en",
+          "audioChannels": 8
+        },
+        {
+          "codec": "EAC3",
+          "language": "fr",
+          "audioChannels": 6
+        },
+        {
+          "codec": "AAC",
+          "language": "de",
+          "audioChannels": 2
+        },
+        {
+          "codec": "AC3",
+          "language": "es",
+          "audioChannels": 1
+        }
+      ],
+      "subtitles": [
+        {
+          "language": "en"
+        },
+        {
+          "language": "fr"
+        },
+        {
+          "language": "de"
+        }
+      ]
+    }
+  ]
+}

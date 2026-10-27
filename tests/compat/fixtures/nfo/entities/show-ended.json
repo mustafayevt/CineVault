@@ -1,0 +1,227 @@
+{
+  "folder": "Ended Show (1999)",
+  "title": "Ended Show",
+  "originalTitle": "The Lighthouse Keepers",
+  "sortTitle": "Keepers, Lighthouse",
+  "englishTitle": "Lighthouse Keepers",
+  "tagline": "Alone together",
+  "plot": "Two keepers, one rock, endless weather.\nSecond line of the plot.",
+  "year": 1999,
+  "firstAired": "1999-09-20",
+  "status": "ENDED",
+  "runtime": 45,
+  "certification": "US_TVPG",
+  "country": "US, CA",
+  "productionCompany": "Beacon Network; Tide TV",
+  "top250": 17,
+  "note": "show note",
+  "lastScraperId": "tmdb",
+  "dateAdded": "2024-02-03 04:05:06",
+  "ids": {
+    "tmdb": 4242
+  },
+  "ratings": [
+    {
+      "id": "tvdb",
+      "rating": 8.8,
+      "votes": 12345,
+      "max": 10
+    },
+    {
+      "id": "imdb",
+      "rating": 9.5,
+      "votes": 2000000,
+      "max": 10
+    }
+  ],
+  "genres": [
+    "DRAMA",
+    "MYSTERY"
+  ],
+  "tags": [
+    "sea",
+    "isolation"
+  ],
+  "actors": [
+    {
+      "name": "Mara Voss",
+      "role": "Head Keeper",
+      "thumb": "https://img.example.test/p/mara.jpg",
+      "profile": "https://db.example.test/person/1",
+      "ids": {
+        "tmdb": 3001,
+        "imdb": "nm1000001",
+        "tvdb": 301
+      }
+    },
+    {
+      "name": "Tom Reed",
+      "role": "Assistant"
+    }
+  ],
+  "directors": [
+    {
+      "name": "Dana Frost",
+      "ids": {
+        "tmdb": 6001
+      }
+    }
+  ],
+  "writers": [
+    {
+      "name": "Eli Crane",
+      "role": "Creator"
+    }
+  ],
+  "producers": [
+    {
+      "name": "Pat Quill",
+      "role": "Executive Producer",
+      "profile": "https://db.example.test/person/9"
+    }
+  ],
+  "trailers": [
+    {
+      "name": "Teaser",
+      "url": "https://www.youtube.com/watch?v=TV123abc_-9",
+      "provider": "youtube",
+      "inNfo": true
+    }
+  ],
+  "artwork": {
+    "POSTER": "https://img.example.test/t/poster.jpg",
+    "BANNER": "https://img.example.test/t/banner.jpg",
+    "FANART": "https://img.example.test/t/fanart.jpg",
+    "CLEARART": "https://img.example.test/t/clearart.png",
+    "CLEARLOGO": "https://img.example.test/t/clearlogo.png",
+    "THUMB": "https://img.example.test/t/thumb.jpg",
+    "KEYART": "https://img.example.test/t/keyart.jpg"
+  },
+  "extraFanartUrls": [
+    "https://img.example.test/t/fanart2.jpg"
+  ],
+  "episodeGroup": {
+    "type": "AIRED",
+    "name": "Aired Order"
+  },
+  "episodeGroups": [
+    {
+      "type": "AIRED",
+      "name": "Aired Order"
+    },
+    {
+      "type": "DVD",
+      "name": "DVD Order"
+    }
+  ],
+  "episodes": [
+    {
+      "title": "Arrival",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 1,
+          "episode": 1
+        },
+        {
+          "group": "DVD",
+          "season": 1,
+          "episode": 1
+        },
+        {
+          "group": "ABSOLUTE",
+          "season": 1,
+          "episode": 1
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse Keepers - S01E01 - Arrival.mkv",
+          "dir": "Season 1",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 2700,
+          "audio": [
+            {
+              "codec": "AC3",
+              "language": "en",
+              "audioChannels": 6
+            }
+          ],
+          "subtitles": [
+            {
+              "language": "en"
+            }
+          ]
+        }
+      ],
+      "originalTitle": "Arrival (Original)",
+      "englishTitle": "Arrival",
+      "plot": "The keepers arrive at the rock.",
+      "firstAired": "2015-03-10",
+      "runtime": 45,
+      "year": 2015,
+      "mediaSource": "BLURAY",
+      "watched": true,
+      "playcount": 2,
+      "lastWatched": "2020-01-02 03:04:05",
+      "dateAdded": "2024-01-02 03:04:05",
+      "note": "episode note",
+      "originalFilename": "Lighthouse.Keepers.S01E01.mkv",
+      "productionCompany": "Beacon Network",
+      "ratings": [
+        {
+          "id": "tvdb",
+          "rating": 8.2,
+          "votes": 321,
+          "max": 10
+        },
+        {
+          "id": "user",
+          "rating": 9.0,
+          "votes": 1,
+          "max": 10
+        }
+      ],
+      "ids": {
+        "tvdb": "55501",
+        "tmdb": 77001,
+        "imdb": "tt7000001"
+      },
+      "tags": [
+        "pilot"
+      ],
+      "actors": [
+        {
+          "name": "Guest One",
+          "role": "Visitor",
+          "thumb": "https://img.example.test/p/g1.jpg",
+          "ids": {
+            "tmdb": 5001
+          }
+        }
+      ],
+      "directors": [
+        {
+          "name": "Dana Frost",
+          "ids": {
+            "tmdb": 6001
+          }
+        }
+      ],
+      "writers": [
+        {
+          "name": "Eli Crane",
+          "role": "Writer"
+        }
+      ],
+      "artwork": {
+        "THUMB": "https://img.example.test/e/s01e01.jpg"
+      }
+    }
+  ],
+  "yearEnd": 2004
+}

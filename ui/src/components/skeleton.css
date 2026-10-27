@@ -1,0 +1,45 @@
+/* Skeleton shimmer: one flat band, a third of the width, slides across the placeholder every
+   1.6 s by transform. At rest, and under reduced motion, it sits off the left edge, so the
+   skeleton is a still tone. A poster skeleton carries a faint dashed 2:3 frame: the poster to come. */
+@keyframes cv-skeleton-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+[data-cv-skeleton] {
+  position: relative;
+  overflow: hidden;
+}
+[data-cv-skeleton]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 34%;
+  background: var(--surface-pressed);
+  transform: translateX(-100%);
+  animation: cv-skeleton-slide 1.6s var(--ease-out) infinite;
+}
+[data-cv-skeleton][data-shape="poster"]::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 22%;
+  aspect-ratio: 2 / 3;
+  transform: translate(-50%, -50%);
+  border: 1.5px dashed var(--line-edge);
+  border-radius: var(--r-4);
+}
+:root[data-motion="reduced"] [data-cv-skeleton]::after {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) [data-cv-skeleton]::after {
+    animation: none;
+  }
+}

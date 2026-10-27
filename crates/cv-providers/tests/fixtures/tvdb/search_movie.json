@@ -1,0 +1,33 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "objectID": "movie-1229",
+      "tvdb_id": "1229",
+      "name": "Heat",
+      "type": "movie",
+      "year": "1995",
+      "first_air_time": "1995-12-15",
+      "overview": "A group of professional bank robbers start to feel the heat.",
+      "overviews": {
+        "eng": "A group of professional bank robbers start to feel the heat."
+      },
+      "translations": {
+        "eng": "Heat"
+      },
+      "image_url": "https://artworks.thetvdb.com/banners/movies/1229/posters/heat.jpg",
+      "remote_ids": [
+        {
+          "id": "tt0113277",
+          "type": 2,
+          "sourceName": "IMDB"
+        },
+        {
+          "id": "949",
+          "type": 12,
+          "sourceName": "TheMovieDB.com"
+        }
+      ]
+    }
+  ]
+}

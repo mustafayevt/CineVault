@@ -1,0 +1,504 @@
+{
+  "status": "success",
+  "data": {
+    "id": 81189,
+    "name": "Breaking Bad",
+    "slug": "breaking-bad",
+    "image": "https://artworks.thetvdb.com/banners/posters/81189-main.jpg",
+    "firstAired": "2008-01-20",
+    "lastAired": "2013-09-29",
+    "nextAired": "",
+    "status": {
+      "id": 2,
+      "name": "Ended",
+      "recordType": "series",
+      "keepUpdated": false
+    },
+    "originalCountry": "usa",
+    "originalLanguage": "eng",
+    "averageRuntime": 45,
+    "year": "2008",
+    "overview": "When Walter White, a chemistry teacher, is diagnosed with lung cancer, he turns to manufacturing methamphetamine.",
+    "genres": [
+      {
+        "id": 3,
+        "name": "Drama",
+        "slug": "drama"
+      },
+      {
+        "id": 4,
+        "name": "Crime",
+        "slug": "crime"
+      },
+      {
+        "id": 4,
+        "name": "Crime",
+        "slug": "crime"
+      },
+      {
+        "id": 9,
+        "name": "Cosmic Horror",
+        "slug": "ch"
+      }
+    ],
+    "artworks": [
+      {
+        "id": 1,
+        "image": "https://artworks.thetvdb.com/banners/posters/81189-tur.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/posters/81189-tur_t.jpg",
+        "language": "tur",
+        "type": 2,
+        "score": 100,
+        "width": 680,
+        "height": 1000
+      },
+      {
+        "id": 2,
+        "image": "https://artworks.thetvdb.com/banners/posters/81189-eng-a.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/posters/81189-eng-a_t.jpg",
+        "language": "eng",
+        "type": 2,
+        "score": 500,
+        "width": 680,
+        "height": 1000
+      },
+      {
+        "id": 3,
+        "image": "https://artworks.thetvdb.com/banners/posters/81189-eng-b.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/posters/81189-eng-b_t.jpg",
+        "language": "eng",
+        "type": 2,
+        "score": 300,
+        "width": 680,
+        "height": 1000
+      },
+      {
+        "id": 4,
+        "image": "https://artworks.thetvdb.com/banners/posters/81189-none.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/posters/81189-none_t.jpg",
+        "language": null,
+        "type": 2,
+        "score": 900,
+        "width": 0,
+        "height": 0
+      },
+      {
+        "id": 5,
+        "image": "https://artworks.thetvdb.com/banners/posters/81189-fra.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/posters/81189-fra_t.jpg",
+        "language": "fra",
+        "type": 2,
+        "score": 1000,
+        "width": 680,
+        "height": 1000
+      },
+      {
+        "id": 6,
+        "image": "https://artworks.thetvdb.com/banners/backgrounds/81189-none.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/backgrounds/81189-none_t.jpg",
+        "language": null,
+        "type": 3,
+        "score": 700,
+        "width": 1920,
+        "height": 1080
+      },
+      {
+        "id": 7,
+        "image": "https://artworks.thetvdb.com/banners/backgrounds/81189-eng.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/backgrounds/81189-eng_t.jpg",
+        "language": "eng",
+        "type": 3,
+        "score": 100,
+        "width": 1920,
+        "height": 1080
+      },
+      {
+        "id": 8,
+        "image": "/banners/graphical/81189-g.jpg",
+        "thumbnail": "/banners/graphical/81189-g_t.jpg",
+        "language": "eng",
+        "type": 1,
+        "score": 50,
+        "width": 758,
+        "height": 140
+      },
+      {
+        "id": 9,
+        "image": "https://artworks.thetvdb.com/banners/clearlogo/81189.png",
+        "thumbnail": "https://artworks.thetvdb.com/banners/clearlogo/81189.png",
+        "language": "eng",
+        "type": 22,
+        "score": 10,
+        "width": 800,
+        "height": 310
+      },
+      {
+        "id": 10,
+        "image": "https://artworks.thetvdb.com/banners/clearart/81189.png",
+        "thumbnail": "https://artworks.thetvdb.com/banners/clearart/81189.png",
+        "language": "eng",
+        "type": 23,
+        "score": 10,
+        "width": 1000,
+        "height": 562
+      },
+      {
+        "id": 11,
+        "image": "https://artworks.thetvdb.com/banners/icons/81189.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/icons/81189_t.jpg",
+        "language": null,
+        "type": 5,
+        "score": 5,
+        "width": 1024,
+        "height": 1024
+      },
+      {
+        "id": 12,
+        "image": "https://artworks.thetvdb.com/banners/cinema/81189.mp4",
+        "thumbnail": "https://artworks.thetvdb.com/banners/cinema/81189.mp4",
+        "language": null,
+        "type": 24,
+        "score": 5,
+        "width": 640,
+        "height": 360
+      },
+      {
+        "id": 13,
+        "image": "https://artworks.thetvdb.com/banners/blank/81189.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/blank/81189_t.jpg",
+        "language": null,
+        "type": 999,
+        "score": 5,
+        "width": 640,
+        "height": 360
+      }
+    ],
+    "characters": [
+      {
+        "id": 2,
+        "name": "Jesse Pinkman",
+        "peopleId": 20,
+        "personName": "Aaron Paul",
+        "image": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/actors/2.jpg",
+        "sort": 2,
+        "type": 3,
+        "peopleType": "Actor",
+        "isFeatured": false
+      },
+      {
+        "id": 1,
+        "name": "Walter White",
+        "peopleId": 10,
+        "personName": "Bryan Cranston",
+        "image": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/actors/1.jpg",
+        "sort": 1,
+        "type": 3,
+        "peopleType": "Actor",
+        "isFeatured": false
+      },
+      {
+        "id": 1,
+        "name": "Walter White",
+        "peopleId": 10,
+        "personName": "Bryan Cranston",
+        "image": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/actors/1.jpg",
+        "sort": 1,
+        "type": 3,
+        "peopleType": "Actor",
+        "isFeatured": false
+      },
+      {
+        "id": 3,
+        "name": null,
+        "peopleId": 30,
+        "personName": "Vince Gilligan",
+        "image": null,
+        "personImgURL": null,
+        "sort": 1,
+        "type": 1,
+        "peopleType": "Director",
+        "isFeatured": false
+      },
+      {
+        "id": 3,
+        "name": null,
+        "peopleId": 30,
+        "personName": "Vince Gilligan",
+        "image": null,
+        "personImgURL": null,
+        "sort": 1,
+        "type": 2,
+        "peopleType": "Writer",
+        "isFeatured": false
+      },
+      {
+        "id": 4,
+        "name": null,
+        "peopleId": 40,
+        "personName": "Mark Johnson",
+        "image": null,
+        "personImgURL": null,
+        "sort": 1,
+        "type": 7,
+        "peopleType": "Executive Producer",
+        "isFeatured": false
+      },
+      {
+        "id": 5,
+        "name": null,
+        "peopleId": 50,
+        "personName": "Dave Porter",
+        "image": null,
+        "personImgURL": null,
+        "sort": 1,
+        "type": 4,
+        "peopleType": "Musical Artist",
+        "isFeatured": false
+      },
+      {
+        "id": 6,
+        "name": "Someone",
+        "peopleId": 60,
+        "personName": "Guest Person",
+        "image": null,
+        "personImgURL": null,
+        "sort": 1,
+        "type": 6,
+        "peopleType": "Guest Star",
+        "isFeatured": false
+      },
+      {
+        "id": 7,
+        "name": "X",
+        "peopleId": 70,
+        "personName": "",
+        "image": null,
+        "personImgURL": null,
+        "sort": 1,
+        "type": 3,
+        "peopleType": "Actor",
+        "isFeatured": false
+      }
+    ],
+    "remoteIds": [
+      {
+        "id": "tt0903747",
+        "type": 2,
+        "sourceName": "IMDB"
+      },
+      {
+        "id": "1396",
+        "type": 12,
+        "sourceName": "TheMovieDB.com"
+      },
+      {
+        "id": "Q1079",
+        "type": 18,
+        "sourceName": "Wikidata"
+      },
+      {
+        "id": "169",
+        "type": 19,
+        "sourceName": "TV Maze"
+      },
+      {
+        "id": "x",
+        "type": 3,
+        "sourceName": "Zap2it"
+      }
+    ],
+    "companies": [
+      {
+        "id": 1,
+        "name": "AMC",
+        "companyType": {
+          "companyTypeId": 1,
+          "companyTypeName": "Network"
+        }
+      },
+      {
+        "id": 2,
+        "name": "Sony Pictures Television",
+        "companyType": {
+          "companyTypeId": 3,
+          "companyTypeName": "Production Company"
+        }
+      },
+      {
+        "id": 3,
+        "name": "Some Distributor",
+        "companyType": {
+          "companyTypeId": 4,
+          "companyTypeName": "Distributor"
+        }
+      }
+    ],
+    "contentRatings": [
+      {
+        "id": 1,
+        "name": "TV-MA",
+        "country": "usa",
+        "contentType": "episode"
+      },
+      {
+        "id": 2,
+        "name": "18",
+        "country": "gbr",
+        "contentType": "episode"
+      },
+      {
+        "id": 3,
+        "name": "16",
+        "country": "deu"
+      }
+    ],
+    "trailers": [
+      {
+        "id": 321,
+        "name": "Breaking Bad Official Trailer",
+        "url": "https://www.youtube.com/watch?v=HhesaQXLuRY",
+        "language": "eng",
+        "runtime": 120
+      },
+      {
+        "id": 322,
+        "name": "Fragmanı",
+        "url": "https://www.youtube.com/watch?v=TRKEY12",
+        "language": "tur",
+        "runtime": 90
+      },
+      {
+        "id": 323,
+        "name": "No address",
+        "url": "",
+        "language": "eng",
+        "runtime": 0
+      },
+      {
+        "id": 324,
+        "name": "Same again",
+        "url": "https://www.youtube.com/watch?v=HhesaQXLuRY",
+        "language": "eng",
+        "runtime": 120
+      },
+      {
+        "id": 325,
+        "name": "Not a web address",
+        "url": "ftp://example.test/x",
+        "language": "eng",
+        "runtime": 5
+      },
+      {
+        "id": 326,
+        "name": "No language",
+        "url": "https://vimeo.com/123456",
+        "language": null,
+        "runtime": 5
+      }
+    ],
+    "seasons": [
+      {
+        "id": 3571,
+        "number": 0,
+        "name": null,
+        "image": null,
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official"
+        }
+      },
+      {
+        "id": 3572,
+        "number": 1,
+        "name": null,
+        "image": "https://artworks.thetvdb.com/banners/seasons/3572-1.jpg",
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official"
+        }
+      },
+      {
+        "id": 3573,
+        "number": 2,
+        "name": null,
+        "image": null,
+        "type": {
+          "id": 1,
+          "name": "Aired Order",
+          "type": "official"
+        }
+      },
+      {
+        "id": 4001,
+        "number": 1,
+        "name": null,
+        "image": null,
+        "type": {
+          "id": 1,
+          "name": "DVD Order",
+          "type": "dvd"
+        }
+      },
+      {
+        "id": 4002,
+        "number": 1,
+        "name": null,
+        "image": null,
+        "type": {
+          "id": 1,
+          "name": "Absolute Order",
+          "type": "absolute"
+        }
+      },
+      {
+        "id": 4003,
+        "number": 1,
+        "name": null,
+        "image": null,
+        "type": {
+          "id": 1,
+          "name": "Regional Order",
+          "type": "regional"
+        }
+      },
+      {
+        "id": 4004,
+        "number": 1,
+        "name": null,
+        "image": null,
+        "type": null
+      }
+    ],
+    "translations": {
+      "nameTranslations": [
+        {
+          "name": "Breaking Bad",
+          "language": "eng",
+          "isPrimary": true
+        },
+        {
+          "name": "Breaking Bad: Kırılma",
+          "language": "tur",
+          "isPrimary": false
+        }
+      ],
+      "overviewTranslations": [
+        {
+          "overview": "When Walter White, a chemistry teacher, is diagnosed with lung cancer, he turns to manufacturing methamphetamine.",
+          "language": "eng",
+          "isPrimary": true
+        },
+        {
+          "overview": "Kimya öğretmeni Walter White akciğer kanseri olduğunu öğrenir.",
+          "language": "tur",
+          "isPrimary": false
+        }
+      ]
+    }
+  }
+}

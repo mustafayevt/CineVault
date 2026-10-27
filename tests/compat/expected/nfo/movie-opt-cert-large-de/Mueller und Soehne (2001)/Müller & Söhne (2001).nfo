@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<movie>
+  <title>Müller &amp; Söhne &lt;Teil 1&gt;</title>
+  <originaltitle>Müller &amp; Söhne</originaltitle>
+  <sorttitle>Müller &amp; Söhne 1</sorttitle>
+  <epbookmark/>
+  <year>2001</year>
+  <ratings>
+    <rating default="true" max="10" name="imdb">
+      <value>6.9</value>
+      <votes>1200</votes>
+    </rating>
+  </ratings>
+  <userrating>0</userrating>
+  <set/>
+  <plot>Er sagte: "Komm später!" – und ging. Fünf Jahre später: 5 &lt; 6 &amp; 7 &gt; 3.</plot>
+  <tagline>Tradition &amp; Zukunft</tagline>
+  <runtime>104</runtime>
+  <mpaa>DE:FSK 16 / DE:FSK-16 / DE:FSK16 / DE:16 / DE:16+ / DE:ab 16</mpaa>
+  <certification>DE:FSK 16 / DE:FSK-16 / DE:FSK16 / DE:16 / DE:16+ / DE:ab 16</certification>
+  <id>tt1234567</id>
+  <tmdbid/>
+  <uniqueid default="true" type="imdb">tt1234567</uniqueid>
+  <country>DE</country>
+  <country>AT</country>
+  <country>CH</country>
+  <status/>
+  <code/>
+  <premiered>2001-09-27</premiered>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <genre>Comedy</genre>
+  <genre>Drama</genre>
+  <genre>Crime</genre>
+  <studio>Rheinfilm GmbH</studio>
+  <director>Hans Müller</director>
+  <tag>Familie &amp; Beruf</tag>
+  <trailer/>
+  <languages>German, French</languages>
+  <dateadded>2023-12-31 23:59:58</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>mpeg2</codec>
+        <aspect>1.78</aspect>
+        <width>720</width>
+        <height>576</height>
+        <resolution>576</resolution>
+        <durationinseconds>6240</durationinseconds>
+      </video>
+      <audio>
+        <codec>mp3</codec>
+        <language>deu</language>
+        <channels>2</channels>
+      </audio>
+      <subtitle>
+        <language>deu</language>
+      </subtitle>
+      <subtitle>
+        <language>eng</language>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+  <!--CineVault meta data-->
+  <source>UNKNOWN</source>
+  <edition>NONE</edition>
+  <original_filename>Müller &amp; Söhne (2001).mkv</original_filename>
+  <user_note/>
+  <english_title/>
+  <crew>
+    <name>Hans Müller</name>
+    <role>DIRECTOR</role>
+  </crew>
+  <cv_locked/>
+</movie>

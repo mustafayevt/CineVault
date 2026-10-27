@@ -1,0 +1,106 @@
+{
+  "cast": [
+    {
+      "characters": [
+        "Lt. Vincent Hanna"
+      ],
+      "person": {
+        "name": "Al Pacino",
+        "ids": {
+          "trakt": 100,
+          "imdb": "nm0000199",
+          "tmdb": 1158
+        }
+      }
+    },
+    {
+      "characters": [
+        "Neil McCauley"
+      ],
+      "person": {
+        "name": "Robert De Niro",
+        "ids": {
+          "trakt": 101,
+          "imdb": "nm0000134",
+          "tmdb": 380
+        }
+      }
+    },
+    {
+      "characters": [],
+      "person": {
+        "name": "Unnamed Extra",
+        "ids": {
+          "trakt": 102
+        }
+      }
+    }
+  ],
+  "crew": {
+    "directing": [
+      {
+        "jobs": [
+          "Director"
+        ],
+        "person": {
+          "name": "Michael Mann",
+          "ids": {
+            "trakt": 200,
+            "imdb": "nm0000520"
+          }
+        }
+      }
+    ],
+    "writing": [
+      {
+        "jobs": [
+          "Writer"
+        ],
+        "person": {
+          "name": "Michael Mann",
+          "ids": {
+            "trakt": 200,
+            "imdb": "nm0000520"
+          }
+        }
+      }
+    ],
+    "production": [
+      {
+        "jobs": [
+          "Producer"
+        ],
+        "person": {
+          "name": "Art Linson",
+          "ids": {
+            "trakt": 201
+          }
+        }
+      },
+      {
+        "jobs": [
+          "Casting"
+        ],
+        "person": {
+          "name": "Bonnie Timmermann",
+          "ids": {
+            "trakt": 202
+          }
+        }
+      }
+    ],
+    "costume & make-up": [
+      {
+        "jobs": [
+          "Costume Designer"
+        ],
+        "person": {
+          "name": "Deborah Scott",
+          "ids": {
+            "trakt": 203
+          }
+        }
+      }
+    ]
+  }
+}

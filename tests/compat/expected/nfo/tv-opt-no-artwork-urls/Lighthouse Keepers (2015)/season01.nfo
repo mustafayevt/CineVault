@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault-->
+<season>
+  <seasonnumber>1</seasonnumber>
+  <title>Season 1</title>
+  <showtitle>Lighthouse Keepers</showtitle>
+  <sorttitle>Season 01</sorttitle>
+  <year/>
+  <plot>Season one plot</plot>
+  <tvdbid>81189</tvdbid>
+  <imdbid>tt0903747</imdbid>
+  <tmdbid>1396</tmdbid>
+  <uniqueid type="tmdb">1396</uniqueid>
+  <uniqueid type="imdb">tt0903747</uniqueid>
+  <uniqueid type="tvdb">81189</uniqueid>
+  <premiered>2015-03-10</premiered>
+  <!--CineVault meta data-->
+  <user_note/>
+</season>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for XBMC-->
+<movie>
+  <title>Long Road</title>
+  <originaltitle/>
+  <sorttitle/>
+  <epbookmark/>
+  <year>2005</year>
+  <rating>6.0</rating>
+  <userrating>0</userrating>
+  <votes>10</votes>
+  <set/>
+  <plot>The long way home.</plot>
+  <tagline/>
+  <runtime>0</runtime>
+  <thumb/>
+  <fanart/>
+  <mpaa/>
+  <certification/>
+  <id>tt0000111</id>
+  <tmdbid/>
+  <uniqueid default="true" type="imdb">tt0000111</uniqueid>
+  <status/>
+  <code/>
+  <premiered/>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <trailer/>
+  <languages/>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>h264</codec>
+        <aspect>2.4</aspect>
+        <width>1920</width>
+        <height>800</height>
+        <durationinseconds>7200</durationinseconds>
+        <stereomode/>
+      </video>
+    </streamdetails>
+  </fileinfo>
+  <!--CineVault meta data-->
+  <source>WEB_DL</source>
+  <edition>DIRECTORS_CUT</edition>
+  <original_filename>Long Road (2005) - Directors Cut.mkv</original_filename>
+  <user_note/>
+  <english_title/>
+  <cv_locked/>
+</movie>

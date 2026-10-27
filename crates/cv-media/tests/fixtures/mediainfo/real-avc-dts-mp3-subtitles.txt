@@ -1,0 +1,146 @@
+# Recorded from MediaInfo 26.10 on a generated sample: AVC, DTS core 5.1 German, MP3 mono, subtitles SRT Turkish forced SDH title, ASS English, SRT French default forced hearing-impaired.
+[General]
+VideoCount: 1
+AudioCount: 2
+TextCount: 3
+Video_Format_List: AVC
+Video_Format_WithHint_List: AVC
+Video_Codec_List: AVC
+Audio_Format_List: DTS / MPEG Audio
+Audio_Format_WithHint_List: DTS / MPEG Audio (MP3)
+Audio_Codec_List: DTS / MPEG Audio
+Audio_Language_List: German / 
+Audio_Channels_Total: 7
+Text_Format_List: UTF-8 / ASS / UTF-8
+Text_Format_WithHint_List: UTF-8 / ASS / UTF-8
+Text_Codec_List: UTF-8 / ASS / UTF-8
+Text_Language_List: Turkish / English / French
+Format: Matroska
+Format/Extensions: mkv mk3d mka mks
+Format_Commercial: Matroska
+Format_Version: Version 4
+Duration: 2023
+Duration/String3: 00:00:02.023
+OverallBitRate: 1648289
+FrameRate: 24.000
+FrameCount: 48
+IsStreamable: Yes
+ErrorDetectionType: Per level 1
+[Video]
+StreamOrder: 0
+ID: 1
+Format: AVC
+Format_Commercial: AVC
+Format_Profile: High 4:4:4 Predictive@L1.2
+Format_Settings: 1 Ref Frames
+Format_Settings_CABAC: No
+Format_Settings_RefFrames: 1
+InternetMediaType: video/H264
+CodecID: V_MPEG4/ISO/AVC
+Duration: 2000.000000
+Duration/String3: 00:00:02.000
+BitRate: 138488
+Width: 320
+Height: 180
+Stored_Height: 192
+Sampled_Width: 320
+Sampled_Height: 180
+PixelAspectRatio: 1.000
+DisplayAspectRatio: 1.778
+FrameRate_Mode: CFR
+FrameRate_Mode_Original: VFR
+FrameRate: 24.000
+FrameCount: 48
+ChromaSubsampling: 4:4:4
+BitDepth: 8
+ScanType: Progressive
+Default: No
+Forced: No
+colour_description_present: Yes
+colour_description_present_Source: Container
+colour_range: Limited
+colour_range_Source: Container
+[Audio]
+StreamOrder: 1
+ID: 2
+Format: DTS
+Format_Commercial: DTS
+Format_Settings_Mode: 16
+Format_Settings_Endianness: Big
+CodecID: A_DTS
+Duration: 2000.000000
+Duration/String3: 00:00:02.000
+BitRate_Mode: CBR
+BitRate: 1413000
+Channel(s): 6
+ChannelPositions: Front: L C R, Side: L R, LFE
+ChannelLayout: C L R Ls Rs LFE
+SamplesPerFrame: 512
+SamplingRate: 48000
+SamplingCount: 96000
+FrameRate: 93.750
+BitDepth: 16
+Compression_Mode: Lossy
+Language: de
+Default: No
+Forced: No
+[Audio]
+StreamOrder: 2
+ID: 3
+Format: MPEG Audio
+Format_Commercial: MPEG Audio
+Format_Version: Version 1
+Format_Profile: Layer 3
+InternetMediaType: audio/mpeg
+CodecID: A_MPEG/L3
+CodecID/Hint: MP3
+Duration: 2023.000000
+Duration/String3: 00:00:02.023
+BitRate_Mode: CBR
+BitRate: 64000
+Channel(s): 1
+SamplingRate: 48000
+SamplingCount: 97104
+Compression_Mode: Lossy
+Default: No
+Forced: No
+[Text]
+StreamOrder: 3
+ID: 4
+Format: UTF-8
+Format_Commercial: UTF-8
+CodecID: S_TEXT/UTF8
+CodecID/Info: UTF-8 Plain Text
+Duration: 1000.000000
+Duration/String3: 00:00:01.000
+Title: Turkish SDH
+Language: tr
+Default: No
+Forced: Yes
+[Text]
+StreamOrder: 4
+ID: 5
+Format: ASS
+Format_Commercial: ASS
+CodecID: S_TEXT/ASS
+CodecID/Info: Advanced Sub Station Alpha
+Duration: 1000.000000
+Duration/String3: 00:00:01.000
+Compression_Mode: Lossless
+Language: en
+Default: No
+Forced: No
+[Text]
+StreamOrder: 5
+ID: 6
+Format: UTF-8
+Format_Commercial: UTF-8
+CodecID: S_TEXT/UTF8
+CodecID/Info: UTF-8 Plain Text
+Duration: 1000.000000
+Duration/String3: 00:00:01.000
+Title: Forced
+Language: fr
+ServiceKind: HI
+Default: Yes
+Forced: Yes

@@ -1,0 +1,16 @@
+{
+  "folder": "The Matrix",
+  "title": "The Matrix",
+  "originalTitle": "The Matrix",
+  "year": 1999,
+  "imdbId": "tt0133093",
+  "tmdbId": 603,
+  "mediaSource": "BLURAY",
+  "files": [
+    {
+      "type": "VIDEO", "filename": "The.Matrix.1999.1080p.BluRay.x264.mkv",
+      "videoCodec": "h264", "videoWidth": 1920, "videoHeight": 1080, "aspectRatio": 1.78, "duration": 8160, "frameRate": 24.0,
+      "audio": [{ "codec": "DTS", "language": "en", "audioChannels": 6 }]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+[
+ {
+  "id": 4711,
+  "title": "La Nuit des Exemples",
+  "original_title": "The Night of Examples",
+  "year": 1998,
+  "imdb_id": "tt0111222",
+  "tmdb_id": 9001,
+  "poster": "https://img.example.test/mpdb/p1.jpg",
+  "synopsis": "Une nuit, un exemple."
+ },
+ {
+  "id": "4712",
+  "titre": "La Nuit des Exemples 2",
+  "year": "2003",
+  "imdb_id": "0222333"
+ },
+ {
+  "id": 4713
+ }
+]

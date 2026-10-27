@@ -1,0 +1,23 @@
+{
+  "folder": "Minimal Show",
+  "title": "Minimal Show",
+  "episodes": [
+    {
+      "title": "First",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 1,
+          "episode": 1
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Minimal Show - S01E01.mkv",
+          "dir": "Season 1"
+        }
+      ]
+    }
+  ]
+}

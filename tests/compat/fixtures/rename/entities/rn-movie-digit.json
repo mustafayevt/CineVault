@@ -1,0 +1,26 @@
+{
+  "folder": "2001 A Space Odyssey",
+  "title": "2001: A Space Odyssey",
+  "year": 1968,
+  "imdbId": "tt0062622",
+  "tmdbId": 62,
+  "mediaSource": "DVD",
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "2001.mkv",
+      "videoCodec": "mpeg-2",
+      "videoWidth": 720,
+      "videoHeight": 576,
+      "aspectRatio": 1.25,
+      "duration": 6000,
+      "audio": [
+        {
+          "codec": "AC3",
+          "language": "en",
+          "audioChannels": 2
+        }
+      ]
+    }
+  ]
+}

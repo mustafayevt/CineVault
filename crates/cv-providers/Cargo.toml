@@ -1,0 +1,31 @@
+[package]
+name = "cv-providers"
+description = "Metadata, artwork and rating providers with shared HTTP, cache and rate limiting."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+cv-domain.workspace = true
+fancy-regex.workspace = true
+flate2.workspace = true
+governor.workspace = true
+httpdate.workspace = true
+quick-xml.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

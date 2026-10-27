@@ -1,0 +1,18 @@
+{
+  "folder": "Double Bill",
+  "title": "Double Bill Part A",
+  "year": 1980,
+  "multiMovieDir": true,
+  "plot": "Lives in a shared folder.",
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Double Bill Part A (1980).mkv",
+      "videoCodec": "h264",
+      "videoWidth": 1280,
+      "videoHeight": 720,
+      "aspectRatio": 1.78,
+      "duration": 3000
+    }
+  ]
+}

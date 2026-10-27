@@ -1,0 +1,74 @@
+{
+ "id": 4711,
+ "title": "La Nuit des Exemples",
+ "original_title": "The Night of Examples",
+ "year": 1998,
+ "release_date": "1998-06-17",
+ "imdb_id": "tt0111222",
+ "tmdb_id": 9001,
+ "tagline": "Tout commence la nuit.",
+ "synopsis": "Une nuit, un exemple devient une règle.",
+ "runtime": 112,
+ "rating": 7.8,
+ "votes": 2210,
+ "genres": [
+  "Policier",
+  "Drame",
+  {
+   "name": "Thriller"
+  }
+ ],
+ "pays": [
+  "France",
+  "États-Unis"
+ ],
+ "directors": [
+  {
+   "name": "Claire Exemple"
+  }
+ ],
+ "actors": [
+  {
+   "name": "Jean Modèle",
+   "role": "Le commissaire"
+  },
+  "Marie Échantillon",
+  {
+   "name": "Jean Modèle",
+   "role": "Autre"
+  }
+ ],
+ "posters": [
+  {
+   "url": "https://img.example.test/mpdb/poster-fr.jpg",
+   "lang": "fr",
+   "width": 1000,
+   "height": 1500,
+   "likes": 12
+  },
+  "https://img.example.test/mpdb/poster-en.jpg"
+ ],
+ "fanarts": [
+  "https://img.example.test/mpdb/fanart1.jpg",
+  "https://img.example.test/mpdb/fanart2.jpg",
+  "https://img.example.test/mpdb/fanart3.jpg"
+ ],
+ "discs": [
+  {
+   "url": "https://img.example.test/mpdb/disc.png",
+   "lang": "xx"
+  }
+ ],
+ "hdclearart": [
+  "https://img.example.test/mpdb/clearart.png"
+ ],
+ "hdclearlogo": [
+  {
+   "url": "https://img.example.test/mpdb/logo.png",
+   "lang": "fr"
+  }
+ ],
+ "banners": [
+  "https://img.example.test/mpdb/banner.jpg"
+ ]
+}

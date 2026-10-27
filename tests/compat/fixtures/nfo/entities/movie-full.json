@@ -1,0 +1,82 @@
+{
+  "folder": "Harbor Lights (1992)",
+  "title": "Harbor Lights",
+  "originalTitle": "Harbor Lights (Original)",
+  "sortTitle": "Harbor Lights Collection 1",
+  "year": 1992,
+  "top250": 199,
+  "plot": "A young sailor finds a lamp in the old harbor. He soon learns that every wish has a price.\nThe city is not what it seems.",
+  "tagline": "Wish carefully",
+  "runtime": 90,
+  "imdbId": "tt0103639",
+  "tmdbId": 812,
+  "ids": { "trakt": 655, "tvdb": "4242" },
+  "productionCompany": "Blue Quay Pictures; Lantern Studios, North Wind Films",
+  "country": "US, GB",
+  "spokenLanguages": "en, de",
+  "certification": "US_G",
+  "mediaSource": "BLURAY",
+  "edition": "NONE",
+  "releaseDate": "1992-11-25",
+  "dateAdded": "2024-03-04 05:06:07",
+  "watched": true,
+  "playcount": 3,
+  "lastWatched": "2024-05-06 07:08:09",
+  "note": "private note",
+  "originalFilename": "Harbor.Lights.1992.1080p.BluRay.x264-GRP.mkv",
+  "englishTitle": "Harbor Lights",
+  "ratings": [
+    { "id": "imdb", "rating": 7.4, "votes": 5987, "max": 10 },
+    { "id": "themoviedb", "rating": 7.7, "votes": 56987, "max": 10 },
+    { "id": "metacritic", "rating": 73, "votes": 40, "max": 100 },
+    { "id": "user", "rating": 8.0, "votes": 1, "max": 10 }
+  ],
+  "genres": ["ADVENTURE", "FAMILY", "ANIMATION"],
+  "tags": ["lamp", "harbor"],
+  "showlinks": ["Harbor Lights: The Series"],
+  "actors": [
+    { "name": "Alex Moreau", "role": "Sailor (voice)", "thumb": "https://img.example.test/p/alex.jpg", "profile": "https://db.example.test/person/15827", "ids": { "tmdb": 15827, "imdb": "nm0001234", "tvdb": 99 } },
+    { "name": "Sam Rivera", "role": "Genie (voice)" }
+  ],
+  "directors": [
+    { "name": "Jo Clarke", "ids": { "tmdb": 1001 } },
+    { "name": "Ray Dunn" }
+  ],
+  "writers": [
+    { "name": "Ted Holt", "role": "Writer" },
+    { "name": "Mia Park", "role": "Writer", "ids": { "imdb": "nm0007777" } }
+  ],
+  "producers": [
+    { "name": "Don Ernst", "role": "Producer", "thumb": "https://img.example.test/p/don.jpg", "profile": "https://db.example.test/person/77" }
+  ],
+  "trailers": [
+    { "name": "Official Trailer", "url": "https://www.youtube.com/watch?v=abc123XYZ_-", "provider": "youtube", "inNfo": true },
+    { "name": "Second", "url": "https://example.test/trailer2.mp4", "provider": "other", "inNfo": false }
+  ],
+  "movieSet": { "title": "Harbor Lights Collection", "plot": "The harbor stories.", "tmdbId": 2344 },
+  "artwork": {
+    "POSTER": "https://img.example.test/m/poster.jpg",
+    "FANART": "https://img.example.test/m/fanart.jpg",
+    "BANNER": "https://img.example.test/m/banner.jpg",
+    "CLEARART": "https://img.example.test/m/clearart.png",
+    "CLEARLOGO": "https://img.example.test/m/clearlogo.png",
+    "DISC": "https://img.example.test/m/disc.png",
+    "THUMB": "https://img.example.test/m/thumb.jpg",
+    "KEYART": "https://img.example.test/m/keyart.jpg",
+    "SQUAREART": "https://img.example.test/m/square.jpg",
+    "LOGO": "https://img.example.test/m/logo.png"
+  },
+  "extraFanarts": ["https://img.example.test/m/fanart2.jpg", "https://img.example.test/m/fanart3.jpg"],
+  "files": [
+    {
+      "type": "VIDEO", "filename": "Harbor Lights (1992).mkv",
+      "videoCodec": "h264", "videoWidth": 1920, "videoHeight": 1080, "aspectRatio": 1.78, "duration": 5400,
+      "dateCreated": "2023-01-02 03:04:05", "dateLastModified": "2023-02-03 04:05:06",
+      "audio": [
+        { "codec": "AC3", "language": "en", "audioChannels": 6 },
+        { "codec": "DTS", "language": "de", "audioChannels": 2 }
+      ],
+      "subtitles": [ { "language": "en" }, { "language": "de", "forced": true } ]
+    }
+  ]
+}

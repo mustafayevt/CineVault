@@ -1,0 +1,240 @@
+{
+  "folder": "Lighthouse Keepers",
+  "title": "Lighthouse Keepers",
+  "year": 2015,
+  "files": [
+    {
+      "filename": "poster.jpg"
+    },
+    {
+      "filename": "fanart.jpg"
+    },
+    {
+      "filename": "banner.jpg"
+    },
+    {
+      "filename": "tvshow.nfo"
+    },
+    {
+      "filename": "theme.mp3"
+    },
+    {
+      "filename": "clearlogo.png"
+    },
+    {
+      "filename": "season-specials-poster.jpg"
+    },
+    {
+      "filename": "extrafanart-1.jpg",
+      "dir": "extrafanart"
+    }
+  ],
+  "seasons": [
+    {
+      "season": 1,
+      "files": [
+        {
+          "filename": "season01-poster.jpg"
+        },
+        {
+          "filename": "season01-fanart.jpg"
+        },
+        {
+          "filename": "season01-banner.jpg"
+        },
+        {
+          "filename": "season01-thumb.jpg"
+        }
+      ]
+    },
+    {
+      "season": 2,
+      "files": []
+    }
+  ],
+  "episodes": [
+    {
+      "title": "Arrival",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 1,
+          "episode": 1
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse.Keepers.S01E01.720p.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1280,
+          "videoHeight": 720,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 1",
+          "audio": [
+            {
+              "codec": "AC3",
+              "language": "en",
+              "audioChannels": 6
+            }
+          ]
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p.nfo",
+          "dir": "Season 1"
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p-thumb.jpg",
+          "dir": "Season 1"
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p.en.srt",
+          "dir": "Season 1",
+          "subtitles": [
+            {
+              "language": "en"
+            }
+          ]
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p.de.forced.srt",
+          "dir": "Season 1",
+          "subtitles": [
+            {
+              "language": "de",
+              "forced": true
+            }
+          ]
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p-trailer.mp4",
+          "dir": "Season 1"
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p-sample.mkv",
+          "dir": "Season 1"
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p-fanart.jpg",
+          "dir": "Season 1"
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p.mkv.vsmeta",
+          "dir": "Season 1"
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E01.720p-mediainfo.xml",
+          "dir": "Season 1"
+        }
+      ]
+    },
+    {
+      "title": "Storm Warning",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 1,
+          "episode": 2
+        }
+      ],
+      "multiEpisode": true,
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse.Keepers.S01E02E03.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 1"
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E02E03.nfo",
+          "dir": "Season 1"
+        }
+      ]
+    },
+    {
+      "title": "Storm Warning Part Two",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 1,
+          "episode": 3
+        }
+      ],
+      "multiEpisode": true,
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse.Keepers.S01E02E03.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 1"
+        },
+        {
+          "filename": "Lighthouse.Keepers.S01E02E03.nfo",
+          "dir": "Season 1"
+        }
+      ]
+    },
+    {
+      "title": "Second Watch",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 2,
+          "episode": 1
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "2x01 second watch.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 2"
+        }
+      ]
+    },
+    {
+      "title": "Behind the Light",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 0,
+          "episode": 1
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "special 1.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Specials"
+        },
+        {
+          "filename": "special 1.en.srt",
+          "dir": "Specials",
+          "subtitles": [
+            {
+              "language": "en"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,137 @@
+/*
+ * Accessibility infrastructure: focus ring (keyboard only), the gold border of a focused field,
+ * Windows high contrast (forced colours).
+ * UI zoom is applied from the Appearance settings (features/settings/appearance.ts).
+ * Everything here reads design-system tokens; the only colours are CSS system colours, which is
+ * what forced-colors mode requires.
+ */
+
+/*
+ * Focus: a 2px ring in --focus-ring, held 2px off the control so the gap shows the ground behind it
+ * (the design system's "2px ring with a 2px bg offset", visible on posters too). It sits in the
+ * base layer so a component can still adjust it with a utility.
+ */
+@layer base {
+  /*
+   * Every element starts from the ring colour. Utilities such as transition-colors also animate
+   * outline-color, so a control that had the default (its text colour) showed a grey or cream
+   * ring for the length of the fade on every focus; now there is nothing to fade from.
+   */
+  *,
+  ::before,
+  ::after {
+    outline-color: var(--focus-ring);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* A mouse or touch click draws no ring: only keyboard focus does (spec desktop-interaction). */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Containers that take programmatic focus (drawers, route changes) are not controls. */
+  [tabindex="-1"]:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /*
+   * A page heading is where a route change, Back or Esc lands focus so a screen reader reads the
+   * new page; it is not a control, so no ring is drawn around it even after a key press.
+   */
+  :is(h1, h2)[tabindex="-1"]:focus {
+    outline: none;
+  }
+}
+
+/*
+ * A text field marks focus with a gold border, whether it was clicked or tabbed into, and draws no
+ * ring around it. Unlayered, so it beats a utility's border colour. The 1px inset outline covers a
+ * border that is there and stands in for one that is not, so focus is always visible. A field
+ * wrapper (`data-field`, the shared Field and SearchField) carries the border for the input in it.
+ */
+:is(input, textarea, select):not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"],
+    [type="file"]
+  ):focus,
+[data-field]:focus-within {
+  border-color: var(--gold);
+  outline: 1px solid var(--gold);
+  outline-offset: -1px;
+}
+[data-field] :is(input, textarea, select):focus,
+[data-field] :is(input, textarea, select):focus-visible {
+  outline: none;
+}
+
+/* Reduced motion lives in motion.css (data-motion="reduced", prefers-reduced-motion). */
+
+/*
+ * Windows high contrast. The system picks the palette, so colour carries no meaning here: state
+ * that is shown by fill gets a border or an outline as well, and the focus ring uses Highlight.
+ */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+  button,
+  [role="switch"] > span,
+  [role="button"] {
+    border: 1px solid ButtonText;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    border-color: GrayText;
+    color: GrayText;
+  }
+  /* Pressed, selected, current and on states: a filled system highlight, not just a tint. */
+  [aria-pressed="true"],
+  [aria-selected="true"],
+  [aria-current="page"],
+  [role="switch"][aria-checked="true"] > span,
+  [aria-checked="true"] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    border-color: HighlightText;
+  }
+  [role="switch"][aria-checked="true"] > span > span {
+    background: HighlightText;
+  }
+  /* Keep artwork and logos in their own colours; the scrim text over them stays readable. */
+  img,
+  video,
+  canvas {
+    forced-color-adjust: none;
+  }
+  /* Panels and cards lose their tonal separation, so draw it. */
+  [role="dialog"],
+  [role="complementary"],
+  [role="status"],
+  [role="alert"],
+  [cmdk-root] {
+    border: 1px solid CanvasText;
+  }
+}
+
+/*
+ * A long menu (a show's More menu has some 25 entries) never runs off the window: it is as tall
+ * as the room Radix measured between its anchor and the window's edge, and scrolls inside.
+ */
+[data-radix-menu-content] {
+  max-height: var(
+    --radix-dropdown-menu-content-available-height,
+    var(--radix-context-menu-content-available-height, 100vh)
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

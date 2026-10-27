@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<episodedetails>
+  <title>Pilot</title>
+  <showtitle>Harbor Town</showtitle>
+  <season>1</season>
+  <episode>1</episode>
+  <aired>2010-01-20</aired>
+  <plot>The first day.</plot>
+  <runtime>44</runtime>
+  <id>111</id>
+  <uniqueid type="tvdb" default="true">111</uniqueid>
+  <thumb>https://images.example.test/town/e1.jpg</thumb>
+  <watched>false</watched>
+  <credits>Writer One</credits>
+  <director>Director One</director>
+  <actor><name>Guest One</name><role>Visitor</role><type>GuestStar</type></actor>
+</episodedetails>

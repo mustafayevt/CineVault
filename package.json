@@ -1,0 +1,21 @@
+{
+  "name": "cinevault",
+  "private": true,
+  "license": "Apache-2.0",
+  "version": "1.0.1",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "notices": "node scripts/gen-notices.mjs",
+    "perf:budgets": "node scripts/perf-budgets.mjs",
+    "perf:coldstart": "node scripts/perf-coldstart.mjs",
+    "tools:fetch": "cargo run -p cv-media --example fetch_tools --",
+    "bundle:check": "node scripts/check-bundle.mjs",
+    "package:portable": "node scripts/package-portable.mjs",
+    "release:keys": "node scripts/release-keys.mjs",
+    "release:publish": "node scripts/release-publish.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3"
+  }
+}

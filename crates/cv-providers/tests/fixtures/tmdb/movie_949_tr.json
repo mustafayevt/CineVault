@@ -1,0 +1,227 @@
+{
+  "adult": false,
+  "backdrop_path": "/rrBuGu0Pjq7Y2BWSI6teXfXnTEB.jpg",
+  "belongs_to_collection": null,
+  "genres": [
+    {
+      "id": 28,
+      "name": "Action"
+    },
+    {
+      "id": 80,
+      "name": "Crime"
+    },
+    {
+      "id": 18,
+      "name": "Drama"
+    },
+    {
+      "id": 53,
+      "name": "Thriller"
+    }
+  ],
+  "id": 949,
+  "imdb_id": "tt0113277",
+  "original_language": "en",
+  "original_title": "Heat",
+  "overview": "",
+  "poster_path": "/zMyfPUelumio3tiDKPffaUT8Ms.jpg",
+  "production_companies": [
+    {
+      "id": 508,
+      "name": "Regency Enterprises"
+    },
+    {
+      "id": 1,
+      "name": "Forward Pass"
+    }
+  ],
+  "production_countries": [
+    {
+      "iso_3166_1": "US",
+      "name": "United States of America"
+    }
+  ],
+  "release_date": "1995-12-15",
+  "runtime": 170,
+  "spoken_languages": [
+    {
+      "english_name": "English",
+      "iso_639_1": "en",
+      "name": "English"
+    },
+    {
+      "english_name": "Spanish",
+      "iso_639_1": "es",
+      "name": "Español"
+    }
+  ],
+  "tagline": "",
+  "title": "Ateş Hattı",
+  "vote_average": 7.9,
+  "vote_count": 7100,
+  "credits": {
+    "cast": [
+      {
+        "id": 5576,
+        "name": "Val Kilmer",
+        "character": "Chris Shiherlis",
+        "order": 2,
+        "profile_path": null
+      },
+      {
+        "id": 380,
+        "name": "Robert De Niro",
+        "character": "Neil McCauley",
+        "order": 1,
+        "profile_path": "/cT8htcckIuyI1Lqwt1CvD02ynTh.jpg"
+      },
+      {
+        "id": 1158,
+        "name": "Al Pacino",
+        "character": "Lt. Vincent Hanna",
+        "order": 0,
+        "profile_path": "/fMDFeVf0pjopTJbyRSLFwNDm8Wr.jpg"
+      }
+    ],
+    "crew": [
+      {
+        "id": 1037,
+        "name": "Michael Mann",
+        "job": "Director",
+        "department": "Directing",
+        "profile_path": "/m.jpg"
+      },
+      {
+        "id": 1037,
+        "name": "Michael Mann",
+        "job": "Screenplay",
+        "department": "Writing",
+        "profile_path": "/m.jpg"
+      },
+      {
+        "id": 1037,
+        "name": "Michael Mann",
+        "job": "Producer",
+        "department": "Production",
+        "profile_path": "/m.jpg"
+      },
+      {
+        "id": 1037,
+        "name": "Michael Mann",
+        "job": "Producer",
+        "department": "Production",
+        "profile_path": "/m.jpg"
+      },
+      {
+        "id": 2000,
+        "name": "Dante Spinotti",
+        "job": "Director of Photography",
+        "department": "Camera",
+        "profile_path": null
+      },
+      {
+        "id": 2001,
+        "name": "Pasquale Buba",
+        "job": "Editor",
+        "department": "Editing",
+        "profile_path": null
+      },
+      {
+        "id": 2002,
+        "name": "Elliot Goldenthal",
+        "job": "Original Music Composer",
+        "department": "Sound",
+        "profile_path": null
+      },
+      {
+        "id": 2003,
+        "name": "Someone Else",
+        "job": "Gaffer",
+        "department": "Lighting",
+        "profile_path": null
+      }
+    ]
+  },
+  "keywords": {
+    "keywords": [
+      {
+        "id": 1,
+        "name": "robbery"
+      },
+      {
+        "id": 2,
+        "name": "Los Angeles"
+      },
+      {
+        "id": 3,
+        "name": "Robbery"
+      }
+    ]
+  },
+  "release_dates": {
+    "results": [
+      {
+        "iso_3166_1": "US",
+        "release_dates": [
+          {
+            "certification": "",
+            "type": 1,
+            "release_date": "1995-12-06T00:00:00.000Z"
+          },
+          {
+            "certification": "R",
+            "type": 3,
+            "release_date": "1995-12-15T00:00:00.000Z"
+          },
+          {
+            "certification": "R",
+            "type": 5,
+            "release_date": "1997-05-20T00:00:00.000Z"
+          }
+        ]
+      },
+      {
+        "iso_3166_1": "DE",
+        "release_dates": [
+          {
+            "certification": "16",
+            "type": 3,
+            "release_date": "1996-02-29T00:00:00.000Z"
+          }
+        ]
+      }
+    ]
+  },
+  "translations": {
+    "translations": [
+      {
+        "iso_3166_1": "TR",
+        "iso_639_1": "tr",
+        "name": "Türkçe",
+        "english_name": "Turkish",
+        "data": {
+          "title": "Ateş Hattı",
+          "overview": "",
+          "tagline": ""
+        }
+      },
+      {
+        "iso_3166_1": "US",
+        "iso_639_1": "en",
+        "name": "English",
+        "english_name": "English",
+        "data": {
+          "title": "Heat",
+          "overview": "Obsessive master thief Neil McCauley leads a top-notch crew on various insane heists.",
+          "tagline": "A Los Angeles Crime Saga"
+        }
+      }
+    ]
+  },
+  "external_ids": {
+    "imdb_id": "tt0113277",
+    "wikidata_id": "Q220394",
+    "facebook_id": null
+  }
+}

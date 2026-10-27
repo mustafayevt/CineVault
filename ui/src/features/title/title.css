@@ -1,0 +1,131 @@
+/*
+ * The backdrop band behind a title page's header: the artwork at 85%
+ * under one fade into the window ground, tokens only. It is clipped to the first 400px (movie) or
+ * 340px (show) of the page plus the lead and 140px, so the rest of the page sits flat on the ground.
+ */
+/* The room above the poster: 30px up to a 768px-high window, growing 1:1 with the height to 200px (the
+   facts and Technical rows stay on the first screen); the band grows with it. */
+.cv-title-header,
+.cv-title-backdrop {
+  --title-lead: clamp(30px, calc(30px + (100vh - 768px) * 1), 200px);
+  /* Where the band ends relative to the old 400px band: just under the header's actions, so they sit on the artwork. */
+  --backdrop-extra: -60px;
+}
+.cv-title-backdrop {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: calc(var(--backdrop-h, 400px) + var(--title-lead, 30px) - 30px + var(--backdrop-extra));
+  overflow: hidden;
+  pointer-events: none;
+}
+/* In the shell's backdrop layer the band starts at the window's top edge, so it also covers the 38px title bar. */
+.cv-title-backdrop[data-in-shell] {
+  height: calc(
+    var(--backdrop-h, 400px) + var(--title-lead, 30px) - 30px + var(--backdrop-extra) + 38px
+  );
+  will-change: transform;
+}
+.cv-title-backdrop-layer {
+  position: absolute;
+  inset: 0;
+}
+.cv-title-backdrop-layer > :first-child {
+  opacity: 0.85;
+}
+/* SCRIM (mask): in the shell the sharp artwork starts at the page column and eases in over 128px, and a blurred copy
+   fills the window edge under the sidebar panel, so the band never starts with a hard line. */
+.cv-title-backdrop[data-in-shell] > .cv-title-backdrop-sharp {
+  left: calc(var(--content-left, 0px) - 64px);
+  mask-image: linear-gradient(to right, transparent 0, black 128px);
+}
+.cv-title-backdrop-soft {
+  filter: blur(28px);
+  transform: scale(1.08);
+  opacity: 0.6;
+}
+/* SCRIM: the one fade from the window ground up the artwork, so the title and ratings keep contrast. */
+.cv-title-backdrop-fade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--surface-window) 5%, transparent) 0%,
+    color-mix(in srgb, var(--surface-window) 45%, transparent) 60%,
+    var(--surface-window) 100%
+  );
+}
+
+/* Quiet links of a title page (collection, provider IDs, "All 42"): muted, dark-on-hover, underlined only on hover. */
+.cv-link {
+  color: var(--text-2);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--dur-hover) var(--ease-out);
+}
+.cv-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* The plot: 14px reading text with 1.65 leading, at most 640px wide. */
+.cv-plot {
+  max-width: 640px;
+  margin: 0;
+  font-size: var(--fs-14);
+  line-height: 1.65;
+}
+
+/* SCRIM (light theme): the artwork keeps its own colours at the top (no pale wash over it) and only
+   fades into the pale ground behind the title, ratings and actions, so dark text there keeps its
+   contrast. */
+:root[data-theme="light"] .cv-title-backdrop-layer > :first-child {
+  opacity: 1;
+}
+:root[data-theme="light"] .cv-title-backdrop-fade {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 30%,
+    color-mix(in srgb, var(--surface-window) 55%, transparent) 62%,
+    color-mix(in srgb, var(--surface-window) 85%, transparent) 82%,
+    var(--surface-window) 100%
+  );
+}
+
+/* The floating "Change poster" / "Change backdrop" buttons: shown while the pointer is over the poster
+   (or the header, for the backdrop) and on keyboard focus; the surface is the floating one. */
+/* Frosted over the artwork: a dim, blurred glass with a hairline edge, so it reads as part of the
+   picture rather than a card stuck on it. */
+.cv-art-btn {
+  opacity: 0;
+  color: var(--text);
+  background-color: color-mix(in srgb, var(--surface-window) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  backdrop-filter: blur(12px) saturate(1.2);
+  transition:
+    opacity var(--dur-hover) var(--ease-out),
+    background-color var(--dur-hover) var(--ease-out);
+}
+.cv-art-btn:hover {
+  background-color: color-mix(in srgb, var(--surface-window) 75%, transparent);
+}
+.cv-art-btn:active {
+  background-color: color-mix(in srgb, var(--surface-window) 85%, transparent);
+}
+.cv-art-btn[data-art-button="poster"]:focus-visible,
+.cv-art-btn[data-art-button="backdrop"]:focus-visible,
+[data-testid="title-poster"]:hover .cv-art-btn[data-art-button="poster"],
+[data-testid="title-poster"]:focus-within .cv-art-btn[data-art-button="poster"],
+.cv-title-header:hover .cv-art-btn[data-art-button="backdrop"],
+.cv-title-header:focus-within .cv-art-btn[data-art-button="backdrop"] {
+  opacity: 1;
+}
+/* Reduced motion: it appears at once. */
+:root[data-motion="reduced"] .cv-art-btn {
+  transition-duration: 0s !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .cv-art-btn {
+    transition-duration: 0s !important;
+  }
+}

@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in CineVault does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please search the existing issues first.
+        Never paste API keys. Security problems go through a private advisory instead (see SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: CineVault version
+      description: Shown in Settings › About.
+      placeholder: "1.0.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is it installed?
+      options:
+        - Setup (.exe)
+        - MSI
+        - Portable zip
+        - DMG
+        - Built from source
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you do, step by step? Folder and file names help (use made-up ones if you prefer).
+      placeholder: |
+        1. Add a movie folder with ...
+        2. Scrape "..."
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: |
+        If you can, set Settings › Advanced › Log detail to "Detailed", reproduce the problem with CineVault started from a terminal, and paste the output. Secrets are masked in the log.
+        CineVault's data folder is `%APPDATA%\CineVault` on Windows and `~/Library/Application Support/CineVault` on macOS (or the `data` folder of a portable copy).
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else

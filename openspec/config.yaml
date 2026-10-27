@@ -1,0 +1,48 @@
+schema: spec-driven
+
+context: |
+  CineVault is a desktop movie and TV library manager for Windows and macOS. It scans media folders,
+  identifies titles from online providers, writes Kodi, Jellyfin, Emby and MediaPortal style NFO and
+  artwork files, renames folders from templates with a preview and Undo, and keeps a History of every
+  change it makes to the user's files.
+  Stack: Tauri 2 desktop shell (src-tauri/), Rust core libraries in a Cargo workspace (crates/cv-*),
+  the `cinevault` command-line binary (cli/), React 19 + TypeScript + Vite + Tailwind v4 frontend (ui/),
+  SQLite storage. IPC commands and events are typed with tauri-specta (ui/src/bindings.ts is generated);
+  long work streams over Tauri channels; images are served over the cv://img protocol, never over IPC.
+  Specs: openspec/specs/<capability>/spec.md describe current behaviour and win over any other wording.
+  UI rules live in the ui-design-system spec, with the tokens in ui/src/styles/tokens.css and
+  ui/src/styles/design-tokens.json and the shared components in ui/src/components (shown on /gallery).
+  Compatibility is described only in terms of the Kodi, Jellyfin, Emby and MediaPortal file formats;
+  byte-exact expectations live in tests/compat/.
+  Conventions: Rust edition 2024, unsafe denied, thiserror in libraries and anyhow only in binaries,
+  tracing for logs and never a secret in them; UI uses functional components with explicit types,
+  design tokens only, lucide-react icons, keyboard reachable controls. One verb per job: Scan, Scrape,
+  Rename (stages New, Scraped, Renamed). Data safety: library rows are never deleted automatically,
+  settings are written atomically, renames go through plan, preview and journal, and replaced or
+  deleted files go to the chosen deleted-files destination (the Recycle Bin or Trash by default).
+  Commits follow Conventional Commits v1.0.0.
+  Workflow: a change is proposed in openspec/changes/<name>/ (proposal.md, design.md, delta specs,
+  tasks.md), validated with `openspec validate <name> --strict`, implemented task by task with each
+  task's checks passing, and archived with `openspec archive <name>` once it is complete, which merges
+  its delta specs into openspec/specs/.
+
+rules:
+  proposal:
+    - State what is out of scope.
+  specs:
+    - Requirements describe observable behaviour in the present tense; implementation choices belong in design.md.
+    - Use neutral examples (invented titles, paths such as D:\Movies or /media/movies), never real personal data.
+  design:
+    - Any change that writes, moves or deletes files in media folders states how it stays safe when interrupted and how it is undone.
+  tasks:
+    - Every task ends with how it is verified (a test, a command, or an observable behaviour).
+    - Size each task so it can be finished and reviewed on its own, and commit each task separately.
+    - Each task group lands its own tests; the last group is for integration checks only.
+    - Tasks that need a human (real-hardware checks, personal API keys, live accounts) say so explicitly.
+
+operations:
+  apply:
+    guidance:
+      - Work through the tasks in order; for each task run the checks it needs (cargo fmt, cargo clippy --workspace --all-targets -- -D warnings, the affected crate tests, and bun run lint, typecheck and test for UI work), tick it in tasks.md and commit it with a Conventional Commit.
+      - Run the full check (cargo test --workspace and the whole UI suite) at the end of each task group.
+      - Before archiving a change that touches user files (scanning writes, NFO and artwork writes, renaming, moves, undo, deletion, interruption recovery), review those code paths for data loss, corruption and partial writes, and cover each finding with a test.

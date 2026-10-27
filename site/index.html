@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CineVault: every title in its place</title>
+<meta name="description" content="CineVault 1.0 is a fast desktop movie and TV library manager for Windows. Scan your folders, Scrape titles with ratings and artwork, write complete Kodi, Jellyfin and Emby NFO files, and Rename with a preview and Undo.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="canonical" href="https://mustafayevt.github.io/CineVault-releases/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CineVault">
+<meta property="og:title" content="CineVault: every title in its place">
+<meta property="og:description" content="A fast desktop movie and TV library manager for Windows. Scan, Scrape, Rename, with ratings from many sources, the artwork you choose, complete NFO files for your media centre, and Undo for everything.">
+<meta property="og:url" content="https://mustafayevt.github.io/CineVault-releases/">
+<meta property="og:image" content="https://mustafayevt.github.io/CineVault-releases/img/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="The CineVault logo and the line Every title in its place, next to a wall of posters">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="preload" as="image" href="img/library-dark.webp" media="(prefers-color-scheme: dark)">
+<link rel="preload" as="image" href="img/library-light.webp" media="(prefers-color-scheme: light)">
+<script>document.documentElement.classList.add("js");</script>
+<script src="site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="./" aria-label="CineVault home">
+      <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M35.743 6.59A21 21 0 1 0 35.743 41.41A3 3 0 0 0 32.388 36.436A15 15 0 1 1 32.388 11.564A3 3 0 0 0 35.743 6.59Z" fill="currentColor"/><path d="M28.5 15H37.5A1.5 1.5 0 0 1 39 16.5V31.5A1.5 1.5 0 0 1 37.5 33H28.5A1.5 1.5 0 0 1 27 31.5V16.5A1.5 1.5 0 0 1 28.5 15Z" class="mark-frame"/></svg>
+      <span>CineVault</span>
+    </a>
+    <nav class="bar-nav" aria-label="Page">
+      <a href="#flow">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/mustafayevt/CineVault-releases/releases">Releases</a>
+    </nav>
+    <a class="btn btn-sm" href="#download">Download</a>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="pill">New</span> Version <span data-version>1.0.0</span> for Windows</p>
+        <h1 id="hero-title">Every title<br>in its place.</h1>
+        <p class="lede">A fast desktop library manager for your movies and TV shows. CineVault reads your folders, fills in details, ratings and artwork, writes complete NFO files for Kodi, Jellyfin and Emby, and tidies every name, with Undo for all of it.</p>
+        <div class="cta">
+          <a class="btn btn-lg" data-dl href="https://github.com/mustafayevt/CineVault-releases/releases/latest/download/CineVault-setup-x64.exe">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75v11.5M7.25 10.5 12 15.25l4.75-4.75M4.75 19.25h14.5"/></svg>
+            <span class="btn-text"><span data-dl-label>Download for Windows</span><small data-dl-note>Version <span data-version>1.0.0</span>, <span data-size>18.2 MB</span></small></span>
+          </a>
+          <a class="btn btn-quiet btn-lg" href="#flow">See how it works</a>
+        </div>
+        <p class="fine" data-dl-fine>Free. Windows 10 and 11, 64-bit. macOS is coming soon.</p>
+      </div>
+    </div>
+    <div class="wrap wrap-wide">
+      <figure class="window window-hero reveal">
+        <picture>
+          <source srcset="img/library-light.webp" media="(prefers-color-scheme: light)">
+          <img src="img/library-dark.webp" width="1440" height="900" fetchpriority="high" alt="The CineVault Library: a grid of posters, each marked with its stage, the Movies, TV shows and Collections switch, filters for stage, drive, quality and problems, and the sidebar with Scrape, Rename, Drives and Torrents above the free space of every drive">
+        </picture>
+      </figure>
+    </div>
+  </section>
+
+  <section class="flow" id="flow" aria-labelledby="flow-title">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="kicker">How it works</p>
+        <h2 id="flow-title">Scan, Scrape, Rename.</h2>
+        <p class="section-lede">One verb per job. Every title moves through three stages, and you always see where each one stands.</p>
+      </header>
+      <ol class="flow-list">
+        <li class="flow-step reveal">
+          <div class="flow-top"><span class="num">1</span><h3>Scan</h3><span class="stage">New</span></div>
+          <p>Automatic. Add your movie and TV folders and CineVault finds every title, keeps its extra files with it and watches for changes. NFO files already on disk are read first, so titles that have them arrive already Scraped.</p>
+        </li>
+        <li class="flow-step reveal">
+          <div class="flow-top"><span class="num">2</span><h3>Scrape</h3><span class="stage">Scraped</span></div>
+          <p>When you ask. Each title gets a match with a confidence score, and <b>Accept all confident</b> takes the sure ones in one click. Every Scrape writes the complete NFO and all the artwork next to the file.</p>
+        </li>
+        <li class="flow-step reveal">
+          <div class="flow-top"><span class="num">3</span><h3>Rename</h3><span class="stage stage-gold">Renamed</span></div>
+          <p>From a template. A word-level preview shows exactly what changes, conflicts are settled on their own row, and nothing moves until you say so. History can put it all back.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <div id="features">
+    <section class="feature" aria-labelledby="f-library">
+      <div class="wrap feature-in">
+        <div class="feature-copy">
+          <p class="kicker">Library</p>
+          <h2 id="f-library">Movies, shows and collections, at a glance</h2>
+          <p>A poster grid or a table where every column sorts. Filter by stage, drive, quality or problems. TV shows open on their seasons, with missing and unaired episodes marked, and a collection appears by itself once you own two films of the same set.</p>
+          <ul class="facts">
+            <li>Show, season and episode pages with season artwork</li>
+            <li>Automatic collections, with the films you are missing</li>
+            <li>Problems filter for unmatched titles and missing files</li>
+          </ul>
+        </div>
+        <figure class="window reveal">
+          <picture>
+            <source srcset="img/show-light.webp" media="(prefers-color-scheme: light)">
+            <img src="img/show-dark.webp" width="1440" height="900" loading="lazy" alt="The page of the TV show Severance: poster, TMDB and IMDb ratings, Play, Scrape, Rename, Move, Open folder and Delete, and Season 2 open with its episodes, one of them missing and one not aired yet">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
+    <section class="feature feature-flip" aria-labelledby="f-movie">
+      <div class="wrap feature-in">
+        <div class="feature-copy">
+          <p class="kicker">Movie page</p>
+          <h2 id="f-movie">The whole film on one page</h2>
+          <p>Plot, cast and crew, ratings side by side and the real video and audio formats read from the file. Every rating links to the movie's page on its site.</p>
+          <ul class="facts">
+            <li>TMDB with every Scrape; IMDb, Rotten Tomatoes, Metacritic, Letterboxd, Trakt and more with your own free OMDb or MDBList key</li>
+            <li>Resolution, HDR and Dolby Vision, audio formats and subtitles from the file</li>
+            <li>Pick any poster, fanart, logo, clear art, banner, disc art or thumb in the artwork picker</li>
+          </ul>
+        </div>
+        <figure class="window reveal">
+          <picture>
+            <source srcset="img/movie-light.webp" media="(prefers-color-scheme: light)">
+            <img src="img/movie-dark.webp" width="1440" height="900" loading="lazy" alt="The movie page for Dune: Part Two: poster, ratings from TMDB, IMDb, Trakt, Letterboxd, Rotten Tomatoes and Metacritic, the action buttons, the plot, director and release facts, the cast and the Technical card with video, audio, subtitles and file">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
+    <section class="feature" aria-labelledby="f-match">
+      <div class="wrap feature-in">
+        <div class="feature-copy">
+          <p class="kicker">Match picker</p>
+          <h2 id="f-match">Know the match before you take it</h2>
+          <p>Every candidate comes with a confidence score and the reason for it. Pick another one and CineVault shows what will change first: the title, the director, the runtime against your file, and the files it rewrites.</p>
+          <ul class="facts">
+            <li>Accept all confident takes every sure match at once</li>
+            <li>Search by title and year, or paste a link or an ID</li>
+            <li>Complete Kodi, Jellyfin and Emby NFO and all artwork on every Scrape</li>
+          </ul>
+        </div>
+        <figure class="window reveal">
+          <picture>
+            <source srcset="img/match-light.webp" media="(prefers-color-scheme: light)">
+            <img src="img/match-dark.webp" width="1440" height="900" loading="lazy" alt="The match picker for Dune: Part Two: the current match at 98 percent, two other results at 90 percent with their reasons, and for the chosen one a What will change panel warning that the runtime differs from the file by 29 minutes">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
+    <section class="feature feature-flip" aria-labelledby="f-rename">
+      <div class="wrap feature-in">
+        <div class="feature-copy">
+          <p class="kicker">Rename</p>
+          <h2 id="f-rename">Tidy names, and nothing moves until you say so</h2>
+          <p>Pick a naming style or write your own template. The preview strikes out the words that go and marks the ones that come, and a clash with another title is settled right on its row.</p>
+          <div class="strip" role="group" aria-label="Example: the folder Dune.Part.Two.2024.2160p.WEB-DL.DV.HDR10.TrueHD.Atmos.7.1-GRP renamed with a naming style">
+            <div class="strip-row"><span class="strip-tag">before</span><code class="strip-from"><span>Dune</span><s>.</s><span>Part</span><s>.</s><span>Two</span><s>.2024.2160p.WEB-DL.DV.HDR10.TrueHD.Atmos.7.1-GRP</s></code></div>
+            <div class="strip-row"><span class="strip-tag">after</span><code class="strip-to" data-style-out aria-live="polite">Dune - Part Two (2024)</code></div>
+            <div class="style-picks" role="group" aria-label="Naming style">
+              <button type="button" class="style-pick" aria-pressed="true" data-style="clean">Clean</button>
+              <button type="button" class="style-pick" aria-pressed="false" data-style="detailed">Detailed</button>
+              <button type="button" class="style-pick" aria-pressed="false" data-style="server">Media-server safe</button>
+              <button type="button" class="style-pick" aria-pressed="false" data-style="custom">Your own</button>
+            </div>
+            <p class="strip-note">Template <code data-style-template>{Title} ({Year})</code></p>
+          </div>
+        </div>
+        <figure class="window reveal">
+          <picture>
+            <source srcset="img/rename-light.webp" media="(prefers-color-scheme: light)">
+            <img src="img/rename-dark.webp" width="1440" height="900" loading="lazy" alt="The Rename page: folder and file names now and after Rename, with the removed words struck through and the added words marked, and three conflicts with a way to resolve each on its row">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
+    <section class="feature" aria-labelledby="f-drives">
+      <div class="wrap feature-in">
+        <div class="feature-copy">
+          <p class="kicker">Drives</p>
+          <h2 id="f-drives">See where the space went</h2>
+          <p>Free space on every drive, the titles on each one biggest first, and a warning when a drive runs low. Move titles to another drive and CineVault copies, verifies the copy, and only then sends the originals to the Recycle Bin.</p>
+          <ul class="facts">
+            <li>Copy, verify, then the originals to the Recycle Bin</li>
+            <li>Quality and size of every title, per drive</li>
+            <li>Offline drives keep their titles until they come back</li>
+          </ul>
+        </div>
+        <figure class="window reveal">
+          <picture>
+            <source srcset="img/drives-light.webp" media="(prefers-color-scheme: light)">
+            <img src="img/drives-dark.webp" width="1440" height="900" loading="lazy" alt="The Drives page: four drives with their free space, one low on space and one offline, and the titles of the Media drive listed biggest first with quality, size and folder">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
+    <section class="feature feature-flip" aria-labelledby="f-torrents">
+      <div class="wrap feature-in">
+        <div class="feature-copy">
+          <p class="kicker">Torrent search</p>
+          <h2 id="f-torrents">Find a better copy</h2>
+          <p>Search a movie or a show from inside the app. Filter by resolution and see at once whether each release is the Same as, Better or Worse than the copy you own. CineVault only hands the release you pick to your own torrent app.</p>
+          <ul class="facts">
+            <li>Results with quality, size, seeders, source and age</li>
+            <li>Search a whole show, one season or one episode</li>
+          </ul>
+          <p class="note">A short notice appears on your first visit: You are responsible for what you download and share.</p>
+        </div>
+        <figure class="window reveal">
+          <picture>
+            <source srcset="img/torrents-light.webp" media="(prefers-color-scheme: light)">
+            <img src="img/torrents-dark.webp" width="1440" height="900" loading="lazy" alt="Torrent search for Blade Runner 2049: your copy is 1080p, and ten releases are listed with quality, size, seeders, source and age, each marked Better, Worse or Same as yours, with resolution filters above">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
+    <section class="feature" aria-labelledby="f-history">
+      <div class="wrap feature-in">
+        <div class="feature-copy">
+          <p class="kicker">History</p>
+          <h2 id="f-history">Undo for everything that touches your files</h2>
+          <p>Renames, moves, deletes, artwork and match changes are all kept in History, each with its own Undo. Delete sends a title to the Recycle Bin; erasing it for good takes Shift+Delete and a typed confirmation.</p>
+          <ul class="facts">
+            <li>Undo a whole batch or a single change</li>
+            <li>Replaced artwork is kept, so Undo puts it back</li>
+          </ul>
+        </div>
+        <figure class="window reveal">
+          <picture>
+            <source srcset="img/history-light.webp" media="(prefers-color-scheme: light)">
+            <img src="img/history-dark.webp" width="1440" height="900" loading="lazy" alt="The History page: renames, a move between drives, a changed poster, a delete to the Recycle Bin and a changed match, each with Undo or Restore">
+          </picture>
+        </figure>
+      </div>
+    </section>
+  </div>
+
+  <section class="more" aria-labelledby="more-title">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="kicker">And also</p>
+        <h2 id="more-title">The little things</h2>
+      </header>
+      <ul class="more-grid">
+        <li class="reveal"><h3>Your media centre reads it</h3><p>NFO files and artwork in the Kodi, Jellyfin and Emby formats, kept up to date every time something changes.</p></li>
+        <li class="reveal"><h3>Light and dark</h3><p>Follows your system theme, with zoom from 80% to 150% for any screen.</p></li>
+        <li class="reveal"><h3>Quick with the keyboard</h3><p>Arrow keys, Enter, Delete, Esc and Ctrl+F for search cover the everyday work.</p></li>
+        <li class="reveal"><h3>Private by design</h3><p>No account and no telemetry. Your own provider keys stay in the system's credential store.</p></li>
+        <li class="reveal"><h3>Nothing lost</h3><p>Deletes go to the Recycle Bin, leftovers to a trash folder, and every rename can be undone.</p></li>
+        <li class="reveal"><h3>Fast on big libraries</h3><p>A Rust core and a poster grid that stays smooth with thousands of titles.</p></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="download" id="download" aria-labelledby="dl-title">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="kicker">Download</p>
+        <h2 id="dl-title">Get CineVault <span data-version>1.0.0</span></h2>
+        <p class="section-lede">Free. Updates arrive inside the app, signed with the project key.</p>
+      </header>
+      <div class="dl-grid">
+        <div class="dl-card">
+          <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.5 10.5 4.5v7h-7zM12 4.25l8.5-1.25v8.5H12zM3.5 12.5h7v7l-7-1zM12 12.5h8.5V21L12 19.75z"/></svg>Windows</h3>
+          <p>Windows 10 and 11, 64-bit, with Microsoft Edge WebView2 (built into Windows 11; the installer fetches it on Windows 10).</p>
+          <a class="btn" data-dl-win href="https://github.com/mustafayevt/CineVault-releases/releases/latest/download/CineVault-setup-x64.exe">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75v11.5M7.25 10.5 12 15.25l4.75-4.75M4.75 19.25h14.5"/></svg>
+            <span class="btn-text"><span>Installer</span><small><span data-size>18.2 MB</span></small></span>
+          </a>
+          <p class="alt">Or the <a class="link" href="https://github.com/mustafayevt/CineVault-releases/releases/latest/download/CineVault-x64.msi">MSI installer</a> or the <a class="link" href="https://github.com/mustafayevt/CineVault-releases/releases/latest/download/CineVault-portable-x64.zip">portable zip</a>, which keeps everything in its own folder.</p>
+          <p class="alt">The Windows builds are not code-signed yet. If SmartScreen stops the installer the first time, choose More info, then Run anyway.</p>
+        </div>
+        <div class="dl-card">
+          <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5c-1.2.1-2.5.9-3.2 1.9-.6.8-1.1 2-.9 3.1 1.3.1 2.5-.7 3.2-1.7.7-.9 1.1-2.1.9-3.3zM18.6 16.2c-.5 1.2-.8 1.7-1.5 2.7-.9 1.4-2.2 3.1-3.8 3.1-1.4 0-1.8-.9-3.7-.9s-2.3.9-3.7.9c-1.6 0-2.8-1.6-3.7-3C.5 15.4.2 10.9 1.9 8.4 3.1 6.6 5 5.6 6.8 5.6s3 1 4.5 1c1.5 0 2.4-1 4.5-1 1.6 0 3.3.9 4.5 2.4-4 2.2-3.3 7.8.3 8.2z"/></svg>macOS</h3>
+          <p>A macOS version is on its way. Watch the <a class="link" href="https://github.com/mustafayevt/CineVault-releases/releases">releases page</a> for news.</p>
+          <span class="soon">Coming soon</span>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><span class="num">1</span><div><h3>Install and open</h3><p>Run the installer, or unzip the portable copy anywhere.</p></div></li>
+        <li><span class="num">2</span><div><h3>Add a free TMDB key</h3><p>Create one at <a class="link" href="https://www.themoviedb.org/settings/api">themoviedb.org</a> and paste it in. OMDb and MDBList keys are optional and add more ratings.</p></div></li>
+        <li><span class="num">3</span><div><h3>Add your folders</h3><p>CineVault scans them right away. Then Scrape and Rename from the sidebar.</p></div></li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div class="foot-brand">
+      <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M35.743 6.59A21 21 0 1 0 35.743 41.41A3 3 0 0 0 32.388 36.436A15 15 0 1 1 32.388 11.564A3 3 0 0 0 35.743 6.59Z" fill="currentColor"/><path d="M28.5 15H37.5A1.5 1.5 0 0 1 39 16.5V31.5A1.5 1.5 0 0 1 37.5 33H28.5A1.5 1.5 0 0 1 27 31.5V16.5A1.5 1.5 0 0 1 28.5 15Z" class="mark-frame"/></svg>
+      <span>CineVault</span>
+    </div>
+    <p class="credit">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings come from <a href="https://www.omdbapi.com/">OMDb</a> and <a href="https://mdblist.com/">MDBList</a> when you add their keys.</p>
+    <p class="foot-links"><a href="https://github.com/mustafayevt/CineVault-releases/releases">Releases and release notes</a><span id="released"></span></p>
+  </div>
+</footer>
+</body>
+</html>

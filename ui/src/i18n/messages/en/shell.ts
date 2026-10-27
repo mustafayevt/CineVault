@@ -1,0 +1,60 @@
+/** English strings of the shell area. Merged with the other areas in `../../catalog.ts`. */
+export const shell = {
+  // Title bar
+  "chrome.back": "Back",
+  "chrome.forward": "Forward",
+
+  // Toasts and notifications
+  "toast.region": "Toasts",
+  "toast.couldNotUndo": "Could not undo: {message}",
+  "toast.undone": "Undone: {message}",
+  "toast.repeat": "×{count}",
+  "notFound.title": "That page does not exist",
+  "notFound.body":
+    "The address may be mistyped, or the page has moved. Pick something from the sidebar or start from the Library.",
+  "notFound.action": "Go to Library",
+
+  // Job names use the three verbs: Scan, Scrape, Rename
+  "job.announce.done": "{name}: finished",
+  "job.announce.doneWithFailures":
+    "{name}: finished, {count, plural, one {# item failed} other {# items failed}}",
+  "job.announce.failed": "{name}: failed.",
+
+  // The new shell: page names shared by the sidebar, the placeholders and the title bar
+  "shell.page.library": "Library",
+  "shell.page.scrape": "Scrape",
+  "shell.page.rename": "Rename",
+  "shell.page.drives": "Drives",
+  "shell.page.torrents": "Torrents",
+  "shell.page.history": "History",
+  "shell.page.settings": "Settings",
+  "shell.sidebar": "Main",
+  "shell.backHint": "Back (Alt+Left)",
+  "shell.forwardHint": "Forward (Alt+Right)",
+  "shell.collapse": "Collapse sidebar",
+  "shell.expand": "Expand sidebar",
+  "shell.theme.toLight": "Switch to the light theme",
+  "shell.theme.toDark": "Switch to the dark theme",
+  "shell.drives.free": "{free} free",
+  "shell.drives.offline": "Offline",
+  "shell.drives.tip": "{name} · {free} free of {total}",
+  "shell.drives.offlineTip": "{name} · Offline",
+  "shell.drives.low": "{count} low",
+  "shell.progress.line": "{verb} {done} of {total}",
+  "shell.progress.paused": "{line} (paused)",
+  "shell.progress.more": "+{count} more",
+  "shell.progress.count": "{done} of {total} · {percent}%",
+  "shell.progress.working": "Working…",
+  "shell.progress.open": "{work}. Show the running work",
+  "shell.progress.list": "Running work",
+  "shell.progress.pause": "Pause {name}",
+  "shell.progress.resume": "Resume {name}",
+  "shell.progress.cancel": "Cancel {name}",
+  "shell.window.controls": "Window controls",
+  "shell.window.minimize": "Minimize",
+  "shell.window.maximize": "Maximize",
+  "shell.window.restore": "Restore",
+  "shell.search.label": "Search library",
+  "shell.search.placeholder": "Search movies, shows, people",
+  "shell.search.clear": "Clear search",
+} as const;

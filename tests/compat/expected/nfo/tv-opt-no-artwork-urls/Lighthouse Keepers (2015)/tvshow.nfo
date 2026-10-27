@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<tvshow>
+  <title>Lighthouse Keepers</title>
+  <originaltitle>The Lighthouse Keepers</originaltitle>
+  <showtitle>Lighthouse Keepers</showtitle>
+  <sorttitle>Keepers, Lighthouse</sorttitle>
+  <year>2015</year>
+  <top250>17</top250>
+  <ratings>
+    <rating default="true" max="10" name="tvdb">
+      <value>8.8</value>
+      <votes>12345</votes>
+    </rating>
+    <rating default="false" max="10" name="imdb">
+      <value>9.5</value>
+      <votes>2000000</votes>
+    </rating>
+  </ratings>
+  <userrating>0</userrating>
+  <plot>Two keepers, one rock, endless weather.
+Second line of the plot.</plot>
+  <tagline>Alone together</tagline>
+  <runtime>45</runtime>
+  <seasonplot number="1">Season one plot</seasonplot>
+  <mpaa>TV-PG</mpaa>
+  <certification>TV-PG</certification>
+  <episodeguide>{"tmdb":"1396","imdb":"tt0903747","tvdb":"81189"}</episodeguide>
+  <id>81189</id>
+  <imdbid>tt0903747</imdbid>
+  <tmdbid>1396</tmdbid>
+  <uniqueid default="false" type="tmdb">1396</uniqueid>
+  <uniqueid default="false" type="imdb">tt0903747</uniqueid>
+  <uniqueid default="true" type="tvdb">81189</uniqueid>
+  <premiered>2015-03-10</premiered>
+  <status>Continuing</status>
+  <watched>false</watched>
+  <playcount/>
+  <genre>Drama</genre>
+  <genre>Mystery</genre>
+  <studio>Beacon Network; Tide TV</studio>
+  <country>US</country>
+  <country>CA</country>
+  <tag>sea</tag>
+  <tag>isolation</tag>
+  <credits>Eli Crane</credits>
+  <director tmdbid="6001">Dana Frost</director>
+  <actor>
+    <name>Mara Voss</name>
+    <role>Head Keeper</role>
+    <profile>https://db.example.test/person/1</profile>
+    <tmdbid>3001</tmdbid>
+    <imdbid>nm1000001</imdbid>
+    <tvdbid>301</tvdbid>
+  </actor>
+  <actor>
+    <name>Tom Reed</name>
+    <role>Assistant</role>
+  </actor>
+  <trailer>plugin://plugin.video.youtube/play/?video_id=TV123abc_-9</trailer>
+  <dateadded>2024-02-03 04:05:06</dateadded>
+  <!--CineVault meta data-->
+  <user_note>show note</user_note>
+  <episode_groups>
+    <group active="true" id="AIRED" name="Aired Order"/>
+    <group id="DVD" name="DVD Order"/>
+  </episode_groups>
+  <english_title>Lighthouse Keepers</english_title>
+  <crew>
+    <name>Dana Frost</name>
+    <role>DIRECTOR</role>
+    <tmdbid>6001</tmdbid>
+  </crew>
+  <crew>
+    <name>Eli Crane</name>
+    <role subrole="Creator">WRITER</role>
+  </crew>
+  <crew>
+    <name>Pat Quill</name>
+    <role subrole="Executive Producer">PRODUCER</role>
+    <profile>https://db.example.test/person/9</profile>
+  </crew>
+  <cv_locked/>
+</tvshow>

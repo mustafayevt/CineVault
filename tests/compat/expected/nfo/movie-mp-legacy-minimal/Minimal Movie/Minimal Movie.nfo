@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for MediaPortal-->
+<movie>
+  <title>Minimal Movie</title>
+  <originaltitle/>
+  <sorttitle/>
+  <year/>
+  <rating>0.0</rating>
+  <userrating>0</userrating>
+  <votes>0</votes>
+  <set/>
+  <plot/>
+  <tagline/>
+  <runtime>0</runtime>
+  <thumb/>
+  <fanart/>
+  <certification/>
+  <id/>
+  <tmdbid/>
+  <country/>
+  <premiered/>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <genres/>
+  <studio/>
+  <credits/>
+  <director/>
+  <trailer/>
+  <languages/>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec/>
+        <aspect>0.00</aspect>
+        <width>0</width>
+        <height>0</height>
+        <resolution/>
+        <durationinseconds>0</durationinseconds>
+      </video>
+    </streamdetails>
+  </fileinfo>
+  <!--CineVault meta data-->
+  <source>UNKNOWN</source>
+  <edition>NONE</edition>
+  <original_filename>Minimal Movie.mkv</original_filename>
+  <user_note/>
+  <english_title/>
+  <cv_locked/>
+</movie>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<caps>
+  <server title="Plain" />
+  <searching>
+    <search available="yes" supportedParams="q" />
+    <tv-search available="no" supportedParams="" />
+    <movie-search available="no" supportedParams="" />
+  </searching>
+</caps>

@@ -1,0 +1,18 @@
+{
+  "folder": "special",
+  "title": "What?! \"Quoted\" <Tag> | Pipe * Star / Slash \\ Back: Colon",
+  "year": 2020,
+  "imdbId": "tt1111111",
+  "originalTitle": "AC/DC: Live at *Home*",
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "special.mkv",
+      "videoCodec": "h264",
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "aspectRatio": 1.78,
+      "duration": 6000
+    }
+  ]
+}

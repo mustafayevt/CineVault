@@ -1,0 +1,27 @@
+{
+ "leagues": [
+  {
+   "idLeague": "9001",
+   "strLeague": "Northern Football League",
+   "strSport": "Soccer",
+   "strLeagueAlternate": "NFL North, Northern League"
+  },
+  {
+   "idLeague": "9002",
+   "strLeague": "Northern Football League Cup",
+   "strSport": "Soccer",
+   "strLeagueAlternate": ""
+  },
+  {
+   "idLeague": "9003",
+   "strLeague": "Grand Prix Series",
+   "strSport": "Motorsport",
+   "strLeagueAlternate": "GPS"
+  },
+  {
+   "idLeague": "9004",
+   "strLeague": "Southern Basketball Association",
+   "strSport": "Basketball"
+  }
+ ]
+}

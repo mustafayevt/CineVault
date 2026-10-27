@@ -1,0 +1,32 @@
+{
+  "cast": [
+    {
+      "characters": [
+        "Walter White"
+      ],
+      "person": {
+        "name": "Bryan Cranston",
+        "ids": {
+          "trakt": 300,
+          "imdb": "nm0186505"
+        }
+      }
+    }
+  ],
+  "crew": {
+    "directing": [],
+    "writing": [
+      {
+        "jobs": [
+          "Creator"
+        ],
+        "person": {
+          "name": "Vince Gilligan",
+          "ids": {
+            "trakt": 301
+          }
+        }
+      }
+    ]
+  }
+}

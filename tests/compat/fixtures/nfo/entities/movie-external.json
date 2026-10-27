@@ -1,0 +1,48 @@
+{
+  "folder": "Extra Streams (2015)",
+  "title": "Extra Streams",
+  "year": 2015,
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Extra Streams (2015).mkv",
+      "videoCodec": "h264",
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "aspectRatio": 1.78,
+      "duration": 5400,
+      "audio": [
+        {
+          "codec": "AC3",
+          "language": "en",
+          "audioChannels": 6
+        }
+      ],
+      "subtitles": [
+        {
+          "language": "en"
+        }
+      ]
+    },
+    {
+      "type": "AUDIO",
+      "filename": "Extra Streams (2015).de.ac3",
+      "audio": [
+        {
+          "codec": "AC3",
+          "language": "de",
+          "audioChannels": 2
+        }
+      ]
+    },
+    {
+      "type": "SUBTITLE",
+      "filename": "Extra Streams (2015).fr.srt",
+      "subtitles": [
+        {
+          "language": "fr"
+        }
+      ]
+    }
+  ]
+}

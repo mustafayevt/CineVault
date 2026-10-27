@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault-->
+<season>
+  <seasonnumber>1</seasonnumber>
+  <title>Season 1</title>
+  <showtitle>Minimal Show</showtitle>
+  <sorttitle>Season 01</sorttitle>
+  <year/>
+  <plot/>
+  <tvdbid/>
+  <imdbid/>
+  <tmdbid/>
+  <premiered/>
+  <!--CineVault meta data-->
+  <user_note/>
+</season>

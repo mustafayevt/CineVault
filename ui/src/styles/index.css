@@ -1,0 +1,22 @@
+@import "tailwindcss";
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./typography.css";
+@import "./motion.css";
+@import "./a11y.css";
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  /* The window never scrolls as a whole: the shell is exactly one window high and each page
+     scrolls inside the main landmark, so the title bar and sidebar stay in place. */
+  html,
+  body {
+    overflow: hidden;
+  }
+}

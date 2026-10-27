@@ -1,0 +1,60 @@
+[package]
+name = "cv-app"
+description = "Application services shared by the GUI and the CLI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+cv-artwork.workspace = true
+cv-db.workspace = true
+cv-domain.workspace = true
+cv-fs.workspace = true
+cv-jobs.workspace = true
+cv-match.workspace = true
+cv-media.workspace = true
+cv-providers.workspace = true
+cv-nfo.workspace = true
+cv-rename.workspace = true
+cv-scan.workspace = true
+cv-torrent.workspace = true
+cv-template.workspace = true
+chrono.workspace = true
+dirs.workspace = true
+getrandom = "0.3"
+keyring.workspace = true
+regex.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tempfile.workspace = true
+zip.workspace = true
+tokio.workspace = true
+trash.workspace = true
+ed25519-dalek = { version = "2", default-features = false, features = ["std", "fast"] }
+base64 = "0.23.1"
+semver = "1.0.28"
+ureq.workspace = true
+sha2.workspace = true
+fs4.workspace = true
+sysinfo.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winreg.workspace = true
+
+[dev-dependencies]
+cv-artwork.workspace = true
+# The fault-injection file system (`cv_rename::exec::fault`) for the safety tests.
+cv-rename = { workspace = true, features = ["fault-injection"] }
+image.workspace = true
+rusqlite.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true

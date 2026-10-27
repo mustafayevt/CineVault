@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for XBMC-->
+<episodedetails>
+  <title>First</title>
+  <originaltitle/>
+  <showtitle>Minimal Show</showtitle>
+  <season>1</season>
+  <episode>1</episode>
+  <id/>
+  <rating>0.0</rating>
+  <userrating>0</userrating>
+  <votes>0</votes>
+  <plot/>
+  <runtime>0</runtime>
+  <mpaa/>
+  <premiered/>
+  <aired/>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec/>
+        <aspect>0.0</aspect>
+        <width>0</width>
+        <height>0</height>
+        <durationinseconds>0</durationinseconds>
+        <stereomode/>
+      </video>
+    </streamdetails>
+  </fileinfo>
+  <epbookmark/>
+  <code/>
+  <!--CineVault meta data-->
+  <source>UNKNOWN</source>
+  <edition>NONE</edition>
+  <original_filename>Minimal Show - S01E01.mkv</original_filename>
+  <user_note/>
+</episodedetails>

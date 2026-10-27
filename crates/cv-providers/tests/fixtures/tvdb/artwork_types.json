@@ -1,0 +1,159 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 1,
+      "name": "Banner",
+      "recordType": "series",
+      "slug": "banner",
+      "imageFormat": "JPG",
+      "width": 758,
+      "height": 140,
+      "thumbWidth": 379,
+      "thumbHeight": 70
+    },
+    {
+      "id": 2,
+      "name": "Poster",
+      "recordType": "series",
+      "slug": "poster",
+      "imageFormat": "JPG",
+      "width": 680,
+      "height": 1000,
+      "thumbWidth": 340,
+      "thumbHeight": 500
+    },
+    {
+      "id": 3,
+      "name": "Background",
+      "recordType": "series",
+      "slug": "background",
+      "imageFormat": "JPG",
+      "width": 1920,
+      "height": 1080,
+      "thumbWidth": 960,
+      "thumbHeight": 540
+    },
+    {
+      "id": 5,
+      "name": "Icon",
+      "recordType": "series",
+      "slug": "icon",
+      "imageFormat": "JPG",
+      "width": 1024,
+      "height": 1024,
+      "thumbWidth": 512,
+      "thumbHeight": 512
+    },
+    {
+      "id": 6,
+      "name": "Banner",
+      "recordType": "season",
+      "slug": "banner",
+      "imageFormat": "JPG",
+      "width": 758,
+      "height": 140,
+      "thumbWidth": 379,
+      "thumbHeight": 70
+    },
+    {
+      "id": 7,
+      "name": "Poster",
+      "recordType": "season",
+      "slug": "poster",
+      "imageFormat": "JPG",
+      "width": 680,
+      "height": 1000,
+      "thumbWidth": 340,
+      "thumbHeight": 500
+    },
+    {
+      "id": 8,
+      "name": "Background",
+      "recordType": "season",
+      "slug": "background",
+      "imageFormat": "JPG",
+      "width": 1920,
+      "height": 1080,
+      "thumbWidth": 960,
+      "thumbHeight": 540
+    },
+    {
+      "id": 11,
+      "name": "Screencap",
+      "recordType": "episode",
+      "slug": "screencap",
+      "imageFormat": "JPG",
+      "width": 640,
+      "height": 360,
+      "thumbWidth": 320,
+      "thumbHeight": 180
+    },
+    {
+      "id": 14,
+      "name": "Poster",
+      "recordType": "movie",
+      "slug": "poster",
+      "imageFormat": "JPG",
+      "width": 680,
+      "height": 1000,
+      "thumbWidth": 340,
+      "thumbHeight": 500
+    },
+    {
+      "id": 15,
+      "name": "Background",
+      "recordType": "movie",
+      "slug": "background",
+      "imageFormat": "JPG",
+      "width": 1920,
+      "height": 1080,
+      "thumbWidth": 960,
+      "thumbHeight": 540
+    },
+    {
+      "id": 22,
+      "name": "ClearLogo",
+      "recordType": "series",
+      "slug": "clearlogo",
+      "imageFormat": "PNG",
+      "width": 800,
+      "height": 310,
+      "thumbWidth": 400,
+      "thumbHeight": 155
+    },
+    {
+      "id": 23,
+      "name": "ClearArt",
+      "recordType": "series",
+      "slug": "clearart",
+      "imageFormat": "PNG",
+      "width": 1000,
+      "height": 562,
+      "thumbWidth": 500,
+      "thumbHeight": 281
+    },
+    {
+      "id": 24,
+      "name": "Cinemagraph",
+      "recordType": "series",
+      "slug": "cinemagraph",
+      "imageFormat": "MP4",
+      "width": 640,
+      "height": 360,
+      "thumbWidth": 320,
+      "thumbHeight": 180
+    },
+    {
+      "id": 30,
+      "name": "Actor",
+      "recordType": "person",
+      "slug": "actor",
+      "imageFormat": "JPG",
+      "width": 300,
+      "height": 450,
+      "thumbWidth": 150,
+      "thumbHeight": 225
+    }
+  ]
+}

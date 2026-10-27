@@ -1,0 +1,17 @@
+[
+  {
+    "type": "movie",
+    "score": 1000,
+    "movie": {
+      "title": "Heat",
+      "year": 1995,
+      "ids": {
+        "trakt": 3,
+        "slug": "heat-1995",
+        "imdb": "tt0113277",
+        "tmdb": 949
+      },
+      "overview": "Obsessive master thief."
+    }
+  }
+]

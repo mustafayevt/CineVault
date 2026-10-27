@@ -1,0 +1,11 @@
+[alias]
+lint = "clippy --workspace --all-targets -- -D warnings"
+
+# Temporary files of tests and tools go into the build folder, not the Windows Temp folder.
+# On Windows a test's temp folder is often left behind (a database still open when it is
+# removed), and tens of thousands of them once filled hundreds of GB of Temp. Inside target/
+# they go away with the build folder.
+[env]
+TMP = { value = "target", relative = true, force = true }
+TEMP = { value = "target", relative = true, force = true }
+TMPDIR = { value = "target", relative = true, force = true }

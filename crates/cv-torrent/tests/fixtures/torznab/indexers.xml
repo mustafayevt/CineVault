@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<indexers>
+  <indexer id="a" configured="true"><title>A</title></indexer>
+  <indexer id="b" configured="true"><title>B</title></indexer>
+  <indexer id="c" configured="true"><title>C</title></indexer>
+</indexers>

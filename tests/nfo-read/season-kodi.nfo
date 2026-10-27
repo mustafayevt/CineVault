@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<season>
+  <seasonnumber>2</seasonnumber>
+  <title>The Second Year</title>
+  <showtitle>Harbor Town</showtitle>
+  <year>2011</year>
+  <plot>More of the same.</plot>
+  <thumb>https://images.example.test/town/s2.jpg</thumb>
+  <premiered>2011-02-03</premiered>
+</season>

@@ -1,0 +1,1958 @@
+{
+  "version": 1,
+  "note": "Settings profiles and cases. Each case writes NFO files for one entity with the merged settings.",
+  "profiles": {
+    "defaults": {
+      "movie": {
+        "nfoFilenames": [
+          "FILENAME_NFO"
+        ],
+        "writeCleanNfo": true,
+        "nfoWriteDateAdded": true,
+        "nfoDateAddedField": "DATE_ADDED",
+        "nfoWriteSingleStudio": false,
+        "nfoWriteLockdata": false,
+        "nfoWriteTrailer": true,
+        "nfoWriteFileinfo": true,
+        "nfoWriteArtworkUrls": true,
+        "nfoLanguage": "en",
+        "certificationStyle": "SHORT",
+        "createOutline": false,
+        "outlineFirstSentence": true,
+        "includeExternalAudioStreams": false,
+        "nfoDiscFolderInside": false,
+        "ratingSources": [
+          "imdb",
+          "themoviedb"
+        ],
+        "movieConnector": "KODI",
+        "movieSetConnector": "KODI",
+        "movieSetNfoFilenames": [
+          "KODI_NFO"
+        ],
+        "movieSetAppendTmdbId": false
+      },
+      "tvShow": {
+        "nfoFilenames": [
+          "TV_SHOW"
+        ],
+        "seasonNfoFilenames": [
+          "SEASON"
+        ],
+        "episodeNfoFilenames": [
+          "FILENAME"
+        ],
+        "writeCleanNfo": true,
+        "nfoWriteDateAdded": true,
+        "nfoDateAddedField": "DATE_ADDED",
+        "nfoWriteSingleStudio": false,
+        "nfoWriteLockdata": false,
+        "nfoWriteTrailer": true,
+        "nfoWriteFileinfo": true,
+        "nfoWriteArtworkUrls": true,
+        "nfoLanguage": "en",
+        "certificationStyle": "SHORT",
+        "createOutline": false,
+        "outlineFirstSentence": true,
+        "nfoWriteEpisodeguide": true,
+        "nfoWriteNewEpisodeguideStyle": true,
+        "nfoWriteDateEnded": true,
+        "nfoWriteAllActors": false,
+        "ratingSources": [
+          "tvdb",
+          "imdb"
+        ],
+        "tvShowConnector": "KODI"
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "movie-kodi-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-kodi-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-xbmc-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "XBMC"
+        }
+      }
+    },
+    {
+      "id": "movie-xbmc-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "XBMC"
+        }
+      }
+    },
+    {
+      "id": "movie-emby-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "EMBY"
+        }
+      }
+    },
+    {
+      "id": "movie-emby-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "EMBY"
+        }
+      }
+    },
+    {
+      "id": "movie-jellyfin-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "JELLYFIN"
+        }
+      }
+    },
+    {
+      "id": "movie-jellyfin-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "JELLYFIN"
+        }
+      }
+    },
+    {
+      "id": "movie-plex-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "PLEX"
+        }
+      }
+    },
+    {
+      "id": "movie-plex-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "PLEX"
+        }
+      }
+    },
+    {
+      "id": "movie-dvr3-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "DVR_3"
+        }
+      }
+    },
+    {
+      "id": "movie-dvr3-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "DVR_3"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-legacy-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-legacy-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-moving-pictures-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP_MP"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-moving-pictures-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP_MP"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-myvideo-full",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP_MV"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-myvideo-minimal",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP_MV"
+        }
+      }
+    },
+    {
+      "id": "movie-kodi-hdr",
+      "kind": "movie",
+      "entity": "movie-hdr",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-kodi-special-chars",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-xbmc-hdr",
+      "kind": "movie",
+      "entity": "movie-hdr",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "XBMC"
+        }
+      }
+    },
+    {
+      "id": "movie-xbmc-special-chars",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "XBMC"
+        }
+      }
+    },
+    {
+      "id": "movie-emby-hdr",
+      "kind": "movie",
+      "entity": "movie-hdr",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "EMBY"
+        }
+      }
+    },
+    {
+      "id": "movie-emby-special-chars",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "EMBY"
+        }
+      }
+    },
+    {
+      "id": "movie-jellyfin-hdr",
+      "kind": "movie",
+      "entity": "movie-hdr",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "JELLYFIN"
+        }
+      }
+    },
+    {
+      "id": "movie-jellyfin-special-chars",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "JELLYFIN"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-legacy-hdr",
+      "kind": "movie",
+      "entity": "movie-hdr",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-legacy-special-chars",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-moving-pictures-hdr",
+      "kind": "movie",
+      "entity": "movie-hdr",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP_MP"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-moving-pictures-special-chars",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP_MP"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-myvideo-hdr",
+      "kind": "movie",
+      "entity": "movie-hdr",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP_MV"
+        }
+      }
+    },
+    {
+      "id": "movie-mp-myvideo-special-chars",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "MP_MV"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-two-names",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoFilenames": [
+            "FILENAME_NFO",
+            "MOVIE_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-opt-movie-nfo-only",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoFilenames": [
+            "MOVIE_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-opt-no-artwork-urls",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoWriteArtworkUrls": false
+        }
+      }
+    },
+    {
+      "id": "movie-opt-no-trailer",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoWriteTrailer": false
+        }
+      }
+    },
+    {
+      "id": "movie-opt-no-fileinfo",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoWriteFileinfo": false
+        }
+      }
+    },
+    {
+      "id": "movie-opt-no-dateadded",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoWriteDateAdded": false
+        }
+      }
+    },
+    {
+      "id": "movie-opt-dateadded-file-created",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoDateAddedField": "FILE_CREATION_DATE"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-dateadded-file-modified",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoDateAddedField": "FILE_LAST_MODIFIED_DATE"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-dateadded-release",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoDateAddedField": "RELEASE_DATE"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-single-studio",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoWriteSingleStudio": true
+        }
+      }
+    },
+    {
+      "id": "movie-opt-lockdata",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoWriteLockdata": true
+        }
+      }
+    },
+    {
+      "id": "movie-opt-outline-first-sentence",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "createOutline": true,
+          "outlineFirstSentence": true
+        }
+      }
+    },
+    {
+      "id": "movie-opt-outline-whole-plot",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "createOutline": true,
+          "outlineFirstSentence": false
+        }
+      }
+    },
+    {
+      "id": "movie-opt-rating-source-order",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "ratingSources": [
+            "themoviedb",
+            "imdb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-opt-rating-source-none-match",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "ratingSources": [
+            "rottentomatoes"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-opt-language-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoLanguage": "de"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-language-fr",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoLanguage": "fr"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-short-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "SHORT"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-short-us",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "SHORT"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-short-mpaa-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "SHORT_MPAA"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-short-mpaa-us",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "SHORT_MPAA"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-medium-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "MEDIUM"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-medium-us",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "MEDIUM"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-medium-full-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "MEDIUM_FULL"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-medium-full-us",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "MEDIUM_FULL"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-large-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "LARGE"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-large-us",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "LARGE"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-large-full-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "LARGE_FULL"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-large-full-us",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "LARGE_FULL"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-technical-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "TECHNICAL"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-technical-us",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "TECHNICAL"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-technical2-de",
+      "kind": "movie",
+      "entity": "movie-de",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "TECHNICAL2"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-cert-technical2-us",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "certificationStyle": "TECHNICAL2"
+        }
+      }
+    },
+    {
+      "id": "movie-opt-external-streams",
+      "kind": "movie",
+      "entity": "movie-external",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "includeExternalAudioStreams": true
+        }
+      }
+    },
+    {
+      "id": "movie-opt-external-streams-off",
+      "kind": "movie",
+      "entity": "movie-external",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "includeExternalAudioStreams": false
+        }
+      }
+    },
+    {
+      "id": "movie-opt-disc-folder-inside",
+      "kind": "movie",
+      "entity": "movie-disc",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoDiscFolderInside": true
+        }
+      }
+    },
+    {
+      "id": "movie-opt-disc-movie-nfo",
+      "kind": "movie",
+      "entity": "movie-disc",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoDiscFolderInside": false
+        }
+      }
+    },
+    {
+      "id": "movie-opt-multi-movie-dir",
+      "kind": "movie",
+      "entity": "movie-multi",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "nfoFilenames": [
+            "MOVIE_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-edition-directors-cut",
+      "kind": "movie",
+      "entity": "movie-edition",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-hdr10plus-8k-av1",
+      "kind": "movie",
+      "entity": "movie-8k-hdr10plus",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-hlg-720p",
+      "kind": "movie",
+      "entity": "movie-720p-hlg",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-3d-sbs",
+      "kind": "movie",
+      "entity": "movie-3d-sbs",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-3d-tab",
+      "kind": "movie",
+      "entity": "movie-3d-tab",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-3d-hsbs",
+      "kind": "movie",
+      "entity": "movie-3d-hsbs",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-3d-mvc",
+      "kind": "movie",
+      "entity": "movie-3d-mvc",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-3d-checker",
+      "kind": "movie",
+      "entity": "movie-3d-checker",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-3d-rows",
+      "kind": "movie",
+      "entity": "movie-3d-rows",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-3d-blocks",
+      "kind": "movie",
+      "entity": "movie-3d-blocks",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "movie-emby-edition",
+      "kind": "movie",
+      "entity": "movie-edition",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "EMBY"
+        }
+      }
+    },
+    {
+      "id": "movie-emby-lockdata",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "EMBY",
+          "nfoWriteLockdata": true
+        }
+      }
+    },
+    {
+      "id": "movie-emby-no-set",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "EMBY",
+          "nfoWriteLockdata": true
+        }
+      }
+    },
+    {
+      "id": "movie-jellyfin-set-ids",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "JELLYFIN",
+          "nfoWriteLockdata": true
+        }
+      }
+    },
+    {
+      "id": "movie-xbmc-edition",
+      "kind": "movie",
+      "entity": "movie-edition",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "XBMC"
+        }
+      }
+    },
+    {
+      "id": "movie-existing-nfo-keep-kodi",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "writeCleanNfo": false
+        }
+      },
+      "existing_nfo": {
+        "file": "Harbor Lights (1992).nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<movie>\r\n  <title>Old Title</title>\r\n  <epbookmark>1234.5</epbookmark>\r\n  <outline>Old outline from the previous file.</outline>\r\n  <playcount>7</playcount>\r\n  <lastplayed>2025-01-02 03:04:05</lastplayed>\r\n  <status>Released</status>\r\n  <code>ABC-123</code>\r\n  <customfield>abc</customfield>\r\n  <nested><inner a=\"1\">value</inner></nested>\r\n</movie>\r\n"
+      }
+    },
+    {
+      "id": "movie-existing-nfo-keep-emby",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "EMBY",
+          "writeCleanNfo": false
+        }
+      },
+      "existing_nfo": {
+        "file": "Harbor Lights (1992).nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<movie>\r\n  <title>Old Title</title>\r\n  <epbookmark>1234.5</epbookmark>\r\n  <outline>Old outline from the previous file.</outline>\r\n  <playcount>7</playcount>\r\n  <lastplayed>2025-01-02 03:04:05</lastplayed>\r\n  <status>Released</status>\r\n  <code>ABC-123</code>\r\n  <customfield>abc</customfield>\r\n  <nested><inner a=\"1\">value</inner></nested>\r\n</movie>\r\n"
+      }
+    },
+    {
+      "id": "movie-existing-nfo-keep-jellyfin",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "JELLYFIN",
+          "writeCleanNfo": false
+        }
+      },
+      "existing_nfo": {
+        "file": "Harbor Lights (1992).nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<movie>\r\n  <title>Old Title</title>\r\n  <epbookmark>1234.5</epbookmark>\r\n  <outline>Old outline from the previous file.</outline>\r\n  <playcount>7</playcount>\r\n  <lastplayed>2025-01-02 03:04:05</lastplayed>\r\n  <status>Released</status>\r\n  <code>ABC-123</code>\r\n  <customfield>abc</customfield>\r\n  <nested><inner a=\"1\">value</inner></nested>\r\n</movie>\r\n"
+      }
+    },
+    {
+      "id": "movie-existing-nfo-keep-xbmc",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "XBMC",
+          "writeCleanNfo": false
+        }
+      },
+      "existing_nfo": {
+        "file": "Harbor Lights (1992).nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<movie>\r\n  <title>Old Title</title>\r\n  <epbookmark>1234.5</epbookmark>\r\n  <outline>Old outline from the previous file.</outline>\r\n  <playcount>7</playcount>\r\n  <lastplayed>2025-01-02 03:04:05</lastplayed>\r\n  <status>Released</status>\r\n  <code>ABC-123</code>\r\n  <customfield>abc</customfield>\r\n  <nested><inner a=\"1\">value</inner></nested>\r\n</movie>\r\n"
+      }
+    },
+    {
+      "id": "movie-existing-nfo-clean",
+      "kind": "movie",
+      "entity": "movie-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "writeCleanNfo": true
+        }
+      },
+      "existing_nfo": {
+        "file": "Harbor Lights (1992).nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<movie>\r\n  <title>Old Title</title>\r\n  <epbookmark>1234.5</epbookmark>\r\n  <outline>Old outline from the previous file.</outline>\r\n  <playcount>7</playcount>\r\n  <lastplayed>2025-01-02 03:04:05</lastplayed>\r\n  <status>Released</status>\r\n  <code>ABC-123</code>\r\n  <customfield>abc</customfield>\r\n  <nested><inner a=\"1\">value</inner></nested>\r\n</movie>\r\n"
+      }
+    },
+    {
+      "id": "movie-existing-nfo-outline-fallback",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "writeCleanNfo": false
+        }
+      },
+      "existing_nfo": {
+        "file": "Minimal Movie.nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<movie>\r\n  <title>Old Title</title>\r\n  <epbookmark>1234.5</epbookmark>\r\n  <outline>Old outline from the previous file.</outline>\r\n  <playcount>7</playcount>\r\n  <lastplayed>2025-01-02 03:04:05</lastplayed>\r\n  <status>Released</status>\r\n  <code>ABC-123</code>\r\n  <customfield>abc</customfield>\r\n  <nested><inner a=\"1\">value</inner></nested>\r\n</movie>\r\n"
+      }
+    },
+    {
+      "id": "movie-existing-nfo-unwatched",
+      "kind": "movie",
+      "entity": "movie-minimal",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieConnector": "KODI",
+          "writeCleanNfo": false
+        }
+      },
+      "existing_nfo": {
+        "file": "Minimal Movie.nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<movie>\r\n  <title>Old Title</title>\r\n  <epbookmark>1234.5</epbookmark>\r\n  <outline>Old outline from the previous file.</outline>\r\n  <playcount>7</playcount>\r\n  <lastplayed>2025-01-02 03:04:05</lastplayed>\r\n  <status>Released</status>\r\n  <code>ABC-123</code>\r\n  <customfield>abc</customfield>\r\n  <nested><inner a=\"1\">value</inner></nested>\r\n</movie>\r\n"
+      }
+    },
+    {
+      "id": "movie-set-kodi-kodi-nfo",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "KODI_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-set-kodi-kodi2-nfo",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "KODI2_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-set-kodi-automator-nfo",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "AUTOMATOR_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-set-kodi-emby-nfo",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "EMBY_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-set-kodi-all-names",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "KODI_NFO",
+            "KODI2_NFO",
+            "AUTOMATOR_NFO",
+            "EMBY_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-set-emby-emby-nfo",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "EMBY",
+          "movieSetNfoFilenames": [
+            "EMBY_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-set-emby-kodi-nfo",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "EMBY",
+          "movieSetNfoFilenames": [
+            "KODI_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-set-emby-all-names",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "EMBY",
+          "movieSetNfoFilenames": [
+            "KODI_NFO",
+            "EMBY_NFO"
+          ]
+        }
+      }
+    },
+    {
+      "id": "movie-set-kodi-append-tmdb",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "KODI_NFO"
+          ],
+          "movieSetAppendTmdbId": true
+        }
+      }
+    },
+    {
+      "id": "movie-set-kodi-lockdata",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "KODI_NFO"
+          ],
+          "nfoWriteLockdata": true,
+          "nfoWriteDateAdded": false
+        }
+      }
+    },
+    {
+      "id": "movie-set-kodi-no-artwork",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "KODI_NFO"
+          ],
+          "nfoWriteArtworkUrls": false
+        }
+      }
+    },
+    {
+      "id": "movie-set-emby-dateadded-release",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "EMBY",
+          "movieSetNfoFilenames": [
+            "EMBY_NFO"
+          ],
+          "nfoDateAddedField": "RELEASE_DATE"
+        }
+      }
+    },
+    {
+      "id": "movie-set-existing-nfo-keep",
+      "kind": "movie-set",
+      "entity": "movie-set-full",
+      "profile": "defaults",
+      "settings": {
+        "movie": {
+          "movieSetConnector": "KODI",
+          "movieSetNfoFilenames": [
+            "KODI_NFO"
+          ],
+          "writeCleanNfo": false
+        }
+      },
+      "existing_nfo": {
+        "file": "Harbor Lights Collection/Harbor Lights Collection.nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<collection>\r\n  <title>Old Set</title>\r\n  <customfield>kept</customfield>\r\n</collection>\r\n"
+      }
+    },
+    {
+      "id": "tv-kodi-full",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "tv-kodi-minimal",
+      "kind": "tv",
+      "entity": "show-minimal",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "tv-kodi-ended",
+      "kind": "tv",
+      "entity": "show-ended",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "tv-xbmc-full",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "XBMC"
+        }
+      }
+    },
+    {
+      "id": "tv-xbmc-minimal",
+      "kind": "tv",
+      "entity": "show-minimal",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "XBMC"
+        }
+      }
+    },
+    {
+      "id": "tv-xbmc-ended",
+      "kind": "tv",
+      "entity": "show-ended",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "XBMC"
+        }
+      }
+    },
+    {
+      "id": "tv-emby-full",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "EMBY"
+        }
+      }
+    },
+    {
+      "id": "tv-emby-minimal",
+      "kind": "tv",
+      "entity": "show-minimal",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "EMBY"
+        }
+      }
+    },
+    {
+      "id": "tv-emby-ended",
+      "kind": "tv",
+      "entity": "show-ended",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "EMBY"
+        }
+      }
+    },
+    {
+      "id": "tv-jellyfin-full",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "JELLYFIN"
+        }
+      }
+    },
+    {
+      "id": "tv-jellyfin-minimal",
+      "kind": "tv",
+      "entity": "show-minimal",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "JELLYFIN"
+        }
+      }
+    },
+    {
+      "id": "tv-jellyfin-ended",
+      "kind": "tv",
+      "entity": "show-ended",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "JELLYFIN"
+        }
+      }
+    },
+    {
+      "id": "tv-plex-full",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "PLEX"
+        }
+      }
+    },
+    {
+      "id": "tv-plex-minimal",
+      "kind": "tv",
+      "entity": "show-minimal",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "PLEX"
+        }
+      }
+    },
+    {
+      "id": "tv-plex-ended",
+      "kind": "tv",
+      "entity": "show-ended",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "PLEX"
+        }
+      }
+    },
+    {
+      "id": "tv-mediaportal-full",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "MEDIAPORTAL"
+        }
+      }
+    },
+    {
+      "id": "tv-mediaportal-minimal",
+      "kind": "tv",
+      "entity": "show-minimal",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "MEDIAPORTAL"
+        }
+      }
+    },
+    {
+      "id": "tv-mediaportal-ended",
+      "kind": "tv",
+      "entity": "show-ended",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "MEDIAPORTAL"
+        }
+      }
+    },
+    {
+      "id": "tv-opt-episodeguide-new",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI"
+        }
+      }
+    },
+    {
+      "id": "tv-opt-episodeguide-off",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteEpisodeguide": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-episodeguide-old-tvdb",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteNewEpisodeguideStyle": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-episodeguide-old-tmdb",
+      "kind": "tv",
+      "entity": "show-ended",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteNewEpisodeguideStyle": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-episodeguide-old-no-ids",
+      "kind": "tv",
+      "entity": "show-imdb-only",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteNewEpisodeguideStyle": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-no-artwork-urls",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteArtworkUrls": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-no-trailer",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteTrailer": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-no-fileinfo",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteFileinfo": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-no-dateadded",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteDateAdded": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-dateadded-release",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoDateAddedField": "RELEASE_DATE"
+        }
+      }
+    },
+    {
+      "id": "tv-opt-dateadded-file-created",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoDateAddedField": "FILE_CREATION_DATE"
+        }
+      }
+    },
+    {
+      "id": "tv-opt-single-studio",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteSingleStudio": true
+        }
+      }
+    },
+    {
+      "id": "tv-opt-lockdata",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteLockdata": true
+        }
+      }
+    },
+    {
+      "id": "tv-opt-no-date-ended",
+      "kind": "tv",
+      "entity": "show-ended",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteDateEnded": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-all-actors",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoWriteAllActors": true
+        }
+      }
+    },
+    {
+      "id": "tv-opt-outline-first-sentence",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "createOutline": true,
+          "outlineFirstSentence": true
+        }
+      }
+    },
+    {
+      "id": "tv-opt-outline-whole-plot",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "createOutline": true,
+          "outlineFirstSentence": false
+        }
+      }
+    },
+    {
+      "id": "tv-opt-rating-source-order",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "ratingSources": [
+            "imdb",
+            "tvdb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "tv-opt-language-de",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "nfoLanguage": "de"
+        }
+      }
+    },
+    {
+      "id": "tv-opt-cert-medium-full",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "certificationStyle": "MEDIUM_FULL"
+        }
+      }
+    },
+    {
+      "id": "tv-opt-season-folder-nfo",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "seasonNfoFilenames": [
+            "SEASON_FOLDER"
+          ]
+        }
+      }
+    },
+    {
+      "id": "tv-opt-season-both-nfo",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "seasonNfoFilenames": [
+            "SEASON",
+            "SEASON_FOLDER"
+          ]
+        }
+      }
+    },
+    {
+      "id": "tv-opt-season-nfo-none",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "seasonNfoFilenames": []
+        }
+      }
+    },
+    {
+      "id": "tv-opt-show-only",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI"
+        }
+      },
+      "write": [
+        "show"
+      ]
+    },
+    {
+      "id": "tv-opt-seasons-only",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI"
+        }
+      },
+      "write": [
+        "seasons"
+      ]
+    },
+    {
+      "id": "tv-opt-episodes-only",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI"
+        }
+      },
+      "write": [
+        "episodes"
+      ]
+    },
+    {
+      "id": "tv-emby-lockdata",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "EMBY",
+          "nfoWriteLockdata": true
+        }
+      }
+    },
+    {
+      "id": "tv-jellyfin-lockdata",
+      "kind": "tv",
+      "entity": "show-full",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "JELLYFIN",
+          "nfoWriteLockdata": true
+        }
+      }
+    },
+    {
+      "id": "tv-existing-nfo-keep",
+      "kind": "tv",
+      "entity": "show-imdb-only",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "writeCleanNfo": false,
+          "nfoWriteNewEpisodeguideStyle": false
+        }
+      },
+      "write": [
+        "show"
+      ],
+      "existing_nfo": {
+        "file": "tvshow.nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<tvshow>\r\n  <title>Old Show</title>\r\n  <episodeguide><url>https://example.test/guide</url></episodeguide>\r\n  <customfield>kept</customfield>\r\n</tvshow>\r\n"
+      }
+    },
+    {
+      "id": "tv-existing-nfo-clean",
+      "kind": "tv",
+      "entity": "show-imdb-only",
+      "profile": "defaults",
+      "settings": {
+        "tvShow": {
+          "tvShowConnector": "KODI",
+          "writeCleanNfo": true,
+          "nfoWriteNewEpisodeguideStyle": false
+        }
+      },
+      "write": [
+        "show"
+      ],
+      "existing_nfo": {
+        "file": "tvshow.nfo",
+        "content": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<tvshow>\r\n  <title>Old Show</title>\r\n  <episodeguide><url>https://example.test/guide</url></episodeguide>\r\n  <customfield>kept</customfield>\r\n</tvshow>\r\n"
+      }
+    }
+  ]
+}

@@ -1,0 +1,138 @@
+{
+  "id": 1396,
+  "name": "Breaking Bad",
+  "original_name": "Breaking Bad",
+  "original_language": "en",
+  "overview": "A high school chemistry teacher turns to crime.",
+  "tagline": "Remember my name",
+  "status": "Ended",
+  "first_air_date": "2008-01-20",
+  "last_air_date": "2013-09-29",
+  "episode_run_time": [
+    45,
+    47
+  ],
+  "genres": [
+    {
+      "id": 18,
+      "name": "Drama"
+    },
+    {
+      "id": 80,
+      "name": "Crime"
+    },
+    {
+      "id": 10765,
+      "name": "Sci-Fi & Fantasy"
+    }
+  ],
+  "production_companies": [
+    {
+      "id": 11073,
+      "name": "Sony Pictures Television Studios"
+    }
+  ],
+  "networks": [
+    {
+      "id": 174,
+      "name": "AMC"
+    }
+  ],
+  "origin_country": [
+    "US"
+  ],
+  "vote_average": 8.9,
+  "vote_count": 13000,
+  "poster_path": "/ggFHVNu6YYI5L9pCfOacjizRGt.jpg",
+  "backdrop_path": "/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+  "seasons": [
+    {
+      "id": 3577,
+      "season_number": 0,
+      "name": "Specials",
+      "overview": "Behind the scenes."
+    },
+    {
+      "id": 3572,
+      "season_number": 1,
+      "name": "Season 1",
+      "overview": "The first season."
+    }
+  ],
+  "credits": {
+    "cast": [
+      {
+        "id": 17419,
+        "name": "Bryan Cranston",
+        "character": "Walter White",
+        "order": 0,
+        "profile_path": "/b.jpg"
+      }
+    ],
+    "crew": [
+      {
+        "id": 66633,
+        "name": "Vince Gilligan",
+        "job": "Producer",
+        "department": "Production"
+      }
+    ]
+  },
+  "keywords": {
+    "results": [
+      {
+        "id": 1,
+        "name": "drug dealer"
+      }
+    ]
+  },
+  "translations": {
+    "translations": [
+      {
+        "iso_3166_1": "US",
+        "iso_639_1": "en",
+        "data": {
+          "name": "Breaking Bad",
+          "overview": "A high school chemistry teacher turns to crime.",
+          "tagline": "Remember my name"
+        }
+      }
+    ]
+  },
+  "external_ids": {
+    "imdb_id": "tt0903747",
+    "tvdb_id": 81189,
+    "tvrage_id": 18164,
+    "wikidata_id": "Q1079"
+  },
+  "content_ratings": {
+    "results": [
+      {
+        "iso_3166_1": "DE",
+        "rating": "16"
+      },
+      {
+        "iso_3166_1": "US",
+        "rating": "TV-MA"
+      }
+    ]
+  },
+  "episode_groups": {
+    "results": [
+      {
+        "id": "5acf93f1c3a368412c00191e",
+        "name": "DVD Order",
+        "type": 3,
+        "episode_count": 63,
+        "group_count": 5
+      },
+      {
+        "id": "5acf93f1c3a368412c00191f",
+        "name": "Production Order",
+        "type": 6,
+        "episode_count": 63,
+        "group_count": 5
+      }
+    ]
+  }
+}

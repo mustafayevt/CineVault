@@ -1,0 +1,59 @@
+{
+  "folder": "Deep Signal Plus (2024)",
+  "title": "Deep Signal Plus",
+  "originalTitle": "Deep Signal",
+  "year": 2024,
+  "plot": "Signals from the deep.",
+  "runtime": 166,
+  "imdbId": "tt15239678",
+  "tmdbId": 693134,
+  "certification": "US_PG13",
+  "mediaSource": "UHD_BLURAY",
+  "releaseDate": "2024-02-29",
+  "dateAdded": "2024-06-01 12:00:00",
+  "ratings": [
+    {
+      "id": "imdb",
+      "rating": 8.6,
+      "votes": 600000,
+      "max": 10
+    }
+  ],
+  "genres": [
+    "SCIENCE_FICTION",
+    "ADVENTURE"
+  ],
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Deep Signal Plus (2024).mkv",
+      "videoCodec": "AV1",
+      "videoWidth": 7680,
+      "videoHeight": 4320,
+      "aspectRatio": 1.78,
+      "duration": 9960,
+      "hdrFormat": "HDR10+",
+      "audio": [
+        {
+          "codec": "Opus",
+          "language": "en",
+          "audioChannels": 2
+        }
+      ],
+      "subtitles": [
+        {
+          "language": "en"
+        },
+        {
+          "language": "fr"
+        },
+        {
+          "language": "ja"
+        },
+        {
+          "language": "pt-BR"
+        }
+      ]
+    }
+  ]
+}

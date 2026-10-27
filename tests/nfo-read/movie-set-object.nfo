@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<movie>
+  <title>Part Two</title>
+  <year>1995</year>
+  <set tmdbcolid="77">
+    <name>Harbor Saga</name>
+    <overview>All the parts.</overview>
+  </set>
+  <sets>
+    <set>Second Collection</set>
+  </sets>
+  <ids>
+    <entry><key>imdb</key><value>tt0113277</value></entry>
+    <entry><key>tmdb</key><value>5</value></entry>
+  </ids>
+  <collectionnumber>77</collectionnumber>
+</movie>

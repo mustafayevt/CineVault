@@ -1,0 +1,37 @@
+{
+  "folder": "Blade Runner 2049",
+  "title": "Blade Runner 2049",
+  "originalTitle": "Blade Runner 2049",
+  "year": 2017,
+  "imdbId": "tt1856101",
+  "tmdbId": 335984,
+  "mediaSource": "BLURAY",
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Blade.Runner.2049.2017.2160p.BluRay.HDR10.mkv",
+      "videoCodec": "hevc",
+      "videoWidth": 3840,
+      "videoHeight": 2160,
+      "aspectRatio": 1.78,
+      "duration": 9840,
+      "hdrFormat": "HDR10",
+      "bitDepth": 10,
+      "frameRate": 23.976,
+      "videoBitRate": 60000000,
+      "filesize": 64424509440,
+      "audio": [
+        {
+          "codec": "DTSHD-MA",
+          "language": "en",
+          "audioChannels": 8
+        }
+      ],
+      "subtitles": [
+        {
+          "language": "en"
+        }
+      ]
+    }
+  ]
+}

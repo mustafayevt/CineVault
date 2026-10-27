@@ -1,0 +1,39 @@
+[
+  {
+    "id": 70900,
+    "season": 1,
+    "number": 1,
+    "_embedded": {
+      "episodes": [
+        {
+          "id": 900,
+          "name": "Pilot",
+          "season": 1,
+          "number": 1,
+          "airdate": "2008-01-20",
+          "runtime": 58,
+          "rating": {
+            "average": 8.8
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": 70901,
+    "season": 1,
+    "number": 2,
+    "_embedded": {
+      "episodes": [
+        {
+          "id": 901,
+          "name": "Cat in the Bag",
+          "season": 1,
+          "number": 2,
+          "airdate": "2008-01-27",
+          "runtime": 48
+        }
+      ]
+    }
+  }
+]

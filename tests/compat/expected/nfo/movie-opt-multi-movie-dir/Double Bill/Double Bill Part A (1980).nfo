@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<movie>
+  <title>Double Bill Part A</title>
+  <originaltitle/>
+  <sorttitle/>
+  <epbookmark/>
+  <year>1980</year>
+  <ratings/>
+  <userrating>0</userrating>
+  <set/>
+  <plot>Lives in a shared folder.</plot>
+  <tagline/>
+  <runtime>0</runtime>
+  <mpaa/>
+  <certification/>
+  <id/>
+  <tmdbid/>
+  <status/>
+  <code/>
+  <premiered/>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <trailer/>
+  <languages/>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>h264</codec>
+        <aspect>1.78</aspect>
+        <width>1280</width>
+        <height>720</height>
+        <resolution>720</resolution>
+        <durationinseconds>3000</durationinseconds>
+      </video>
+    </streamdetails>
+  </fileinfo>
+  <!--CineVault meta data-->
+  <source>UNKNOWN</source>
+  <edition>NONE</edition>
+  <original_filename>Double Bill Part A (1980).mkv</original_filename>
+  <user_note/>
+  <english_title/>
+  <cv_locked/>
+</movie>

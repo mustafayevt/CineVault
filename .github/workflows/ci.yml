@@ -1,0 +1,96 @@
+name: CI
+
+# Runs on every pull request to main, and by hand: Actions → CI → Run workflow, or
+# gh workflow run ci.yml [--ref <branch>]. Pushes to main do not start it on their own.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  check:
+    name: Build, lint and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      # Windows runners have slow NTFS disks; a Dev Drive (ReFS) mounted as the cargo target folder
+      # makes Rust builds much faster there. Nothing else changes: the target folder stays at ./target.
+      - name: Dev Drive for the target folder (Windows)
+        if: runner.os == 'Windows'
+        uses: samypr100/setup-dev-drive@v4
+        with:
+          drive-size: 30GB
+          drive-format: ReFS
+          drive-type: Dynamic
+          mount-path: ${{ github.workspace }}/target
+          trusted-dev-drive: true
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+
+      # The Tauri app embeds ui/dist at compile time, so the UI is built first on both systems.
+      # UI lint, typecheck and tests are platform independent and run on macOS only (faster runner).
+      - name: UI install
+        working-directory: ui
+        run: bun install --frozen-lockfile
+
+      - name: UI lint
+        if: runner.os == 'macOS'
+        working-directory: ui
+        run: bun run lint
+
+      - name: UI typecheck
+        if: runner.os == 'macOS'
+        working-directory: ui
+        run: bun run typecheck
+
+      - name: UI format
+        if: runner.os == 'macOS'
+        working-directory: ui
+        run: bun run format:check
+
+      - name: UI test
+        if: runner.os == 'macOS'
+        working-directory: ui
+        run: bun run test
+
+      - name: UI build
+        working-directory: ui
+        run: bun run build
+
+      - name: Rust format
+        run: cargo fmt --all -- --check
+
+      - name: Rust clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust test
+        run: cargo test --workspace

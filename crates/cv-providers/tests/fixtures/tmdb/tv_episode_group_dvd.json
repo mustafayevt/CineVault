@@ -1,0 +1,66 @@
+{
+  "id": "5acf93f1c3a368412c00191e",
+  "name": "DVD Order",
+  "type": 3,
+  "groups": [
+    {
+      "id": "g-a",
+      "name": "Season 1",
+      "order": 1,
+      "episodes": [
+        {
+          "id": 62086,
+          "name": "Cat’s in the Bag...",
+          "overview": "The aftermath.",
+          "air_date": "2008-01-27",
+          "season_number": 1,
+          "episode_number": 2,
+          "runtime": 58,
+          "vote_average": 8.3,
+          "vote_count": 100,
+          "still_path": "/s.jpg",
+          "guest_stars": [],
+          "crew": [],
+          "order": 0
+        },
+        {
+          "id": 62085,
+          "name": "Pilot",
+          "overview": "A teacher begins cooking.",
+          "air_date": "2008-01-20",
+          "season_number": 1,
+          "episode_number": 1,
+          "runtime": 58,
+          "vote_average": 8.3,
+          "vote_count": 100,
+          "still_path": "/s.jpg",
+          "guest_stars": [],
+          "crew": [],
+          "order": 1
+        }
+      ]
+    },
+    {
+      "id": "g-b",
+      "name": "Specials",
+      "order": 0,
+      "episodes": [
+        {
+          "id": 900001,
+          "name": "Good Cop / Bad Cop",
+          "overview": "A short.",
+          "air_date": "2009-02-17",
+          "season_number": 0,
+          "episode_number": 1,
+          "runtime": 58,
+          "vote_average": 8.3,
+          "vote_count": 100,
+          "still_path": "/s.jpg",
+          "guest_stars": [],
+          "crew": [],
+          "order": 0
+        }
+      ]
+    }
+  ]
+}

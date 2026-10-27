@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="metadata.sample.combo" name="Sample Combined Index" version="1.0.0" provider-name="CineVault tests">
+  <extension point="xbmc.metadata.scraper.movies" library="movies.xml"/>
+  <extension point="xbmc.metadata.scraper.tvshows" library="shows.xml"/>
+</addon>

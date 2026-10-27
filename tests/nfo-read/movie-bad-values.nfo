@@ -1,0 +1,12 @@
+<movie>
+  <title>Bad Values</title>
+  <year>soon</year>
+  <runtime>long</runtime>
+  <rating>n/a</rating>
+  <premiered>someday</premiered>
+  <playcount>many</playcount>
+  <lastplayed>never</lastplayed>
+  <top250>-</top250>
+  <tmdbid>none</tmdbid>
+  <plot>Only the plot is fine.</plot>
+</movie>

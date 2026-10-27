@@ -1,0 +1,24 @@
+{
+  "id": 3577,
+  "season_number": 0,
+  "name": "Specials",
+  "overview": "",
+  "air_date": "2009-02-17",
+  "poster_path": null,
+  "episodes": [
+    {
+      "id": 900001,
+      "name": "Good Cop / Bad Cop",
+      "overview": "A short.",
+      "air_date": "2009-02-17",
+      "season_number": 0,
+      "episode_number": 1,
+      "runtime": 58,
+      "vote_average": 8.3,
+      "vote_count": 100,
+      "still_path": "/s.jpg",
+      "guest_stars": [],
+      "crew": []
+    }
+  ]
+}

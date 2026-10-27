@@ -1,0 +1,6 @@
+{
+ "name": "Unauthorized",
+ "message": "Votre clé est invalide ! Session expirée ?",
+ "code": 0,
+ "status": 401
+}

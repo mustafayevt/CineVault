@@ -1,0 +1,25 @@
+# A ripped PAL DVD title: interlaced MPEG-2 with anamorphic pixels and Dolby Digital 2.0.
+[General]
+Format: MPEG-PS
+Format/Extensions: mpeg mpg vob vro
+Duration: 5400000
+Duration/String3: 01:30:00.000
+OverallBitRate: 6500000
+[Video]
+Format: MPEG Video
+Format_Version: Version 2
+Format_Profile: Main@Main
+Width: 720
+Height: 576
+PixelAspectRatio: 1.422
+DisplayAspectRatio: 1.778
+FrameRate: 25.000
+BitRate: 6000000
+ScanType: Interlaced
+[Audio]
+Format: AC-3
+Format_Commercial_IfAny: Dolby Digital
+BitRate_Mode: CBR
+BitRate: 192000
+Channel(s): 2
+Language: en

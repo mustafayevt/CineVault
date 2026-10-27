@@ -1,0 +1,28 @@
+{
+  "folder": "Long Road (2005)",
+  "title": "Long Road",
+  "year": 2005,
+  "plot": "The long way home.",
+  "edition": "DIRECTORS_CUT",
+  "mediaSource": "WEB_DL",
+  "imdbId": "tt0000111",
+  "ratings": [
+    {
+      "id": "themoviedb",
+      "rating": 6.0,
+      "votes": 10,
+      "max": 10
+    }
+  ],
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Long Road (2005) - Directors Cut.mkv",
+      "videoCodec": "h264",
+      "videoWidth": 1920,
+      "videoHeight": 800,
+      "aspectRatio": 2.4,
+      "duration": 7200
+    }
+  ]
+}

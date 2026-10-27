@@ -1,0 +1,23 @@
+{
+  "page": 1,
+  "total_pages": 2,
+  "total_results": 3,
+  "results": [
+    {
+      "id": 949,
+      "title": "Heat",
+      "original_title": "Heat",
+      "release_date": "1995-12-15",
+      "overview": "About Heat.",
+      "poster_path": "/p.jpg"
+    },
+    {
+      "id": 9999,
+      "title": "Heat Wave",
+      "original_title": "Heat Wave",
+      "release_date": "2006-01-01",
+      "overview": "About Heat Wave.",
+      "poster_path": null
+    }
+  ]
+}

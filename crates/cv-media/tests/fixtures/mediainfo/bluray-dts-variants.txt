@@ -1,0 +1,102 @@
+# A Blu-ray remux: every DTS family variant, plain TrueHD, and a VobSub track.
+[General]
+Format: Matroska
+Format/Extensions: mkv mk3d mka mks
+Duration: 6300000
+Duration/String3: 01:45:00.000
+OverallBitRate: 31000000
+[Video]
+Format: AVC
+Format_Profile: High@L4.1
+CodecID: V_MPEG4/ISO/AVC
+Width: 1920
+Height: 1080
+PixelAspectRatio: 1.000
+FrameRate: 23.976
+BitDepth: 8
+BitRate: 22000000
+ScanType: Progressive
+[Audio]
+Format: DTS
+Format_Commercial_IfAny: DTS-HD Master Audio
+Format_Profile: MA / Core
+Format_AdditionalFeatures: XLL
+CodecID: A_DTS
+BitRate_Mode: VBR / CBR
+BitRate: 4261000 / 1509000
+Channel(s): 8 / 6
+BitDepth: 24 / 24
+Language: en
+Default: Yes
+[Audio]
+Format: DTS
+Format_Commercial_IfAny: DTS-HD Master Audio
+Format_Profile: MA / Core
+Format_AdditionalFeatures: XLL X
+CodecID: A_DTS
+BitRate_Mode: VBR / CBR
+BitRate: 3000000 / 1509000
+Channel(s): 8 / 6
+Language: en
+[Audio]
+Format: DTS
+Format_Commercial_IfAny: DTS-HD Master Audio
+Format_Profile: MA / Core
+Format_AdditionalFeatures: XLL X IMAX
+CodecID: A_DTS
+BitRate_Mode: VBR / CBR
+BitRate: 3000000 / 1509000
+Channel(s): 8 / 6
+Language: de
+[Audio]
+Format: DTS
+Format_Commercial_IfAny: DTS-HD High Resolution Audio
+Format_Profile: HRA / Core
+Format_AdditionalFeatures: XBR
+CodecID: A_DTS
+BitRate_Mode: CBR
+BitRate: 2046000
+Channel(s): 8
+Language: it
+[Audio]
+Format: DTS
+Format_Commercial_IfAny: DTS-ES
+Format_Profile: ES
+Format_AdditionalFeatures: XCh
+CodecID: A_DTS
+BitRate_Mode: CBR
+BitRate: 1509000
+Channel(s): 7
+Language: es
+[Audio]
+Format: DTS
+Format_Profile: 96/24
+Format_AdditionalFeatures: X96
+CodecID: A_DTS
+BitRate_Mode: CBR
+BitRate: 1509000
+Channel(s): 6
+Language: ja
+[Audio]
+Format: DTS
+Format_Commercial: DTS
+CodecID: A_DTS
+BitRate_Mode: CBR
+BitRate: 754000
+Channel(s): 6
+BitDepth: 16
+Language: pt
+[Audio]
+Format: MLP FBA
+Format_Commercial_IfAny: Dolby TrueHD
+CodecID: A_TRUEHD
+BitRate_Mode: VBR
+BitRate: 2900000
+Channel(s): 6
+BitDepth: 24
+Language: ko
+[Text]
+Format: VobSub
+CodecID: S_VOBSUB
+Language: fr
+Forced: Yes

@@ -1,0 +1,22 @@
+# A Blu-ray 3D rip stored as one 3840x1080 frame with both eyes, flagged by the multi-view fields.
+[General]
+Format: Matroska
+Format/Extensions: mkv mk3d mka mks
+Duration: 5880000
+Duration/String3: 01:38:00.000
+[Video]
+Format: AVC
+Width: 3840
+Height: 1080
+PixelAspectRatio: 1.000
+MultiView_Count: 2
+MultiView_Layout: Side by Side (left eye first)
+FrameRate: 23.976
+ScanType: Progressive
+[Audio]
+Format: DTS
+Format_Commercial_IfAny: DTS-HD Master Audio
+Format_Profile: MA / Core
+Format_AdditionalFeatures: XLL
+Channel(s): 6
+Language: en

@@ -1,0 +1,19 @@
+{
+  "folder": "Disc Feature (1999)",
+  "title": "Disc Feature",
+  "year": 1999,
+  "disc": true,
+  "plot": "Disc based movie.",
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "VIDEO_TS.IFO",
+      "dir": "VIDEO_TS",
+      "videoCodec": "mpeg-2",
+      "videoWidth": 720,
+      "videoHeight": 480,
+      "aspectRatio": 1.78,
+      "duration": 5400
+    }
+  ]
+}

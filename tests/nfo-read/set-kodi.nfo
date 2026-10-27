@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<collection>
+  <title>Harbor Saga</title>
+  <sorttitle>Saga, Harbor</sorttitle>
+  <overview>All the parts.</overview>
+  <thumb>https://images.example.test/saga/poster.jpg</thumb>
+  <fanart>https://images.example.test/saga/fan.jpg</fanart>
+  <uniqueid type="tmdb" default="true">77</uniqueid>
+  <tag>saga</tag>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+</collection>

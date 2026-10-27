@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<movie>
+  <title>Minimal Movie</title>
+  <originaltitle/>
+  <sorttitle/>
+  <epbookmark>1234.5</epbookmark>
+  <year/>
+  <ratings/>
+  <userrating>0</userrating>
+  <set/>
+  <plot/>
+  <outline>Old outline from the previous file.</outline>
+  <tagline/>
+  <runtime>0</runtime>
+  <mpaa/>
+  <certification/>
+  <id/>
+  <tmdbid/>
+  <status>Released</status>
+  <code>ABC-123</code>
+  <premiered/>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <trailer/>
+  <languages/>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec/>
+        <aspect>0.00</aspect>
+        <width>0</width>
+        <height>0</height>
+        <resolution/>
+        <durationinseconds>0</durationinseconds>
+      </video>
+    </streamdetails>
+  </fileinfo>
+  <customfield>abc</customfield>
+  <nested>
+    <inner a="1">value</inner>
+  </nested>
+  <!--CineVault meta data-->
+  <source>UNKNOWN</source>
+  <edition>NONE</edition>
+  <original_filename>Minimal Movie.mkv</original_filename>
+  <user_note/>
+  <english_title/>
+  <cv_locked/>
+</movie>

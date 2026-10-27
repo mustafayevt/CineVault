@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<collection>
+  <title>Harbor Lights Collection</title>
+  <sorttitle>Harbor Lights 1</sorttitle>
+  <overview>A set of harbor stories.</overview>
+  <thumb>https://img.example.test/s/poster.jpg</thumb>
+  <fanart>https://img.example.test/s/fanart.jpg</fanart>
+  <uniqueid default="true" type="tmdb">2344</uniqueid>
+  <tag>harbor</tag>
+  <tag>series</tag>
+  <lockdata>true</lockdata>
+  <!--CineVault meta data-->
+  <user_note/>
+  <english_title/>
+</collection>

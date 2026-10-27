@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<movie>
+  <title>Deep Signal Plus</title>
+  <originaltitle>Deep Signal</originaltitle>
+  <sorttitle/>
+  <epbookmark/>
+  <year>2024</year>
+  <ratings>
+    <rating default="true" max="10" name="imdb">
+      <value>8.6</value>
+      <votes>600000</votes>
+    </rating>
+  </ratings>
+  <userrating>0</userrating>
+  <set/>
+  <plot>Signals from the deep.</plot>
+  <tagline/>
+  <runtime>166</runtime>
+  <mpaa>PG-13</mpaa>
+  <certification>PG-13</certification>
+  <id>tt15239678</id>
+  <tmdbid>693134</tmdbid>
+  <uniqueid default="false" type="tmdb">693134</uniqueid>
+  <uniqueid default="true" type="imdb">tt15239678</uniqueid>
+  <status/>
+  <code/>
+  <premiered>2024-02-29</premiered>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <genre>Science Fiction</genre>
+  <genre>Adventure</genre>
+  <trailer/>
+  <languages/>
+  <dateadded>2024-06-01 12:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>av1</codec>
+        <aspect>1.78</aspect>
+        <width>7680</width>
+        <height>4320</height>
+        <resolution>8K</resolution>
+        <hdrtype>hdr10plus</hdrtype>
+        <durationinseconds>9960</durationinseconds>
+        <hdrformats>HDR10+</hdrformats>
+      </video>
+      <audio>
+        <codec>opus</codec>
+        <language>eng</language>
+        <channels>2</channels>
+      </audio>
+      <subtitle>
+        <language>eng</language>
+      </subtitle>
+      <subtitle>
+        <language>fra</language>
+      </subtitle>
+      <subtitle>
+        <language>jpn</language>
+      </subtitle>
+      <subtitle>
+        <language>pob</language>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+  <!--CineVault meta data-->
+  <source>UHD_BLURAY</source>
+  <edition>NONE</edition>
+  <original_filename>Deep Signal Plus (2024).mkv</original_filename>
+  <user_note/>
+  <english_title/>
+  <cv_locked/>
+</movie>

@@ -1,0 +1,104 @@
+{
+  "folder": "Deep Signal (2024)",
+  "title": "Deep Signal",
+  "originalTitle": "Deep Signal",
+  "year": 2024,
+  "plot": "Signals from the deep.",
+  "runtime": 166,
+  "imdbId": "tt15239678",
+  "tmdbId": 693134,
+  "certification": "US_PG13",
+  "mediaSource": "UHD_BLURAY",
+  "releaseDate": "2024-02-29",
+  "dateAdded": "2024-06-01 12:00:00",
+  "ratings": [
+    {
+      "id": "imdb",
+      "rating": 8.6,
+      "votes": 600000,
+      "max": 10
+    }
+  ],
+  "genres": [
+    "SCIENCE_FICTION",
+    "ADVENTURE"
+  ],
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Deep Signal (2024).mkv",
+      "videoCodec": "hevc",
+      "videoWidth": 3840,
+      "videoHeight": 2160,
+      "aspectRatio": 2.39,
+      "duration": 9960,
+      "hdrFormat": "Dolby Vision, HDR10",
+      "audio": [
+        {
+          "codec": "TrueHD/Atmos",
+          "language": "en",
+          "audioChannels": 8
+        },
+        {
+          "codec": "DTSHD-MA",
+          "language": "fr",
+          "audioChannels": 8
+        },
+        {
+          "codec": "DTS-X",
+          "language": "ja",
+          "audioChannels": 8
+        },
+        {
+          "codec": "DTS-X-IMAX",
+          "language": "en",
+          "audioChannels": 8
+        },
+        {
+          "codec": "EAC3/Atmos",
+          "language": "de",
+          "audioChannels": 6
+        },
+        {
+          "codec": "DTSHD-HRA",
+          "language": "es",
+          "audioChannels": 8
+        },
+        {
+          "codec": "AC3EX",
+          "language": "it",
+          "audioChannels": 6
+        },
+        {
+          "codec": "DTS-ES",
+          "language": "pt",
+          "audioChannels": 6
+        },
+        {
+          "codec": "AAC",
+          "language": "nl",
+          "audioChannels": 2
+        },
+        {
+          "codec": "FLAC",
+          "language": "sv",
+          "audioChannels": 2
+        }
+      ],
+      "subtitles": [
+        {
+          "language": "en"
+        },
+        {
+          "language": "fr"
+        },
+        {
+          "language": "ja"
+        },
+        {
+          "language": "pt-BR"
+        }
+      ]
+    }
+  ]
+}

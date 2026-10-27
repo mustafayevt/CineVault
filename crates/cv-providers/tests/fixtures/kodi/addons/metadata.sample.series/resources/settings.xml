@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<settings version="1">
+  <section id="metadata.sample.series">
+    <category id="general" label="General">
+      <group id="1">
+        <setting id="baseurl" type="string" label="Site address">
+          <default>https://series.example.test</default>
+        </setting>
+      </group>
+    </category>
+  </section>
+</settings>

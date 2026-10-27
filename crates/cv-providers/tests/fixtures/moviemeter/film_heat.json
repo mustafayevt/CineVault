@@ -1,0 +1,41 @@
+{
+  "id": 1234,
+  "url": "https://www.moviemeter.nl/film/1234",
+  "title": "Heat",
+  "alternative_title": "Heat (1995)",
+  "alternative_titles": [
+    "Heat (1995)",
+    "Strijd"
+  ],
+  "year": 1995,
+  "imdb": "tt0113277",
+  "duration": 170,
+  "average": 4.2,
+  "votes_count": 12345,
+  "genres": [
+    "Actie",
+    "Misdaad",
+    "Drama"
+  ],
+  "countries": [
+    "Verenigde Staten"
+  ],
+  "directors": [
+    {
+      "name": "Michael Mann"
+    }
+  ],
+  "actors": [
+    {
+      "name": "Al Pacino"
+    },
+    {
+      "name": "Robert De Niro"
+    }
+  ],
+  "plot": "Een groep professionele dieven krijgt het warm onder hun voeten.",
+  "posters": {
+    "small": "https://img.example.test/mm/heat_s.jpg",
+    "large": "https://img.example.test/mm/heat_l.jpg"
+  }
+}

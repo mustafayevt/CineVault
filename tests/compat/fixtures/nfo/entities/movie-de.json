@@ -1,0 +1,64 @@
+{
+  "folder": "Mueller und Soehne (2001)",
+  "title": "Müller & Söhne <Teil 1>",
+  "originalTitle": "Müller & Söhne",
+  "sortTitle": "Müller & Söhne 1",
+  "year": 2001,
+  "plot": "Er sagte: \"Komm später!\" – und ging. Fünf Jahre später: 5 < 6 & 7 > 3.",
+  "tagline": "Tradition & Zukunft",
+  "runtime": 104,
+  "imdbId": "tt1234567",
+  "country": "DE; AT/CH",
+  "productionCompany": "Rheinfilm GmbH",
+  "spokenLanguages": "de, fr",
+  "certification": "DE_FSK16",
+  "releaseDate": "2001-09-27",
+  "dateAdded": "2023-12-31 23:59:58",
+  "ratings": [
+    {
+      "id": "imdb",
+      "rating": 6.85,
+      "votes": 1200,
+      "max": 10
+    }
+  ],
+  "genres": [
+    "COMEDY",
+    "DRAMA",
+    "CRIME"
+  ],
+  "tags": [
+    "Familie & Beruf"
+  ],
+  "directors": [
+    {
+      "name": "Hans Müller"
+    }
+  ],
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Müller & Söhne (2001).mkv",
+      "videoCodec": "mpeg-2",
+      "videoWidth": 720,
+      "videoHeight": 576,
+      "aspectRatio": 1.7777,
+      "duration": 6240,
+      "audio": [
+        {
+          "codec": "MP3",
+          "language": "de",
+          "audioChannels": 2
+        }
+      ],
+      "subtitles": [
+        {
+          "language": "de"
+        },
+        {
+          "language": "en"
+        }
+      ]
+    }
+  ]
+}

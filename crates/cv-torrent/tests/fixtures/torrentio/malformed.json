@@ -1,0 +1,8 @@
+{"streams":[
+{"name":"Torrentio\n1080p","title":"Good.Movie.2020.1080p.WEB-DL\n👤 12 💾 2.1 GB ⚙️ YTS","infoHash":"0123456789abcdef0123456789abcdef01234567","fileIdx":0},
+{"name":"Torrentio","infoHash":"1123456789abcdef0123456789abcdef01234567"},
+{"name":"Torrentio","title":"Bad.Hash.2020\n👤 1","infoHash":"nope"},
+{"name":"Torrentio","title":"No.Hash.2020\n👤 1"},
+{"name":"Torrentio","title":"","infoHash":"2123456789abcdef0123456789abcdef01234567"},
+{"name":"Torrentio","title":"Second.Good.Movie.2020.720p\n👤 3 💾 900 MB ⚙️ EZTV","infoHash":"3123456789ABCDEF0123456789ABCDEF01234567"}
+]}

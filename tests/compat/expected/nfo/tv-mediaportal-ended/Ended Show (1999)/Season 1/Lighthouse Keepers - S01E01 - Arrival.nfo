@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for MediaPortal-->
+<episodedetails>
+  <title>Arrival</title>
+  <originaltitle>Arrival (Original)</originaltitle>
+  <showtitle>Ended Show</showtitle>
+  <season>1</season>
+  <episode>1</episode>
+  <id>55501</id>
+  <uniqueid default="false" type="tmdb">77001</uniqueid>
+  <uniqueid default="true" type="imdb">tt7000001</uniqueid>
+  <uniqueid default="false" type="tvdb">55501</uniqueid>
+  <ratings>
+    <rating default="true" max="10" name="tvdb">
+      <value>8.2</value>
+      <votes>321</votes>
+    </rating>
+  </ratings>
+  <userrating>9</userrating>
+  <plot>The keepers arrive at the rock.</plot>
+  <runtime>45</runtime>
+  <thumb>https://img.example.test/e/s01e01.jpg</thumb>
+  <mpaa/>
+  <premiered>2015-03-10</premiered>
+  <aired>2015-03-10</aired>
+  <watched>true</watched>
+  <playcount>2</playcount>
+  <lastplayed>2020-01-02 03:04:05</lastplayed>
+  <studio>Beacon Network</studio>
+  <tag>pilot</tag>
+  <credits>Eli Crane</credits>
+  <director tmdbid="6001">Dana Frost</director>
+  <actor>
+    <name>Guest One</name>
+    <role>Visitor</role>
+    <thumb>https://img.example.test/p/g1.jpg</thumb>
+    <tmdbid>5001</tmdbid>
+  </actor>
+  <dateadded>2024-01-02 03:04:05</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>h264</codec>
+        <aspect>1.78</aspect>
+        <width>1920</width>
+        <height>1080</height>
+        <resolution>1080</resolution>
+        <durationinseconds>2700</durationinseconds>
+      </video>
+      <audio>
+        <codec>ac3</codec>
+        <language>eng</language>
+        <channels>6</channels>
+      </audio>
+      <subtitle>
+        <language>eng</language>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+  <epbookmark/>
+  <code/>
+  <!--CineVault meta data-->
+  <source>BLURAY</source>
+  <edition>NONE</edition>
+  <original_filename>Lighthouse.Keepers.S01E01.mkv</original_filename>
+  <user_note>episode note</user_note>
+  <english_title>Arrival</english_title>
+  <crew>
+    <name>Dana Frost</name>
+    <role>DIRECTOR</role>
+    <tmdbid>6001</tmdbid>
+  </crew>
+  <crew>
+    <name>Eli Crane</name>
+    <role subrole="Writer">WRITER</role>
+  </crew>
+</episodedetails>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<movie>
+  <title>Old Layout</title>
+  <originaltitle>Old Layout (original)</originaltitle>
+  <sorttitle>Layout, Old</sorttitle>
+  <rating>6,8</rating>
+  <votes>1.234</votes>
+  <year>2001</year>
+  <outline>Short.</outline>
+  <plot>Long story.</plot>
+  <runtime>1h 58m</runtime>
+  <thumb>https://images.example.test/old/poster.jpg</thumb>
+  <fanart>https://images.example.test/old/fan.jpg</fanart>
+  <mpaa>FSK 12</mpaa>
+  <id>tt0113277</id>
+  <genre>Action / Crime; Thriller, Drama</genre>
+  <studio>Alpha Films, Beta Films</studio>
+  <country>US</country>
+  <set>Old Saga</set>
+  <releasedate>01.03.2001</releasedate>
+  <tmdbId>12</tmdbId>
+</movie>

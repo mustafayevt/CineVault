@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <title>Test</title>
+    <item>
+      <title>Night.of.the.Living.Dead.1968.1080p.BluRay.x264-GRP</title>
+      <guid>https://t.example/details/1</guid>
+      <link>https://t.example/dl/1.torrent</link>
+      <pubDate>Sat, 17 Oct 2026 15:42:41 +0000</pubDate>
+      <size>1503238554</size>
+      <enclosure url="https://t.example/dl/1.torrent" length="1503238554" type="application/x-bittorrent" />
+      <torznab:attr name="seeders" value="52" />
+      <torznab:attr name="peers" value="61" />
+      <torznab:attr name="infohash" value="BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" />
+      <torznab:attr name="magneturl" value="magnet:?xt=urn:btih:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB&amp;dn=Night.of.the.Living.Dead.1968" />
+      <torznab:attr name="category" value="2040" />
+    </item>
+    <item>
+      <title>Night of the Living Dead 1968 720p BRRip</title>
+      <link>https://t.example/dl/2.torrent</link>
+      <size>734106214</size>
+      <torznab:attr name="seeders" value="31" />
+    </item>
+    <item>
+      <title>Item without any link</title>
+    </item>
+    <item>
+      <link>https://t.example/dl/4.torrent</link>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,4 @@
+# Expected outputs are compared byte for byte (NFO files use CRLF), so git must never convert them.
+expected/** -text
+# Fixture inputs are plain LF text.
+fixtures/** text eol=lf

@@ -1,0 +1,33 @@
+{
+  "title": "Heat",
+  "year": 1995,
+  "ids": {
+    "trakt": 3,
+    "slug": "heat-1995",
+    "imdb": "tt0113277",
+    "tmdb": 949
+  },
+  "tagline": "A Los Angeles crime saga",
+  "overview": "Obsessive master thief Neil McCauley leads a top-notch crew on various insane heists.",
+  "released": "1995-12-15",
+  "runtime": 170,
+  "country": "us",
+  "trailer": "https://youtube.com/watch?v=2GfZl4kuVNI",
+  "homepage": null,
+  "status": "released",
+  "rating": 7.95432,
+  "votes": 21034,
+  "comment_count": 100,
+  "updated_at": "2024-05-01T10:00:00.000Z",
+  "language": "en",
+  "available_translations": [
+    "en",
+    "tr"
+  ],
+  "genres": [
+    "action",
+    "crime",
+    "drama"
+  ],
+  "certification": "R"
+}

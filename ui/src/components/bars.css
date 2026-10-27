@@ -1,0 +1,35 @@
+/* Bars and rings. The ring of the collapsed progress card: the arc changes with the value, over the same time and
+   easing as the bars. Reduced motion changes it at once. */
+.cv-ring-arc {
+  transition: stroke-dashoffset var(--dur-bar) var(--ease-out);
+}
+:root[data-motion="reduced"] .cv-ring-arc {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .cv-ring-arc {
+    transition: none;
+  }
+}
+
+/* Progress of unknown length: a 40% fill sweeping across by transform. Static under reduced motion. */
+@keyframes cv-bar-sweep {
+  from {
+    transform: translateX(-40%) scaleX(0.4);
+  }
+  to {
+    transform: translateX(100%) scaleX(0.4);
+  }
+}
+.cv-bar-indeterminate {
+  transform: scaleX(0.4);
+  animation: cv-bar-sweep 1.4s var(--ease-out) infinite;
+}
+:root[data-motion="reduced"] .cv-bar-indeterminate {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .cv-bar-indeterminate {
+    animation: none;
+  }
+}

@@ -1,0 +1,59 @@
+/* Type styles of the desktop redesign (design-tokens.json "type"). Use as `className="type-body"`.
+   The scale is 11, 12, 13, 14, 16, 20 and 28px in weights 500, 600 and 700, every value read from
+   the --fs-* and --fw-* tokens (700 only for headings and numbers). Archivo carries every word and
+   number; JetBrains Mono (`.type-code*`) is only for literal strings: paths, file names, NFO text,
+   template tokens, release names. Section labels have one style, `.type-section-label`. The classes
+   sit in the components layer, so Tailwind utilities still override single properties. */
+
+@layer components {
+  .type-hero {
+    font: var(--fw-700) var(--fs-28)/1.15 var(--font-sans);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .type-page-title {
+    font: var(--fw-700) var(--fs-20)/1.2 var(--font-sans);
+    letter-spacing: -0.01em;
+  }
+  .type-subhead {
+    font: var(--fw-600) var(--fs-16)/1.3 var(--font-sans);
+  }
+  .type-card-title {
+    font: var(--fw-600) var(--fs-14)/1.4 var(--font-sans);
+  }
+  .type-reading {
+    font: var(--fw-500) var(--fs-14)/1.55 var(--font-sans);
+  }
+  .type-body {
+    font: var(--fw-500) var(--fs-13)/1.45 var(--font-sans);
+  }
+  .type-body-strong {
+    font: var(--fw-600) var(--fs-13)/1.45 var(--font-sans);
+  }
+  .type-small {
+    font: var(--fw-500) var(--fs-12)/1.4 var(--font-sans);
+  }
+  .type-num {
+    font: var(--fw-500) var(--fs-13)/1.45 var(--font-sans);
+    font-variant-numeric: tabular-nums;
+  }
+  .type-num-sm {
+    font: var(--fw-500) var(--fs-12)/1.4 var(--font-sans);
+    font-variant-numeric: tabular-nums;
+  }
+  /* The one section label: 11px, semibold, uppercase, 0.06em tracking, muted. */
+  .type-section-label {
+    font: var(--fw-600) var(--fs-11)/1.3 var(--font-sans);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .type-code {
+    font: var(--fw-500) var(--fs-12)/1.5 var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .type-code-sm {
+    font: var(--fw-500) var(--fs-11)/1.45 var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}

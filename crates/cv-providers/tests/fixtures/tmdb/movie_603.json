@@ -1,0 +1,28 @@
+{
+  "id": 603,
+  "title": "The Matrix",
+  "original_title": "The Matrix",
+  "original_language": "en",
+  "overview": "A hacker learns the truth.",
+  "release_date": "1999-03-30",
+  "belongs_to_collection": {
+    "id": 2344,
+    "name": "The Matrix Collection",
+    "poster_path": "/c.jpg"
+  },
+  "imdb_id": "tt0133093",
+  "genres": [
+    {
+      "id": 878,
+      "name": "Science Fiction"
+    },
+    {
+      "id": 28,
+      "name": "Action"
+    }
+  ],
+  "adult": false,
+  "vote_average": 8.2,
+  "vote_count": 25000,
+  "poster_path": "/p.jpg"
+}

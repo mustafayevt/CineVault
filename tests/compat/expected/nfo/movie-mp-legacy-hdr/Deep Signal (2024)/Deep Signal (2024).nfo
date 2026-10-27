@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for MediaPortal-->
+<movie>
+  <title>Deep Signal</title>
+  <originaltitle>Deep Signal</originaltitle>
+  <sorttitle/>
+  <year>2024</year>
+  <rating>8.6</rating>
+  <userrating>0</userrating>
+  <votes>600000</votes>
+  <set/>
+  <plot>Signals from the deep.</plot>
+  <tagline/>
+  <runtime>166</runtime>
+  <thumb/>
+  <fanart/>
+  <certification>PG-13</certification>
+  <id>tt15239678</id>
+  <tmdbid>693134</tmdbid>
+  <uniqueid default="false" type="tmdb">693134</uniqueid>
+  <uniqueid default="true" type="imdb">tt15239678</uniqueid>
+  <country/>
+  <premiered>2024-02-29</premiered>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <genres>
+    <genre>Science Fiction</genre>
+    <genre>Adventure</genre>
+  </genres>
+  <studio/>
+  <credits/>
+  <director/>
+  <trailer/>
+  <languages/>
+  <dateadded>2024-06-01 12:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <aspect>2.40</aspect>
+        <width>3840</width>
+        <height>2160</height>
+        <resolution>4K</resolution>
+        <hdrtype>dolbyvision</hdrtype>
+        <durationinseconds>9960</durationinseconds>
+        <hdrformats>Dolby Vision, HDR10</hdrformats>
+      </video>
+      <audio>
+        <codec>truehd_atmos</codec>
+        <language>eng</language>
+        <channels>8</channels>
+      </audio>
+      <audio>
+        <codec>dtshd_ma</codec>
+        <language>fra</language>
+        <channels>8</channels>
+      </audio>
+      <audio>
+        <codec>dtshd_ma_x</codec>
+        <language>jpn</language>
+        <channels>8</channels>
+      </audio>
+      <audio>
+        <codec>dtshd_ma_x_imax</codec>
+        <language>eng</language>
+        <channels>8</channels>
+      </audio>
+      <audio>
+        <codec>eac3_ddp_atmos</codec>
+        <language>deu</language>
+        <channels>6</channels>
+      </audio>
+      <audio>
+        <codec>dtshd_hra</codec>
+        <language>spa</language>
+        <channels>8</channels>
+      </audio>
+      <audio>
+        <codec>ac3</codec>
+        <language>ita</language>
+        <channels>6</channels>
+      </audio>
+      <audio>
+        <codec>dca</codec>
+        <language>por</language>
+        <channels>6</channels>
+      </audio>
+      <audio>
+        <codec>aac</codec>
+        <language>nld</language>
+        <channels>2</channels>
+      </audio>
+      <audio>
+        <codec>flac</codec>
+        <language>swe</language>
+        <channels>2</channels>
+      </audio>
+      <subtitle>
+        <language>eng</language>
+      </subtitle>
+      <subtitle>
+        <language>fra</language>
+      </subtitle>
+      <subtitle>
+        <language>jpn</language>
+      </subtitle>
+      <subtitle>
+        <language>pob</language>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+  <!--CineVault meta data-->
+  <source>UHD_BLURAY</source>
+  <edition>NONE</edition>
+  <original_filename>Deep Signal (2024).mkv</original_filename>
+  <user_note/>
+  <english_title/>
+  <cv_locked/>
+</movie>

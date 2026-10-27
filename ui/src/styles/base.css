@@ -1,0 +1,166 @@
+/*
+ * Desktop base styles (spec desktop-interaction). The app behaves like a
+ * native program, not a web page: the pointer says what a control does, interface text cannot be
+ * selected (values, paths and log lines can), images do not ghost-drag, buttons never underline and
+ * scrollbars are thin. Everything reads design tokens. The focus ring and the focused-field border
+ * are in a11y.css; the browser shortcuts and the browser menu are off in features/shell/desktopGuards.ts.
+ * The rules sit in the base layer, so a Tailwind utility on one control (cursor-default, say) wins.
+ */
+
+@layer base {
+  body {
+    margin: 0;
+    background: var(--surface-window);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--fs-13);
+    font-weight: var(--fw-500);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Dragging over labels, cards or headings selects nothing and the pointer stays an arrow.
+       Text people type or may want to copy opts back in below. */
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* Fields, editable text and literal strings (paths, release names, NFO text, log lines) stay
+     selectable. Anything else opts in with .cv-selectable. */
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]),
+  pre,
+  code,
+  samp,
+  .cv-selectable,
+  .type-code,
+  .type-code-sm,
+  .select-text {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Pointers: the hand on everything that does something when clicked. */
+  button,
+  [role="button"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="tab"],
+  [role="option"],
+  [role="switch"],
+  [role="checkbox"],
+  [role="radio"],
+  a[href],
+  summary,
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="button"],
+  input[type="submit"],
+  [data-clickable] {
+    cursor: pointer;
+  }
+
+  /* The text cursor belongs to fields only. */
+  input:not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="button"],
+    [type="submit"],
+    [type="reset"],
+    [type="file"]
+  ),
+  textarea,
+  [contenteditable]:not([contenteditable="false"]) {
+    cursor: text;
+  }
+
+  /* Column dividers and pane splitters resize; something being dragged is grabbed. */
+  [data-resize="col"] {
+    cursor: col-resize;
+  }
+  [data-resize="row"] {
+    cursor: row-resize;
+  }
+  [data-drag-source] {
+    cursor: grab;
+  }
+  [data-dragging="true"],
+  [data-dragging="true"] * {
+    cursor: grabbing;
+  }
+
+  /* A disabled control says so, whatever it is. Last, so it wins over the hand. */
+  :disabled,
+  [aria-disabled="true"],
+  [data-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  /* No underline on a button, hovered or not (a link keeps its own). */
+  button,
+  [role="button"],
+  a[role="button"] {
+    text-decoration: none;
+  }
+
+  /* Images never start a ghost drag, unless the image is a drag source (an artwork tile). */
+  img {
+    -webkit-user-drag: none;
+  }
+  img[data-drag-source] {
+    -webkit-user-drag: element;
+  }
+
+  /* Shortcut hints are words, not literals: they take the interface face, never the mono one. */
+  kbd {
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * Thin scrollbars everywhere, drawn from the line tokens and without arrow buttons (the platform
+   * default on Windows is a wide bar with arrows). Both web views of the app (WebView2 and WebKit)
+   * read the -webkit pseudo-elements; the standard properties are the fallback for an engine
+   * without them, because setting them turns the pseudo-elements off in Chromium.
+   */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: var(--r-pill);
+    background: var(--line-kbd) padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted) padding-box;
+  }
+  ::-webkit-scrollbar-button,
+  ::-webkit-scrollbar-corner {
+    display: none;
+    background: transparent;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--line-kbd) transparent;
+    }
+  }
+}
+
+/*
+ * A scrolling area that keeps its scrollbar out of sight until the pointer or the keyboard is in
+ * it: the sidebar, which scrolls only when a short window holds many folders.
+ */
+.cv-scroll-quiet::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.cv-scroll-quiet:hover::-webkit-scrollbar-thumb,
+.cv-scroll-quiet:focus-within::-webkit-scrollbar-thumb {
+  background: var(--line-kbd) padding-box;
+}

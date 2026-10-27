@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<movie>
+  <title>Depth Charge TAB</title>
+  <originaltitle/>
+  <sorttitle/>
+  <epbookmark/>
+  <year>2010</year>
+  <ratings/>
+  <userrating>0</userrating>
+  <set/>
+  <plot/>
+  <tagline/>
+  <runtime>0</runtime>
+  <mpaa/>
+  <certification/>
+  <id/>
+  <tmdbid/>
+  <status/>
+  <code/>
+  <premiered/>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <trailer/>
+  <languages/>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>h264</codec>
+        <aspect>1.78</aspect>
+        <width>1920</width>
+        <height>1080</height>
+        <resolution>1080</resolution>
+        <stereomode>split_horizontal</stereomode>
+        <durationinseconds>6000</durationinseconds>
+      </video>
+      <audio>
+        <codec>ac3</codec>
+        <language>eng</language>
+        <channels>6</channels>
+      </audio>
+    </streamdetails>
+  </fileinfo>
+  <!--CineVault meta data-->
+  <source>UNKNOWN</source>
+  <edition>NONE</edition>
+  <original_filename>Depth Charge TAB (2010).mkv</original_filename>
+  <user_note/>
+  <english_title/>
+  <cv_locked/>
+</movie>

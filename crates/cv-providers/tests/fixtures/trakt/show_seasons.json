@@ -1,0 +1,86 @@
+[
+  {
+    "number": 0,
+    "ids": {
+      "trakt": 5000
+    },
+    "episodes": [
+      {
+        "season": 0,
+        "number": 1,
+        "title": "Good Cop Bad Cop",
+        "ids": {
+          "trakt": 6000,
+          "tvdb": 1
+        },
+        "number_abs": null,
+        "overview": "A special.",
+        "rating": 7.5,
+        "votes": 100,
+        "first_aired": "2009-03-01T05:00:00.000Z",
+        "runtime": 5
+      }
+    ]
+  },
+  {
+    "number": 1,
+    "ids": {
+      "trakt": 5001
+    },
+    "episodes": [
+      {
+        "season": 1,
+        "number": 1,
+        "title": "Pilot",
+        "ids": {
+          "trakt": 6001,
+          "tvdb": 349232,
+          "imdb": "tt0959621",
+          "tmdb": 62085
+        },
+        "number_abs": 1,
+        "overview": "Walter is diagnosed.",
+        "rating": 8.9,
+        "votes": 5000,
+        "first_aired": "2008-01-21T02:00:00.000Z",
+        "runtime": 58
+      },
+      {
+        "season": 1,
+        "number": 2,
+        "title": "Cat in the Bag",
+        "ids": {
+          "trakt": 6002
+        },
+        "number_abs": 2,
+        "overview": null,
+        "rating": null,
+        "votes": null,
+        "first_aired": null,
+        "runtime": null
+      }
+    ]
+  },
+  {
+    "number": 2,
+    "ids": {
+      "trakt": 5002
+    },
+    "episodes": [
+      {
+        "season": 2,
+        "number": 1,
+        "title": "Seven Thirty-Seven",
+        "ids": {
+          "trakt": 6003
+        },
+        "number_abs": null,
+        "overview": "",
+        "rating": 8.5,
+        "votes": 3000,
+        "first_aired": "2009-03-09T02:00:00.000Z",
+        "runtime": 47
+      }
+    ]
+  }
+]

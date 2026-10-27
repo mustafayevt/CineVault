@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<anime id="100" restricted="false">
+  <type>TV Series</type>
+  <episodecount>4</episodecount>
+  <startdate>2001-04-02</startdate>
+  <enddate>2001-04-23</enddate>
+  <titles>
+    <title xml:lang="x-jat" type="main">Hoshi no Tabi</title>
+    <title xml:lang="en" type="official">Star Voyage</title>
+    <title xml:lang="ja" type="official">星の旅</title>
+    <title xml:lang="de" type="official">Sternenreise</title>
+    <title xml:lang="en" type="synonym">Voyage of Stars</title>
+    <title xml:lang="en" type="short">SV</title>
+  </titles>
+  <url>http://example.test/starvoyage</url>
+  <creators>
+    <name id="1" type="Direction">Taro Regie</name>
+    <name id="2" type="Original Work">Hanako Autorin</name>
+    <name id="3" type="Music">Jiro Klang</name>
+    <name id="4" type="Character Design">Saburo Zeichner</name>
+    <name id="5" type="Animation Work">Studio Beispiel</name>
+    <name id="5" type="Animation Work">Studio Beispiel</name>
+  </creators>
+  <description>A crew travels between stars.
+http://anidb.net/ch101 [Captain Mika] meets [i]the stowaway[/i].
+Source: Example Press
+Note: Based on a novel.</description>
+  <ratings>
+    <permanent count="1234">8.51</permanent>
+    <temporary count="1300">8.60</temporary>
+    <review count="12">8.20</review>
+  </ratings>
+  <picture>100.jpg</picture>
+  <resources>
+    <resource type="2"><externalentity><identifier>4242</identifier></externalentity></resource>
+    <resource type="43"><externalentity><identifier>tt0111111</identifier></externalentity></resource>
+    <resource type="44"><externalentity><identifier>tv/5555</identifier></externalentity></resource>
+    <resource type="4"><externalentity><url>http://official.example.test/</url></externalentity></resource>
+  </resources>
+  <tags>
+    <tag id="1" parentid="0" weight="600" localspoiler="false" globalspoiler="false"><name>science fiction</name><description>Futures.</description></tag>
+    <tag id="2" parentid="0" weight="400"><name>space travel</name></tag>
+    <tag id="3" parentid="0" weight="100"><name>weak tag</name></tag>
+    <tag id="4" parentid="0" weight="300" globalspoiler="true"><name>spoiler tag</name></tag>
+    <tag id="5" parentid="0" weight="500"><name>comedy</name></tag>
+  </tags>
+  <characters>
+    <character id="101" type="Character">
+      <rating votes="10">9.1</rating>
+      <name>Mika</name>
+      <gender>female</gender>
+      <charactertype id="1">Character</charactertype>
+      <picture>101.jpg</picture>
+      <seiyuu id="9" picture="seiyuu9.jpg">Yui Stimme</seiyuu>
+    </character>
+    <character id="102" type="Character">
+      <name>Stowaway</name>
+      <seiyuu id="10">Ken Sprecher</seiyuu>
+    </character>
+    <character id="103" type="Character">
+      <name>Narrator</name>
+      <seiyuu id="9" picture="seiyuu9.jpg">Yui Stimme</seiyuu>
+    </character>
+    <character id="104" type="Character">
+      <name>Silent</name>
+    </character>
+  </characters>
+  <episodes>
+    <episode id="1002" update="2020-01-01">
+      <epno type="1">2</epno>
+      <length>24</length>
+      <airdate>2001-04-09</airdate>
+      <title xml:lang="en">Stowaway</title>
+    </episode>
+    <episode id="1001" update="2020-01-01">
+      <epno type="1">1</epno>
+      <length>24</length>
+      <airdate>2001-04-02</airdate>
+      <rating votes="5">7.5</rating>
+      <title xml:lang="en">Departure</title>
+      <title xml:lang="ja">出発</title>
+      <title xml:lang="x-jat">Shuppatsu</title>
+      <summary>Mika leaves.</summary>
+    </episode>
+    <episode id="1003">
+      <epno type="1">3</epno>
+      <airdate>2001-04-16</airdate>
+      <title xml:lang="x-jat">Kikan</title>
+    </episode>
+    <episode id="1004">
+      <epno type="2">S1</epno>
+      <length>12</length>
+      <airdate>2001-12-24</airdate>
+      <title xml:lang="en">Recap</title>
+    </episode>
+    <episode id="1005">
+      <epno type="3">C1</epno>
+      <title xml:lang="en">Opening</title>
+    </episode>
+    <episode id="1006">
+      <epno type="1">4</epno>
+      <airdate>2001-04-23</airdate>
+      <title xml:lang="en">Final Stop</title>
+    </episode>
+  </episodes>
+</anime>

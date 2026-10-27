@@ -1,0 +1,54 @@
+[package]
+name = "cinevault-app"
+description = "CineVault desktop application shell (Tauri 2)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "cinevault-app"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+cv-app.workspace = true
+cv-artwork.workspace = true
+cv-db.workspace = true
+cv-domain.workspace = true
+cv-jobs.workspace = true
+cv-media.workspace = true
+cv-nfo.workspace = true
+cv-providers.workspace = true
+cv-rename.workspace = true
+cv-scan.workspace = true
+cv-template.workspace = true
+cv-torrent.workspace = true
+tauri = { version = "2", features = ["specta"] }
+# Native Windows 11 snap-layout flyout over the custom maximize button (no-op elsewhere).
+tauri-plugin-snap-layout = "1.0.9"
+serde.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+specta.workspace = true
+specta-typescript = "0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-opener = "2"
+# Native folder picker for the first-run setup (used from Rust, no JS permission needed).
+tauri-plugin-dialog = "2"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+tempfile.workspace = true
+tauri = { version = "2", features = ["test"] }
+image.workspace = true

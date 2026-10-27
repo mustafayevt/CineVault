@@ -1,0 +1,197 @@
+/* Design tokens of the CineVault design system (machine-readable twin: design-tokens.json).
+   Warm-neutral greys in one surface ladder (window, card, raised, active,
+   floating, plus a well inside floating surfaces), three divider strengths, gold only where it guides.
+   Colours and the floating shadow switch with [data-theme]; the app sets it from the system theme
+   (features/settings/appearance.ts). Everything else is theme independent.
+   Hard-coded colour values live only in this file. */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-window: #121211;
+  --surface-card: #1a1a19;
+  --surface-well: #171716;
+  --surface-raised: #232321;
+  --surface-active: #2c2c29;
+  --surface-pressed: #333330;
+  --surface-floating: #1f1f1d;
+  --surface-floating-hover: #2a2926;
+  --line-row: rgba(255, 255, 255, 0.05);
+  --line-section: rgba(255, 255, 255, 0.08);
+  --line-edge: rgba(255, 255, 255, 0.1);
+  --line-kbd: rgba(255, 255, 255, 0.12);
+  --text: #ebe9e4;
+  --text-2: #aaa8a2;
+  --text-muted: #8a8984;
+  --text-disabled: #6f6e6a;
+  --gold: #cbb68a;
+  --gold-hover: #d6c49c;
+  --on-gold: #121211;
+  --gold-tint: rgba(203, 182, 138, 0.14);
+  --gold-tint-edge: rgba(203, 182, 138, 0.35);
+  --selected-row: rgba(203, 182, 138, 0.1);
+  --ok: #6fd09c;
+  --warn: #ea8c55;
+  --warn-bar: #c9733f;
+  --warn-tint: rgba(224, 119, 58, 0.15);
+  --danger: #f4848f;
+  --bar-neutral: #8f8c85;
+  --track: #353431;
+  --scrim: rgba(8, 8, 10, 0.72);
+  --scrim-text: #f1efea;
+  --badge-scrim: rgba(8, 8, 10, 0.72);
+  --focus-ring: var(--text);
+  --shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 250, 240, 0.04);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --surface-window: #f2f1ee;
+  --surface-card: #fbfaf8;
+  --surface-well: #f6f5f2;
+  --surface-raised: #ffffff;
+  --surface-active: #e7e5e0;
+  --surface-pressed: #dcdad4;
+  --surface-floating: #ffffff;
+  --surface-floating-hover: #ecebe7;
+  --line-row: rgba(0, 0, 0, 0.05);
+  --line-section: rgba(0, 0, 0, 0.08);
+  --line-edge: rgba(0, 0, 0, 0.1);
+  --line-kbd: rgba(0, 0, 0, 0.12);
+  --text: #1a1a19;
+  --text-2: #5d5c58;
+  --text-muted: #666561;
+  --text-disabled: #9a9893;
+  --gold: #7a6438;
+  --gold-hover: #6b5730;
+  --on-gold: #f2f1ee;
+  --gold-tint: rgba(122, 100, 56, 0.14);
+  --gold-tint-edge: rgba(122, 100, 56, 0.35);
+  --selected-row: rgba(122, 100, 56, 0.1);
+  --ok: #1a6e45;
+  --warn: #963e0d;
+  --warn-bar: #b04a12;
+  --warn-tint: rgba(176, 74, 18, 0.12);
+  --danger: #a82533;
+  --bar-neutral: #a8a59e;
+  --track: #e2e0da;
+  --scrim: rgba(8, 8, 10, 0.72);
+  --scrim-text: #f1efea;
+  --badge-scrim: rgba(255, 255, 255, 0.94);
+  --focus-ring: var(--text);
+  --shadow-floating: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(40, 30, 10, 0.08);
+}
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --gutter: 8px;
+  --inset: 24px;
+  --r-4: 4px;
+  --r-6: 6px;
+  --r-10: 10px;
+  --r-14: 14px;
+  --r-pill: 999px;
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: 20px;
+  --fs-28: 28px;
+  --fw-500: 500;
+  --fw-600: 600;
+  --fw-700: 700;
+  --h-btn-sm: 24px;
+  --h-btn: 28px;
+  --h-btn-lg: 32px;
+  --h-field: 30px;
+  --h-search: 34px;
+  --h-seg: 24px;
+  --h-chip: 24px;
+  --h-tag: 18px;
+  --h-nav: 32px;
+  --h-row: 34px;
+  --h-thead: 30px;
+  --h-menu-item: 28px;
+  --dur-hover: 110ms;
+  --dur-pop: 140ms;
+  --dur-page: 120ms;
+  --dur-bar: 180ms;
+  --dur-expand: 180ms;
+  --dur-max: 250ms;
+  --pop-scale: 0.98;
+  --lift: -2px;
+}
+
+/* Tailwind utilities: bg-surface-card, text-text-muted, border-line-edge, bg-gold ... follow the
+   active theme. */
+
+@theme inline {
+  --color-surface-window: var(--surface-window);
+  --color-surface-card: var(--surface-card);
+  --color-surface-well: var(--surface-well);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-active: var(--surface-active);
+  --color-surface-pressed: var(--surface-pressed);
+  --color-surface-floating: var(--surface-floating);
+  --color-surface-floating-hover: var(--surface-floating-hover);
+  --color-line-row: var(--line-row);
+  --color-line-section: var(--line-section);
+  --color-line-edge: var(--line-edge);
+  --color-line-kbd: var(--line-kbd);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-muted: var(--text-muted);
+  --color-text-disabled: var(--text-disabled);
+  --color-gold: var(--gold);
+  --color-gold-hover: var(--gold-hover);
+  --color-on-gold: var(--on-gold);
+  --color-gold-tint: var(--gold-tint);
+  --color-gold-tint-edge: var(--gold-tint-edge);
+  --color-selected-row: var(--selected-row);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-warn-bar: var(--warn-bar);
+  --color-warn-tint: var(--warn-tint);
+  --color-danger: var(--danger);
+  --color-bar-neutral: var(--bar-neutral);
+  --color-track: var(--track);
+  --color-scrim: var(--scrim);
+  --color-scrim-text: var(--scrim-text);
+  --color-badge-scrim: var(--badge-scrim);
+}
+
+/* The floating shadow changes with the theme, so its utility reads the variable. */
+@utility shadow-floating {
+  box-shadow: var(--shadow-floating);
+}
+
+/*
+ * Container breakpoints of the work pane (the shell's main area). Pages respond to the width of
+ * the pane, not the window, so pinning the dock reflows a page the way a narrower window would.
+ * Use them as `@pane-lg:` (min-width 960px: two cards side by side), `@pane-md:` (840px: the hero
+ * is roomy) and `@pane-sm:` (760px: above the companion layout; a workspace shows two panes).
+ */
+@theme {
+  --container-pane-lg: 960px;
+  --container-pane-md: 840px;
+  --container-pane-sm: 760px;
+}
+
+/* Theme independent tokens Tailwind maps: ease-out, ease-in, font-sans ... Enter uses ease-out,
+   exit ease-in; nothing bounces and nothing runs longer than --dur-max. */
+
+@theme static {
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --font-sans: Archivo, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+}

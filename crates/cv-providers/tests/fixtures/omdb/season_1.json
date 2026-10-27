@@ -1,0 +1,29 @@
+{
+  "Title": "Breaking Bad",
+  "Season": "1",
+  "totalSeasons": "2",
+  "Episodes": [
+    {
+      "Title": "Pilot",
+      "Released": "2008-01-20",
+      "Episode": "1",
+      "imdbRating": "9.0",
+      "imdbID": "tt0959621"
+    },
+    {
+      "Title": "Cat's in the Bag...",
+      "Released": "2008-01-27",
+      "Episode": "2",
+      "imdbRating": "8.6",
+      "imdbID": "tt1054724"
+    },
+    {
+      "Title": "Unnumbered",
+      "Released": "N/A",
+      "Episode": "N/A",
+      "imdbRating": "N/A",
+      "imdbID": "tt0000001"
+    }
+  ],
+  "Response": "True"
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<anime id="100" restricted="false">
+  <type>TV Series</type>
+  <episodecount>4</episodecount>
+  <startdate>2001-04-02</startdate>
+  <enddate>2001-04-23</enddate>
+  <titles>
+    <title xml:lang="x-jat" type="main">Hoshi no Tabi</title>
+    <title xml:lang="en" type="official">Star Voyage</title>
+    <title xml:lang="ja" type="official">星の旅</title>
+    <title xml:lang="de" type="official">Sternenreise</title>
+    <title xml:lang="en" type="synonym">Voyage of Stars</title>
+    <title xml:lang="en" type="short">SV</title>
+  </titles>
+  <url>http://example.tes

@@ -1,0 +1,61 @@
+[
+  {
+    "id": 900,
+    "name": "Pilot",
+    "season": 1,
+    "number": 1,
+    "type": "regular",
+    "airdate": "2008-01-20",
+    "runtime": 58,
+    "rating": {
+      "average": 8.8
+    },
+    "image": {
+      "medium": "https://img.example.test/tvmaze/e900_m.jpg",
+      "original": "https://img.example.test/tvmaze/e900_o.jpg"
+    },
+    "summary": "<p>Walt is diagnosed.</p>"
+  },
+  {
+    "id": 901,
+    "name": "Cat in the Bag",
+    "season": 1,
+    "number": 2,
+    "type": "regular",
+    "airdate": "2008-01-27",
+    "runtime": 48,
+    "rating": {
+      "average": null
+    },
+    "image": null,
+    "summary": null
+  },
+  {
+    "id": 950,
+    "name": "Season 1 recap",
+    "season": 1,
+    "number": null,
+    "type": "insignificant_special",
+    "airdate": "2008-12-01",
+    "runtime": 5,
+    "rating": {
+      "average": null
+    },
+    "image": null,
+    "summary": null
+  },
+  {
+    "id": 902,
+    "name": "Seven Thirty-Seven",
+    "season": 2,
+    "number": 1,
+    "type": "regular",
+    "airdate": "2009-03-08",
+    "runtime": 47,
+    "rating": {
+      "average": 8.6
+    },
+    "image": null,
+    "summary": null
+  }
+]

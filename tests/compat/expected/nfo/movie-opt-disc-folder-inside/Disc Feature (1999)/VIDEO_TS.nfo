@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<movie>
+  <title>Disc Feature</title>
+  <originaltitle/>
+  <sorttitle/>
+  <epbookmark/>
+  <year>1999</year>
+  <ratings/>
+  <userrating>0</userrating>
+  <set/>
+  <plot>Disc based movie.</plot>
+  <tagline/>
+  <runtime>0</runtime>
+  <mpaa/>
+  <certification/>
+  <id/>
+  <tmdbid/>
+  <status/>
+  <code/>
+  <premiered/>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <trailer/>
+  <languages/>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>mpeg2</codec>
+        <aspect>1.78</aspect>
+        <width>720</width>
+        <height>480</height>
+        <resolution>480</resolution>
+        <durationinseconds>5400</durationinseconds>
+      </video>
+    </streamdetails>
+  </fileinfo>
+  <!--CineVault meta data-->
+  <source>UNKNOWN</source>
+  <edition>NONE</edition>
+  <original_filename>VIDEO_TS.IFO</original_filename>
+  <user_note/>
+  <english_title/>
+  <cv_locked/>
+</movie>

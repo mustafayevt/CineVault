@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 12:00:00 by Example Writer for Kodi-->
+<movie>
+  <title>Harbor Lights</title>
+  <originaltitle>Les Lumieres du Port</originaltitle>
+  <sorttitle>Harbor Lights 1</sorttitle>
+  <userrating>8</userrating>
+  <top250>0</top250>
+  <outline>A sailor finds a lamp.</outline>
+  <plot>A sailor finds a lamp on the quay and the town changes.</plot>
+  <tagline>Follow the light</tagline>
+  <runtime>96</runtime>
+  <thumb aspect="poster">https://images.example.test/harbor/poster.jpg</thumb>
+  <thumb aspect="clearlogo">https://images.example.test/harbor/logo.png</thumb>
+  <thumb aspect="landscape">https://images.example.test/harbor/landscape.jpg</thumb>
+  <fanart>
+    <thumb>https://images.example.test/harbor/fan1.jpg</thumb>
+    <thumb>https://images.example.test/harbor/fan2.jpg</thumb>
+  </fanart>
+  <mpaa>Rated PG-13</mpaa>
+  <uniqueid type="imdb" default="true">tt0103639</uniqueid>
+  <uniqueid type="tmdb">949</uniqueid>
+  <ratings>
+    <rating name="imdb" max="10" default="true"><value>7.5</value><votes>12000</votes></rating>
+    <rating name="themoviedb" max="10" default="false"><value>7.1</value><votes>3400</votes></rating>
+    <rating name="rottenTomatoes" max="100" default="false"><value>91</value><votes>0</votes></rating>
+  </ratings>
+  <premiered>1992-05-01</premiered>
+  <watched>true</watched>
+  <playcount>2</playcount>
+  <lastplayed>2025-01-02 03:04:05</lastplayed>
+  <genre>Drama</genre>
+  <genre>Science Fiction</genre>
+  <studio>First Pictures</studio>
+  <studio>Second Pictures</studio>
+  <country>United States</country>
+  <credits>Writer One</credits>
+  <director>Director One</director>
+  <tag>harbor</tag>
+  <actor>
+    <name>Actor One</name>
+    <role>Lead</role>
+    <order>0</order>
+    <thumb>https://images.example.test/people/one.jpg</thumb>
+    <tmdbid>101</tmdbid>
+  </actor>
+  <actor>
+    <name>Actor Two</name>
+    <role>Friend</role>
+  </actor>
+  <trailer>plugin://plugin.video.youtube/play/?video_id=abc123XYZ_-</trailer>
+  <languages>English, German</languages>
+  <dateadded>2024-01-01 00:00:00</dateadded>
+  <customfield>unknown to the reader</customfield>
+</movie>

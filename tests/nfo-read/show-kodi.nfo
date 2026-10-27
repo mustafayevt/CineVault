@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<tvshow>
+  <title>Harbor Town</title>
+  <originaltitle>Hafenstadt</originaltitle>
+  <showtitle>Harbor Town</showtitle>
+  <year>2010</year>
+  <plot>Life at the docks.</plot>
+  <runtime>45</runtime>
+  <thumb aspect="poster">https://images.example.test/town/poster.jpg</thumb>
+  <thumb aspect="banner">https://images.example.test/town/banner.jpg</thumb>
+  <thumb aspect="poster" type="season" season="1">https://images.example.test/town/s1.jpg</thumb>
+  <thumb aspect="poster" type="season" season="0">https://images.example.test/town/s0.jpg</thumb>
+  <namedseason number="1">The Beginning</namedseason>
+  <fanart><thumb>https://images.example.test/town/fan.jpg</thumb></fanart>
+  <mpaa>TV-14</mpaa>
+  <episodeguide>{"tmdb":"1396","tvdb":"81189"}</episodeguide>
+  <id>81189</id>
+  <imdbid>tt0903747</imdbid>
+  <tmdbid>1396</tmdbid>
+  <premiered>2010-01-20</premiered>
+  <status>Ended</status>
+  <genre>Drama</genre>
+  <studio>Dock Network</studio>
+  <country>US</country>
+  <actor><name>Lead One</name><role>Captain</role></actor>
+  <director>Boss One</director>
+</tvshow>

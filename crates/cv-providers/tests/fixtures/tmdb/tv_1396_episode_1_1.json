@@ -1,0 +1,38 @@
+{
+  "id": 62085,
+  "name": "Pilot",
+  "overview": "A teacher begins cooking.",
+  "air_date": "2008-01-20",
+  "season_number": 1,
+  "episode_number": 1,
+  "runtime": 58,
+  "vote_average": 8.3,
+  "vote_count": 100,
+  "still_path": "/s.jpg",
+  "guest_stars": [
+    {
+      "id": 99,
+      "name": "Guest Person",
+      "character": "Neighbour",
+      "order": 3
+    }
+  ],
+  "crew": [
+    {
+      "id": 66633,
+      "name": "Vince Gilligan",
+      "job": "Director",
+      "department": "Directing"
+    },
+    {
+      "id": 66633,
+      "name": "Vince Gilligan",
+      "job": "Writer",
+      "department": "Writing"
+    }
+  ],
+  "external_ids": {
+    "imdb_id": "tt0959621",
+    "tvdb_id": 349232
+  }
+}

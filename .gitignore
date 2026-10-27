@@ -1,0 +1,36 @@
+# Rust
+/target/
+**/target/
+
+# Node / UI
+node_modules/
+/ui/dist/
+*.tsbuildinfo
+
+# Tauri
+/src-tauri/gen/schemas/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local data and secrets
+*.local
+*.local.toml
+.env
+.env.*
+*.pem
+.cinevault-keys/
+
+
+# Tools fetched for development (bun run tools:fetch)
+/.dev-tools/
+
+# The downloaded anime ID database is cached outside the repo; never commit a copy
+anime-offline-database*.json*
+
+# Screenshot check output (bun run shots)
+/ui/.shots/

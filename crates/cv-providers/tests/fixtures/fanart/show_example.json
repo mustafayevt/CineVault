@@ -1,0 +1,44 @@
+{
+  "name": "Example Series",
+  "thetvdb_id": "81189",
+  "hdtvlogo": [
+    {"id": "101", "url": "https://assets.example.test/fanart/tv/81189/hdtvlogo/logo-en.png", "lang": "en", "likes": "9"}
+  ],
+  "clearlogo": [
+    {"id": "102", "url": "https://assets.example.test/fanart/tv/81189/clearlogo/logo-sd-en.png", "lang": "en", "likes": "15"}
+  ],
+  "hdclearart": [
+    {"id": "103", "url": "https://assets.example.test/fanart/tv/81189/hdclearart/art-en.png", "lang": "en", "likes": "4"}
+  ],
+  "clearart": [],
+  "tvposter": [
+    {"id": "104", "url": "https://assets.example.test/fanart/tv/81189/tvposter/poster-en.jpg", "lang": "en", "likes": "6"}
+  ],
+  "tvbanner": [
+    {"id": "105", "url": "https://assets.example.test/fanart/tv/81189/tvbanner/banner-en.jpg", "lang": "en", "likes": "2"}
+  ],
+  "tvthumb": [
+    {"id": "106", "url": "https://assets.example.test/fanart/tv/81189/tvthumb/thumb-en.jpg", "lang": "en", "likes": "5"}
+  ],
+  "characterart": [
+    {"id": "107", "url": "https://assets.example.test/fanart/tv/81189/characterart/char-en.png", "lang": "en", "likes": "1"}
+  ],
+  "showbackground": [
+    {"id": "108", "url": "https://assets.example.test/fanart/tv/81189/showbackground/bg-show.jpg", "lang": "", "likes": "10", "season": ""},
+    {"id": "109", "url": "https://assets.example.test/fanart/tv/81189/showbackground/bg-season1.jpg", "lang": "", "likes": "3", "season": "1"}
+  ],
+  "seasonposter": [
+    {"id": "110", "url": "https://assets.example.test/fanart/tv/81189/seasonposter/s1-en.jpg", "lang": "en", "likes": "4", "season": "1"},
+    {"id": "111", "url": "https://assets.example.test/fanart/tv/81189/seasonposter/s1-de.jpg", "lang": "de", "likes": "9", "season": "1"},
+    {"id": "112", "url": "https://assets.example.test/fanart/tv/81189/seasonposter/s2-en.jpg", "lang": "en", "likes": "1", "season": "2"},
+    {"id": "113", "url": "https://assets.example.test/fanart/tv/81189/seasonposter/specials-en.jpg", "lang": "en", "likes": "1", "season": "0"},
+    {"id": "114", "url": "https://assets.example.test/fanart/tv/81189/seasonposter/all-en.jpg", "lang": "en", "likes": "2", "season": "all"},
+    {"id": "115", "url": "https://assets.example.test/fanart/tv/81189/seasonposter/nonumber-en.jpg", "lang": "en", "likes": "50"}
+  ],
+  "seasonthumb": [
+    {"id": "116", "url": "https://assets.example.test/fanart/tv/81189/seasonthumb/s1-en.jpg", "lang": "en", "likes": "2", "season": "1"}
+  ],
+  "seasonbanner": [
+    {"id": "117", "url": "https://assets.example.test/fanart/tv/81189/seasonbanner/s1-en.jpg", "lang": "en", "likes": "1", "season": "1"}
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "id": 3572,
+  "season_number": 1,
+  "name": "Staffel 1",
+  "overview": "",
+  "air_date": "2008-01-20",
+  "poster_path": "/s1.jpg",
+  "external_ids": {
+    "tvdb_id": 30272
+  },
+  "episodes": [
+    {
+      "id": 62085,
+      "name": "Pilotfolge",
+      "overview": "",
+      "air_date": "2008-01-20",
+      "season_number": 1,
+      "episode_number": 1,
+      "runtime": 58,
+      "vote_average": 8.3,
+      "vote_count": 100,
+      "still_path": "/s.jpg",
+      "guest_stars": [],
+      "crew": []
+    },
+    {
+      "id": 62086,
+      "name": "",
+      "overview": "",
+      "air_date": "2008-01-27",
+      "season_number": 1,
+      "episode_number": 2,
+      "runtime": 58,
+      "vote_average": 8.3,
+      "vote_count": 100,
+      "still_path": "/s.jpg",
+      "guest_stars": [],
+      "crew": []
+    }
+  ]
+}

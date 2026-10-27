@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "note": "Hand-written NFOs for the tolerant readers (crates/cv-nfo/tests/read.rs). Each case reads one file with one reader and compares the listed summary keys; keys not listed are not checked. Several files are broken on purpose.",
+  "cases": [
+    {"file": "movie-kodi.nfo", "kind": "movie", "valid": true, "expect": {
+      "title": "Harbor Lights", "original_title": "Les Lumieres du Port", "sort_title": "Harbor Lights 1",
+      "year": "1992", "runtime": "96", "imdb": "tt0103639", "tmdb": "949",
+      "rating.imdb": "7.5/12000/10", "rating.tmdb": "7.1/3400/10", "rating.tomatometerallcritics": "91/0/100", "rating.user": "8/0/10",
+      "certification": "US_PG13", "genres": "DRAMA|SCIENCE_FICTION", "studios": "First Pictures|Second Pictures", "countries": "United States",
+      "release_date": "1992-05-01", "watched": "true", "play_count": "2", "last_played": "2025-01-02 03:04:05", "date_added": "2024-01-01 00:00:00",
+      "poster": "https://images.example.test/harbor/poster.jpg", "clearlogo": "https://images.example.test/harbor/logo.png",
+      "landscape": "https://images.example.test/harbor/landscape.jpg", "fanart": "https://images.example.test/harbor/fan1.jpg", "extra_fanarts": "1",
+      "trailer": "https://www.youtube.com/watch?v=abc123XYZ_-", "languages": "English|German", "tags": "harbor",
+      "credits": "Actor One:actor:Lead|Actor Two:actor:Friend|Director One:director:|Writer One:writer:", "outline": "A sailor finds a lamp.", "tagline": "Follow the light"}},
+    {"file": "movie-legacy.nfo", "kind": "movie", "valid": true, "expect": {
+      "title": "Old Layout", "sort_title": "Layout, Old", "year": "2001", "runtime": "118", "imdb": "tt0113277", "tmdb": "12", "rating.NFO": "6.8/1234/10",
+      "certification": "DE_FSK12", "genres": "ACTION|CRIME|THRILLER|DRAMA", "studios": "Alpha Films|Beta Films", "release_date": "2001-03-01",
+      "set": "Old Saga", "poster": "https://images.example.test/old/poster.jpg", "fanart": "https://images.example.test/old/fan.jpg"}},
+    {"file": "movie-set-object.nfo", "kind": "movie", "valid": true, "expect": {
+      "title": "Part Two", "set": "Harbor Saga", "set_overview": "All the parts.", "set_tmdb": "77", "other_sets": "Second Collection",
+      "imdb": "tt0113277", "tmdb": "5", "tmdbSet": "77"}},
+    {"file": "movie-uppercase.nfo", "kind": "movie", "valid": true, "expect": {
+      "title": "Shouting Tags", "original_title": "Alt Title", "year": "1999", "imdb": "tt0123456", "plot": "Plot in mixed case tags."}},
+    {"file": "movie-broken-unclosed.nfo", "kind": "movie", "valid": true, "expect": {"title": "Heat", "year": "1995"}},
+    {"file": "movie-broken-swallowed.nfo", "kind": "movie", "valid": true, "expect": {
+      "title": "Swallowed", "genres": "CRIME", "runtime": "170", "year": "1995", "imdb": "tt0113277"}},
+    {"file": "movie-broken-mismatched.nfo", "kind": "movie", "valid": true, "expect": {"title": "Mismatch", "year": "1999", "runtime": "100"}},
+    {"file": "movie-bad-values.nfo", "kind": "movie", "valid": true, "expect": {
+      "title": "Bad Values", "year": "0", "runtime": "0", "ratings": "0", "release_date": "", "watched": "false", "last_played": "", "top250": "0",
+      "ids": "0", "plot": "Only the plot is fine."}},
+    {"file": "movie-windows-1252.nfo", "kind": "movie", "valid": true, "expect": {
+      "title": "Café Noir – Le Film", "year": "1998", "credits": "René Dupont:director:"}},
+    {"file": "movie-utf16.nfo", "kind": "movie", "valid": true, "expect": {"title": "Wide Characters ü", "year": "2003"}},
+    {"file": "url-tmdb.nfo", "kind": "movie", "valid": false, "expect": {"tmdb": "949", "ids": "1"}},
+    {"file": "url-imdb.nfo", "kind": "movie", "valid": false, "expect": {"imdb": "tt0113277", "ids": "1"}},
+    {"file": "id-only.nfo", "kind": "movie", "valid": false, "expect": {"imdb": "tt0103639", "ids": "1"}},
+    {"file": "release-info.nfo", "kind": "movie", "valid": false, "expect": {"imdb": "tt0113277", "title": ""}},
+    {"file": "foreign-no-title.nfo", "kind": "movie", "valid": false, "expect": {"title": "", "year": "1999"}},
+    {"file": "foreign-root.nfo", "kind": "movie", "none": true},
+    {"file": "recording-movie.nfo", "kind": "movie", "valid": true, "expect": {
+      "title": "Night Show", "plot": "Live from the harbor.", "certification": "US_PG", "genres": "NEWS|TALK_SHOW", "ratings": "0"}},
+    {"file": "set-kodi.nfo", "kind": "set", "valid": true, "expect": {
+      "title": "Harbor Saga", "sort_title": "Saga, Harbor", "overview": "All the parts.", "tmdb": "77", "tags": "saga",
+      "poster": "https://images.example.test/saga/poster.jpg", "fanart": "https://images.example.test/saga/fan.jpg", "date_added": "2024-01-01 00:00:00"}},
+    {"file": "set-emby-broken.nfo", "kind": "set", "valid": true, "expect": {"title": "Harbor Saga", "overview": "All the parts, Emby style.", "tmdb": "77"}},
+    {"file": "url-tmdb.nfo", "kind": "set", "none": true},
+    {"file": "show-kodi.nfo", "kind": "show", "valid": true, "expect": {
+      "title": "Harbor Town", "original_title": "Hafenstadt", "year": "2010", "runtime": "45", "certification": "US_TV14", "status": "Ended",
+      "first_aired": "2010-01-20", "tvdb": "81189", "imdb": "tt0903747", "tmdb": "1396", "poster": "https://images.example.test/town/poster.jpg",
+      "banner": "https://images.example.test/town/banner.jpg", "fanart": "https://images.example.test/town/fan.jpg",
+      "seasons": "0:|1:The Beginning", "season_posters": "0:https://images.example.test/town/s0.jpg|1:https://images.example.test/town/s1.jpg",
+      "credits": "Lead One:actor:Captain|Boss One:director:", "studios": "Dock Network", "countries": "US"}},
+    {"file": "show-guide-url.nfo", "kind": "show", "valid": true, "expect": {"title": "Guide By Url", "tvdb": "81189", "tmdb": "1396"}},
+    {"file": "show-broken.nfo", "kind": "show", "valid": true, "expect": {"title": "Half A Show", "year": "2001", "status": "Continuing"}},
+    {"file": "show-url-tvdb.nfo", "kind": "show", "valid": false, "expect": {"tvdb": "81189", "ids": "1"}},
+    {"file": "movie-kodi.nfo", "kind": "show", "valid": false, "expect": {"title": "", "imdb": "tt0103639", "tvdb": ""}},
+    {"file": "season-kodi.nfo", "kind": "season", "valid": true, "expect": {
+      "number": "2", "title": "The Second Year", "show_title": "Harbor Town", "year": "2011", "first_aired": "2011-02-03",
+      "poster": "https://images.example.test/town/s2.jpg"}},
+    {"file": "season-specials.nfo", "kind": "season", "valid": true, "expect": {"number": "0", "title": "Specials"}},
+    {"file": "season-no-number.nfo", "kind": "season", "valid": false, "expect": {"number": "", "title": "Nameless"}},
+    {"file": "show-kodi.nfo", "kind": "season", "none": true},
+    {"file": "episode-single.nfo", "kind": "episode", "expect": {
+      "count": "1", "0.valid": "true", "0.title": "Pilot", "0.show_title": "Harbor Town", "0.season": "1", "0.episode": "1", "0.aired": "2010-01-20",
+      "0.runtime": "44", "0.tvdb": "111", "0.thumb": "https://images.example.test/town/e1.jpg", "0.watched": "false",
+      "0.credits": "Guest One:guest:Visitor|Director One:director:|Writer One:writer:"}},
+    {"file": "episode-multi.nfo", "kind": "episode", "expect": {
+      "count": "2", "0.title": "Two Parter, Part 1", "0.episode": "5", "1.title": "Two Parter, Part 2", "1.episode": "6", "1.season": "2"}},
+    {"file": "episode-wrapped.nfo", "kind": "episode", "expect": {"count": "2", "0.title": "First", "1.title": "Second", "1.episode": "4"}},
+    {"file": "episode-broken-nested.nfo", "kind": "episode", "expect": {
+      "count": "2", "0.title": "Unclosed One", "0.episode": "1", "1.title": "Closed Two", "1.episode": "2", "1.season": "3"}},
+    {"file": "episode-no-numbers.nfo", "kind": "episode", "expect": {"count": "1", "0.valid": "true", "0.title": "Numberless", "0.season": "", "0.episode": ""}},
+    {"file": "recording-episode.nfo", "kind": "episode", "expect": {
+      "count": "1", "0.title": "Pilot", "0.show_title": "Night Show", "0.plot": "Live from the harbor.", "0.season": "1", "0.episode": "1", "0.certification": "US_TVPG"}},
+    {"file": "foreign-root.nfo", "kind": "episode", "expect": {"count": "0"}}
+  ]
+}

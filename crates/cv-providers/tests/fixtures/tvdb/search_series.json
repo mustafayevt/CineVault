@@ -1,0 +1,77 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "objectID": "series-81189",
+      "tvdb_id": "81189",
+      "name": "Breaking Bad",
+      "slug": "breaking-bad",
+      "type": "series",
+      "year": "2008",
+      "first_air_time": "2008-01-20",
+      "status": "Ended",
+      "primary_language": "eng",
+      "country": "usa",
+      "overview": "When Walter White, a chemistry teacher, is diagnosed with lung cancer, he turns to manufacturing methamphetamine.",
+      "overviews": {
+        "eng": "When Walter White, a chemistry teacher, is diagnosed with lung cancer, he turns to manufacturing methamphetamine.",
+        "tur": "Kimya öğretmeni Walter White akciğer kanseri olduğunu öğrenir."
+      },
+      "translations": {
+        "eng": "Breaking Bad",
+        "tur": "Breaking Bad: Kırılma"
+      },
+      "image_url": "https://artworks.thetvdb.com/banners/posters/81189-10.jpg",
+      "thumbnail": "https://artworks.thetvdb.com/banners/posters/81189-10_t.jpg",
+      "remote_ids": [
+        {
+          "id": "tt0903747",
+          "type": 2,
+          "sourceName": "IMDB"
+        },
+        {
+          "id": "1396",
+          "type": 12,
+          "sourceName": "TheMovieDB.com"
+        },
+        {
+          "id": "nm0000001",
+          "type": 2,
+          "sourceName": "IMDB"
+        }
+      ]
+    },
+    {
+      "objectID": "series-300000",
+      "tvdb_id": "300000",
+      "name": "Breaking Bad: Minisodes",
+      "slug": "breaking-bad-minisodes",
+      "type": "series",
+      "first_air_time": "2009-05-01",
+      "overview": "Short webisodes.",
+      "translations": null,
+      "overviews": null,
+      "remote_ids": null,
+      "image_url": "https://artworks.thetvdb.com/banners/posters/300000-1.jpg"
+    },
+    {
+      "objectID": "series-300000",
+      "tvdb_id": 300000,
+      "name": "Duplicate row",
+      "type": "series",
+      "year": "2009"
+    },
+    {
+      "objectID": "series-0",
+      "tvdb_id": "",
+      "name": "Nameless id",
+      "type": "series"
+    },
+    {
+      "objectID": "series-300001",
+      "tvdb_id": "300001",
+      "name": "",
+      "type": "series"
+    }
+  ]
+}

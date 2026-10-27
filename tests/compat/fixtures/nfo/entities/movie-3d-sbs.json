@@ -1,0 +1,25 @@
+{
+  "folder": "Depth Charge SBS (2010)",
+  "title": "Depth Charge SBS",
+  "year": 2010,
+  "videoIn3D": true,
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "Depth Charge SBS (2010).mkv",
+      "videoCodec": "h264",
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "aspectRatio": 1.78,
+      "duration": 6000,
+      "video3DFormat": "3D SBS",
+      "audio": [
+        {
+          "codec": "AC3",
+          "language": "en",
+          "audioChannels": 6
+        }
+      ]
+    }
+  ]
+}

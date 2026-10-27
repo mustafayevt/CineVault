@@ -1,0 +1,15 @@
+{
+  "Title": "Breaking Bad",
+  "Season": "2",
+  "totalSeasons": "2",
+  "Episodes": [
+    {
+      "Title": "Seven Thirty-Seven",
+      "Released": "2009-03-08",
+      "Episode": "1",
+      "imdbRating": "8.6",
+      "imdbID": "tt1232248"
+    }
+  ],
+  "Response": "True"
+}

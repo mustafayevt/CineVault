@@ -1,0 +1,128 @@
+name: Release build
+
+# Shared by release-windows.yml and release-macos.yml: builds the installers for one operating
+# system and puts them on the GitHub Release `v<version>` (version from src-tauri/tauri.conf.json).
+# The release is created when it does not exist yet; files from an earlier run of the same
+# version are replaced, so either system can be (re)released on its own at any time.
+# The build needs no secrets and no API keys: provider keys are entered by each user in the app.
+# The installers are unsigned; the update manifest is signed afterwards by a maintainer with
+# `bun run release:publish`, on the machine that holds the signing key.
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: "windows or macos"
+        type: string
+        required: true
+      publish:
+        description: Put the installers on the GitHub Release (false = workflow artifacts only)
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  installers:
+    name: Installers (${{ inputs.os }})
+    runs-on: ${{ inputs.os == 'windows' && 'windows-latest' || 'macos-latest' }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      # Windows runners have slow NTFS disks; a Dev Drive (ReFS) mounted as the cargo target folder
+      # makes Rust builds much faster there. Nothing else changes: the target folder stays at ./target.
+      - name: Dev Drive for the target folder (Windows)
+        if: runner.os == 'Windows'
+        uses: samypr100/setup-dev-drive@v4
+        with:
+          drive-size: 30GB
+          drive-format: ReFS
+          drive-type: Dynamic
+          mount-path: ${{ github.workspace }}/target
+          trusted-dev-drive: true
+
+      # One universal DMG covers Apple Silicon and Intel Macs (app-shell spec).
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ inputs.os == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Read the version
+        id: version
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "Building CineVault $version for ${{ inputs.os }}"
+
+      - name: Check the bundling configuration
+        run: node scripts/check-bundle.mjs
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd ui && bun install --frozen-lockfile
+
+      # `tauri build` runs the UI build first (beforeBuildCommand) and bundles per OS:
+      # MSI and NSIS on Windows, DMG and .app on macOS (tauri.windows.conf.json, tauri.macos.conf.json).
+      - name: Build installers
+        run: bun run tauri build ${{ inputs.os == 'macos' && '--target universal-apple-darwin' || '' }}
+
+      - name: Check the installers exist
+        run: node scripts/check-bundle.mjs --artifacts
+
+      - name: Build the portable zip (Windows)
+        if: runner.os == 'Windows'
+        run: node scripts/package-portable.mjs
+
+      - name: Collect installers
+        run: |
+          mkdir -p out
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            bundle=target/release/bundle
+            cp "$bundle"/msi/*.msi "$bundle"/nsis/*.exe "$bundle"/portable/*.zip out/
+          else
+            bundle=target/universal-apple-darwin/release/bundle
+            cp "$bundle"/dmg/*.dmg out/
+          fi
+          cd out
+          if command -v sha256sum >/dev/null; then sha256sum * > "SHA256SUMS-$RUNNER_OS.txt"; else shasum -a 256 * > "SHA256SUMS-$RUNNER_OS.txt"; fi
+          cat "SHA256SUMS-$RUNNER_OS.txt"
+
+      - name: Keep the installers as workflow artifacts
+        if: ${{ !inputs.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinevault-${{ runner.os }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Put the installers on the GitHub Release
+        if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            # The other system's run may create it at the same moment; then the upload below still works.
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "CineVault $VERSION" --generate-notes \
+              || gh release view "$TAG" >/dev/null
+          fi
+          gh release upload "$TAG" out/* --clobber
+          echo "Published to https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"

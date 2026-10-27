@@ -1,0 +1,150 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "src-tauri", "cli"]
+
+[workspace.package]
+version = "1.0.1"
+edition = "2024"
+rust-version = "1.90"
+license = "Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# Internal crates
+cv-domain = { path = "crates/cv-domain" }
+cv-fs = { path = "crates/cv-fs" }
+cv-db = { path = "crates/cv-db" }
+cv-scan = { path = "crates/cv-scan" }
+cv-media = { path = "crates/cv-media" }
+cv-template = { path = "crates/cv-template" }
+cv-nfo = { path = "crates/cv-nfo" }
+cv-providers = { path = "crates/cv-providers" }
+cv-match = { path = "crates/cv-match" }
+cv-artwork = { path = "crates/cv-artwork" }
+cv-rename = { path = "crates/cv-rename" }
+cv-jobs = { path = "crates/cv-jobs" }
+cv-app = { path = "crates/cv-app" }
+cv-torrent = { path = "crates/cv-torrent" }
+
+# Third-party
+anyhow = "1"
+thiserror = "2"
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+rusqlite = { version = "0.37", features = ["bundled", "functions"] }
+tempfile = "3"
+# Local time zone for the timestamps NFO files hold (cv-app).
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+dirs = "7"
+regex = "1"
+# Unicode normalisation of file names (cv-rename: NFC and NFD spell one name on macOS).
+icu_normalizer = "2.3"
+# External tool downloads (cv-media): HTTPS client, checksums, archive formats.
+ureq = "3"
+sha2 = "0.11"
+fs4 = { version = "1.1", default-features = false, features = ["sync"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
+tar = "0.4"
+bzip2 = "0.6"
+# MediaInfo XML sidecar files (cv-media), AniDB answers (cv-providers).
+quick-xml = "0.42"
+# gzip files (the AniDB title dump in cv-providers); pure Rust backend, already in the lock file.
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+# MediaInfo is loaded at run time (cv-media, the one module allowed to use `unsafe`).
+libloading = "0.9"
+notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+# Thumbnail cache (cv-artwork): decoders, lossy WebP encoder (libwebp), ThumbHash placeholders.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp", "webp"] }
+webp = { version = "0.3", default-features = false }
+thumbhash = "0.1"
+# Shared provider HTTP client (cv-providers): OS TLS stack (no extra crypto build tools), rate limiter,
+# HTTP-date parsing for Retry-After.
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "gzip", "http2"] }
+governor = { version = "0.10", default-features = false, features = ["std"] }
+httpdate = "1"
+# PCRE-style expressions of Kodi XML scrapers (cv-providers): look-around and back-references.
+fancy-regex = "0.19"
+# Move files to the system trash / Recycle Bin (cv-app, delete with files).
+trash = { version = "5", default-features = false, features = ["coinit_apartmentthreaded"] }
+# Desktop only (Windows Credential Manager, macOS Keychain); no Linux store is enabled.
+keyring = { version = "3.6", default-features = false, features = ["windows-native", "apple-native"] }
+
+# Local mock servers in the torrent search tests (cv-torrent).
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
+
+# Torrent search (cv-torrent): base32 info-hashes, accent-free title spellings, property tests.
+data-encoding = "2"
+unicode-normalization = "0.1"
+proptest = "1"
+# Managed indexer service (cv-torrent): the executable path of a process, to tell our own leftover
+# from a stranger, and a Windows job object that ends the child with the app (no unsafe of ours).
+sysinfo = { version = "0.39", default-features = false, features = ["disk", "system"] }
+# Reads the Recycle Bin settings of a volume (cv-app, Windows only; safe registry access).
+winreg = "0.56"
+win32job = "2"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.dev]
+# Line tables keep file:line in panics and backtraces; full debug info made test binaries
+# fill tens of GB per checkout.
+debug = "line-tables-only"
+
+# SQLite is C code: compile it optimised even in debug builds, so database tests and
+# `tauri dev` are not dominated by an unoptimised engine.
+[profile.dev.package.libsqlite3-sys]
+opt-level = 3
+
+# Image decoding, resizing, WebP encoding and hashing are CPU-bound loops; unoptimised they are
+# 20 to 50 times slower, which would make the 5,000-poster cache test and `tauri dev` crawl.
+# `cv-artwork` is included because the generic resize code of `image` is compiled inside it.
+[profile.dev.package.cv-artwork]
+opt-level = 3
+
+[profile.dev.package.image]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+
+[profile.dev.package.zune-core]
+opt-level = 3
+
+[profile.dev.package.png]
+opt-level = 3
+
+[profile.dev.package.fdeflate]
+opt-level = 3
+
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.dev.package.moxcms]
+opt-level = 3
+
+[profile.dev.package.libwebp-sys]
+opt-level = 3
+
+[profile.dev.package.webp]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.thumbhash]
+opt-level = 3
+
+[profile.release]
+# Default codegen units (16) with thin LTO: release builds are much faster than with one unit,
+# for a runtime cost of a few percent.
+lto = "thin"
+strip = true

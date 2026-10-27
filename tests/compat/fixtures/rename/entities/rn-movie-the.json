@@ -1,0 +1,17 @@
+{
+  "folder": "the",
+  "title": "The Last Lighthouse",
+  "sortTitle": "",
+  "year": 2010,
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "tll.mkv",
+      "videoCodec": "h264",
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "aspectRatio": 1.78,
+      "duration": 6000
+    }
+  ]
+}

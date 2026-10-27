@@ -1,0 +1,35 @@
+{
+  "folder": "Action/Dune Part Two",
+  "title": "Dune: Part Two",
+  "originalTitle": "Dune: Part Two",
+  "englishTitle": "Dune: Part Two",
+  "sortTitle": "Dune 2",
+  "year": 2024,
+  "imdbId": "tt15239678",
+  "tmdbId": 693134,
+  "certification": "US_PG13",
+  "mediaSource": "WEB_DL",
+  "edition": "EXTENDED_EDITION",
+  "spokenLanguages": "en, de",
+  "productionCompany": "Legend Pictures; Warner Quay",
+  "releaseDate": "2024-02-29",
+  "ratings": [{ "id": "imdb", "rating": 8.6, "votes": 600000, "max": 10 }],
+  "genres": ["SCIENCE_FICTION", "ADVENTURE", "DRAMA"],
+  "tags": ["desert", "sequel"],
+  "note": "keep",
+  "actors": [{ "name": "Alex Moreau", "role": "Hero" }, { "name": "Sam Rivera", "role": "Friend" }],
+  "directors": [{ "name": "Jo Clarke" }],
+  "writers": [{ "name": "Mia Park" }],
+  "files": [
+    {
+      "type": "VIDEO", "filename": "Dune.Part.Two.2024.2160p.WEB-DL.DV.HDR10.mkv",
+      "videoCodec": "hevc", "videoWidth": 3840, "videoHeight": 2160, "aspectRatio": 1.78, "duration": 9960,
+      "hdrFormat": "Dolby Vision, HDR10", "bitDepth": 10, "frameRate": 23.976, "videoBitRate": 18000000, "filesize": 21474836480,
+      "audio": [
+        { "codec": "TrueHD/Atmos", "language": "en", "audioChannels": 8 },
+        { "codec": "AC3", "language": "de", "audioChannels": 6 }
+      ],
+      "subtitles": [{ "language": "en" }, { "language": "de" }, { "language": "fr" }]
+    }
+  ]
+}

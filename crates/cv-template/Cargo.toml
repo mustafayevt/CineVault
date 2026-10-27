@@ -1,0 +1,20 @@
+[package]
+name = "cv-template"
+description = "Template engine used by the renamer."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+cv-domain.workspace = true
+cv-media.workspace = true
+regex.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

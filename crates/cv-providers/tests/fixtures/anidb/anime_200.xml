@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<anime id="200" restricted="false">
+  <type>Movie</type>
+  <episodecount>1</episodecount>
+  <startdate>2010-07-10</startdate>
+  <enddate>2010-07-10</enddate>
+  <titles>
+    <title xml:lang="x-jat" type="main">Mirai no Eiga</title>
+    <title xml:lang="en" type="official">Movie of the Future</title>
+  </titles>
+  <description>A film &amp; its sequel &lt;3.</description>
+  <ratings><temporary count="40">7.2</temporary></ratings>
+  <tags><tag id="1" weight="250"><name>drama</name></tag></tags>
+  <episodes>
+    <episode id="2001"><epno type="1">1</epno><length>95</length><airdate>2010-07-10</airdate><title xml:lang="en">Complete Movie</title></episode>
+  </episodes>
+</anime>

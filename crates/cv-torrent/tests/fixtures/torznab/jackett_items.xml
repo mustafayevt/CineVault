@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <atom:link href="http://127.0.0.1:9117/" rel="self" type="application/rss+xml" />
+    <title>LimeTorrents</title>
+    <description>LimeTorrents is a Public general torrent index with mostly verified torrents</description>
+    <link>https://www.limetorrents.fun/</link>
+    <language>en-US</language>
+    <category>search</category>
+    <item>
+      <title>Blade Runner 1982 1080p BluRayRip Opus 7 1 x265 Lootera</title>
+      <guid>https://www.limetorrents.fun/Blade-Runner-1982-1080p-BluRayRip-Opus-7-1-x265-Lootera-torrent-19954304.html</guid>
+      <jackettindexer id="limetorrents">LimeTorrents</jackettindexer>
+      <type>public</type>
+      <comments>https://www.limetorrents.fun/Blade-Runner-1982-1080p-BluRayRip-Opus-7-1-x265-Lootera-torrent-19954304.html</comments>
+      <pubDate>Sat, 26 Sep 2026 04:33:08 +0400</pubDate>
+      <size>3006477107</size>
+      <description />
+      <link>http://127.0.0.1:9117/dl/limetorrents/?jackett_apikey=REDACTED&amp;path=Q2ZESjhLdlYtdURSem01RWlpZC1Od1p2OHE4OWZlY0dvU05kOXhkNmMwbkpHa0o4YzU2REItay1tUHk1MGR4LWZvMGluNUpWMjBHaUZidzVzNTV5c01oUDRwTGNPSkJpYXBsRzktTjZmdUdlWjNDSmZqR1U2ZGVjVWJzTmgzYzRMcmtPV0FKSzhGVndHNnVNZndCOVNYQnVQRXF6cXlKSFE1Rnp5dG1MbjNiaHJwMTZKUmpETXA3c2NQTEJLWUZpNnZ3d09SM2FZTTJPeWNTSkpYUHBQQ1hTOEVmS1BGRHNhVFUzYjZvREhTTzZqcDZLSmNRVFZQeTRrTEhwYnhKQm5vVjdPZw&amp;file=Blade+Runner+1982+1080p+BluRayRip+Opus+7+1+x265+Lootera</link>
+      <category>2000</category>
+      <category>100467</category>
+      <enclosure url="http://127.0.0.1:9117/dl/limetorrents/?jackett_apikey=REDACTED&amp;path=Q2ZESjhLdlYtdURSem01RWlpZC1Od1p2OHE4OWZlY0dvU05kOXhkNmMwbkpHa0o4YzU2REItay1tUHk1MGR4LWZvMGluNUpWMjBHaUZidzVzNTV5c01oUDRwTGNPSkJpYXBsRzktTjZmdUdlWjNDSmZqR1U2ZGVjVWJzTmgzYzRMcmtPV0FKSzhGVndHNnVNZndCOVNYQnVQRXF6cXlKSFE1Rnp5dG1MbjNiaHJwMTZKUmpETXA3c2NQTEJLWUZpNnZ3d09SM2FZTTJPeWNTSkpYUHBQQ1hTOEVmS1BGRHNhVFUzYjZvREhTTzZqcDZLSmNRVFZQeTRrTEhwYnhKQm5vVjdPZw&amp;file=Blade+Runner+1982+1080p+BluRayRip+Opus+7+1+x265+Lootera" length="3006477107" type="application/x-bittorrent" />
+      <torznab:attr name="category" value="2000" />
+      <torznab:attr name="category" value="100467" />
+      <torznab:attr name="seeders" value="5" />
+      <torznab:attr name="peers" value="10" />
+      <torznab:attr name="downloadvolumefactor" value="0" />
+      <torznab:attr name="uploadvolumefactor" value="1" />
+    </item>
+<item>
+      <title>Blade Runner (The Final Cut) (1982</title>
+      <guid>https://www.limetorrents.fun/Blade-Runner-(The-Final-Cut)-(1982-torrent-19902166.html</guid>
+      <jackettindexer id="limetorrents">LimeTorrents</jackettindexer>
+      <type>public</type>
+      <comments>https://www.limetorrents.fun/Blade-Runner-(The-Final-Cut)-(1982-torrent-19902166.html</comments>
+      <pubDate>Thu, 27 Aug 2026 04:33:08 +0400</pubDate>
+      <size>7988639170</size>
+      <description />
+      <link>http://127.0.0.1:9117/dl/limetorrents/?jackett_apikey=REDACTED&amp;path=Q2ZESjhLdlYtdURSem01RWlpZC1Od1p2OHFfUF80a2VPZ3pNU0Y0ZHJqVDJIUFhscWltR1NNbTR5N1pCUGxFQTZvZ3dZS3U4R0tIZUtSVHVtbEJjS2d2UnZfR0dCTEdGdVZGRGNabGtXUVFSRENPVWU5NGFiWXJDMWgzWmdIckRmWGJIMGhCY2tNZGp5SFJ5cFY0OFJFeGJaRkZTWFlvX2xzUlVMN1dmZUdMWjdnUEpyeFBjaFh3eVJnVGtUSG55VGhCalZxTndzamo1YWtDZlo5MURRZFZVdGNsaUk3X0IxZEJpZ1I3UjVIYVdSQm1M&amp;file=Blade+Runner+(The+Final+Cut)+(1982</link>
+      <category>2000</category>
+      <category>100467</category>
+      <enclosure url="http://127.0.0.1:9117/dl/limetorrents/?jackett_apikey=REDACTED&amp;path=Q2ZESjhLdlYtdURSem01RWlpZC1Od1p2OHFfUF80a2VPZ3pNU0Y0ZHJqVDJIUFhscWltR1NNbTR5N1pCUGxFQTZvZ3dZS3U4R0tIZUtSVHVtbEJjS2d2UnZfR0dCTEdGdVZGRGNabGtXUVFSRENPVWU5NGFiWXJDMWgzWmdIckRmWGJIMGhCY2tNZGp5SFJ5cFY0OFJFeGJaRkZTWFlvX2xzUlVMN1dmZUdMWjdnUEpyeFBjaFh3eVJnVGtUSG55VGhCalZxTndzamo1YWtDZlo5MURRZFZVdGNsaUk3X0IxZEJpZ1I3UjVIYVdSQm1M&amp;file=Blade+Runner+(The+Final+Cut)+(1982" length="7988639170" type="application/x-bittorrent" />
+      <torznab:attr name="category" value="2000" />
+      <torznab:attr name="category" value="100467" />
+      <torznab:attr name="seeders" value="5" />
+      <torznab:attr name="peers" value="9" />
+      <torznab:attr name="downloadvolumefactor" value="0" />
+      <torznab:attr name="uploadvolumefactor" value="1" />
+    </item>
+  </channel>
+</rss>

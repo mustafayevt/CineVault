@@ -1,0 +1,1 @@
+The old '3' Free Sports API key is permanently disabled, Please use the new test key "123" or sign up to premium here https://www.thesportsdb.com/pricing

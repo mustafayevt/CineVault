@@ -1,0 +1,35 @@
+[package]
+name = "cv-artwork"
+description = "Artwork selection, download, naming and the thumbnail cache."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+cv-db.workspace = true
+cv-domain.workspace = true
+cv-fs.workspace = true
+cv-jobs.workspace = true
+cv-media.workspace = true
+cv-nfo.workspace = true
+cv-providers.workspace = true
+cv-rename.workspace = true
+image.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+thumbhash.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+webp.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+cv-scan.workspace = true
+tempfile.workspace = true

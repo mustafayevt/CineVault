@@ -1,0 +1,94 @@
+# A UHD remux in Matroska: Dolby Vision profile 8 with an HDR10 base layer (MediaInfo 23+ layer
+# lists), TrueHD Atmos 7.1, a commentary track, E-AC-3 Atmos 5.1, and four subtitle tracks.
+[General]
+Format: Matroska
+Format/Extensions: mkv mk3d mka mks
+Format_Version: Version 4
+Title: Alien
+Duration: 7020000
+Duration/String3: 01:57:00.000
+OverallBitRate: 58123456
+[Video]
+Format: HEVC
+Format_Profile: Main 10@L5.1@High
+HDR_Format: Dolby Vision / SMPTE ST 2086
+HDR_Format_Version: 1.0 /
+HDR_Format_Profile: dvhe.08 /
+HDR_Format_Level: 06 /
+HDR_Format_Settings: BL+RPU /
+HDR_Format_Compatibility: HDR10 / HDR10
+CodecID: V_MPEGH/ISO/HEVC
+Width: 3840
+Height: 1608
+PixelAspectRatio: 1.000
+DisplayAspectRatio: 2.388
+FrameRate: 23.976
+BitDepth: 10
+BitRate: 45000000
+ScanType: Progressive
+colour_primaries: BT.2020
+transfer_characteristics: PQ
+[Audio]
+Format: MLP FBA 16-ch
+Format_Commercial_IfAny: Dolby TrueHD with Dolby Atmos
+Format_AdditionalFeatures: 16-ch
+CodecID: A_TRUEHD
+BitRate_Mode: VBR
+BitRate: 4567000
+Channel(s): 8
+Channel(s)_Original: 16 objects
+ChannelLayout: L R C LFE Ls Rs Lb Rb
+BitDepth: 24
+Language: en
+Title: Dolby TrueHD Atmos 7.1
+Default: Yes
+Forced: No
+[Audio]
+Format: AC-3
+Format_Commercial_IfAny: Dolby Digital
+CodecID: A_AC3
+BitRate_Mode: CBR
+BitRate: 640000
+Channel(s): 6
+BitDepth: 32
+Language: en
+Title: Director's Commentary
+Default: No
+Forced: No
+[Audio]
+Format: E-AC-3
+Format_Commercial_IfAny: Dolby Digital Plus with Dolby Atmos
+Format_AdditionalFeatures: JOC
+CodecID: A_EAC3
+BitRate_Mode: CBR
+BitRate: 768000
+Channel(s): 6
+Language: fr
+Default: No
+Forced: No
+[Text]
+Format: PGS
+CodecID: S_HDMV/PGS
+Language: en
+Default: Yes
+Forced: No
+[Text]
+Format: PGS
+CodecID: S_HDMV/PGS
+Language: en
+Title: Forced
+Default: No
+Forced: Yes
+[Text]
+Format: UTF-8
+CodecID: S_TEXT/UTF8
+Language: fr
+Title: Français (SDH)
+Default: No
+Forced: No
+[Text]
+Format: UTF-8
+CodecID: S_TEXT/UTF8
+Language: tr
+Default: No
+Forced: No

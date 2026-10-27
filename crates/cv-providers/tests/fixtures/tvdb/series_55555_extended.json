@@ -1,0 +1,25 @@
+{
+  "status": "success",
+  "data": {
+    "id": 55555,
+    "name": "Orijinal Dizi",
+    "image": null,
+    "firstAired": "",
+    "year": "2019",
+    "status": {
+      "name": "Continuing"
+    },
+    "originalCountry": "tur",
+    "averageRuntime": null,
+    "overview": "Orijinal özet.",
+    "genres": null,
+    "artworks": null,
+    "characters": null,
+    "remoteIds": null,
+    "companies": null,
+    "contentRatings": null,
+    "trailers": null,
+    "seasons": null,
+    "translations": null
+  }
+}

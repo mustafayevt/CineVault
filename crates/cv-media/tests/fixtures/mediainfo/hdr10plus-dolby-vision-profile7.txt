@@ -1,0 +1,27 @@
+# A UHD disc rip carrying Dolby Vision profile 7 (minimum and full enhancement layer), an HDR10 base and HDR10+.
+[General]
+Format: Matroska
+Format/Extensions: mkv mk3d mka mks
+Duration: 5400000
+Duration/String3: 01:30:00.000
+[Video]
+Format: HEVC
+CodecID: V_MPEGH/ISO/HEVC
+HDR_Format: Dolby Vision / SMPTE ST 2086 / SMPTE ST 2094 App 4
+HDR_Format_Version: 1.0 / / 1
+HDR_Format_Profile: dvhe.07 / /
+HDR_Format_Settings: BL+EL+RPU / /
+HDR_Format_Compatibility: Blu-ray / HDR10 / HDR10+ Profile B
+Width: 3840
+Height: 2160
+PixelAspectRatio: 1.000
+FrameRate: 24.000
+BitDepth: 10
+ScanType: Progressive
+[Audio]
+Format: E-AC-3
+Format_Commercial_IfAny: Dolby Digital Plus with Dolby Atmos
+Format_AdditionalFeatures: JOC
+Channel(s): 6
+Language: en
+Default: Yes

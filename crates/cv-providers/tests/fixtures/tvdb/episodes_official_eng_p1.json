@@ -1,0 +1,33 @@
+{
+  "status": "success",
+  "data": {
+    "series": {
+      "id": 81189,
+      "name": "Breaking Bad"
+    },
+    "episodes": [
+      {
+        "id": 349234,
+        "seriesId": 81189,
+        "name": "...And the Bag's in the River",
+        "overview": "Walt decides Krazy-8's fate.",
+        "aired": "2008-02-10",
+        "runtime": 47,
+        "image": null,
+        "imageType": null,
+        "isMovie": 0,
+        "number": 3,
+        "seasonNumber": 1,
+        "absoluteNumber": 3,
+        "year": "2008"
+      }
+    ]
+  },
+  "links": {
+    "prev": 0,
+    "self": 1,
+    "next": null,
+    "total_items": 4,
+    "page_size": 3
+  }
+}

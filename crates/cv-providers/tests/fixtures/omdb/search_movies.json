@@ -1,0 +1,32 @@
+{
+  "Search": [
+    {
+      "Title": "Heat",
+      "Year": "1995",
+      "imdbID": "tt0113277",
+      "Type": "movie",
+      "Poster": "https://img.example.test/omdb/heat.jpg"
+    },
+    {
+      "Title": "Heat",
+      "Year": "1986",
+      "imdbID": "tt0091209",
+      "Type": "movie",
+      "Poster": "N/A"
+    },
+    {
+      "Title": "Heat Wave",
+      "Year": "2005",
+      "imdbID": "tt9999999",
+      "Type": "game",
+      "Poster": "N/A"
+    },
+    {
+      "Title": "Broken entry",
+      "Year": "2000",
+      "Type": "movie"
+    }
+  ],
+  "totalResults": "4",
+  "Response": "True"
+}

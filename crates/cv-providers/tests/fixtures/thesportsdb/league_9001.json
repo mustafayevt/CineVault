@@ -1,0 +1,33 @@
+{
+ "leagues": [
+  {
+   "idLeague": "9001",
+   "strSport": "Soccer",
+   "strLeague": "Northern Football League",
+   "strLeagueAlternate": "NFL North, Northern League",
+   "intDivision": "0",
+   "idCup": "0",
+   "strCurrentSeason": "2015-2016",
+   "intFormedYear": "1992",
+   "dateFirstEvent": "1992-08-15",
+   "strGender": "Male",
+   "strCountry": "England",
+   "strWebsite": "www.example.test/nfl",
+   "strDescriptionEN": "The Northern Football League is the top level of the example football system.\r\n\r\nIt is contested by twenty clubs.",
+   "strDescriptionDE": "Die Northern Football League ist die höchste Spielklasse im Beispielfußball.",
+   "strDescriptionFR": "",
+   "strFanart1": "https://img.example.test/league/fanart/one.jpg",
+   "strFanart2": "https://img.example.test/league/fanart/two.jpg",
+   "strFanart3": null,
+   "strFanart4": "https://img.example.test/league/fanart/four.jpg",
+   "strBanner": "https://img.example.test/league/banner/banner.jpg",
+   "strBadge": "https://img.example.test/league/badge/badge.png",
+   "strLogo": "https://img.example.test/league/logo/logo.png",
+   "strPoster": "https://img.example.test/league/poster/poster.jpg",
+   "strTrophy": "https://img.example.test/league/trophy/trophy.png",
+   "strNaming": "{strHomeTeam} vs {strAwayTeam}",
+   "strComplete": "yes",
+   "strLocked": "unlocked"
+  }
+ ]
+}

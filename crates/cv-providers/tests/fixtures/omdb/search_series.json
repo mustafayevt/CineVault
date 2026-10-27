@@ -1,0 +1,20 @@
+{
+  "Search": [
+    {
+      "Title": "Breaking Bad",
+      "Year": "2008–2013",
+      "imdbID": "tt0903747",
+      "Type": "series",
+      "Poster": "https://img.example.test/omdb/bb.jpg"
+    },
+    {
+      "Title": "Breaking Bad",
+      "Year": "2008",
+      "imdbID": "tt0959621",
+      "Type": "episode",
+      "Poster": "N/A"
+    }
+  ],
+  "totalResults": "2",
+  "Response": "True"
+}

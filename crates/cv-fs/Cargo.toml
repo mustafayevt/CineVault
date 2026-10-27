@@ -1,0 +1,17 @@
+[package]
+name = "cv-fs"
+description = "Safe writes into media folders: atomic replace with a flush, and short retries when another program holds a file for a moment."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

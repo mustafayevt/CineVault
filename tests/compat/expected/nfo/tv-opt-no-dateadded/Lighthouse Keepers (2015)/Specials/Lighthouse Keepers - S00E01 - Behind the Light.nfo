@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for Kodi-->
+<episodedetails>
+  <title>Behind the Light</title>
+  <originaltitle/>
+  <showtitle>Lighthouse Keepers</showtitle>
+  <season>0</season>
+  <episode>1</episode>
+  <displayseason>1</displayseason>
+  <displayepisode>5</displayepisode>
+  <id/>
+  <ratings/>
+  <userrating>0</userrating>
+  <plot>A special.</plot>
+  <runtime>45</runtime>
+  <mpaa/>
+  <premiered>2015-12-24</premiered>
+  <aired>2015-12-24</aired>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <studio>Beacon Network</studio>
+  <studio>Tide TV</studio>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>h264</codec>
+        <aspect>1.78</aspect>
+        <width>1920</width>
+        <height>1080</height>
+        <resolution>1080</resolution>
+        <durationinseconds>2700</durationinseconds>
+      </video>
+      <audio>
+        <codec>ac3</codec>
+        <language>eng</language>
+        <channels>6</channels>
+      </audio>
+      <subtitle>
+        <language>eng</language>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+  <epbookmark/>
+  <code/>
+  <!--CineVault meta data-->
+  <source>UNKNOWN</source>
+  <edition>NONE</edition>
+  <original_filename>Lighthouse Keepers - S00E01 - Behind the Light.mkv</original_filename>
+  <user_note/>
+</episodedetails>

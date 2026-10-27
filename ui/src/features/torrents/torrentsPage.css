@@ -1,0 +1,21 @@
+/*
+ * The Torrents page. The row's "Send to torrent app" button shows while the row is
+ * hovered or current, so a table of releases stays calm; it never changes the row's layout.
+ */
+.tr-send {
+  opacity: 0;
+  transition: opacity var(--dur-hover) var(--ease-out);
+}
+[role="row"]:hover .tr-send,
+[role="row"][data-current="true"] .tr-send,
+.tr-send:focus-visible {
+  opacity: 1;
+}
+:root[data-motion="reduced"] .tr-send {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .tr-send {
+    transition: none;
+  }
+}

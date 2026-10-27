@@ -1,0 +1,63 @@
+{
+  "status": "success",
+  "data": {
+    "series": {
+      "id": 81189,
+      "name": "Breaking Bad"
+    },
+    "episodes": [
+      {
+        "id": 349232,
+        "seriesId": 81189,
+        "name": "Pilot",
+        "overview": "Walter White receives a diagnosis.",
+        "aired": "2008-01-20",
+        "runtime": 58,
+        "image": "/banners/episodes/81189/349232.jpg",
+        "imageType": 11,
+        "isMovie": 0,
+        "number": 1,
+        "seasonNumber": 1,
+        "absoluteNumber": 1,
+        "year": "2008"
+      },
+      {
+        "id": 349233,
+        "seriesId": 81189,
+        "name": "Cat's in the Bag...",
+        "overview": "Walt and Jesse clean up.",
+        "aired": "2008-01-27",
+        "runtime": 47,
+        "image": "https://artworks.thetvdb.com/banners/episodes/81189/349233.jpg",
+        "imageType": 11,
+        "isMovie": 0,
+        "number": 2,
+        "seasonNumber": 1,
+        "absoluteNumber": 2,
+        "year": "2008"
+      },
+      {
+        "id": 349234,
+        "seriesId": 81189,
+        "name": "...And the Bag's in the River",
+        "overview": "Walt decides Krazy-8's fate.",
+        "aired": "2008-02-10",
+        "runtime": 47,
+        "image": null,
+        "imageType": null,
+        "isMovie": 0,
+        "number": 3,
+        "seasonNumber": 1,
+        "absoluteNumber": 3,
+        "year": "2008"
+      }
+    ]
+  },
+  "links": {
+    "prev": null,
+    "self": 0,
+    "next": null,
+    "total_items": 3,
+    "page_size": 3
+  }
+}

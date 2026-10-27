@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "packages": {
+    "mediainfo": {
+      "display": "MediaInfo",
+      "license": "BSD-2-Clause",
+      "homepage": "https://mediaarea.net/en/MediaInfo",
+      "platforms": {
+        "windows-x86_64": {
+          "version": "26.10",
+          "artifacts": [
+            {
+              "url": "https://mediaarea.net/download/binary/libmediainfo0/26.10/MediaInfo_DLL_26.10_Windows_x64_WithoutInstaller.zip",
+              "sha256": "4efe172df014693732e8b64a004cf382b8599eaf86be26a9b38c0d2993e60e1d",
+              "size": 4467447,
+              "format": "zip",
+              "files": [
+                { "provides": "mediainfo", "from": "MediaInfo.dll", "to": "MediaInfo.dll" },
+                { "from": "Developers/License.html", "to": "LICENSE.html" }
+              ]
+            }
+          ]
+        },
+        "macos-x86_64": {
+          "version": "26.10",
+          "artifacts": [
+            {
+              "url": "https://mediaarea.net/download/binary/libmediainfo0/26.10/MediaInfo_DLL_26.10_Mac_x86_64+arm64.tar.bz2",
+              "sha256": "eb50c172cce6f777383d8c69256be48c47855845a5362cea9b824fb514d5fbb8",
+              "size": 7442004,
+              "format": "tar.bz2",
+              "files": [
+                { "provides": "mediainfo", "from": "MediaInfoLib/libmediainfo.0.dylib", "to": "libmediainfo.0.dylib" },
+                { "from": "MediaInfoLib/License.html", "to": "LICENSE.html" }
+              ]
+            }
+          ]
+        },
+        "macos-aarch64": {
+          "version": "26.10",
+          "artifacts": [
+            {
+              "url": "https://mediaarea.net/download/binary/libmediainfo0/26.10/MediaInfo_DLL_26.10_Mac_x86_64+arm64.tar.bz2",
+              "sha256": "eb50c172cce6f777383d8c69256be48c47855845a5362cea9b824fb514d5fbb8",
+              "size": 7442004,
+              "format": "tar.bz2",
+              "files": [
+                { "provides": "mediainfo", "from": "MediaInfoLib/libmediainfo.0.dylib", "to": "libmediainfo.0.dylib" },
+                { "from": "MediaInfoLib/License.html", "to": "LICENSE.html" }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "ffmpeg": {
+      "display": "FFmpeg",
+      "license": "GPL-3.0-or-later (build); FFmpeg itself is LGPL-2.1-or-later / GPL-2.0-or-later",
+      "homepage": "https://ffmpeg.org",
+      "platforms": {
+        "windows-x86_64": {
+          "version": "8.1.2",
+          "artifacts": [
+            {
+              "url": "https://github.com/GyanD/codexffmpeg/releases/download/8.1.2/ffmpeg-8.1.2-essentials_build.zip",
+              "sha256": "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec",
+              "size": 109728040,
+              "format": "zip",
+              "files": [
+                { "provides": "ffmpeg", "from": "ffmpeg-8.1.2-essentials_build/bin/ffmpeg.exe", "to": "ffmpeg.exe" },
+                { "from": "ffmpeg-8.1.2-essentials_build/LICENSE", "to": "LICENSE.txt" }
+              ]
+            }
+          ]
+        },
+        "macos-x86_64": {
+          "version": "9.0.2",
+          "artifacts": [
+            {
+              "url": "https://evermeet.cx/ffmpeg/ffmpeg-9.0.2.zip",
+              "sha256": "4acc0be580f9b2788029eb7bd4d645ff87968911b0a62aeeb3940d42d54558d5",
+              "size": 26198325,
+              "format": "zip",
+              "files": [
+                { "provides": "ffmpeg", "from": "ffmpeg", "to": "ffmpeg" }
+              ]
+            }
+          ]
+        },
+        "macos-aarch64": {
+          "version": "9.0.2",
+          "artifacts": [
+            {
+              "url": "https://evermeet.cx/ffmpeg/ffmpeg-9.0.2.zip",
+              "sha256": "4acc0be580f9b2788029eb7bd4d645ff87968911b0a62aeeb3940d42d54558d5",
+              "size": 26198325,
+              "format": "zip",
+              "files": [
+                { "provides": "ffmpeg", "from": "ffmpeg", "to": "ffmpeg" }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "indexer-service": {
+      "display": "Indexer service (Jackett)",
+      "license": "GPL-2.0",
+      "homepage": "https://github.com/Jackett/Jackett",
+      "platforms": {
+        "windows-x86_64": {
+          "version": "0.24.2903",
+          "artifacts": [
+            {
+              "url": "https://github.com/Jackett/Jackett/releases/download/v0.24.2903/Jackett.Binaries.Windows.zip",
+              "sha256": "c4ea2254688017f6e4ef0b9f5abc128e9134793b1995bc8d527fb8b6e6a3a25e",
+              "size": 57061988,
+              "format": "zip",
+              "mode": "tree",
+              "root": "Jackett/",
+              "program": { "provides": "indexer-service", "path": "JackettConsole.exe" }
+            }
+          ]
+        },
+        "macos-x86_64": {
+          "version": "0.24.2903",
+          "artifacts": [
+            {
+              "url": "https://github.com/Jackett/Jackett/releases/download/v0.24.2903/Jackett.Binaries.macOS.tar.gz",
+              "sha256": "e78b21e76df9a8329cddd4a55da9ef5353486f2649523040803c0021a1310a8d",
+              "size": 50127041,
+              "format": "tar.gz",
+              "mode": "tree",
+              "root": "Jackett/",
+              "program": { "provides": "indexer-service", "path": "jackett" }
+            }
+          ]
+        },
+        "macos-aarch64": {
+          "version": "0.24.2903",
+          "artifacts": [
+            {
+              "url": "https://github.com/Jackett/Jackett/releases/download/v0.24.2903/Jackett.Binaries.macOSARM64.tar.gz",
+              "sha256": "c329944b8e539b2d4e63cb200b2cf75ff3e6e0e6cdd6f71140a0a088d41e5240",
+              "size": 47876613,
+              "format": "tar.gz",
+              "mode": "tree",
+              "root": "Jackett/",
+              "program": { "provides": "indexer-service", "path": "jackett" }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

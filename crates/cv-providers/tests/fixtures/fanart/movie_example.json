@@ -1,0 +1,38 @@
+{
+  "name": "Example Film",
+  "tmdb_id": "9001",
+  "imdb_id": "tt0111222",
+  "hdmovielogo": [
+    {"id": "11", "url": "https://assets.example.test/fanart/movies/9001/hdmovielogo/logo-en.png", "lang": "en", "likes": "7"},
+    {"id": "12", "url": "https://assets.example.test/fanart/movies/9001/hdmovielogo/logo-de.png", "lang": "de", "likes": "20"}
+  ],
+  "movielogo": [
+    {"id": "13", "url": "https://assets.example.test/fanart/movies/9001/movielogo/logo-sd-en.png", "lang": "en", "likes": "30"}
+  ],
+  "movieposter": [
+    {"id": "21", "url": "https://assets.example.test/fanart/movies/9001/movieposter/poster-de.jpg", "lang": "de", "likes": "12"},
+    {"id": "22", "url": "https://assets.example.test/fanart/movies/9001/movieposter/poster-en-low.jpg", "lang": "en", "likes": "2"},
+    {"id": "23", "url": "https://assets.example.test/fanart/movies/9001/movieposter/poster-en-high.jpg", "lang": "en", "likes": "5"},
+    {"id": "24", "url": "https://assets.example.test/fanart/movies/9001/movieposter/poster-textless.jpg", "lang": "00", "likes": "3"},
+    {"id": "25", "url": "", "lang": "en", "likes": "99"}
+  ],
+  "moviebackground": [
+    {"id": "31", "url": "https://assets.example.test/fanart/movies/9001/moviebackground/bg-text.jpg", "lang": "en", "likes": "4"},
+    {"id": "32", "url": "https://assets.example.test/fanart/movies/9001/moviebackground/bg-textless.jpg", "lang": "", "likes": "6"}
+  ],
+  "hdmovieclearart": [
+    {"id": "41", "url": "https://assets.example.test/fanart/movies/9001/hdmovieclearart/art-en.png", "lang": "en", "likes": "1"}
+  ],
+  "movieart": [
+    {"id": "42", "url": "https://assets.example.test/fanart/movies/9001/movieart/art-sd-en.png", "lang": "en", "likes": "8"}
+  ],
+  "moviedisc": [
+    {"id": "51", "url": "https://assets.example.test/fanart/movies/9001/moviedisc/disc-en.png", "lang": "en", "likes": "2", "disc": "1", "disc_type": "bluray"}
+  ],
+  "moviebanner": [
+    {"id": "61", "url": "https://assets.example.test/fanart/movies/9001/moviebanner/banner-en.jpg", "lang": "en", "likes": "1"}
+  ],
+  "moviethumb": [
+    {"id": "71", "url": "https://assets.example.test/fanart/movies/9001/moviethumb/thumb-en.jpg", "lang": "en", "likes": "3"}
+  ]
+}

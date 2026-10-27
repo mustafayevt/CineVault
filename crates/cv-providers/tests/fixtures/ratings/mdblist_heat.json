@@ -1,0 +1,19 @@
+{
+  "title": "Heat",
+  "year": 1995,
+  "type": "movie",
+  "ids": { "imdb": "tt0113277", "tmdb": 949, "trakt": 1244, "tvdb": null },
+  "ratings": [
+    { "source": "imdb", "value": 8.3, "score": 83, "votes": 650000, "url": "https://www.imdb.com/title/tt0113277" },
+    { "source": "tmdb", "value": 79, "score": 79, "votes": 7000, "url": null },
+    { "source": "trakt", "value": 80, "score": 80, "votes": 41000, "url": null },
+    { "source": "metacritic", "value": 76, "score": 76, "votes": null, "url": null },
+    { "source": "metacriticuser", "value": 8.4, "score": 84, "votes": 800, "url": null },
+    { "source": "tomatoes", "value": 83, "score": 83, "votes": 87, "url": null },
+    { "source": "popcorn", "value": 94, "score": 94, "votes": 250000, "url": null },
+    { "source": "letterboxd", "value": 4.1, "score": 82, "votes": 640000, "url": null },
+    { "source": "rogerebert", "value": 4, "score": 100, "votes": null, "url": null },
+    { "source": "myanimelist", "value": null, "score": null, "votes": null, "url": null },
+    { "source": "futuresource", "value": 3, "score": 30, "votes": 1, "url": null }
+  ]
+}

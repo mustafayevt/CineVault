@@ -1,0 +1,144 @@
+# Recorded from MediaInfo 26.10 on a generated sample: HEVC 10-bit HDR10 (BT.2020 PQ, ST 2086, MaxCLL), E-AC-3 5.1 English default, AC-3 2.0 French commentary.
+[General]
+VideoCount: 1
+AudioCount: 2
+Video_Format_List: HEVC
+Video_Format_WithHint_List: HEVC
+Video_Codec_List: HEVC
+Audio_Format_List: E-AC-3 / AC-3
+Audio_Format_WithHint_List: E-AC-3 / AC-3
+Audio_Codec_List: E-AC-3 / AC-3
+Audio_Language_List: English / French
+Audio_Channels_Total: 8
+Format: Matroska
+Format/Extensions: mkv mk3d mka mks
+Format_Commercial: Matroska
+Format_Version: Version 4
+Duration: 2000
+Duration/String3: 00:00:02.000
+OverallBitRate: 641192
+FrameRate: 24.000
+FrameCount: 48
+IsStreamable: Yes
+ErrorDetectionType: Per level 1
+[Video]
+StreamOrder: 0
+ID: 1
+Format: HEVC
+Format_Commercial: HEVC
+Format_Profile: Main 10@L2@Main
+HDR_Format: SMPTE ST 2086
+HDR_Format_Commercial: HDR10
+HDR_Format_Compatibility: HDR10
+InternetMediaType: video/H265
+CodecID: V_MPEGH/ISO/HEVC
+Duration: 2000.000000
+Duration/String3: 00:00:02.000
+BitRate: 52432
+Width: 320
+Height: 180
+Stored_Height: 192
+Sampled_Width: 320
+Sampled_Height: 180
+PixelAspectRatio: 1.000
+DisplayAspectRatio: 1.778
+FrameRate_Mode: CFR
+FrameRate: 24.000
+FrameRate_Num: 24
+FrameRate_Den: 1
+FrameCount: 48
+ColorSpace: YUV
+ChromaSubsampling: 4:2:0
+BitDepth: 10
+ScanType: Progressive
+Default: No
+Forced: No
+colour_description_present: Yes
+colour_description_present_Source: Container / Stream
+colour_range: Limited
+colour_range_Source: Container / Stream
+colour_primaries: BT.2020
+colour_primaries_Source: Stream
+transfer_characteristics: PQ
+transfer_characteristics_Source: Stream
+matrix_coefficients: BT.2020 non-constant
+matrix_coefficients_Source: Stream
+MasteringDisplay_ColorPrimaries: Display P3
+MasteringDisplay_ColorPrimaries_Source: Stream
+MasteringDisplay_Luminance: min: 0.0001 cd/m2, max: 1000 cd/m2
+MasteringDisplay_Luminance_Source: Stream
+MasteringDisplay_Luminance_Min: 0.0001
+MasteringDisplay_Luminance_Max: 1000
+MaxCLL: 1000
+MaxCLL_Source: Stream
+MaxFALL: 400
+MaxFALL_Source: Stream
+[Audio]
+StreamOrder: 1
+ID: 2
+Format: E-AC-3
+Format_Commercial: Dolby Digital Plus
+Format_Commercial_IfAny: Dolby Digital Plus
+Format_Settings_Endianness: Big
+InternetMediaType: audio/eac3
+CodecID: A_EAC3
+Duration: 2000.000000
+Duration/String3: 00:00:02.000
+BitRate_Mode: CBR
+BitRate: 384000
+Channel(s): 6
+ChannelPositions: Front: L C R, Side: L R, LFE
+ChannelLayout: L R C LFE Ls Rs
+SamplesPerFrame: 1536
+SamplingRate: 48000
+SamplingCount: 96000
+FrameRate: 31.250
+BitDepth: 32
+Compression_Mode: Lossy
+Language: en
+ServiceKind: CM
+Default: Yes
+Forced: No
+bsid: 16
+dialnorm: -31
+acmod: 7
+lfeon: 1
+dialnorm_Average: -31
+dialnorm_Minimum: -31
+dialnorm_Maximum: -31
+dialnorm_Count: 63
+[Audio]
+StreamOrder: 2
+ID: 3
+Format: AC-3
+Format_Commercial: Dolby Digital
+Format_Commercial_IfAny: Dolby Digital
+Format_Settings_Endianness: Big
+CodecID: A_AC3
+Duration: 2000.000000
+Duration/String3: 00:00:02.000
+BitRate_Mode: CBR
+BitRate: 192000
+Channel(s): 2
+ChannelPositions: Front: L R
+ChannelLayout: L R
+SamplesPerFrame: 1536
+SamplingRate: 48000
+SamplingCount: 96000
+FrameRate: 31.250
+BitDepth: 32
+Compression_Mode: Lossy
+Title: Commentary by the director
+Language: fr
+ServiceKind: CM
+Default: No
+Forced: No
+bsid: 8
+dialnorm: -31
+dsurmod: 0
+acmod: 2
+lfeon: 0
+dialnorm_Average: -31
+dialnorm_Minimum: -31
+dialnorm_Maximum: -31
+dialnorm_Count: 63

@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1234,
+    "title": "Heat",
+    "year": 1995,
+    "imdb": "113277",
+    "alternative_title": "Heat (1995)",
+    "posters": {
+      "small": "https://img.example.test/mm/heat_s.jpg"
+    }
+  },
+  {
+    "id": 99,
+    "title": "Heat",
+    "year": 1986
+  },
+  {
+    "title": "No id"
+  }
+]

@@ -1,0 +1,42 @@
+{
+ "events": [
+  {
+   "idEvent": "6001",
+   "strEvent": "Albion vs Rovers",
+   "strEventAlternate": null,
+   "strSeason": "2015-2016",
+   "idLeague": "9001",
+   "strLeague": "Northern Football League",
+   "strSport": "Soccer",
+   "strHomeTeam": "Albion",
+   "strAwayTeam": "Rovers",
+   "intRound": "1",
+   "dateEvent": "2015-08-08",
+   "strTime": "15:00:00+00:00",
+   "strThumb": null,
+   "strPoster": null,
+   "strVideo": null,
+   "strDescriptionEN": null,
+   "strStatus": null
+  },
+  {
+   "idEvent": "6002",
+   "strEvent": "United vs City",
+   "strEventAlternate": null,
+   "strSeason": "2015-2016",
+   "idLeague": "9001",
+   "strLeague": "Northern Football League",
+   "strSport": "Soccer",
+   "strHomeTeam": "United",
+   "strAwayTeam": "City",
+   "intRound": "1",
+   "dateEvent": "2015-08-09",
+   "strTime": "16:00:00+00:00",
+   "strThumb": null,
+   "strPoster": "https://img.example.test/event/poster2.jpg",
+   "strVideo": null,
+   "strDescriptionEN": null,
+   "strStatus": null
+  }
+ ]
+}

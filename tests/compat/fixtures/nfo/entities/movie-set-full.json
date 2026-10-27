@@ -1,0 +1,18 @@
+{
+  "set": {
+    "title": "Harbor Lights Collection",
+    "sortTitle": "Harbor Lights 1",
+    "plot": "A set of harbor stories.",
+    "tmdbId": 2344,
+    "productionCompany": "Blue Quay Pictures",
+    "tags": [
+      "harbor",
+      "series"
+    ],
+    "dateAdded": "2022-02-03 04:05:06",
+    "artwork": {
+      "POSTER": "https://img.example.test/s/poster.jpg",
+      "FANART": "https://img.example.test/s/fanart.jpg"
+    }
+  }
+}

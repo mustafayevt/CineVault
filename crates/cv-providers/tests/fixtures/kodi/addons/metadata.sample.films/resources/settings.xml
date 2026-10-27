@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<settings>
+  <setting id="baseurl" type="text" label="Site address" default="https://films.example.test"/>
+</settings>

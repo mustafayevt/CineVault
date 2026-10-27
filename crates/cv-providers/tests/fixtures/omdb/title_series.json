@@ -1,0 +1,28 @@
+{
+  "Title": "Breaking Bad",
+  "Year": "2008–2013",
+  "Rated": "TV-MA",
+  "Released": "20 Jan 2008",
+  "Runtime": "49 min",
+  "Genre": "Crime, Drama, Thriller",
+  "Director": "N/A",
+  "Writer": "Vince Gilligan",
+  "Actors": "Bryan Cranston, Aaron Paul, Anna Gunn",
+  "Plot": "A high school chemistry teacher diagnosed with cancer turns to manufacturing drugs.",
+  "Language": "English, Spanish",
+  "Country": "United States",
+  "Poster": "https://img.example.test/omdb/bb.jpg",
+  "Ratings": [
+    {
+      "Source": "Internet Movie Database",
+      "Value": "9.5/10"
+    }
+  ],
+  "Metascore": "N/A",
+  "imdbRating": "9.5",
+  "imdbVotes": "2,100,000",
+  "imdbID": "tt0903747",
+  "Type": "series",
+  "totalSeasons": "2",
+  "Response": "True"
+}

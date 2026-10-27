@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2024-01-01 00:00:00 by CineVault for XBMC-->
+<movie>
+  <title>Harbor Lights</title>
+  <originaltitle>Harbor Lights (Original)</originaltitle>
+  <sorttitle>Harbor Lights Collection 1</sorttitle>
+  <epbookmark>1234.5</epbookmark>
+  <year>1992</year>
+  <rating>7.4</rating>
+  <userrating>8</userrating>
+  <votes>5987</votes>
+  <top250>199</top250>
+  <set>Harbor Lights Collection</set>
+  <plot>A young sailor finds a lamp in the old harbor. He soon learns that every wish has a price.
+The city is not what it seems.</plot>
+  <outline>Old outline from the previous file.</outline>
+  <tagline>Wish carefully</tagline>
+  <runtime>90</runtime>
+  <thumb>https://img.example.test/m/poster.jpg</thumb>
+  <fanart>https://img.example.test/m/fanart.jpg</fanart>
+  <mpaa>G</mpaa>
+  <certification>G</certification>
+  <id>tt0103639</id>
+  <tmdbid>812</tmdbid>
+  <uniqueid default="false" type="tmdb">812</uniqueid>
+  <uniqueid default="true" type="imdb">tt0103639</uniqueid>
+  <uniqueid default="false" type="trakt">655</uniqueid>
+  <uniqueid default="false" type="tvdb">4242</uniqueid>
+  <country>US</country>
+  <country>GB</country>
+  <status>Released</status>
+  <code>ABC-123</code>
+  <premiered>1992-11-25</premiered>
+  <watched>true</watched>
+  <playcount>7</playcount>
+  <lastplayed>2025-01-02 03:04:05</lastplayed>
+  <genre>Adventure</genre>
+  <genre>Family</genre>
+  <genre>Animation</genre>
+  <studio>Blue Quay Pictures</studio>
+  <studio>Lantern Studios</studio>
+  <studio>North Wind Films</studio>
+  <credits>Ted Holt</credits>
+  <credits imdbid="nm0007777">Mia Park</credits>
+  <director tmdbid="1001">Jo Clarke</director>
+  <director>Ray Dunn</director>
+  <tag>lamp</tag>
+  <tag>harbor</tag>
+  <actor>
+    <name>Alex Moreau</name>
+    <role>Sailor (voice)</role>
+    <thumb>https://img.example.test/p/alex.jpg</thumb>
+    <profile>https://db.example.test/person/15827</profile>
+    <tmdbid>15827</tmdbid>
+    <imdbid>nm0001234</imdbid>
+    <tvdbid>99</tvdbid>
+  </actor>
+  <actor>
+    <name>Sam Rivera</name>
+    <role>Genie (voice)</role>
+  </actor>
+  <producer>
+    <name>Don Ernst</name>
+    <role>Producer</role>
+    <thumb>https://img.example.test/p/don.jpg</thumb>
+    <profile>https://db.example.test/person/77</profile>
+  </producer>
+  <trailer>plugin://plugin.video.youtube/?action=play_video&amp;videoid=abc123XYZ_-</trailer>
+  <languages>English, German</languages>
+  <showlink>Harbor Lights: The Series</showlink>
+  <dateadded>2024-03-04 05:06:07</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>h264</codec>
+        <aspect>1.78</aspect>
+        <width>1920</width>
+        <height>1080</height>
+        <durationinseconds>5400</durationinseconds>
+        <stereomode/>
+      </video>
+      <audio>
+        <codec>AC3</codec>
+        <language>en</language>
+        <channels>6</channels>
+      </audio>
+      <audio>
+        <codec>DTS</codec>
+        <language>de</language>
+        <channels>2</channels>
+      </audio>
+      <subtitle>
+        <language>en</language>
+      </subtitle>
+      <subtitle>
+        <language>de</language>
+      </subtitle>
+    </streamdetails>
+  </fileinfo>
+  <customfield>abc</customfield>
+  <nested>
+    <inner a="1">value</inner>
+  </nested>
+  <!--CineVault meta data-->
+  <source>BLURAY</source>
+  <edition>NONE</edition>
+  <original_filename>Harbor.Lights.1992.1080p.BluRay.x264-GRP.mkv</original_filename>
+  <user_note>private note</user_note>
+  <english_title>Harbor Lights</english_title>
+  <crew>
+    <name>Jo Clarke</name>
+    <role>DIRECTOR</role>
+    <tmdbid>1001</tmdbid>
+  </crew>
+  <crew>
+    <name>Ray Dunn</name>
+    <role>DIRECTOR</role>
+  </crew>
+  <crew>
+    <name>Ted Holt</name>
+    <role subrole="Writer">WRITER</role>
+  </crew>
+  <crew>
+    <name>Mia Park</name>
+    <role subrole="Writer">WRITER</role>
+    <imdbid>nm0007777</imdbid>
+  </crew>
+  <crew>
+    <name>Don Ernst</name>
+    <role subrole="Producer">PRODUCER</role>
+    <thumb>https://img.example.test/p/don.jpg</thumb>
+    <profile>https://db.example.test/person/77</profile>
+  </crew>
+  <cv_locked/>
+</movie>

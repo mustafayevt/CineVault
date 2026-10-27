@@ -1,0 +1,14 @@
+# created: Tue Oct 20 12:00:00 2026
+# <aid>|<type>|<language>|<title>
+# type: 1=primary title (one per anime), 2=synonyms (multiple per anime), 3=shorttitles (multiple per anime), 4=official title (one per language)
+# language: the language the title is written in (x-jat = romaji)
+100|1|x-jat|Hoshi no Tabi
+100|4|en|Star Voyage
+100|4|ja|星の旅
+100|2|en|Voyage of Stars
+100|3|en|SV
+101|1|x-jat|Hoshi no Tabi: Gekijouban
+101|4|en|Star Voyage: The Movie
+200|1|x-jat|Mirai no Eiga
+200|4|en|Movie of the Future
+300|1|x-jat|Neko no Heya

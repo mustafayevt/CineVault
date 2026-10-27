@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="metadata.sample.films" name="Sample Film Index" version="1.0.0" provider-name="CineVault tests">
+  <requires>
+    <import addon="xbmc.metadata" version="2.1.0"/>
+  </requires>
+  <extension point="xbmc.metadata.scraper.movies" library="sample_films.xml" language="en"/>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en">A small made-up film index used to test the scraper interpreter.</summary>
+  </extension>
+</addon>

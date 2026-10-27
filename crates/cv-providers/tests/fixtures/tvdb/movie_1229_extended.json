@@ -1,0 +1,225 @@
+{
+  "status": "success",
+  "data": {
+    "id": 1229,
+    "name": "Heat",
+    "slug": "heat",
+    "image": "/banners/movies/1229/posters/heat-main.jpg",
+    "runtime": 170,
+    "year": "1995",
+    "status": {
+      "id": 5,
+      "name": "Released"
+    },
+    "originalCountry": "usa",
+    "originalLanguage": "eng",
+    "genres": [
+      {
+        "id": 4,
+        "name": "Crime"
+      },
+      {
+        "id": 12,
+        "name": "Thriller"
+      }
+    ],
+    "artworks": [
+      {
+        "id": 21,
+        "image": "https://artworks.thetvdb.com/banners/movies/1229/posters/heat-eng.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/movies/1229/posters/heat-eng_t.jpg",
+        "language": "eng",
+        "type": 14,
+        "score": 80,
+        "width": 680,
+        "height": 1000
+      },
+      {
+        "id": 22,
+        "image": "https://artworks.thetvdb.com/banners/movies/1229/posters/heat-tur.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/movies/1229/posters/heat-tur_t.jpg",
+        "language": "tur",
+        "type": 14,
+        "score": 60,
+        "width": 680,
+        "height": 1000
+      },
+      {
+        "id": 23,
+        "image": "https://artworks.thetvdb.com/banners/movies/1229/backgrounds/heat.jpg",
+        "thumbnail": "https://artworks.thetvdb.com/banners/movies/1229/backgrounds/heat_t.jpg",
+        "language": null,
+        "type": 15,
+        "score": 70,
+        "width": 1920,
+        "height": 1080
+      },
+      {
+        "id": 24,
+        "image": "https://artworks.thetvdb.com/banners/movies/1229/clearlogo/heat.png",
+        "thumbnail": "https://artworks.thetvdb.com/banners/movies/1229/clearlogo/heat.png",
+        "language": "eng",
+        "type": 22,
+        "score": 9,
+        "width": 800,
+        "height": 310
+      }
+    ],
+    "characters": [
+      {
+        "id": 11,
+        "name": "Vincent Hanna",
+        "peopleId": 110,
+        "personName": "Al Pacino",
+        "image": null,
+        "personImgURL": "https://artworks.thetvdb.com/banners/actors/11.jpg",
+        "sort": 1,
+        "type": 3,
+        "peopleType": "Actor",
+        "isFeatured": false
+      },
+      {
+        "id": 12,
+        "name": "Neil McCauley",
+        "peopleId": 120,
+        "personName": "Robert De Niro",
+        "image": null,
+        "personImgURL": null,
+        "sort": 2,
+        "type": 3,
+        "peopleType": "Actor",
+        "isFeatured": false
+      },
+      {
+        "id": 13,
+        "name": null,
+        "peopleId": 130,
+        "personName": "Michael Mann",
+        "image": null,
+        "personImgURL": null,
+        "sort": 1,
+        "type": 1,
+        "peopleType": "Director",
+        "isFeatured": false
+      }
+    ],
+    "remoteIds": [
+      {
+        "id": "tt0113277",
+        "type": 2,
+        "sourceName": "IMDB"
+      },
+      {
+        "id": "949",
+        "type": 12,
+        "sourceName": "TheMovieDB.com"
+      }
+    ],
+    "companies": {
+      "studio": [
+        {
+          "id": 1,
+          "name": "Warner Bros."
+        }
+      ],
+      "production": [
+        {
+          "id": 2,
+          "name": "Regency Enterprises"
+        },
+        {
+          "id": 1,
+          "name": "Warner Bros."
+        }
+      ],
+      "distributor": [
+        {
+          "id": 5,
+          "name": "A Distributor"
+        }
+      ],
+      "network": [],
+      "special_effects": [
+        {
+          "id": 6,
+          "name": "Effects House"
+        }
+      ]
+    },
+    "releases": [
+      {
+        "country": "deu",
+        "date": "1996-02-22",
+        "detail": ""
+      },
+      {
+        "country": "usa",
+        "date": "1995-12-20",
+        "detail": "limited"
+      },
+      {
+        "country": "usa",
+        "date": "1995-12-15",
+        "detail": ""
+      },
+      {
+        "country": "global",
+        "date": "1995-12-01",
+        "detail": ""
+      }
+    ],
+    "audioLanguages": [
+      "eng",
+      "spa",
+      "eng"
+    ],
+    "contentRatings": [
+      {
+        "id": 1,
+        "name": "R",
+        "country": "usa"
+      },
+      {
+        "id": 2,
+        "name": "16",
+        "country": "deu"
+      }
+    ],
+    "trailers": [
+      {
+        "id": 700,
+        "name": "Heat Trailer",
+        "url": "https://www.youtube.com/watch?v=2GfZl4kuVNI",
+        "language": "eng",
+        "runtime": 150
+      }
+    ],
+    "seasons": null,
+    "translations": {
+      "nameTranslations": [
+        {
+          "name": "Heat",
+          "language": "eng",
+          "isPrimary": true
+        },
+        {
+          "name": "Hararet",
+          "language": "tur",
+          "isPrimary": false
+        }
+      ],
+      "overviewTranslations": [
+        {
+          "overview": "A group of professional bank robbers start to feel the heat from police.",
+          "language": "eng",
+          "isPrimary": true
+        },
+        {
+          "overview": "Bir grup profesyonel banka soyguncusu.",
+          "language": "tur",
+          "isPrimary": false
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,215 @@
+{
+  "folder": "Plain Show",
+  "title": "Plain Show",
+  "originalTitle": "The Lighthouse Keepers",
+  "year": 0,
+  "status": "CONTINUING",
+  "ids": {
+    "tvdb": "81189",
+    "tmdb": 1396,
+    "imdb": "tt0903747"
+  },
+  "certification": "US_TVPG",
+  "productionCompany": "Beacon Network; Tide TV",
+  "genres": [
+    "DRAMA",
+    "MYSTERY"
+  ],
+  "tags": [
+    "sea"
+  ],
+  "ratings": [
+    {
+      "id": "tvdb",
+      "rating": 8.8,
+      "votes": 100,
+      "max": 10
+    }
+  ],
+  "episodes": [
+    {
+      "title": "Arrival",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 1,
+          "episode": 1
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse Keepers - S01E01 - Arrival.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 1",
+          "audio": [
+            {
+              "codec": "AC3",
+              "language": "en",
+              "audioChannels": 6
+            }
+          ]
+        }
+      ],
+      "firstAired": "2015-03-10",
+      "mediaSource": "BLURAY",
+      "originalTitle": "Arrival (Original)"
+    },
+    {
+      "title": "Storm Warning",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 1,
+          "episode": 2
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse Keepers - S01E02E03 - Storm.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 1",
+          "audio": [
+            {
+              "codec": "AC3",
+              "language": "en",
+              "audioChannels": 6
+            }
+          ]
+        }
+      ],
+      "firstAired": "2015-03-17",
+      "multiEpisode": true
+    },
+    {
+      "title": "Storm Warning (Part 2)",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 1,
+          "episode": 3
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse Keepers - S01E02E03 - Storm.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 1",
+          "audio": [
+            {
+              "codec": "AC3",
+              "language": "en",
+              "audioChannels": 6
+            }
+          ]
+        }
+      ],
+      "firstAired": "2015-03-24",
+      "multiEpisode": true
+    },
+    {
+      "title": "Second Watch: Begins",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 2,
+          "episode": 1
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse Keepers - S02E01 - Second Watch.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 2",
+          "audio": [
+            {
+              "codec": "AC3",
+              "language": "en",
+              "audioChannels": 6
+            }
+          ]
+        }
+      ],
+      "firstAired": "2016-03-08"
+    },
+    {
+      "title": "Behind the Light",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 0,
+          "episode": 1
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse Keepers - S00E01 - Behind the Light.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Specials",
+          "audio": [
+            {
+              "codec": "AC3",
+              "language": "en",
+              "audioChannels": 6
+            }
+          ]
+        }
+      ],
+      "firstAired": "2015-12-24"
+    },
+    {
+      "title": "Nine Eleven",
+      "numbers": [
+        {
+          "group": "AIRED",
+          "season": 10,
+          "episode": 11
+        }
+      ],
+      "files": [
+        {
+          "type": "VIDEO",
+          "filename": "Lighthouse Keepers - S10E11.mkv",
+          "videoCodec": "h264",
+          "videoWidth": 1920,
+          "videoHeight": 1080,
+          "aspectRatio": 1.78,
+          "duration": 6000,
+          "dir": "Season 10",
+          "audio": [
+            {
+              "codec": "AC3",
+              "language": "en",
+              "audioChannels": 6
+            }
+          ]
+        }
+      ],
+      "firstAired": "2020-01-01"
+    }
+  ]
+}

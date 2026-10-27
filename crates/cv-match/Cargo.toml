@@ -1,0 +1,19 @@
+[package]
+name = "cv-match"
+description = "Title matching: confidence scoring, evidence and the review queue."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+cv-domain.workspace = true
+regex.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

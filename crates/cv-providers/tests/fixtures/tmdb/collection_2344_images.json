@@ -1,0 +1,25 @@
+{
+  "id": 2344,
+  "posters": [
+    {
+      "file_path": "/matrix-poster.jpg",
+      "width": 1000,
+      "height": 1500,
+      "iso_639_1": "en",
+      "vote_average": 5.0,
+      "vote_count": 10,
+      "aspect_ratio": 0.667
+    }
+  ],
+  "backdrops": [
+    {
+      "file_path": "/matrix-fanart.jpg",
+      "width": 1920,
+      "height": 1080,
+      "iso_639_1": null,
+      "vote_average": 5.0,
+      "vote_count": 10,
+      "aspect_ratio": 1.778
+    }
+  ]
+}

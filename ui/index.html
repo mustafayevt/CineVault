@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CineVault</title>
+    <!-- The window ground (--surface-window) of the last theme before any style loads, so the
+         window never shows a white first frame; the tokens take over once the bundle loads. The
+         native window paints the dark ground before this (tauri.conf.json backgroundColor). -->
+    <style>
+      html {
+        background: #121211;
+      }
+      html[data-theme="light"] {
+        background: #f2f1ee;
+      }
+    </style>
+    <script>
+      // The look of the last session (features/settings/bootLook.ts), drawn before the first
+      // paint so a light theme does not flash on start.
+      (function () {
+        var root = document.documentElement;
+        var look = null;
+        try {
+          look = JSON.parse(localStorage.getItem("cv.boot-look") || "null");
+        } catch (e) {}
+        if (!look) return;
+        var light = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches;
+        root.dataset.theme = look.theme === "system" ? (light ? "light" : "dark") : look.theme;
+        if (look.motion === "reduced" || look.motion === "full") root.dataset.motion = look.motion;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

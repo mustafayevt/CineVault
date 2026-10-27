@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MediaInfo
+    xmlns="https://mediaarea.net/mediainfo"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://mediaarea.net/mediainfo https://mediaarea.net/mediainfo/mediainfo_2_0.xsd"
+    version="2.0">
+<creatingLibrary version="26.10" url="https://mediaarea.net/MediaInfo">MediaInfoLib</creatingLibrary>
+<media ref="D:\Movies\Sample Feature (2021)\Sample Feature (2021).mkv">
+<track type="General">
+<VideoCount>1</VideoCount>
+<AudioCount>2</AudioCount>
+<TextCount>2</TextCount>
+<Format>Matroska</Format>
+<Format_Extensions>mkv mk3d mka mks</Format_Extensions>
+<Format_Version>Version 4</Format_Version>
+<FileSize>48318382080</FileSize>
+<Duration>7020.123000000</Duration>
+<OverallBitRate>55062000</OverallBitRate>
+<FrameRate>23.976</FrameRate>
+<Movie>Sample &amp; Feature</Movie>
+<extra>
+<IMDB>tt0000001</IMDB>
+</extra>
+</track>
+<track type="Video">
+<StreamOrder>0</StreamOrder>
+<ID>1</ID>
+<Format>HEVC</Format>
+<Format_Profile>Main 10@L5.1@High</Format_Profile>
+<HDR_Format>Dolby Vision / SMPTE ST 2086</HDR_Format>
+<HDR_Format_Compatibility>HDR10 / HDR10</HDR_Format_Compatibility>
+<CodecID>V_MPEGH/ISO/HEVC</CodecID>
+<Duration>7020.123000000</Duration>
+<BitRate>45000000</BitRate>
+<Width>3840</Width>
+<Height>1608</Height>
+<PixelAspectRatio>1.000</PixelAspectRatio>
+<DisplayAspectRatio>2.388</DisplayAspectRatio>
+<FrameRate>23.976</FrameRate>
+<BitDepth>10</BitDepth>
+<ScanType>Progressive</ScanType>
+<colour_primaries>BT.2020</colour_primaries>
+<transfer_characteristics>PQ</transfer_characteristics>
+</track>
+<track type="Audio">
+<StreamOrder>1</StreamOrder>
+<ID>2</ID>
+<Format>MLP FBA 16-ch</Format>
+<Format_Commercial_IfAny>Dolby TrueHD with Dolby Atmos</Format_Commercial_IfAny>
+<Format_AdditionalFeatures>16-ch</Format_AdditionalFeatures>
+<CodecID>A_TRUEHD</CodecID>
+<Duration>7020.123000000</Duration>
+<BitRate_Mode>VBR</BitRate_Mode>
+<BitRate>4567000</BitRate>
+<Channels>8</Channels>
+<Channels_Original>16 objects</Channels_Original>
+<ChannelLayout>L R C LFE Ls Rs Lb Rb</ChannelLayout>
+<BitDepth>24</BitDepth>
+<Title>Dolby TrueHD Atmos 7.1</Title>
+<Language>en</Language>
+<Default>Yes</Default>
+<Forced>No</Forced>
+</track>
+<track type="Audio" typeorder="2">
+<StreamOrder>2</StreamOrder>
+<ID>3</ID>
+<Format>AC-3</Format>
+<Format_Commercial_IfAny>Dolby Digital</Format_Commercial_IfAny>
+<CodecID>A_AC3</CodecID>
+<BitRate_Mode>CBR</BitRate_Mode>
+<BitRate>640000</BitRate>
+<Channels>6</Channels>
+<BitDepth>32</BitDepth>
+<Title>Director's Commentary</Title>
+<Language>fr</Language>
+<Default>No</Default>
+<Forced>No</Forced>
+</track>
+<track type="Text">
+<StreamOrder>3</StreamOrder>
+<ID>4</ID>
+<Format>PGS</Format>
+<CodecID>S_HDMV/PGS</CodecID>
+<Language>en</Language>
+<Default>Yes</Default>
+<Forced>No</Forced>
+</track>
+<track type="Text" typeorder="2">
+<StreamOrder>4</StreamOrder>
+<ID>5</ID>
+<Format>UTF-8</Format>
+<CodecID>S_TEXT/UTF8</CodecID>
+<Title>Français (SDH)</Title>
+<Language>fr</Language>
+<Default>No</Default>
+<Forced>No</Forced>
+</track>
+</media>
+</MediaInfo>

@@ -1,0 +1,18 @@
+{
+  "folder": "unicode",
+  "title": "Amélie... Ünïcödé Ñandú",
+  "originalTitle": "Le Fabuleux Destin d'Amélie Poulain",
+  "year": 2001,
+  "sortTitle": "Amélie",
+  "files": [
+    {
+      "type": "VIDEO",
+      "filename": "amelie.mkv",
+      "videoCodec": "h264",
+      "videoWidth": 1920,
+      "videoHeight": 1080,
+      "aspectRatio": 1.78,
+      "duration": 6000
+    }
+  ]
+}

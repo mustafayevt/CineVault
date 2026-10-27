@@ -1,0 +1,25 @@
+/* A toast's time-left bar: shrinks from full to nothing by transform over the toast's duration
+   (set inline) and pauses with the timer. Under reduced motion it is not drawn: the timer still
+   runs, and hovering or focusing the toast still keeps it. */
+@keyframes cv-toast-bar {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+.cv-toast-bar {
+  transform-origin: left center;
+  animation-name: cv-toast-bar;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+:root[data-motion="reduced"] .cv-toast-bar {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .cv-toast-bar {
+    display: none;
+  }
+}

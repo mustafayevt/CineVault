@@ -1,0 +1,50 @@
+[package]
+name = "cv-torrent"
+description = "Torrent search: sources, query variants, merge, ranking and the managed indexer service."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+chrono.workspace = true
+cv-domain.workspace = true
+cv-providers.workspace = true
+cv-scan.workspace = true
+data-encoding.workspace = true
+getrandom = "0.3"
+quick-xml.workspace = true
+regex.workspace = true
+reqwest = { workspace = true, features = ["cookies"] }
+serde.workspace = true
+serde_json.workspace = true
+sysinfo.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+unicode-normalization.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+win32job.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+proptest.workspace = true
+tempfile.workspace = true
+
+[[bin]]
+name = "stub_indexer"
+path = "tests/bin/stub_indexer.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "indexer_parent_harness"
+path = "tests/bin/indexer_parent_harness.rs"
+test = false
+doc = false
+
+[lints]
+workspace = true

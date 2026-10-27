@@ -1,0 +1,345 @@
+/*
+ * Motion of the desktop design. Every duration and easing is a token
+ * from tokens.css: --dur-hover 110ms, --dur-pop 140ms, --dur-page 120ms, --dur-bar 180ms,
+ * --dur-expand 180ms, never above --dur-max 250ms; --ease-out for things entering or changing,
+ * --ease-in for things leaving; no bounce. Only transform, opacity and (for an expanding row) the
+ * grid row track animate. motion.css.test.ts checks all of it.
+ *
+ * Exit: a component keeps its element mounted (Presence) and sets data-state="closed" for the
+ * length of the exit; the element then leaves ease-in. Each class below has its own rule in the
+ * reduced-motion blocks further down.
+ */
+
+@keyframes cv-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes cv-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes cv-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--pop-scale));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes cv-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(var(--pop-scale));
+  }
+}
+@keyframes cv-slide-up-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--cv-slide-x, 0), var(--cv-slide-y, 8px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+@keyframes cv-slide-up-out {
+  from {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--cv-slide-x, 0), var(--cv-slide-y, 8px));
+  }
+}
+
+/* Hover and pressed colour changes: put on any control that changes fill, edge or text colour. */
+.cv-hoverable {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: var(--dur-hover);
+  transition-timing-function: var(--ease-out);
+}
+
+/*
+ * Menus, tooltips and popovers: fade in and grow from --pop-scale at their anchor. The anchor is
+ * --cv-origin when a component sets it, Radix's own origin otherwise, the centre as a last resort.
+ */
+.cv-pop {
+  transform-origin: var(--cv-origin, var(--radix-popper-transform-origin, center));
+  animation: cv-pop-in var(--dur-pop) var(--ease-out) both;
+}
+.cv-pop[data-state="closed"] {
+  animation-name: cv-pop-out;
+  animation-timing-function: var(--ease-in);
+}
+
+/* The selection bar and toasts: slide up (toasts also in from the right, --cv-slide-x) and fade. */
+.cv-slide-up {
+  animation: cv-slide-up-in var(--dur-bar) var(--ease-out) both;
+}
+.cv-slide-up[data-state="closed"] {
+  animation-name: cv-slide-up-out;
+  animation-timing-function: var(--ease-in);
+}
+
+/* A page change: a quick crossfade, never a slide across the window. */
+.cv-page {
+  animation: cv-fade-in var(--dur-page) var(--ease-out) both;
+}
+.cv-page[data-state="closed"] {
+  animation-name: cv-fade-out;
+  animation-timing-function: var(--ease-in);
+}
+
+/*
+ * Rows and sections that open (an episode, Show all files, technical details): the track grows
+ * from 0fr to 1fr, so nothing is measured. The one child holds the content. A closed section is
+ * hidden once it has finished closing, so its controls leave the Tab order.
+ */
+.cv-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-expand) var(--ease-in);
+}
+.cv-expand > * {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s var(--ease-in) var(--dur-expand);
+}
+.cv-expand:is([data-open="true"], [data-state="open"]) {
+  grid-template-rows: 1fr;
+  transition-timing-function: var(--ease-out);
+}
+.cv-expand:is([data-open="true"], [data-state="open"]) > * {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+/* A poster on hover: lifts by --lift and brightens a little. Pressing it puts it back. */
+.cv-lift {
+  transition:
+    transform var(--dur-pop) var(--ease-out),
+    filter var(--dur-pop) var(--ease-out);
+}
+.cv-lift:hover {
+  transform: translateY(var(--lift));
+  filter: brightness(1.06);
+}
+.cv-lift:active {
+  transform: none;
+}
+
+/* Progress and space bars: a full-width fill scaled from the left, so a value change glides. */
+.cv-bar {
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(var(--progress, 0));
+  transition: transform var(--dur-bar) var(--ease-out);
+}
+
+/* Check badges and Undo states: the new content fades in (a changed key replays it). */
+.cv-xfade {
+  animation: cv-fade-in var(--dur-hover) var(--ease-out) both;
+}
+.cv-xfade[data-state="closed"] {
+  animation-name: cv-fade-out;
+  animation-timing-function: var(--ease-in);
+}
+
+/*
+ * Reduced motion for the classes above (the Motion setting writes data-motion on the root, the
+ * system preference is the fallback, as for the reduced-motion rules below): nothing scales, slides, lifts
+ * or grows. Menus and bars appear with an opacity fade only, everything else changes at once.
+ */
+:root[data-motion="reduced"] .cv-hoverable {
+  transition-duration: 0s;
+}
+:root[data-motion="reduced"] .cv-pop,
+:root[data-motion="reduced"] .cv-slide-up {
+  animation-name: cv-fade-in;
+  transform: none;
+}
+:root[data-motion="reduced"] .cv-pop[data-state="closed"],
+:root[data-motion="reduced"] .cv-slide-up[data-state="closed"] {
+  animation-name: cv-fade-out;
+}
+:root[data-motion="reduced"] .cv-page,
+:root[data-motion="reduced"] .cv-xfade {
+  transform: none;
+}
+:root[data-motion="reduced"] .cv-expand,
+:root[data-motion="reduced"] .cv-expand > * {
+  transition: none;
+}
+:root[data-motion="reduced"] .cv-lift,
+:root[data-motion="reduced"] .cv-lift:hover,
+:root[data-motion="reduced"] .cv-lift:active {
+  transform: none;
+  filter: none;
+  transition: none;
+}
+:root[data-motion="reduced"] .cv-bar {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .cv-hoverable {
+    transition-duration: 0s;
+  }
+  :root:not([data-motion="full"]) .cv-pop,
+  :root:not([data-motion="full"]) .cv-slide-up {
+    animation-name: cv-fade-in;
+    transform: none;
+  }
+  :root:not([data-motion="full"]) .cv-pop[data-state="closed"],
+  :root:not([data-motion="full"]) .cv-slide-up[data-state="closed"] {
+    animation-name: cv-fade-out;
+  }
+  :root:not([data-motion="full"]) .cv-page,
+  :root:not([data-motion="full"]) .cv-xfade {
+    transform: none;
+  }
+  :root:not([data-motion="full"]) .cv-expand,
+  :root:not([data-motion="full"]) .cv-expand > * {
+    transition: none;
+  }
+  :root:not([data-motion="full"]) .cv-lift,
+  :root:not([data-motion="full"]) .cv-lift:hover,
+  :root:not([data-motion="full"]) .cv-lift:active {
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  :root:not([data-motion="full"]) .cv-bar {
+    transition: none;
+  }
+}
+
+/* ==== Small effects and reduced motion ====
+   Helpers some components still use (`.motion-fast`, `.motion-settle`, the highlight flash, the
+   toast timer) and the reduced-motion switch for everything. They read the motion tokens. */
+
+/* Duration plus easing in one class: .motion-fast for hovers, -base for lifts, -slow for panels. */
+.motion-fast {
+  transition-duration: var(--dur-hover);
+  transition-timing-function: var(--ease-out);
+}
+
+/* A small confirmation landing (a stage tick, a segment filling): eased like every other entrance. */
+@keyframes settle-in {
+  from {
+    opacity: 0.4;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.motion-settle {
+  animation: settle-in var(--dur-bar) var(--ease-out);
+}
+
+/*
+ * Reduced motion. `data-motion="reduced"` on the root element is set from the operating system's
+ * prefers-reduced-motion or from Settings > Motion (features/settings/appearance.ts); "full" forces motion
+ * on. Every transition becomes a crossfade of at most 100ms, nothing slides, zooms or shimmers, and
+ * skeletons are static.
+ */
+:root[data-motion="reduced"] {
+  --motion-shift: 0px;
+}
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 100ms !important;
+  animation-iteration-count: 1 !important;
+  animation-delay: 0ms !important;
+  transition-duration: 100ms !important;
+  transition-delay: 0ms !important;
+  transition-property:
+    color, background-color, border-color, outline-color, box-shadow, opacity !important;
+  scroll-behavior: auto !important;
+}
+:root[data-motion="reduced"] .animate-spin,
+:root[data-motion="reduced"] .cv-toast-time,
+:root[data-motion="reduced"] .motion-settle {
+  animation: none !important;
+}
+
+/* Before the attribute is set (first paint), and for a window that never runs the script, follow the system. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) {
+    --motion-shift: 0px;
+  }
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) *::before,
+  :root:not([data-motion="full"]) *::after {
+    animation-duration: 100ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 100ms !important;
+    transition-delay: 0ms !important;
+    transition-property:
+      color, background-color, border-color, outline-color, box-shadow, opacity !important;
+    scroll-behavior: auto !important;
+  }
+  :root:not([data-motion="full"]) .animate-spin,
+  :root:not([data-motion="full"]) .cv-toast-time,
+  :root:not([data-motion="full"]) .motion-settle {
+    animation: none !important;
+  }
+}
+
+/*
+ * A value that just changed in place flashes the highlight colour for --dur-expand, then goes.
+ * The flash is an overlay whose opacity fades, so nothing but opacity animates. Put `.cv-hl` in a
+ * positioned element (features/live/HighlightFlash).
+ */
+@keyframes hl-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.cv-hl {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--gold-tint);
+  animation: hl-flash var(--dur-expand) var(--ease-out) forwards;
+}
+
+/* A toast's time-left bar (components/Toast.tsx): shrinks by transform for the toast's duration. */
+@keyframes toast-time {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+.cv-toast-time {
+  animation-name: toast-time;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}

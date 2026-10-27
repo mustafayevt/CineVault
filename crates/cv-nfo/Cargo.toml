@@ -1,0 +1,23 @@
+[package]
+name = "cv-nfo"
+description = "NFO readers and writers for Kodi, Jellyfin, Emby and MediaPortal."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+cv-domain.workspace = true
+cv-fs.workspace = true
+cv-media.workspace = true
+quick-xml.workspace = true
+regex.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
