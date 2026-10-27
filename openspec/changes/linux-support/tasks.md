@@ -97,7 +97,7 @@ Read this block once; every task below relies on it.
 
 ## 3. Trash and path identity (data safety)
 
-- [ ] 3.1 Path comparison and mount helpers in cv-fs `[haiku]`
+- [x] 3.1 Path comparison and mount helpers in cv-fs `[haiku]`
   - After: 1.1. Wave 1.
   - Touch: new `crates/cv-fs/src/paths.rs`, `crates/cv-fs/src/lib.rs` (one `pub mod paths;` line).
   - Do NOT touch: `crates/cv-fs/src/volume.rs` (3.7 switches it), any other crate.
@@ -238,7 +238,7 @@ Read this block once; every task below relies on it.
 
 ## 5. Desktop shell and UI
 
-- [ ] 5.1 Linux Tauri configuration `[haiku]`
+- [x] 5.1 Linux Tauri configuration `[haiku]`
   - After: nothing. Wave 1.
   - Touch: new `src-tauri/tauri.linux.conf.json`, `src-tauri/src/chrome.rs` (tests and doc comment).
   - Do NOT touch: `tauri.conf.json`, the Windows or macOS config.

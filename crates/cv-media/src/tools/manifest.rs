@@ -20,7 +20,8 @@ const SCHEMA: u32 = 1;
 /// A tool CineVault can locate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ToolId {
-    /// The MediaInfo library (`MediaInfo.dll`, `libmediainfo.dylib`), loaded by the app.
+    /// The MediaInfo library (`MediaInfo.dll`, `libmediainfo.dylib`, `libmediainfo.so.0`), loaded
+    /// by the app.
     MediaInfo,
     Ffmpeg,
     /// The local program that reaches the sites that need an indexer (Jackett). It has its own
@@ -69,8 +70,8 @@ impl ToolId {
     }
 
     /// The name every copy of the tool has in its file name, whatever the build adds around it
-    /// (`ffmpeg.exe`, `libmediainfo.0.dylib`). A file the user chooses must contain it, so an
-    /// unrelated program is never started to ask its version.
+    /// (`ffmpeg.exe`, `libmediainfo.0.dylib`, `libmediainfo.so.0`). A file the user chooses must
+    /// contain it, so an unrelated program is never started to ask its version.
     #[must_use]
     pub const fn program_name(self) -> &'static str {
         match self {
@@ -91,6 +92,7 @@ impl ToolId {
             }
         } else {
             match self {
+                Self::MediaInfo if cfg!(target_os = "linux") => "libmediainfo.so.0",
                 Self::MediaInfo => "libmediainfo.dylib",
                 Self::Ffmpeg => "ffmpeg",
                 Self::IndexerService => "jackett",
@@ -152,10 +154,16 @@ pub enum Platform {
     WindowsX64,
     MacosX64,
     MacosArm64,
+    LinuxX64,
 }
 
 impl Platform {
-    pub const ALL: [Self; 3] = [Self::WindowsX64, Self::MacosX64, Self::MacosArm64];
+    pub const ALL: [Self; 4] = [
+        Self::WindowsX64,
+        Self::MacosX64,
+        Self::MacosArm64,
+        Self::LinuxX64,
+    ];
 
     /// The platform this build runs on, or `None` where no downloads exist.
     #[must_use]
@@ -166,6 +174,8 @@ impl Platform {
             Some(Self::MacosX64)
         } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
             Some(Self::MacosArm64)
+        } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+            Some(Self::LinuxX64)
         } else {
             None
         }
@@ -178,6 +188,7 @@ impl Platform {
             Self::WindowsX64 => "windows-x86_64",
             Self::MacosX64 => "macos-x86_64",
             Self::MacosArm64 => "macos-aarch64",
+            Self::LinuxX64 => "linux-x86_64",
         }
     }
 }
@@ -542,7 +553,11 @@ mod tests {
     fn the_embedded_manifest_is_valid_and_covers_every_platform() {
         let manifest = Manifest::embedded();
         for package in Package::ALL {
-            for platform in Platform::ALL {
+            // 2.3 adds linux-x86_64 to the manifest; remove this filter then.
+            for platform in Platform::ALL
+                .into_iter()
+                .filter(|p| *p != Platform::LinuxX64)
+            {
                 let spec = manifest
                     .platform_spec(package, platform)
                     .unwrap_or_else(|| panic!("{package} has no entry for {platform}"));
@@ -560,7 +575,11 @@ mod tests {
     fn every_embedded_download_is_pinned_over_https() {
         let manifest = Manifest::embedded();
         for package in Package::ALL {
-            for platform in Platform::ALL {
+            // 2.3 adds linux-x86_64 to the manifest; remove this filter then.
+            for platform in Platform::ALL
+                .into_iter()
+                .filter(|p| *p != Platform::LinuxX64)
+            {
                 let spec = manifest.platform_spec(package, platform).expect("entry");
                 for artifact in &spec.artifacts {
                     assert!(artifact.url.starts_with("https://"), "{}", artifact.url);
@@ -577,6 +596,49 @@ mod tests {
             assert_eq!(ToolId::parse(tool.as_str()), Some(tool));
         }
         assert_eq!(ToolId::parse("MediaInfo"), None);
+    }
+
+    #[test]
+    fn the_linux_platform_has_its_manifest_key() {
+        assert_eq!(Platform::LinuxX64.key(), "linux-x86_64");
+        assert!(Platform::ALL.contains(&Platform::LinuxX64));
+    }
+
+    #[test]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    fn a_linux_x86_64_build_is_the_linux_platform() {
+        assert_eq!(Platform::current(), Some(Platform::LinuxX64));
+    }
+
+    #[test]
+    fn the_media_info_library_is_named_for_each_system() {
+        let expected = if cfg!(windows) {
+            "MediaInfo.dll"
+        } else if cfg!(target_os = "linux") {
+            "libmediainfo.so.0"
+        } else {
+            "libmediainfo.dylib"
+        };
+        assert_eq!(ToolId::MediaInfo.file_name(), expected);
+    }
+
+    #[test]
+    fn a_manifest_with_a_linux_platform_returns_its_spec() {
+        let json = with(r#""windows-x86_64": {"#, r#""linux-x86_64": {"#);
+        let manifest = Manifest::parse(&json).expect("a linux-x86_64 entry is valid");
+        let windows = Manifest::embedded()
+            .platform_spec(Package::MediaInfo, Platform::WindowsX64)
+            .cloned()
+            .expect("the windows entry");
+        let linux = manifest
+            .platform_spec(Package::MediaInfo, Platform::LinuxX64)
+            .expect("the linux entry");
+        assert_eq!(linux, &windows);
+        assert!(
+            manifest
+                .platform_spec(Package::MediaInfo, Platform::WindowsX64)
+                .is_none()
+        );
     }
 
     #[test]
