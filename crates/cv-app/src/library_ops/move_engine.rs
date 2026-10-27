@@ -2059,8 +2059,9 @@ impl<'a> MoveEngine<'a> {
             .map(|(sent, _)| {
                 tracing::warn!(file = %sent.original, "an original sent to the bin is not in it");
                 format!(
-                    "{} left the old folder but is not in the Recycle Bin; its verified copy is                      in the new place",
-                    name_of(Path::new(&sent.original))
+                    "{} left the old folder but is not in the {}; its verified copy is                      in the new place",
+                    name_of(Path::new(&sent.original)),
+                    super::BIN_NAME
                 )
             })
             .collect();
@@ -2088,7 +2089,8 @@ impl<'a> MoveEngine<'a> {
         }
         notes.extend(outcome.error.map(|error| {
             format!(
-                "The Recycle Bin refused some originals ({error}); they went to the trash folder"
+                "The {} refused some originals ({error}); they went to the trash folder",
+                super::BIN_NAME
             )
         }));
         Ok(notes)
@@ -2420,7 +2422,12 @@ impl MoveEngine<'_> {
             };
             if let Err(problems) = restored {
                 report.status = TakeBackStatus::Failed(problems.first().map_or_else(
-                    || "The originals could not be taken back from the Recycle Bin".to_owned(),
+                    || {
+                        format!(
+                            "The originals could not be taken back from the {}",
+                            super::BIN_NAME
+                        )
+                    },
                     |(path, why)| format!("{path}: {why}"),
                 ));
                 return Ok(report);

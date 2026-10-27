@@ -713,7 +713,7 @@ impl DrivesService {
                     if failed.is_none() {
                         report.problems.push((
                             item.original.clone(),
-                            "It is still in the Recycle Bin".to_owned(),
+                            format!("It is still in the {}", crate::library_ops::BIN_NAME),
                         ));
                     }
                 } else {
@@ -725,7 +725,10 @@ impl DrivesService {
             if let Some(error) = failed {
                 report.problems.push((
                     String::new(),
-                    format!("The Recycle Bin could not be emptied: {error}"),
+                    format!(
+                        "The {} could not be emptied: {error}",
+                        crate::library_ops::BIN_NAME
+                    ),
                 ));
             }
         }

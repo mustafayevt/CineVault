@@ -23,6 +23,8 @@
 
 use std::path::Path;
 
+use super::BIN_NAME;
+
 /// Why a volume has no system bin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoBin {
@@ -64,24 +66,18 @@ pub fn bin_refusal(
     size: impl FnOnce(&Path) -> u64,
 ) -> Option<String> {
     match volumes.bin_of(path) {
-        VolumeBin::None(why) => Some(
-            match why {
-                NoBin::Network if cfg!(windows) => {
-                    "This is a network drive, which has no Recycle Bin"
-                }
-                NoBin::Network => "This is a network drive, which has no Trash",
-                NoBin::Removable => "This is a removable drive, which has no Recycle Bin",
-                NoBin::TurnedOff => "The Recycle Bin is turned off for this drive",
-                NoBin::NotLocal => "This drive has no Recycle Bin",
-                NoBin::NoTrashFolder => "This drive has no Trash folder CineVault can use",
-                NoBin::ReadOnly => "This drive is read-only",
-            }
-            .to_owned(),
-        ),
+        VolumeBin::None(why) => Some(match why {
+            NoBin::Network => format!("This is a network drive, which has no {BIN_NAME}"),
+            NoBin::Removable => format!("This is a removable drive, which has no {BIN_NAME}"),
+            NoBin::TurnedOff => format!("The {BIN_NAME} is turned off for this drive"),
+            NoBin::NotLocal => format!("This drive has no {BIN_NAME}"),
+            NoBin::NoTrashFolder => "This drive has no Trash folder CineVault can use".to_owned(),
+            NoBin::ReadOnly => "This drive is read-only".to_owned(),
+        }),
         VolumeBin::Takes {
             max_bytes: Some(max),
         } if size(path) > max => Some(format!(
-            "{} is larger than the Recycle Bin of its drive can hold",
+            "{} is larger than the {BIN_NAME} of its drive can hold",
             path.file_name().map_or_else(
                 || path.display().to_string(),
                 |n| n.to_string_lossy().into_owned()
@@ -339,11 +335,12 @@ mod tests {
 
     #[test]
     fn drives_without_a_bin_are_refused_without_sizing() {
+        let no_bin = format!("no {BIN_NAME}");
         for (why, text) in [
             (NoBin::Network, "network drive"),
             (NoBin::Removable, "removable drive"),
             (NoBin::TurnedOff, "turned off"),
-            (NoBin::NotLocal, "no Recycle Bin"),
+            (NoBin::NotLocal, no_bin.as_str()),
             (NoBin::NoTrashFolder, "no Trash folder CineVault can use"),
             (NoBin::ReadOnly, "read-only"),
         ] {
@@ -352,6 +349,36 @@ mod tests {
             })
             .unwrap();
             assert!(said.contains(text), "{said}");
+        }
+    }
+
+    #[test]
+    fn no_reason_names_a_bin_the_system_does_not_have() {
+        let mut said: Vec<String> = [
+            NoBin::Network,
+            NoBin::Removable,
+            NoBin::TurnedOff,
+            NoBin::NotLocal,
+            NoBin::NoTrashFolder,
+            NoBin::ReadOnly,
+        ]
+        .into_iter()
+        .filter_map(|why| bin_refusal(&Fixed(VolumeBin::None(why)), Path::new("/x"), |_| 0))
+        .collect();
+        said.extend(bin_refusal(
+            &Fixed(VolumeBin::Takes { max_bytes: Some(1) }),
+            Path::new("/x/Heat"),
+            |_| 2,
+        ));
+        assert_eq!(said.len(), 7);
+        for text in said {
+            assert!(
+                text.contains(BIN_NAME) || !text.contains("Recycle Bin"),
+                "{text}"
+            );
+            if !cfg!(windows) {
+                assert!(!text.contains("Recycle Bin"), "{text}");
+            }
         }
     }
 

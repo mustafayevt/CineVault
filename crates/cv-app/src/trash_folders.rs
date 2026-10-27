@@ -41,8 +41,13 @@ pub const EMPTY_CONFIRMATION: &str = "DELETE";
 
 /// The Undo reason of an entry whose files were emptied from a trash folder.
 pub const EMPTIED_FOLDER: &str = "Its files were emptied from the trash folder";
-/// The Undo reason of an entry whose files were emptied from the Recycle Bin.
-pub const EMPTIED_BIN: &str = "Its files were emptied from the Recycle Bin";
+/// The Undo reason of an entry whose files were emptied from the Recycle Bin (the Trash on Linux
+/// and macOS).
+pub const EMPTIED_BIN: &str = if cfg!(windows) {
+    "Its files were emptied from the Recycle Bin"
+} else {
+    "Its files were emptied from the Trash"
+};
 /// The Undo reason of an entry whose files were erased at once.
 pub const ERASED_AT_ONCE: &str =
     "Its files were erased: Deleted files are set to Delete permanently";
