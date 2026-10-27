@@ -675,3 +675,179 @@ fn a_bin_empty_that_stops_part_way_switches_off_the_undo_of_what_it_erased_only(
         "only the entry whose files were erased loses its Undo"
     );
 }
+
+/// A bin laid out like the freedesktop Trash (`files/` and `info/*.trashinfo`), filled by the
+/// same sender CineVault uses on Linux. Its `bin_id` is the info file, as the system's own
+/// listing names it. It stands in for the real Trash, which a test never touches.
+#[cfg(unix)]
+struct TrashFolder {
+    trash: PathBuf,
+}
+
+#[cfg(unix)]
+impl TrashFolder {
+    fn info_of(&self, item: &crate::library_ops::BinnedItem) -> PathBuf {
+        PathBuf::from(&item.bin_id)
+    }
+
+    fn stored_of(&self, item: &crate::library_ops::BinnedItem) -> PathBuf {
+        let info = self.info_of(item);
+        let name = info.file_stem().unwrap().to_owned();
+        self.trash.join("files").join(name)
+    }
+}
+
+#[cfg(unix)]
+impl crate::library_ops::SystemTrash for TrashFolder {
+    fn supports(&self, _path: &Path) -> bool {
+        true
+    }
+    fn send(&self, paths: &[PathBuf]) -> Result<(), String> {
+        for path in paths {
+            crate::library_ops::xdg_trash::move_into(&self.trash, path, "2026-10-28T10:00:00")?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(unix)]
+impl crate::library_ops::SystemBin for TrashFolder {
+    fn send_tracked(&self, paths: &[PathBuf]) -> crate::library_ops::trash_bin::SendOutcome {
+        let mut sent = Vec::new();
+        for path in paths {
+            let size = crate::library_ops::trash_bin::size_of(path);
+            let moved =
+                crate::library_ops::xdg_trash::move_into(&self.trash, path, "2026-10-28T10:00:00");
+            match moved {
+                Ok(info) => sent.push(crate::library_ops::BinnedItem {
+                    original: path.to_string_lossy().into_owned(),
+                    bin_id: info.to_string_lossy().into_owned(),
+                    size,
+                }),
+                Err(error) => {
+                    return crate::library_ops::trash_bin::SendOutcome {
+                        sent,
+                        error: Some(error),
+                    };
+                }
+            }
+        }
+        crate::library_ops::trash_bin::SendOutcome { sent, error: None }
+    }
+    fn present(&self, items: &[crate::library_ops::BinnedItem]) -> Vec<bool> {
+        items
+            .iter()
+            .map(|item| !item.bin_id.is_empty() && self.info_of(item).is_file())
+            .collect()
+    }
+    fn restore(
+        &self,
+        _items: &[crate::library_ops::BinnedItem],
+    ) -> Result<(), Vec<(String, String)>> {
+        Err(vec![(String::new(), "not needed here".to_owned())])
+    }
+    fn purge(&self, items: &[crate::library_ops::BinnedItem]) -> Result<(), String> {
+        for item in items {
+            let stored = self.stored_of(item);
+            let _ = if stored.is_dir() {
+                std::fs::remove_dir_all(&stored)
+            } else {
+                std::fs::remove_file(&stored)
+            };
+            let _ = std::fs::remove_file(self.info_of(item));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_drive_counts_and_empties_only_the_trash_items_cinevault_recorded() {
+    use crate::history::{NewEntry, NewTitle, record};
+    use crate::library_ops::send_or_fallback;
+    use cv_db::repo::history::{HistoryKind, UndoState, get_entry};
+
+    let dir = tempfile::tempdir().unwrap();
+    let db = Arc::new(Database::open(dir.path().join("library.db")).unwrap());
+    let root = dir.path().join("Movies");
+    std::fs::create_dir_all(&root).unwrap();
+    let text = root.to_string_lossy().into_owned();
+    let id = db
+        .write({
+            let text = text.clone();
+            move |tx| insert_source(tx, SourceKind::Movie, &text)
+        })
+        .unwrap()
+        .id;
+    let key = volume_key(&text);
+    let volumes = Fake::new(&[volume(&key, "Local", DriveKind::Ssd, TB, 500 * GB)]);
+    let answers = Arc::new(Answers(Mutex::new([(id, true)].into_iter().collect())));
+    let service = DrivesService::with(Arc::clone(&db), volumes, answers);
+    let trash = TrashFolder {
+        trash: dir.path().join("Trash"),
+    };
+    let bin = Arc::new(trash);
+    service.set_trash(bin.clone(), crate::deleted_files::default_source());
+
+    // The person's own earlier deletes sit in the same Trash; CineVault did not send them.
+    let foreign = dir.path().join("Foreign.mkv");
+    std::fs::write(&foreign, vec![9_u8; 500]).unwrap();
+    crate::library_ops::xdg_trash::move_into(&bin.trash, &foreign, "2026-10-01T08:00:00").unwrap();
+
+    let put = |rel: &str, bytes: usize| {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, vec![1_u8; bytes]).unwrap();
+        path
+    };
+    let a = put("Heat (1995)/movie.mkv", 40);
+    let b = put("Alien (1979)/movie.mkv", 60);
+    let binned = send_or_fallback(
+        bin.as_ref(),
+        &[
+            a.parent().unwrap().to_path_buf(),
+            b.parent().unwrap().to_path_buf(),
+        ],
+        &root,
+        "b1",
+    )
+    .unwrap();
+    assert_eq!(binned.items.len(), 2, "{:?}", binned.notes);
+    assert!(binned.items.iter().all(|i| bin.info_of(i).is_file()));
+    let recorded = record(
+        &db,
+        &NewEntry {
+            kind: HistoryKind::Delete,
+            summary: "Deleted".to_owned(),
+            line: String::new(),
+            bytes: None,
+            extra: serde_json::json!({ "binned": [{ "item_id": 1, "items": binned.items }] }),
+            batch_ref: None,
+            titles: vec![NewTitle {
+                item_id: cv_domain::ItemId(1),
+                title: "x".to_owned(),
+                before: String::new(),
+                after: String::new(),
+            }],
+        },
+    )
+    .unwrap();
+
+    // The size is the two folders CineVault sent, not the person's 500 bytes.
+    let overview = service.overview().unwrap();
+    assert_eq!(overview.drives[0].bin_bytes, 100);
+    let contents = service.trash_contents(None).unwrap();
+    assert_eq!(contents.bin.len(), 2);
+
+    let report = service.empty_trash(None, "DELETE").unwrap();
+    assert_eq!((report.bin_items, report.bytes), (2, 100));
+    assert!(report.problems.is_empty(), "{:?}", report.problems);
+    assert_eq!(service.overview().unwrap().drives[0].bin_bytes, 0);
+    // CineVault's items are gone; the person's own file and its info file are untouched.
+    assert!(bin.trash.join("files/Foreign.mkv").is_file());
+    assert!(bin.trash.join("info/Foreign.mkv.trashinfo").is_file());
+    assert!(!bin.trash.join("files/Heat (1995)").exists());
+    assert!(!bin.trash.join("files/Alien (1979)").exists());
+    let row = db.read(move |c| get_entry(c, recorded)).unwrap().unwrap();
+    assert_eq!(row.undo_state, UndoState::None);
+}
