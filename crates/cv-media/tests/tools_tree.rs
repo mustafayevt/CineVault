@@ -339,13 +339,32 @@ fn the_executable_files_of_a_tree_stay_executable() {
     let server = TestServer::start();
     let url = server.route("/tree", Reply::Body(archive.clone()));
     let tools = tempfile::tempdir().expect("temp dir");
+    // A Windows drive mounted into Linux (WSL's /mnt/c) answers every chmod with its own fixed
+    // mode, so no install can keep a mode there; the check only means something where the folder
+    // can hold Unix modes.
+    let probe = tools.path().join("mode-probe");
+    fs::write(&probe, b"x").expect("probe file");
+    fs::set_permissions(&probe, fs::Permissions::from_mode(0o751)).expect("chmod probe");
+    let kept = fs::metadata(&probe)
+        .expect("probe metadata")
+        .permissions()
+        .mode()
+        & 0o777;
+    fs::remove_file(&probe).expect("remove probe");
+    if kept != 0o751 {
+        eprintln!(
+            "skipped: the temp folder's file system does not keep Unix modes (got {kept:o}); \
+             point TMPDIR at a Linux file system"
+        );
+        return;
+    }
     let manager = manager(tools.path(), tree_manifest(&url, &archive, "tar.gz", None));
     install_tree(&manager).expect("install");
     let program = manager
         .resolve(ToolId::IndexerService)
         .expect("program")
         .path;
-    let mode = |p: &Path| fs::metadata(p).expect("metadata").permissions().mode() & 0o777;
+    let mode =|p: &Path| fs::metadata(p).expect("metadata").permissions().mode() & 0o777;
     assert_eq!(mode(&program), 0o755);
     assert_eq!(mode(&program.with_file_name("other")), 0o755);
     let data = program
