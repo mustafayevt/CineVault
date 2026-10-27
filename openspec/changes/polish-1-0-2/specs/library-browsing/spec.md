@@ -37,11 +37,36 @@ Columns SHALL be resizable by dragging the header edge, which has a hit area at 
 ## ADDED Requirements
 
 ### Requirement: Spotlight search
-Typing in the title-bar search SHALL open a dropdown under it with instant results grouped as Movies, TV shows and People, a "See all results for <text>" row and, while the field is empty, the recent searches. The Up and Down arrows SHALL move through the rows, Enter SHALL open the chosen row (a title page, a person's page or the Library search), and Esc SHALL close the dropdown.
+Typing in the title-bar search SHALL open a panel under the field that updates about 80 ms after the last keystroke and keeps the previous rows on screen until the new ones arrive. It SHALL list the best match as "Top hit", then only the groups that have hits among "Movies", "TV shows", "Collections" and "People", about five rows each, and end with "See all N results →". The panel SHALL appear at once under reduced motion.
 
 #### Scenario: Instant results
 - **WHEN** the user types "blade"
-- **THEN** matching movies and shows appear grouped, and Enter on the first opens its page
+- **THEN** matching movies and shows appear grouped under "Top hit", "Movies" and "TV shows", with "See all N results →" last
+
+### Requirement: Spotlight rows
+A title row of the panel SHALL show a small poster, the title with the typed letters marked, the type and year, and its stage. A title that matches only through typo forgiveness SHALL be labelled "Similar".
+
+#### Scenario: Typo result
+- **WHEN** the user types "blde" and the search forgives it to find "Blade Runner"
+- **THEN** the row reads "Blade Runner" with the subtle label "Similar"
+
+### Requirement: Spotlight keys
+The Up and Down arrows SHALL move through the rows of the panel and wrap. Enter SHALL open the highlighted row (a title page, a collection, or the Library filtered to a person), and with no row highlighted SHALL search the Library as before. The first Esc SHALL close the panel and the second SHALL clear the field, and a press outside SHALL close it. The field SHALL be a combobox and the panel its listbox for screen readers.
+
+#### Scenario: Open the highlighted row
+- **WHEN** the user types "blade", presses Down and then Enter
+- **THEN** the page of the first row opens
+
+#### Scenario: Enter without a highlighted row
+- **WHEN** the user types "blade" and presses Enter without using the arrow keys
+- **THEN** the Library opens with the search "blade"
+
+### Requirement: Spotlight recents
+With the field empty and focused the panel SHALL list up to six recent searches and up to six recently opened titles, each list with a "Clear" button.
+
+#### Scenario: Recent searches
+- **WHEN** the user focuses the empty field after searching for "heat"
+- **THEN** "heat" is listed under "Recent searches", and choosing it searches again
 
 ### Requirement: Date added is the file's creation time
 A title's "Date added" SHALL be the creation time of its main file when it is first inserted, falling back to the scan time when the file system gives none. Titles whose date added equals the library's first-scan time SHALL be repaired once from their file's creation time.

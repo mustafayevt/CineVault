@@ -91,7 +91,7 @@ describe("the app frame", () => {
     document.body.dispatchEvent(reload);
     expect(reload.defaultPrevented).toBe(true);
     await userEvent.setup().keyboard("{Control>}f{/Control}");
-    expect(screen.getByRole("searchbox", { name: "Search library" })).toHaveFocus();
+    expect(screen.getByRole("combobox", { name: "Search library" })).toHaveFocus();
   });
 
   it("shows the caption buttons on Windows only", async () => {

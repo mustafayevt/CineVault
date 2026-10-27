@@ -1,8 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { SearchField } from "../../components/SearchField";
-import { t } from "../../i18n/catalog";
+import { SpotlightSearch } from "../search/Spotlight";
 import { CaptionButtons } from "./CaptionButtons";
 import { LIBRARY_SEARCH_ATTRIBUTE } from "./desktopGuards";
 import type { Platform } from "./platform";
@@ -29,7 +28,8 @@ function libraryQuery(pathname: string, search: unknown): string {
  * double-click maximises or restores it); the library search sits in its centre, 440px wide, in
  * the card colour, with the Ctrl F hint; on Windows the caption buttons sit flush at the top
  * right, 46 by 32. On macOS the traffic lights are in the sidebar panel's top row, so the bar
- * holds only the search. Enter in the search opens the Library with `?q=`.
+ * holds only the search. The search suggests titles as you type (see `SpotlightSearch`); Enter
+ * with no suggestion highlighted opens the Library with `?q=`.
  */
 export function TitleBar({ platform, windowApi }: TitleBarProps) {
   const maximized = useWindowMaximized(windowApi);
@@ -46,13 +46,14 @@ export function TitleBar({ platform, windowApi }: TitleBarProps) {
     setText(urlQuery);
   }
 
-  const open = (query: string) => {
+  const open = (query: string, type?: "collections") => {
     const q = query.trim();
     void navigate({
       to: "/library",
       // On the Library the other choices (type, view, filters) stay; elsewhere it starts fresh.
       search: ((previous: Record<string, unknown>) => ({
         ...(pathname === "/library" ? previous : {}),
+        ...(type === undefined ? {} : { type }),
         q: q === "" ? undefined : q,
       })) as never,
     });
@@ -65,30 +66,17 @@ export function TitleBar({ platform, windowApi }: TitleBarProps) {
       className="flex h-[38px] shrink-0 items-start bg-transparent select-none"
     >
       <div data-tauri-drag-region className="h-[38px] min-w-0 flex-1 basis-0" />
-      <form
-        role="search"
-        className="flex h-[38px] items-center"
-        onSubmit={(event) => {
-          event.preventDefault();
-          open(text);
+      <SpotlightSearch
+        text={text}
+        setText={setText}
+        shortcut={platform === "macos" ? "⌘ F" : "Ctrl F"}
+        fieldAttributes={{ [LIBRARY_SEARCH_ATTRIBUTE]: "" }}
+        openLibrary={open}
+        onClear={() => {
+          setText("");
+          if (urlQuery !== "") open("");
         }}
-      >
-        <SearchField
-          {...{ [LIBRARY_SEARCH_ATTRIBUTE]: "" }}
-          aria-label={t("shell.search.label")}
-          placeholder={t("shell.search.placeholder")}
-          shortcut={platform === "macos" ? "⌘ F" : "Ctrl F"}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onClear={() => {
-            setText("");
-            if (urlQuery !== "") open("");
-          }}
-          clearLabel={t("shell.search.clear")}
-          className="w-[440px] min-w-[200px] max-w-[40vw]"
-          boxClassName="h-[30px]!"
-        />
-      </form>
+      />
       <div
         data-tauri-drag-region
         className="flex min-w-0 flex-1 basis-0 items-start justify-end self-stretch"

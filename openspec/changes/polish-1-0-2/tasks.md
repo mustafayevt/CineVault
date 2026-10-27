@@ -4,7 +4,7 @@
 
 ## 2. Spotlight search
 
-- [ ] 2.1 Instant grouped results, recent searches, keyboard and "See all results" under the title-bar search. Verified by a component test and by trying it in the app.
+- [x] 2.1 Instant grouped results, recent searches, keyboard and "See all results" under the title-bar search. Verified by a component test and by trying it in the app.
 
 ## 3. Stage column
 

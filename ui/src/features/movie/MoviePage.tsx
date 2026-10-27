@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { useRememberOpened } from "../search/recents";
 import { useClearNewOnOpen } from "../curation/newFlagActions";
 import { displayTitle, usePreferOriginalTitle } from "../library/displayTitle";
 import { DetailRequestError, currentDetailBackend } from "../detail/detailBackend";
@@ -44,6 +45,13 @@ function MovieView({ detail }: { detail: MovieDetail }) {
   const format = useFormat();
   const heading = displayTitle(detail.title, detail.original_title, usePreferOriginalTitle());
   const queryClient = useQueryClient();
+  useRememberOpened({
+    kind: "movie",
+    id: detail.id,
+    title: heading,
+    year: detail.year,
+    poster: detail.poster,
+  });
   const backend = currentDetailBackend();
   const detailsId = useId();
   const nfoId = useId();
