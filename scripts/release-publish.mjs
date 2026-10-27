@@ -10,7 +10,10 @@
 // 2. Checks every installer against the SHA256SUMS-<os>.txt files the release workflow wrote.
 // 3. Writes the manifest payload (version, date, notes, one build per platform: the NSIS setup
 //    exe for Windows, the DMG for macOS when it is there), signs it with the private key and
-//    verifies the envelope with the public key built into the app.
+//    verifies the envelope with the public key built into the app. The notes are the matching
+//    `## [x.y.z]` section of CHANGELOG.md when it has one (--notes <file> wins; then the release's
+//    own description; then the commit subjects), so the GitHub release and the notes the app
+//    shows before updating are the same clean text.
 // 4. Creates or updates Release v<version> in the public releases repository with the installers,
 //    the sums and manifest.json, and marks it latest. Rerunning is safe (--clobber); run it again
 //    after the macOS workflow to add the darwin builds.
@@ -35,6 +38,7 @@ import {
   signPayload,
   verifyEnvelope,
 } from "./update-signing.mjs";
+import { notesFor, readChangelog, sectionFor } from "./changelog.mjs";
 
 export const SOURCE_REPO = "mustafayevt/CineVault";
 export const RELEASES_REPO = "mustafayevt/CineVault-releases";
@@ -163,6 +167,18 @@ export function notesFromCommits(subjects) {
   return parts.join("\n\n");
 }
 
+/**
+ * The release notes of `version` from the text of CHANGELOG.md: its section as Markdown, or null
+ * when the file has no section for it (or the section is empty). `unreleased` is true when the
+ * section is still headed "unreleased", which the maintainer should change to the date first.
+ */
+export function changelogNotes(changelogText, version) {
+  if (changelogText == null) return null;
+  const notes = notesFor(changelogText, version);
+  if (notes === null) return null;
+  return { notes, unreleased: sectionFor(changelogText, version)?.date === "unreleased" };
+}
+
 const semverParts = (tag) => {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(tag);
   return match ? match.slice(1, 4).map(Number) : null;
@@ -222,6 +238,13 @@ export function defaultKeyPath() {
 
 function releaseNotes(options, version, body) {
   if (options.notes) return { notes: readFileSync(options.notes, "utf8").trim(), from: options.notes };
+  const fromChangelog = changelogNotes(readChangelog(), version);
+  if (fromChangelog) {
+    if (fromChangelog.unreleased) {
+      console.warn(`CHANGELOG.md still calls ${version} "unreleased"; put the release date in its heading.`);
+    }
+    return { notes: fromChangelog.notes, from: `CHANGELOG.md (section ${version})` };
+  }
   const fromBody = meaningfulBody(body);
   if (fromBody) return { notes: fromBody, from: "the release's description" };
   try {
@@ -421,6 +444,29 @@ function selfTest() {
     notes === "New\n- Add the Keep sub-folders toggle\n- Drop something\n\nFixes\n- Count sizes in 1024s on Windows",
     `notes grouping, got ${JSON.stringify(notes)}`,
   );
+  const log = [
+    "# Changelog",
+    "",
+    "## [1.2.0] - unreleased",
+    "",
+    "### Added",
+    "- Faster scans.",
+    "",
+    "## [1.1.0] - 2026-10-30",
+    "",
+    "### Fixed",
+    "- A fix.",
+    "",
+    "## Earlier versions",
+    "",
+    "See releases.",
+  ].join("\n");
+  const fromLog = changelogNotes(log, "1.1.0");
+  assert(fromLog?.notes === "### Fixed\n- A fix." && fromLog.unreleased === false, "notes from the matching CHANGELOG section");
+  assert(changelogNotes(log, "1.2.0")?.unreleased === true, "an unreleased section is flagged");
+  assert(changelogNotes(log, "1.0.0") === null && changelogNotes(null, "1.2.0") === null, "no section or no file falls back");
+  const real = changelogNotes(readChangelog(), "1.0.1");
+  assert(real !== null && real.notes.includes("### Added"), "the repository's CHANGELOG.md has 1.0.1");
   assert(stableName("CineVault_1.2.0_x64-setup.exe") === "CineVault-setup-x64.exe", "stable setup name");
   assert(stableName("CineVault_1.2.0_x64_en-US.msi") === "CineVault-x64.msi", "stable MSI name");
   assert(stableName("CineVault_1.2.0_x64-portable.zip") === "CineVault-portable-x64.zip", "stable portable name");
