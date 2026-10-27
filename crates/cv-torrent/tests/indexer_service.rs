@@ -16,7 +16,7 @@ use cv_torrent::indexer_service::{
     IndexerProcess, Running, ServerConfigFile, ServiceError, StartParams,
 };
 use cv_torrent::source::{INDEXER_LANE, client_builder};
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
 
 const STUB: &str = env!("CARGO_BIN_EXE_stub_indexer");
 const HARNESS: &str = env!("CARGO_BIN_EXE_indexer_parent_harness");
@@ -170,7 +170,11 @@ fn alive(pid: u32) -> bool {
         true,
         ProcessRefreshKind::nothing(),
     );
-    system.process(target).is_some()
+    // A program that has ended but whose parent has not collected it yet (a zombie on Unix)
+    // still has an entry; it is not running.
+    system
+        .process(target)
+        .is_some_and(|process| process.status() != ProcessStatus::Zombie)
 }
 
 /// Waits up to `seconds` for `pid` to be gone.
