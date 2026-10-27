@@ -27,6 +27,7 @@ cv-rename.workspace = true
 cv-scan.workspace = true
 cv-template.workspace = true
 cv-torrent.workspace = true
+fs4.workspace = true
 tauri = { version = "2", features = ["specta"] }
 # Native Windows 11 snap-layout flyout over the custom maximize button (no-op elsewhere).
 tauri-plugin-snap-layout = "1.0.9"

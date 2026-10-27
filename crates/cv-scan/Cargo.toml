@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 cv-db.workspace = true
 cv-domain.workspace = true
+cv-fs.workspace = true
 cv-jobs.workspace = true
 notify.workspace = true
 regex.workspace = true

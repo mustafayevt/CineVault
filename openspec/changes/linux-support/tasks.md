@@ -34,7 +34,7 @@ Read this block once; every task below relies on it.
 
 ## 1. Dependencies
 
-- [ ] 1.1 Add the Linux dependencies in one place `[haiku]`
+- [x] 1.1 Add the Linux dependencies in one place `[haiku]`
   - After: nothing. Blocks every Rust task.
   - Touch: `Cargo.toml` (root), `crates/cv-app/Cargo.toml`, `crates/cv-media/Cargo.toml`, `crates/cv-scan/Cargo.toml`, `crates/cv-db/Cargo.toml`, `src-tauri/Cargo.toml`, `Cargo.lock`.
   - Do NOT touch: any `.rs` file. Later tasks do not edit `Cargo.toml` or `Cargo.lock`, so they can run in parallel.
