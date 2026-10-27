@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { MenuItem } from "./MenuItem";
 import { Table } from "./Table";
 import type { TableColumn, TableSort } from "./Table";
-import { arrangeColumns, moveColumn, readLayout, writeLayout } from "./tableLayout";
+import { arrangeColumns, moveColumn, planDrop, readLayout, writeLayout } from "./tableLayout";
 import { useListSelection } from "./useListSelection";
 
 interface Movie {
@@ -42,12 +42,14 @@ function Harness({
   onOpen,
   storageKey,
   withMenu,
+  withHeaderMenu,
   onSortChange,
 }: {
   rows: Movie[];
   onOpen?: (id: number) => void;
   storageKey?: string;
   withMenu?: boolean;
+  withHeaderMenu?: boolean;
   onSortChange?: (sort: TableSort) => void;
 }) {
   const keys = useMemo(() => rows.map((m) => m.id), [rows]);
@@ -62,6 +64,7 @@ function Harness({
         columns={columns}
         selection={selection}
         storageKey={storageKey}
+        headerMenu={withHeaderMenu === true ? <MenuItem>Columns</MenuItem> : undefined}
         sort={sort}
         onSortChange={(next) => {
           setSort(next);
@@ -328,6 +331,190 @@ describe("Table", () => {
     expect(headers()).toEqual(["stage", "size", "title", "year"]);
   });
 
+  it("moves the lifted header and the cells with the pointer without rendering a row", async () => {
+    const user = userEvent.setup();
+    let cellCalls = 0;
+    const counted: TableColumn<Movie>[] = columns.map((c) =>
+      c.id === "size" ? { ...c, cell: (m) => (cellCalls++, `${m.id} GB`) } : c,
+    );
+    function Counted() {
+      const rows = useMemo(() => moviesOf(5), []);
+      const keys = useMemo(() => rows.map((m) => m.id), [rows]);
+      const selection = useListSelection({ keys });
+      return (
+        <Table
+          aria-label="Movies"
+          rows={rows}
+          rowKey={(m) => m.id}
+          columns={counted}
+          selection={selection}
+        />
+      );
+    }
+    render(<Counted />);
+    const grid = screen.getByRole("grid");
+    const size = screen.getByRole("columnheader", { name: "Size" });
+    const sizeCell = within(rowOf("Movie 1")).getAllByRole("gridcell")[3] as HTMLElement;
+    const before = cellCalls;
+    await user.pointer([
+      { keys: "[MouseLeft>]", target: size, coords: { clientX: 340 } },
+      { target: size, coords: { clientX: 330 } },
+      { target: size, coords: { clientX: 250 } },
+    ]);
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    });
+    // Lifted and following the pointer (90px left of where it was pressed), the neighbours slid.
+    expect(grid).toHaveAttribute("data-reordering");
+    expect(size).toHaveAttribute("data-lifted");
+    expect(size.style.transform).toBe("translateX(-90px)");
+    expect(sizeCell.style.transform).toBe("translateX(-90px)");
+    expect(screen.getByRole("columnheader", { name: "Year" }).style.transform).toBe(
+      "translateX(90px)",
+    );
+    expect(document.querySelector("[data-drop-marker]")).toHaveStyle({ display: "block" });
+    // No row was rendered by any of it.
+    expect(cellCalls).toBe(before);
+    await user.pointer({ keys: "[/MouseLeft]", target: size, coords: { clientX: 250 } });
+    expect(grid).not.toHaveAttribute("data-reordering");
+    expect(size.style.transform).toBe("");
+    expect(document.querySelector("[data-drop-marker]")).toHaveStyle({ display: "none" });
+    expect(screen.getAllByRole("columnheader").map((h) => h.dataset.column)).toEqual([
+      "stage",
+      "title",
+      "size",
+      "year",
+    ]);
+  });
+
+  it("puts a dragged header back on Esc and does not sort or clear the selection", async () => {
+    const user = userEvent.setup();
+    const onSortChange = vi.fn();
+    render(<Harness rows={moviesOf(5)} storageKey="cancel" onSortChange={onSortChange} />);
+    await user.click(rowOf("Movie 2"));
+    const size = screen.getByRole("columnheader", { name: "Size" });
+    await user.pointer([
+      { keys: "[MouseLeft>]", target: size, coords: { clientX: 340 } },
+      { target: size, coords: { clientX: 250 } },
+    ]);
+    expect(size).toHaveAttribute("data-lifted");
+    await user.keyboard("{Escape}");
+    expect(size).not.toHaveAttribute("data-lifted");
+    expect(size.style.transform).toBe("");
+    await user.pointer({ keys: "[/MouseLeft]", target: size, coords: { clientX: 250 } });
+    expect(screen.getAllByRole("columnheader").map((h) => h.dataset.column)).toEqual([
+      "stage",
+      "title",
+      "year",
+      "size",
+    ]);
+    expect(readLayout("cancel").order).toEqual([]);
+    expect(onSortChange).not.toHaveBeenCalled();
+    expect(count()).toBe("1");
+  });
+
+  it("shows the new width on the header and the cells while the edge is dragged, before release", async () => {
+    const user = userEvent.setup();
+    render(<Harness rows={moviesOf(5)} storageKey="live" />);
+    const handle = screen.getByRole("separator", { name: "Resize Size" });
+    const header = screen.getByRole("columnheader", { name: "Size" });
+    const cell = within(rowOf("Movie 1")).getAllByRole("gridcell")[3] as HTMLElement;
+    await user.pointer([
+      { keys: "[MouseLeft>]", target: handle, coords: { clientX: 100 } },
+      { target: handle, coords: { clientX: 130 } },
+    ]);
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    });
+    expect(header.style.width).toBe("120px");
+    expect(cell.style.width).toBe("120px");
+    // Nothing is stored until the release.
+    expect(readLayout("live").widths).toEqual({});
+    await user.pointer({ keys: "[/MouseLeft]", target: handle, coords: { clientX: 130 } });
+    expect(readLayout("live").widths).toEqual({ size: 120 });
+    expect(header.style.width).toBe("120px");
+  });
+
+  it("keeps the width when a resize is cancelled with Esc, and never goes under the minimum", async () => {
+    const user = userEvent.setup();
+    render(<Harness rows={moviesOf(5)} storageKey="resize-cancel" />);
+    const handle = screen.getByRole("separator", { name: "Resize Size" });
+    const header = screen.getByRole("columnheader", { name: "Size" });
+    await user.pointer([
+      { keys: "[MouseLeft>]", target: handle, coords: { clientX: 100 } },
+      { target: handle, coords: { clientX: 130 } },
+    ]);
+    await user.keyboard("{Escape}");
+    expect(header.style.width).toBe("90px");
+    await user.pointer({ keys: "[/MouseLeft]", target: handle, coords: { clientX: 130 } });
+    expect(readLayout("resize-cancel").widths).toEqual({});
+    await user.pointer([
+      { keys: "[MouseLeft>]", target: handle, coords: { clientX: 100 } },
+      { target: handle, coords: { clientX: -500 } },
+      { keys: "[/MouseLeft]", target: handle, coords: { clientX: -500 } },
+    ]);
+    expect(handle).toHaveAttribute("aria-valuenow", "40");
+  });
+
+  it("fits a column to its content when its edge is double-clicked", async () => {
+    const user = userEvent.setup();
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        // Only a cell laid out at its natural size reports a width.
+        const natural = this.style.width === "max-content";
+        const width = natural ? (this.dataset.col === "size" ? 133.2 : 50) : 0;
+        return {
+          width,
+          height: 0,
+          top: 0,
+          left: 0,
+          right: width,
+          bottom: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        };
+      });
+    try {
+      render(<Harness rows={moviesOf(5)} storageKey="fit" />);
+      await user.dblClick(screen.getByRole("separator", { name: "Resize Size" }));
+      expect(screen.getByRole("columnheader", { name: "Size" }).style.width).toBe("134px");
+      expect(readLayout("fit").widths).toEqual({ size: 134 });
+      // The measuring left no trace on the cells.
+      expect(within(rowOf("Movie 1")).getAllByRole("gridcell")[3]?.style.width).toBe("134px");
+    } finally {
+      rect.mockRestore();
+    }
+  });
+
+  it("moves the right-clicked column with Move left and Move right in the header menu", async () => {
+    const user = userEvent.setup();
+    const headers = () => screen.getAllByRole("columnheader").map((h) => h.dataset.column);
+    render(<Harness rows={moviesOf(5)} storageKey="menu" withHeaderMenu />);
+    const rightClick = (name: string) =>
+      user.pointer({
+        keys: "[MouseRight]",
+        target: screen.getByRole("columnheader", { name }),
+      });
+    await rightClick("Size");
+    await user.click(screen.getByRole("menuitem", { name: "Move left" }));
+    expect(headers()).toEqual(["stage", "title", "size", "year"]);
+    expect(readLayout("menu").order).toEqual(["stage", "title", "size", "year"]);
+    await rightClick("Title");
+    await user.click(screen.getByRole("menuitem", { name: "Move right" }));
+    expect(headers()).toEqual(["stage", "size", "title", "year"]);
+    // The first movable column has nowhere to go left, and the fixed column has no move items.
+    await rightClick("Size");
+    expect(screen.getByRole("menuitem", { name: "Move left" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await user.keyboard("{Escape}");
+    await rightClick("Stage");
+    expect(screen.queryByRole("menuitem", { name: "Move left" })).toBeNull();
+  });
+
   it("selects an unselected row alone on right-click and keeps a selection it is part of", async () => {
     const user = userEvent.setup();
     render(<Harness rows={moviesOf(8)} withMenu />);
@@ -375,6 +562,31 @@ describe("table layout", () => {
     expect(moveColumn(["check", "a", "b"], fixed, "b", 1)).toEqual(["check", "b", "a"]);
     expect(moveColumn(["check", "a", "b"], fixed, "a", 0)).toBeNull();
     expect(moveColumn(["check", "a", "b"], fixed, "check", 2)).toBeNull();
+  });
+
+  it("plans where a dragged column lands from its middle, keeping it between the movable columns", () => {
+    const slots = [
+      { id: "check", left: 0, width: 50, fixed: true },
+      { id: "a", left: 50, width: 100, fixed: false },
+      { id: "b", left: 150, width: 100, fixed: false },
+      { id: "c", left: 250, width: 100, fixed: false },
+    ];
+    // Not moved: stays, and no one else slides.
+    const rest = planDrop(slots, "b", 150);
+    expect(rest?.order).toEqual(["check", "a", "b", "c"]);
+    expect([...(rest?.shifts.values() ?? [])]).toEqual([0, 0, 0]);
+    // Past the middle of c: b goes last, c slides left by b's width.
+    const right = planDrop(slots, "b", 260);
+    expect(right?.order).toEqual(["check", "a", "c", "b"]);
+    expect(right?.shifts.get("c")).toBe(-100);
+    expect(right?.dropLeft).toBe(250);
+    // Dragged far left, over the fixed column: kept at the first movable place.
+    const left = planDrop(slots, "c", -300);
+    expect(left?.order).toEqual(["check", "c", "a", "b"]);
+    expect(left?.dragLeft).toBe(50);
+    expect(left?.shifts.get("a")).toBe(100);
+    // A fixed column is not draggable.
+    expect(planDrop(slots, "check", 100)).toBeNull();
   });
 
   it("reads a damaged entry as no layout", () => {

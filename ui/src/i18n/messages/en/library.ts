@@ -98,6 +98,10 @@ export const library = {
   "library.view.table": "Table view",
   "library.table.label": "{kind} table",
   "library.table.resize": "Resize {column}",
+  "library.table.moveLeft": "Move left",
+  "library.table.moveRight": "Move right",
+  "library.table.firstPlace": "Already the first column that can move",
+  "library.table.lastPlace": "Already the last column",
   "library.columns.button": "Columns",
 
   "selection.count": "{count, plural, one {# selected} other {# selected}}",

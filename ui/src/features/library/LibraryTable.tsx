@@ -154,6 +154,8 @@ export function LibraryTable({
         width: 280,
         minWidth: 160,
         grow: true,
+        // Title stays first: it never moves and nothing takes its place.
+        fixed: true,
         sortable: true,
         ...first("title"),
         cell: (slot) => {

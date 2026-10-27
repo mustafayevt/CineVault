@@ -1,6 +1,6 @@
 ## 1. Table columns
 
-- [ ] 1.1 Smooth drag-reorder and resize in the Library table: pointer-driven reorder with lifted header, sliding neighbours, drop marker, Esc to cancel, Move left/right in the header menu, Title pinned; resize with an 8px edge, live width without row re-renders, auto-fit on double-click, widths and order persisted. Verified by the table and library table tests and `bun run perf:grid` not regressing.
+- [x] 1.1 Smooth drag-reorder and resize in the Library table: pointer-driven reorder with lifted header, sliding neighbours, drop marker, Esc to cancel, Move left/right in the header menu, Title pinned; resize with an 8px edge, live width without row re-renders, auto-fit on double-click, widths and order persisted. Verified by the table and library table tests and `bun run perf:grid` not regressing.
 
 ## 2. Spotlight search
 
