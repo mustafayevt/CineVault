@@ -80,6 +80,12 @@ function renderScrape(path = "/scrape") {
         path: "/library",
         component: () => <p>Library</p>,
       }),
+      createRoute({
+        getParentRoute: () => root,
+        path: "/settings",
+        validateSearch: (search: Record<string, unknown>) => search,
+        component: () => <p>Settings</p>,
+      }),
     ]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
@@ -373,6 +379,19 @@ describe("the candidates of the current title", () => {
     await user.type(search, "Dune");
     expect(await screen.findByText(/TheTVDB needs a key/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Set up TheTVDB" })).toBeInTheDocument();
+  });
+
+  it("takes the Set up link to that provider's key row in Settings", async () => {
+    const user = userEvent.setup();
+    install();
+    const { router } = renderScrape();
+    await openUncertain(user);
+    const search = screen.getByRole("searchbox", { name: "Title, or an IMDb or TMDB link or ID" });
+    await user.clear(search);
+    await user.type(search, "Dune");
+    await user.click(await screen.findByRole("button", { name: "Set up TheTVDB" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
+    expect(router.state.location.search).toEqual({ section: "providers", key: "tvdb" });
   });
 
   it("takes a pasted TMDB link as one exact result", async () => {

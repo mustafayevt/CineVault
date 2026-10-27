@@ -51,13 +51,15 @@ export const onboarding = {
   "setup.tmdb.needsKey": "Test your TMDB key first.",
   "setup.tmdb.needsKeyFix": "Paste the key and press Test, or skip this step.",
 
-  // Step 3: ratings keys
-  "setup.ratings.title": "Add your ratings keys",
+  // Step 3: optional keys (ratings and artwork)
+  "setup.ratings.title": "Add your optional keys",
   "setup.ratings.intro":
-    "Both are optional. Each key adds ratings to your titles, and either can be added later in Settings.",
+    "All are optional. Each key adds ratings or artwork to your titles, and any can be added later in Settings.",
   "setup.ratings.optional": "Optional",
   "setup.ratings.omdb": "Adds IMDb, Rotten Tomatoes and Metacritic ratings",
   "setup.ratings.mdblist": "Adds Letterboxd and more ratings",
+  "setup.ratings.fanart": "Adds more artwork",
+  "setup.ratings.tvdb": "Adds TV artwork and episode data",
 
   // Step 4: naming
   "setup.naming.title": "How should folders and files be named?",

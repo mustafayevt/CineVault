@@ -1,4 +1,6 @@
 import { Select } from "../../components/Select";
+import { useSearch } from "@tanstack/react-router";
+
 import { t } from "../../i18n/catalog";
 import { KeyField } from "../providers/KeyField";
 import { useProviderKeys } from "../providers/useProviderKeys";
@@ -29,11 +31,14 @@ function GetKey({ href, label }: { href: string | undefined; label: string }) {
 }
 
 /**
- * Settings, Providers (spec `app-shell` "Settings page"): the TMDB, OMDb and MDBList keys with
- * their state and Test, and the metadata language and ratings country. Changes apply at once.
+ * Settings, Providers (spec `app-shell` "Settings page"): the TMDB key and the optional OMDb,
+ * MDBList, Fanart.tv and TheTVDB keys with their state and Test, and the metadata language and
+ * ratings country. Changes apply at once.
  */
 export function ProvidersSection() {
   const keys = useProviderKeys();
+  // A link that asks for one key (search says "TheTVDB needs a key") leaves the cursor in it.
+  const { key: wanted } = useSearch({ strict: false }) as { key?: string };
   const language = useSetting<string>("metadata.language");
   const country = useSetting<string>("metadata.country");
   const find = (id: string) => keys.providers.find((provider) => provider.id === id);
@@ -55,7 +60,12 @@ export function ProvidersSection() {
           </>
         }
       >
-        <KeyField provider={find("tmdb")} keys={keys} label={t("settingsPage.providers.tmdb")} />
+        <KeyField
+          provider={find("tmdb")}
+          keys={keys}
+          label={t("settingsPage.providers.tmdb")}
+          focusOnShow={wanted === "tmdb"}
+        />
       </FormRow>
       <FormRow
         label={t("settingsPage.providers.omdb")}
@@ -69,7 +79,12 @@ export function ProvidersSection() {
           </>
         }
       >
-        <KeyField provider={find("omdb")} keys={keys} label={t("settingsPage.providers.omdb")} />
+        <KeyField
+          provider={find("omdb")}
+          keys={keys}
+          label={t("settingsPage.providers.omdb")}
+          focusOnShow={wanted === "omdb"}
+        />
       </FormRow>
       <FormRow
         label={t("settingsPage.providers.mdblist")}
@@ -87,6 +102,45 @@ export function ProvidersSection() {
           provider={find("mdblist")}
           keys={keys}
           label={t("settingsPage.providers.mdblist")}
+          focusOnShow={wanted === "mdblist"}
+        />
+      </FormRow>
+      <FormRow
+        label={t("settingsPage.providers.fanart")}
+        hint={
+          <>
+            {t("settingsPage.providers.fanart.hint")}
+            <GetKey
+              href={find("fanart")?.registration_url}
+              label={t("settingsPage.providers.getKey")}
+            />
+          </>
+        }
+      >
+        <KeyField
+          provider={find("fanart")}
+          keys={keys}
+          label={t("settingsPage.providers.fanart")}
+          focusOnShow={wanted === "fanart"}
+        />
+      </FormRow>
+      <FormRow
+        label={t("settingsPage.providers.tvdb")}
+        hint={
+          <>
+            {t("settingsPage.providers.tvdb.hint")}
+            <GetKey
+              href={find("tvdb")?.registration_url}
+              label={t("settingsPage.providers.getKey")}
+            />
+          </>
+        }
+      >
+        <KeyField
+          provider={find("tvdb")}
+          keys={keys}
+          label={t("settingsPage.providers.tvdb")}
+          focusOnShow={wanted === "tvdb"}
         />
       </FormRow>
       <FormRow

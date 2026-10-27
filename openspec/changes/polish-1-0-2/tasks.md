@@ -32,7 +32,7 @@
 
 ## 9. Optional provider keys
 
-- [ ] 9.1 Fanart.tv and TheTVDB keys in Settings › Providers and onboarding step 3, and the "needs a key" link in search opening them. Verified by cv-providers and settings tests.
+- [x] 9.1 Fanart.tv and TheTVDB keys in Settings › Providers and onboarding step 3, and the "needs a key" link in search opening them. Verified by cv-providers and settings tests.
 
 ## 10. Release notes
 

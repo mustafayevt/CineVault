@@ -147,10 +147,12 @@ const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
   // `?section=<id>` opens the page at that section (providers, naming, folders, torrents, appearance, updates).
-  validateSearch: (search: Record<string, unknown>): { section?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { section?: string; key?: string } => ({
     ...(typeof search.section === "string" && search.section !== ""
       ? { section: search.section }
       : {}),
+    // `key=<provider>` also puts the cursor in that provider's key field (Providers section).
+    ...(typeof search.key === "string" && search.key !== "" ? { key: search.key } : {}),
   }),
   component: SettingsPage,
 });

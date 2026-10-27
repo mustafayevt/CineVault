@@ -245,7 +245,7 @@ export function TmdbStep({
   );
 }
 
-/** Step 3: the optional OMDb and MDBList keys, with what each adds. */
+/** Step 3: the optional OMDb, MDBList, Fanart.tv and TheTVDB keys, with what each adds. */
 export function RatingsStep({
   keys,
   headingRef,
@@ -260,6 +260,18 @@ export function RatingsStep({
       name: "MDBList",
       label: "settingsPage.providers.mdblist",
       adds: "setup.ratings.mdblist",
+    },
+    {
+      id: "fanart",
+      name: "Fanart.tv",
+      label: "settingsPage.providers.fanart",
+      adds: "setup.ratings.fanart",
+    },
+    {
+      id: "tvdb",
+      name: "TheTVDB",
+      label: "settingsPage.providers.tvdb",
+      adds: "setup.ratings.tvdb",
     },
   ] as const;
   return (

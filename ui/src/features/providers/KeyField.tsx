@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { Button } from "../../components/Button";
@@ -16,6 +16,8 @@ interface KeyFieldProps {
   label: string;
   /** Called after a typed key passed Test and was saved. */
   onSaved?: () => void;
+  /** Puts the cursor in the field once the provider is known (a link that asks for this key). */
+  focusOnShow?: boolean;
 }
 
 /** The field a key is typed into: the first one the provider requires. */
@@ -29,11 +31,17 @@ function keyFieldOf(provider: ProviderCredentials): string {
  * the saved one when nothing is typed, and saves a typed key that passes. A saved key is never
  * read back, so the field then shows dots and the line offers Remove (with Undo).
  */
-export function KeyField({ provider, keys, label, onSaved }: KeyFieldProps) {
+export function KeyField({ provider, keys, label, onSaved, focusOnShow = false }: KeyFieldProps) {
   const [draft, setDraft] = useState("");
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const known = provider !== undefined;
+  // The field is disabled until the provider list has been read, so focus waits for it.
+  useEffect(() => {
+    if (focusOnShow && known) input.current?.focus();
+  }, [focusOnShow, known]);
 
   if (provider === undefined) {
     return (
@@ -102,6 +110,7 @@ export function KeyField({ provider, keys, label, onSaved }: KeyFieldProps) {
         <Field
           mono
           className="min-w-0 flex-1"
+          ref={input}
           type={secret && !reveal ? "password" : "text"}
           autoComplete="off"
           spellCheck={false}

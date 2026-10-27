@@ -27,6 +27,7 @@ async function renderSettings(path = "/settings") {
         path: "/settings",
         validateSearch: (search: Record<string, unknown>) => ({
           section: typeof search.section === "string" ? search.section : undefined,
+          key: typeof search.key === "string" ? search.key : undefined,
         }),
         component: SettingsPage,
       }),
@@ -183,7 +184,35 @@ describe("Settings, Providers", () => {
     await renderSettings();
     expect(
       (await screen.findAllByPlaceholderText("Keys can be set in the desktop app")).length,
-    ).toBe(3);
+    ).toBe(5);
+  });
+
+  it("offers the optional Fanart.tv and TheTVDB keys like the OMDb one, each with a link to get a key", async () => {
+    const user = userEvent.setup();
+    const backend = recordingBackend();
+    setProvidersBackend(backend);
+    await renderSettings();
+    const tvdb = await screen.findByLabelText("TheTVDB key");
+    const fanart = await screen.findByLabelText("Fanart.tv key");
+    // The synthetic library starts with both saved, one working and one turned down.
+    expect(tvdb.closest("[data-provider]")).toHaveAttribute("data-state", "active");
+    expect(fanart.closest("[data-provider]")).toHaveAttribute("data-state", "rejected");
+    expect(tvdb).toHaveAttribute("type", "password");
+    expect(screen.getByText("Adds TV artwork and episode data.")).toBeVisible();
+    expect(screen.getByText("Adds more artwork.")).toBeVisible();
+    expect(screen.getAllByRole("link", { name: "Get a free key" }).length).toBeGreaterThanOrEqual(
+      5,
+    );
+    await user.type(fanart, "new-key");
+    await user.click(screen.getByRole("button", { name: "Test the Fanart.tv key" }));
+    await waitFor(() => expect(backend.tested.at(-1)).toMatchObject({ provider: "fanart" }));
+  });
+
+  it("puts the cursor in the key a link asks for", async () => {
+    setProvidersBackend(recordingBackend());
+    await renderSettings("/settings?section=providers&key=tvdb");
+    const tvdb = await screen.findByLabelText("TheTVDB key");
+    await waitFor(() => expect(tvdb).toHaveFocus());
   });
 });
 
