@@ -62,7 +62,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-media --lib tools::manifest`; LINUX CHECK `cargo test -p cv-media --lib tools::manifest`.
   - Commit: `feat(tools): add the linux-x86_64 tool platform`
 
-- [ ] 2.2 Unpack `.tar.xz` downloads `[haiku]`
+- [x] 2.2 Unpack `.tar.xz` downloads `[haiku]`
   - After: 2.1 (same crate, enum in `manifest.rs`).
   - Touch: `crates/cv-media/src/tools/archive.rs`, `crates/cv-media/src/tools/manifest.rs` (the `ArchiveFormat` enum only).
   - Do NOT touch: `manifest.json`, `install.rs`, `download.rs`.

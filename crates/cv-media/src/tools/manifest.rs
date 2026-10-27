@@ -208,6 +208,9 @@ pub enum ArchiveFormat {
     TarBz2,
     #[serde(rename = "tar.gz")]
     TarGz,
+    /// A tar archive compressed with xz, the form Linux builds of the tools come in.
+    #[serde(rename = "tar.xz")]
+    TarXz,
     /// The download is the program itself.
     #[serde(rename = "raw")]
     Raw,
