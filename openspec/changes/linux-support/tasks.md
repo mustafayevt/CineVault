@@ -345,7 +345,7 @@ Read this block once; every task below relies on it.
 
 ## 8. Website and documents
 
-- [ ] 8.1 Linux on the website `[haiku]`
+- [x] 8.1 Linux on the website `[haiku]`
   - After: nothing. Wave 1.
   - Touch: `site/index.html`, `site/site.js`, `site/style.css` only if a third card needs layout.
   - Steps: add a Linux card in the download section (after the Windows card, line 284-292 pattern) with "Linux (beta)", "Ubuntu 22.04 or newer, Fedora 38 or newer, x86_64. The AppImage updates itself; it needs FUSE 2 (`libfuse2t64` on Ubuntu 24.04).", buttons to `…/releases/latest/download/CineVault-x86_64.AppImage`, links to `CineVault-amd64.deb` and `CineVault-x86_64.rpm`, and a Tux-free generic icon (inline SVG like the others, `aria-hidden`). `site.js`: `isLinux()` (`/Linux|X11/` and not Android or ChromeOS `CrOS`) → the hero button points to the AppImage with "Download for Linux (beta)"; Mac logic unchanged. Meta descriptions (lines 7, 18) say "for Windows and Linux".

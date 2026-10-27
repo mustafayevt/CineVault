@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CineVault: every title in its place</title>
-<meta name="description" content="CineVault 1.0 is a fast desktop movie and TV library manager for Windows. Scan your folders, Scrape titles with ratings and artwork, write complete Kodi, Jellyfin and Emby NFO files, and Rename with a preview and Undo.">
+<meta name="description" content="CineVault 1.0 is a fast desktop movie and TV library manager for Windows and Linux. Scan your folders, Scrape titles with ratings and artwork, write complete Kodi, Jellyfin and Emby NFO files, and Rename with a preview and Undo.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="CineVault">
 <meta property="og:title" content="CineVault: every title in its place">
-<meta property="og:description" content="A fast desktop movie and TV library manager for Windows. Scan, Scrape, Rename, with ratings from many sources, the artwork you choose, complete NFO files for your media centre, and Undo for everything.">
+<meta property="og:description" content="A fast desktop movie and TV library manager for Windows and Linux. Scan, Scrape, Rename, with ratings from many sources, the artwork you choose, complete NFO files for your media centre, and Undo for everything.">
 <meta property="og:url" content="https://mustafayevt.github.io/CineVault-releases/">
 <meta property="og:image" content="https://mustafayevt.github.io/CineVault-releases/img/og.png">
 <meta property="og:image:width" content="1280">
@@ -54,7 +54,7 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="pill">New</span> Version <span data-version>1.0.0</span> for Windows</p>
+        <p class="eyebrow"><span class="pill">New</span> Version <span data-version>1.0.0</span> for Windows and Linux</p>
         <h1 id="hero-title">Every title<br>in its place.</h1>
         <p class="lede">A fast desktop library manager for your movies and TV shows. CineVault reads your folders, fills in details, ratings and artwork, writes complete NFO files for Kodi, Jellyfin and Emby, and tidies every name, with Undo for all of it.</p>
         <div class="cta">
@@ -64,7 +64,7 @@
           </a>
           <a class="btn btn-quiet btn-lg" href="#flow">See how it works</a>
         </div>
-        <p class="fine" data-dl-fine>Free. Windows 10 and 11, 64-bit. macOS is coming soon.</p>
+        <p class="fine" data-dl-fine>Free. Windows 10 and 11, 64-bit, and Linux (beta). macOS is coming soon.</p>
       </div>
     </div>
     <div class="wrap wrap-wide">
@@ -291,6 +291,17 @@
           <p class="alt">The Windows builds are not code-signed yet. If SmartScreen stops the installer the first time, choose More info, then Run anyway.</p>
         </div>
         <div class="dl-card">
+          <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4.75h18A1.25 1.25 0 0 1 22.25 6v12A1.25 1.25 0 0 1 21 19.25H3A1.25 1.25 0 0 1 1.75 18V6A1.25 1.25 0 0 1 3 4.75Zm1.25 2.5v9.5h15.5v-9.5ZM7.2 10.2l2.4 2.2-2.4 2.2-1.1-1.1 1.7-1.1-1.7-1.1zM11.5 14.1h4.8v1.2h-4.8z"/></svg>Linux (beta)</h3>
+          <p>Ubuntu 22.04 or newer, Fedora 38 or newer, 64-bit (x86_64). The AppImage updates itself; it needs FUSE 2 (<code>libfuse2t64</code> on Ubuntu 24.04).</p>
+          <a class="btn" data-dl-linux href="https://github.com/mustafayevt/CineVault-releases/releases/latest/download/CineVault-x86_64.AppImage">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75v11.5M7.25 10.5 12 15.25l4.75-4.75M4.75 19.25h14.5"/></svg>
+            <span class="btn-text"><span>AppImage</span><small>Beta, 64-bit</small></span>
+          </a>
+          <p class="alt">Or the <a class="link" href="https://github.com/mustafayevt/CineVault-releases/releases/latest/download/CineVault-amd64.deb">.deb package</a> for Debian and Ubuntu, or the <a class="link" href="https://github.com/mustafayevt/CineVault-releases/releases/latest/download/CineVault-x86_64.rpm">.rpm package</a> for Fedora.</p>
+          <p class="alt">After the download, make the AppImage runnable with <code>chmod +x CineVault-x86_64.AppImage</code>, then open it.</p>
+          <p class="alt">The Linux version is a beta. Expect rough edges, and report what breaks on the releases page.</p>
+        </div>
+        <div class="dl-card dl-card-wide">
           <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.5c-1.2.1-2.5.9-3.2 1.9-.6.8-1.1 2-.9 3.1 1.3.1 2.5-.7 3.2-1.7.7-.9 1.1-2.1.9-3.3zM18.6 16.2c-.5 1.2-.8 1.7-1.5 2.7-.9 1.4-2.2 3.1-3.8 3.1-1.4 0-1.8-.9-3.7-.9s-2.3.9-3.7.9c-1.6 0-2.8-1.6-3.7-3C.5 15.4.2 10.9 1.9 8.4 3.1 6.6 5 5.6 6.8 5.6s3 1 4.5 1c1.5 0 2.4-1 4.5-1 1.6 0 3.3.9 4.5 2.4-4 2.2-3.3 7.8.3 8.2z"/></svg>macOS</h3>
           <p>A macOS version is on its way. Watch the <a class="link" href="https://github.com/mustafayevt/CineVault-releases/releases">releases page</a> for news.</p>
           <span class="soon">Coming soon</span>

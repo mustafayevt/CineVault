@@ -715,6 +715,11 @@ h2 {
   font-size: 14px;
 }
 
+/* Three cards sit in two columns; the last one (macOS) spans the row so it is not left alone. */
+.dl-card-wide {
+  grid-column: 1 / -1;
+}
+
 .soon {
   padding: 8px 14px;
   border: 1px dashed var(--line-edge);
