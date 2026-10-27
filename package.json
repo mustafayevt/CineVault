@@ -13,7 +13,8 @@
     "bundle:check": "node scripts/check-bundle.mjs",
     "package:portable": "node scripts/package-portable.mjs",
     "release:keys": "node scripts/release-keys.mjs",
-    "release:publish": "node scripts/release-publish.mjs"
+    "release:publish": "node scripts/release-publish.mjs",
+    "site:changelog": "node scripts/site-changelog.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.3"
