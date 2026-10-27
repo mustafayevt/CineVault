@@ -111,7 +111,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-fs`; LINUX CHECK `cargo test -p cv-fs`.
   - Commit: `feat(fs): add platform-aware path comparison and Linux mount helpers`
 
-- [ ] 3.2 Linux rules for which volume can keep a Trash item `[risky: needs Sonnet/Opus]`
+- [x] 3.2 Linux rules for which volume can keep a Trash item `[risky: needs Sonnet/Opus]`
   - After: 1.1. Wave 2.
   - Touch: new `crates/cv-app/src/library_ops/xdg_dirs.rs`, `crates/cv-app/src/library_ops/bin_volumes.rs`, `crates/cv-app/src/library_ops/mod.rs` (module line only).
   - Do NOT touch: `trash_bin.rs`, `policy_bin.rs`, Windows code in `bin_volumes.rs`.

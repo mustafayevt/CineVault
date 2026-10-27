@@ -43,6 +43,7 @@ pub(crate) mod tests;
 pub(crate) mod trash_bin;
 pub(crate) mod uncached;
 mod volume;
+pub(crate) mod xdg_dirs;
 
 use cv_db::DbError;
 use cv_domain::{Item, ItemDetail, ItemId};
