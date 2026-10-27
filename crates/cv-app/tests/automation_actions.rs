@@ -1537,18 +1537,28 @@ async fn a_ratings_fetch_announces_its_start_as_a_stage_change_and_its_end_as_ra
     let seen = record_changes(&rig);
 
     rig.services.actions().fetch_ratings(&[id]).await;
-
+    // The NFO is written again with the new ratings (announced as Files, unless a background
+    // write got there first), and the title's names are checked again in the background (one
+    // more Stage). When those finish is up to the machine, and announcements of one burst leave
+    // in an order of their own, so check what was announced, not their order, and that the start
+    // came first.
+    let arrived =
+        wait_until(|| parts_for(&seen, id).contains(&vec![ChangePart::Ratings, ChangePart::Stage]))
+            .await;
     let parts = parts_for(&seen, id);
-    assert_eq!(
-        parts,
-        vec![
-            vec![ChangePart::Stage],
-            // The NFO is written again with the new ratings.
-            vec![ChangePart::Files],
-            vec![ChangePart::Ratings, ChangePart::Stage],
-        ],
-        "the start comes first, then the stored ratings"
-    );
+    assert!(arrived, "{parts:?}");
+    assert_eq!(parts[0], vec![ChangePart::Stage], "the start comes first");
+    for part in &parts {
+        assert!(
+            [
+                vec![ChangePart::Stage],
+                vec![ChangePart::Files],
+                vec![ChangePart::Ratings, ChangePart::Stage],
+            ]
+            .contains(part),
+            "{parts:?}"
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
