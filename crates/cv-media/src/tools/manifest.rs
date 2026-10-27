@@ -556,11 +556,7 @@ mod tests {
     fn the_embedded_manifest_is_valid_and_covers_every_platform() {
         let manifest = Manifest::embedded();
         for package in Package::ALL {
-            // 2.3 adds linux-x86_64 to the manifest; remove this filter then.
-            for platform in Platform::ALL
-                .into_iter()
-                .filter(|p| *p != Platform::LinuxX64)
-            {
+            for platform in Platform::ALL {
                 let spec = manifest
                     .platform_spec(package, platform)
                     .unwrap_or_else(|| panic!("{package} has no entry for {platform}"));
@@ -578,11 +574,7 @@ mod tests {
     fn every_embedded_download_is_pinned_over_https() {
         let manifest = Manifest::embedded();
         for package in Package::ALL {
-            // 2.3 adds linux-x86_64 to the manifest; remove this filter then.
-            for platform in Platform::ALL
-                .into_iter()
-                .filter(|p| *p != Platform::LinuxX64)
-            {
+            for platform in Platform::ALL {
                 let spec = manifest.platform_spec(package, platform).expect("entry");
                 for artifact in &spec.artifacts {
                     assert!(artifact.url.starts_with("https://"), "{}", artifact.url);
@@ -627,8 +619,19 @@ mod tests {
 
     #[test]
     fn a_manifest_with_a_linux_platform_returns_its_spec() {
-        let json = with(r#""windows-x86_64": {"#, r#""linux-x86_64": {"#);
-        let manifest = Manifest::parse(&json).expect("a linux-x86_64 entry is valid");
+        // The embedded manifest has a real linux-x86_64 entry, so the fixture drops it and moves
+        // the Windows entry under that key; the spec returned must be the moved one.
+        let mut json: serde_json::Value =
+            serde_json::from_str(EMBEDDED).expect("the embedded manifest is JSON");
+        let platforms = json["packages"]["mediainfo"]["platforms"]
+            .as_object_mut()
+            .expect("mediainfo platforms");
+        platforms.remove("linux-x86_64");
+        let windows_entry = platforms
+            .remove("windows-x86_64")
+            .expect("the windows entry");
+        platforms.insert("linux-x86_64".to_owned(), windows_entry);
+        let manifest = Manifest::parse(&json.to_string()).expect("a linux-x86_64 entry is valid");
         let windows = Manifest::embedded()
             .platform_spec(Package::MediaInfo, Platform::WindowsX64)
             .cloned()
@@ -642,6 +645,46 @@ mod tests {
                 .platform_spec(Package::MediaInfo, Platform::WindowsX64)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn the_linux_mediainfo_and_ffmpeg_are_the_verified_pins() {
+        let manifest = Manifest::embedded();
+        let expected = [
+            (
+                Package::MediaInfo,
+                "26.10",
+                "https://mediaarea.net/download/binary/libmediainfo0/26.10/MediaInfo_DLL_26.10_Lambda_x86_64.zip",
+                6_470_279,
+                "467b2a0307a7b2e36cb1dc50ed37bfaa522f97a40e713752d95305c27edccc87",
+                ArchiveFormat::Zip,
+                ToolId::MediaInfo,
+                "libmediainfo.so.0",
+            ),
+            (
+                Package::Ffmpeg,
+                "8.1.3-9-g29e619e767",
+                "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1.tar.xz",
+                150_360_944,
+                "97ce978979194b5cf7e06a5e68020dbdaa7a4f3294c5452b6a1bc347100dbb79",
+                ArchiveFormat::TarXz,
+                ToolId::Ffmpeg,
+                "ffmpeg",
+            ),
+        ];
+        for (package, version, url, size, sha, format, tool, file) in expected {
+            let spec = manifest
+                .platform_spec(package, Platform::LinuxX64)
+                .unwrap_or_else(|| panic!("no linux entry for {package}"));
+            let [artifact] = spec.artifacts.as_slice() else {
+                panic!("one artifact for {package} on linux");
+            };
+            assert_eq!(spec.version, version);
+            assert_eq!(artifact.url, url);
+            assert_eq!((artifact.size, artifact.sha256.as_str()), (size, sha));
+            assert_eq!(artifact.format, format);
+            assert_eq!(spec.tool_files().get(&tool).map(String::as_str), Some(file));
+        }
     }
 
     #[test]
@@ -669,6 +712,14 @@ mod tests {
                 "Jackett.Binaries.macOSARM64.tar.gz",
                 47_876_613,
                 "c329944b8e539b2d4e63cb200b2cf75ff3e6e0e6cdd6f71140a0a088d41e5240",
+                ArchiveFormat::TarGz,
+                "jackett",
+            ),
+            (
+                Platform::LinuxX64,
+                "Jackett.Binaries.LinuxAMDx64.tar.gz",
+                50_937_824,
+                "becbd7905a0964cb85c87abffe1c191313730cc027acd4758182924ef7e7d66f",
                 ArchiveFormat::TarGz,
                 "jackett",
             ),

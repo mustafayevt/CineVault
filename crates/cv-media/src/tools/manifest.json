@@ -50,6 +50,21 @@
               ]
             }
           ]
+        },
+        "linux-x86_64": {
+          "version": "26.10",
+          "artifacts": [
+            {
+              "url": "https://mediaarea.net/download/binary/libmediainfo0/26.10/MediaInfo_DLL_26.10_Lambda_x86_64.zip",
+              "sha256": "467b2a0307a7b2e36cb1dc50ed37bfaa522f97a40e713752d95305c27edccc87",
+              "size": 6470279,
+              "format": "zip",
+              "files": [
+                { "provides": "mediainfo", "from": "lib/libmediainfo.so.0.0.0", "to": "libmediainfo.so.0" },
+                { "from": "LICENSE", "to": "LICENSE.txt" }
+              ]
+            }
+          ]
         }
       }
     },
@@ -100,6 +115,21 @@
               ]
             }
           ]
+        },
+        "linux-x86_64": {
+          "version": "8.1.3-9-g29e619e767",
+          "artifacts": [
+            {
+              "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1.tar.xz",
+              "sha256": "97ce978979194b5cf7e06a5e68020dbdaa7a4f3294c5452b6a1bc347100dbb79",
+              "size": 150360944,
+              "format": "tar.xz",
+              "files": [
+                { "provides": "ffmpeg", "from": "ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1/bin/ffmpeg", "to": "ffmpeg" },
+                { "from": "ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1/LICENSE.txt", "to": "LICENSE.txt" }
+              ]
+            }
+          ]
         }
       }
     },
@@ -143,6 +173,20 @@
               "url": "https://github.com/Jackett/Jackett/releases/download/v0.24.2903/Jackett.Binaries.macOSARM64.tar.gz",
               "sha256": "c329944b8e539b2d4e63cb200b2cf75ff3e6e0e6cdd6f71140a0a088d41e5240",
               "size": 47876613,
+              "format": "tar.gz",
+              "mode": "tree",
+              "root": "Jackett/",
+              "program": { "provides": "indexer-service", "path": "jackett" }
+            }
+          ]
+        },
+        "linux-x86_64": {
+          "version": "0.24.2903",
+          "artifacts": [
+            {
+              "url": "https://github.com/Jackett/Jackett/releases/download/v0.24.2903/Jackett.Binaries.LinuxAMDx64.tar.gz",
+              "sha256": "becbd7905a0964cb85c87abffe1c191313730cc027acd4758182924ef7e7d66f",
+              "size": 50937824,
               "format": "tar.gz",
               "mode": "tree",
               "root": "Jackett/",

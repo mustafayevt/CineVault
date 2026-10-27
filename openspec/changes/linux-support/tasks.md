@@ -74,7 +74,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-media --lib tools::archive`; `cargo test -p cv-media --test tools_tree`.
   - Commit: `feat(tools): unpack tar.xz downloads`
 
-- [ ] 2.3 Pin the Linux tool downloads `[haiku]` (needs network)
+- [x] 2.3 Pin the Linux tool downloads `[haiku]` (needs network)
   - After: 2.1, 2.2.
   - Touch: `crates/cv-media/src/tools/manifest.json` only.
   - Do NOT touch: any `.rs` file. Never guess a hash.
@@ -87,7 +87,6 @@ Read this block once; every task below relies on it.
     3. Delete the downloads afterwards.
   - Accept: `cargo test -p cv-media` passes (the manifest parser test reads the embedded JSON); LINUX CHECK `bun run tools:fetch -- --dir $HOME/.cache/cv-tools` then `ls` shows `libmediainfo.so.0`, `ffmpeg`, the `Jackett` tree; LINUX CHECK `CINEVAULT_LIVE_TOOLS=1 cargo test -p cv-media --test tools_live`.
   - Commit: `feat(tools): pin MediaInfo, FFmpeg and the indexer service for Linux`
-  - BLOCKED: the three Linux pins check out (URLs, SHA-256 and sizes), but a real `linux-x86_64` entry makes `manifest::tests::a_manifest_with_a_linux_platform_returns_its_spec` fail: it renames the Windows entry to `linux-x86_64` and expects that to be the only one. The test and the two `2.3` filters (`manifest.rs`, lines 559 and 581) are in a `.rs` file outside this task. Fix them there first, then pin.
 
 - [x] 2.4 Start the indexer service without system ICU on Linux `[haiku]`
   - After: 1.1. Wave 1.
