@@ -313,6 +313,184 @@ fn dir_is_writable(dir: &Path) -> bool {
     true
 }
 
+/// The start and end of the file a copy-in-progress update is saved under, beside the AppImage.
+#[cfg(unix)]
+const PART_PREFIX: &str = ".CineVault-update-";
+#[cfg(unix)]
+const PART_SUFFIX: &str = ".AppImage.part";
+
+/// Replaces the AppImage at `target` with the verified download, so the app is never left
+/// without a working copy: the download is checked again, copied beside `target`, checked as
+/// copied, and only then renamed over `target` in one step. Until that rename the old file is
+/// untouched; a failure at any earlier point removes the half-made copy and changes nothing. The
+/// running AppImage keeps its open file, so it goes on running until the app quits.
+///
+/// # Errors
+/// [`UpdateError::Io`] when `target` is not a file or its folder cannot take a new file (the
+/// message says the app was not changed), the download changed since it was verified, or the copy
+/// could not be written; [`UpdateError::ChecksumMismatch`] when the copy does not match the
+/// signed SHA-256.
+#[cfg(unix)]
+pub fn replace_appimage(installer: &VerifiedInstaller, target: &Path) -> Result<(), UpdateError> {
+    replace_appimage_checked(installer, target, &|_| Ok(()))
+}
+
+/// [`replace_appimage`] with a hook that runs on the finished copy before it is checked, so a
+/// test can damage the copy.
+#[cfg(unix)]
+fn replace_appimage_checked(
+    installer: &VerifiedInstaller,
+    target: &Path,
+    after_copy: &dyn Fn(&Path) -> std::io::Result<()>,
+) -> Result<(), UpdateError> {
+    use std::io::{Seek, SeekFrom};
+
+    // Work on the real file: when the AppImage is reached through a link, the link must stay a
+    // link and the file it points to is the one that is replaced.
+    let target = std::fs::canonicalize(target).map_err(|error| {
+        UpdateError::Io(format!(
+            "the CineVault AppImage {} cannot be found ({error}); nothing was changed",
+            target.display()
+        ))
+    })?;
+    if !target.is_file() {
+        return Err(UpdateError::Io(format!(
+            "{} is not a file, so it cannot be replaced; nothing was changed",
+            target.display()
+        )));
+    }
+    let dir = target.parent().ok_or_else(|| {
+        UpdateError::Io(format!(
+            "{} has no folder; nothing was changed",
+            target.display()
+        ))
+    })?;
+    // Only plain characters reach the file name; the version comes from the signed manifest but
+    // a name must never leave the folder.
+    let version: String = installer
+        .version()
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let part = dir.join(format!("{PART_PREFIX}{version}{PART_SUFFIX}"));
+
+    // Held until the rename: the file that was checked is the file that is copied.
+    let mut source = installer.reverify()?;
+    source
+        .seek(SeekFrom::Start(0))
+        .map_err(|error| UpdateError::Io(error.to_string()))?;
+
+    let result = write_part(&mut source, &part, installer, after_copy).and_then(|()| {
+        // The one step that changes the app: same folder, so it is atomic.
+        std::fs::rename(&part, &target).map_err(|error| {
+            UpdateError::Io(format!(
+                "the new version could not be put in place ({error}); the app was not changed"
+            ))
+        })
+    });
+    if let Err(error) = result {
+        let _ = std::fs::remove_file(&part);
+        tracing::warn!(%error, target = %target.display(), "the AppImage was not replaced");
+        return Err(error);
+    }
+    // Make the rename durable. The new file is already in place, so a failure here is not an
+    // update failure.
+    if let Err(error) = File::open(dir).and_then(|folder| folder.sync_all()) {
+        tracing::warn!(%error, "the folder of the AppImage could not be synced");
+    }
+    tracing::info!(
+        target = %target.display(),
+        version = installer.version(),
+        "the AppImage was replaced"
+    );
+    Ok(())
+}
+
+/// Writes the copy at `part` (new file, executable), flushes it and checks it against the signed
+/// size and SHA-256. The caller removes `part` on an error.
+#[cfg(unix)]
+fn write_part(
+    source: &mut File,
+    part: &Path,
+    installer: &VerifiedInstaller,
+    after_copy: &dyn Fn(&Path) -> std::io::Result<()>,
+) -> Result<(), UpdateError> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let io = |error: std::io::Error| UpdateError::Io(error.to_string());
+    let mut copy = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o755)
+        .open(part)
+        .map_err(|error| {
+            UpdateError::Io(format!(
+                "a new file cannot be created in {} ({error}); the app was not changed",
+                part.parent().unwrap_or(part).display()
+            ))
+        })?;
+    std::io::copy(source, &mut copy).map_err(io)?;
+    copy.sync_all().map_err(io)?;
+    // Set again in full: the creation mode is cut by the umask.
+    set_executable(&copy).map_err(io)?;
+    drop(copy);
+    after_copy(part).map_err(io)?;
+
+    let mut file = File::open(part).map_err(io)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0_u8; 64 * 1024];
+    let mut total = 0_u64;
+    loop {
+        let read = file.read(&mut buffer).map_err(io)?;
+        if read == 0 {
+            break;
+        }
+        total += read as u64;
+        hasher.update(&buffer[..read]);
+    }
+    if total != installer.size {
+        return Err(UpdateError::WrongSize);
+    }
+    if super::service::hex(hasher.finalize().as_slice()) != installer.sha256 {
+        return Err(UpdateError::ChecksumMismatch);
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn set_executable(file: &File) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    file.set_permissions(std::fs::Permissions::from_mode(0o755))
+}
+
+/// Removes the half-made copies an interrupted update left in `dir` (the AppImage's folder). Only
+/// regular files named `.CineVault-update-*.AppImage.part` are touched.
+#[cfg(unix)]
+pub fn remove_stale_parts(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        let ours = name.len() > PART_PREFIX.len() + PART_SUFFIX.len()
+            && name.starts_with(PART_PREFIX)
+            && name.ends_with(PART_SUFFIX);
+        // `file_type` does not follow links, so a link with such a name is left alone.
+        if ours && entry.file_type().is_ok_and(|kind| kind.is_file()) {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 /// What the close of the app did about an update.
 #[derive(Debug)]
 pub enum CloseUpdate {
@@ -637,5 +815,182 @@ mod tests {
         assert!(dir_is_writable(dir.path()));
         assert_eq!(std::fs::read_dir(dir.path()).expect("list").count(), 0);
         assert!(!dir_is_writable(&dir.path().join("missing")));
+    }
+
+    #[cfg(unix)]
+    mod replace {
+        use super::*;
+        use std::os::unix::fs::PermissionsExt;
+
+        /// A folder with an old fake AppImage and a verified download of `new`.
+        fn setup(new: &[u8]) -> (tempfile::TempDir, PathBuf, VerifiedInstaller) {
+            let dir = tempfile::tempdir().expect("dir");
+            let apps = dir.path().join("apps");
+            std::fs::create_dir(&apps).expect("apps");
+            let target = apps.join("CineVault.AppImage");
+            std::fs::write(&target, b"old version").expect("old");
+            std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o700))
+                .expect("mode");
+            let installer = verified(&dir.path().join("downloads"), new);
+            (dir, target, installer)
+        }
+
+        fn names(dir: &Path) -> Vec<String> {
+            let mut names: Vec<String> = std::fs::read_dir(dir)
+                .expect("list")
+                .map(|entry| {
+                    entry
+                        .expect("entry")
+                        .file_name()
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect();
+            names.sort();
+            names
+        }
+
+        #[test]
+        fn the_new_bytes_replace_the_old_file_which_stays_executable() {
+            let (_dir, target, installer) = setup(b"new version");
+            replace_appimage(&installer, &target).expect("replaced");
+            assert_eq!(std::fs::read(&target).expect("read"), b"new version");
+            let mode = std::fs::metadata(&target)
+                .expect("meta")
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o777, 0o755);
+            assert_eq!(names(target.parent().expect("dir")), ["CineVault.AppImage"]);
+            // The download itself is left for the update service to clean up.
+            assert!(installer.path().is_file());
+        }
+
+        #[test]
+        fn a_running_copy_keeps_its_file_open_while_it_is_replaced() {
+            let (_dir, target, installer) = setup(b"new version");
+            let mut running = File::open(&target).expect("open");
+            replace_appimage(&installer, &target).expect("replaced");
+            let mut old = String::new();
+            running.read_to_string(&mut old).expect("read");
+            assert_eq!(old, "old version");
+        }
+
+        #[test]
+        fn a_damaged_copy_leaves_the_old_file_and_no_part() {
+            let (_dir, target, installer) = setup(b"new version");
+            let flip = |part: &Path| {
+                let mut bytes = std::fs::read(part)?;
+                bytes[0] ^= 0xff;
+                std::fs::write(part, bytes)
+            };
+            let error = replace_appimage_checked(&installer, &target, &flip).expect_err("damaged");
+            assert!(matches!(error, UpdateError::ChecksumMismatch));
+            assert_eq!(std::fs::read(&target).expect("read"), b"old version");
+            assert_eq!(
+                std::fs::metadata(&target)
+                    .expect("meta")
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o700
+            );
+            assert_eq!(names(target.parent().expect("dir")), ["CineVault.AppImage"]);
+
+            // A copy of the wrong length is refused the same way.
+            let cut = |part: &Path| std::fs::write(part, b"new");
+            let error = replace_appimage_checked(&installer, &target, &cut).expect_err("short");
+            assert!(matches!(error, UpdateError::WrongSize));
+            assert_eq!(names(target.parent().expect("dir")), ["CineVault.AppImage"]);
+        }
+
+        #[test]
+        fn a_download_that_changed_is_never_copied() {
+            let (_dir, target, installer) = setup(b"new version");
+            std::fs::write(installer.path(), b"new_version").expect("swap");
+            let error = replace_appimage(&installer, &target).expect_err("changed");
+            assert!(matches!(error, UpdateError::ChecksumMismatch));
+            assert_eq!(std::fs::read(&target).expect("read"), b"old version");
+            assert_eq!(names(target.parent().expect("dir")), ["CineVault.AppImage"]);
+        }
+
+        #[test]
+        fn a_missing_or_folder_target_is_refused_with_nothing_changed() {
+            let (dir, target, installer) = setup(b"new version");
+            let gone = dir.path().join("apps").join("gone.AppImage");
+            let error = replace_appimage(&installer, &gone).expect_err("missing");
+            assert!(error.to_string().contains("nothing was changed"));
+            let error = replace_appimage(&installer, &dir.path().join("apps")).expect_err("folder");
+            assert!(error.to_string().contains("not a file"));
+            assert_eq!(names(&dir.path().join("apps")), ["CineVault.AppImage"]);
+            assert_eq!(std::fs::read(&target).expect("read"), b"old version");
+        }
+
+        #[test]
+        fn a_folder_that_takes_no_new_file_keeps_the_old_app() {
+            let (_dir, target, installer) = setup(b"new version");
+            let apps = target.parent().expect("dir");
+            std::fs::set_permissions(apps, std::fs::Permissions::from_mode(0o555)).expect("lock");
+            // Root ignores the mode; the case cannot be made then.
+            let locked = std::fs::File::create(apps.join("probe")).is_err();
+            let result = replace_appimage(&installer, &target);
+            std::fs::set_permissions(apps, std::fs::Permissions::from_mode(0o755)).expect("unlock");
+            if locked {
+                let error = result.expect_err("read-only");
+                assert!(error.to_string().contains("the app was not changed"));
+                assert_eq!(std::fs::read(&target).expect("read"), b"old version");
+                assert_eq!(names(apps), ["CineVault.AppImage"]);
+            }
+        }
+
+        #[test]
+        fn a_link_to_the_appimage_stays_a_link() {
+            let (dir, target, installer) = setup(b"new version");
+            let link = dir.path().join("CineVault");
+            std::os::unix::fs::symlink(&target, &link).expect("link");
+            replace_appimage(&installer, &link).expect("replaced");
+            assert!(
+                link.symlink_metadata()
+                    .expect("meta")
+                    .file_type()
+                    .is_symlink()
+            );
+            assert_eq!(std::fs::read(&target).expect("read"), b"new version");
+        }
+
+        #[test]
+        fn only_stale_parts_are_removed() {
+            let dir = tempfile::tempdir().expect("dir");
+            let stale = [
+                ".CineVault-update-1.2.0.AppImage.part",
+                ".CineVault-update-0.9.1-beta.AppImage.part",
+            ];
+            let keep = [
+                "CineVault.AppImage",
+                "notes.part",
+                ".CineVault-update-1.2.0.AppImage",
+                ".other-update-1.2.0.AppImage.part",
+                ".CineVault-update-.AppImage.part",
+            ];
+            for name in stale.iter().chain(&keep) {
+                std::fs::write(dir.path().join(name), b"x").expect("file");
+            }
+            // A folder with a matching name is not a file of ours.
+            std::fs::create_dir(dir.path().join(".CineVault-update-dir.AppImage.part"))
+                .expect("dir");
+            remove_stale_parts(dir.path());
+            let left = names(dir.path());
+            for name in stale {
+                assert!(!left.iter().any(|n| n == name), "{name} should be gone");
+            }
+            for name in keep {
+                assert!(left.iter().any(|n| n == name), "{name} should stay");
+            }
+            assert!(
+                left.iter()
+                    .any(|n| n == ".CineVault-update-dir.AppImage.part")
+            );
+            // A missing folder is not an error.
+            remove_stale_parts(&dir.path().join("missing"));
+        }
     }
 }

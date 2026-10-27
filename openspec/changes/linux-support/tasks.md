@@ -299,7 +299,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib updates`; `cargo check -p cinevault-app` (callers still compile).
   - Commit: `feat(updates): choose how a Linux copy installs an update`
 
-- [ ] 6.2 Replace the AppImage with the verified download `[risky: needs Sonnet/Opus]`
+- [x] 6.2 Replace the AppImage with the verified download `[risky: needs Sonnet/Opus]`
   - After: 6.1. Wave 2.
   - Touch: `crates/cv-app/src/updates/install.rs` only.
   - Steps (design D9): `pub fn replace_appimage(installer: &VerifiedInstaller, target: &Path) -> Result<(), UpdateError>`: `reverify()` and keep the handle; copy into `<dir>/.CineVault-update-<version>.AppImage.part` opened with `create_new`; `sync_all`; mode `0o755` (`PermissionsExt`, Unix only); hash the copy and compare with the signed SHA-256 (reuse `super::service::hex` and `Sha256` as `reverify` does at lines 80-108); `std::fs::rename(part, target)`; open the folder and `sync_all` it; any error removes the `.part` and returns. `pub fn remove_stale_parts(dir: &Path)` removes only files matching `.CineVault-update-*.AppImage.part`. Unix-only functions under `#[cfg(unix)]`.
