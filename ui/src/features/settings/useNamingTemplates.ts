@@ -28,6 +28,23 @@ export interface NamingTemplates {
   change: (field: NamingField, text: string, now?: boolean) => void;
   /** The plan for the templates as they are being edited: its `examples` are the live examples. */
   preview: OrganizePreviewDto | undefined;
+  /** The naming styles: the presets (shared with the first run's Naming step) and the user's own. */
+  styles: readonly NamingStyle[];
+  /** The style in use, or `undefined` while the profiles load. */
+  activeStyle: NamingStyle | undefined;
+  /**
+   * Makes a style the active one. `discard` is the custom style it replaces, which is deleted
+   * (the caller has asked first). Resolves to why it failed, or `null`.
+   */
+  choose: (id: string, discard?: string) => Promise<string | null>;
+}
+
+/** A naming style as the Style control lists it. */
+export interface NamingStyle {
+  id: string;
+  name: string;
+  /** A preset; the others are the user's own ("Custom"). */
+  builtin: boolean;
 }
 
 /**
@@ -134,6 +151,28 @@ export function useNamingTemplates(): NamingTemplates {
     [commit, setProblem],
   );
 
+  const choose = useCallback(
+    async (id: string, discard?: string) => {
+      // What was typed but not saved yet is dropped with the old style.
+      for (const timer of Object.values(timers.current)) window.clearTimeout(timer);
+      timers.current = {};
+      try {
+        await saving.current;
+        let saved = await backend.selectProfile(id);
+        if (discard !== undefined && discard !== id) saved = await backend.deleteProfile(discard);
+        client.setQueryData(PROFILES_KEY, saved);
+        setTexts({});
+        setProblems({});
+        setEdited({});
+        await client.invalidateQueries({ queryKey: RENAME_KEY });
+        return null;
+      } catch (error) {
+        return messageOf(error);
+      }
+    },
+    [backend, client],
+  );
+
   const request = useMemo(
     () =>
       active === undefined
@@ -165,6 +204,9 @@ export function useNamingTemplates(): NamingTemplates {
     problemOf: (field) => problems[field] ?? null,
     change,
     preview: plan.data,
+    styles: profiles.data?.profiles ?? [],
+    activeStyle: active,
+    choose,
   };
 }
 

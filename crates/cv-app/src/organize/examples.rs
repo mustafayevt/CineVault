@@ -4,7 +4,8 @@
 //! edition, no HDR, a colon in the title) and on built-in samples where it does not.
 
 use cv_domain::{AudioStream, Edition, Item, ItemDetail, MediaFile, MediaFileType, MediaSource};
-use cv_rename::MovieRenamer;
+use cv_domain::{EpisodeNumber, ItemId};
+use cv_rename::{MovieRenamer, TvRenamer};
 
 use super::load::LoadedMovie;
 use super::model::{Example, ExampleKind};
@@ -42,6 +43,35 @@ pub(crate) fn examples(movies: &[&LoadedMovie], renamer: &MovieRenamer) -> Vec<E
         .collect()
 }
 
+/// The TV episode example: a built-in sample show, so the episode template always has one to
+/// show, whether or not the library holds a show. `folder` is the show and season folders.
+pub(crate) fn episode_example(renamer: &TvRenamer) -> Option<Example> {
+    let mut show = Item::show("Severance");
+    show.core.year = 2022;
+    show.core.ids.set("tmdb", "95396");
+    let mut episode = Item::episode(ItemId(0), "Hello, Ms. Cobel");
+    if let ItemDetail::Episode(fields) = &mut episode.detail {
+        fields.numbers.set(EpisodeNumber::aired(2, 1));
+    }
+    let mut file = video(1920, 1080, &["HDR10"], "DTS", 6);
+    file.container_format = "Matroska".to_owned();
+    episode.core.media_files.push(file);
+    if let ItemDetail::Episode(fields) = &mut episode.detail {
+        fields.media_source = MediaSource::Bluray;
+    }
+    let name = renamer.episode_file_name(&show, &[&episode]).ok()?;
+    let show_folder = renamer.show_folder_name(&show).ok()?;
+    let season_folder = renamer.season_folder_name(&show, &episode).ok()?;
+    Some(Example {
+        kind: ExampleKind::Episode,
+        title: show.core.title.clone(),
+        year: show.core.year,
+        folder: format!("{show_folder}/{season_folder}"),
+        file: name,
+        sample: true,
+    })
+}
+
 /// Whether `item` shows the edge case of `kind`.
 fn fits(kind: ExampleKind, item: &Item) -> bool {
     let ItemDetail::Movie(fields) = &item.detail else {
@@ -53,7 +83,7 @@ fn fits(kind: ExampleKind, item: &Item) -> bool {
             f.kind == MediaFileType::Video && f.has_media_info() && f.hdr_formats.is_empty()
         }),
         ExampleKind::Colon => item.core.title.contains(':'),
-        ExampleKind::Plain => true,
+        ExampleKind::Plain | ExampleKind::Episode => true,
     }
 }
 
@@ -82,7 +112,7 @@ fn sample(kind: ExampleKind) -> Item {
             video(3840, 2160, &["HDR10"], "DTS-HD MA", 8),
         ),
         ExampleKind::NoHdr => ("Arrival", 2016, "329865", video(1920, 1080, &[], "DTS", 6)),
-        ExampleKind::Colon | ExampleKind::Plain => (
+        ExampleKind::Colon | ExampleKind::Plain | ExampleKind::Episode => (
             "Dune: Part Two",
             2024,
             "693134",

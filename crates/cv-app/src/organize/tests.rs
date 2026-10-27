@@ -171,7 +171,7 @@ fn the_preview_lists_changes_counts_tidy_and_locked_and_touches_nothing() {
 }
 
 #[test]
-fn the_preview_shows_three_examples_with_the_edge_cases() {
+fn the_preview_shows_the_examples_with_the_edge_cases() {
     let lib = Lib::new();
     let preview = lib
         .service
@@ -180,9 +180,17 @@ fn the_preview_shows_three_examples_with_the_edge_cases() {
     let kinds: Vec<ExampleKind> = preview.examples.iter().map(|e| e.kind).collect();
     assert_eq!(
         kinds,
-        [ExampleKind::Edition, ExampleKind::NoHdr, ExampleKind::Colon]
+        [
+            ExampleKind::Edition,
+            ExampleKind::NoHdr,
+            ExampleKind::Colon,
+            ExampleKind::Episode
+        ]
     );
     assert!(preview.examples.iter().all(|e| e.sample));
+    let episode = &preview.examples[3];
+    assert_eq!(episode.folder, "Severance (2022)/Season 02");
+    assert_eq!(episode.file, "Severance - S02E01 - Hello, Ms. Cobel");
     let colon = &preview.examples[2];
     assert_eq!(colon.folder, "Dune - Part Two (2024)");
     let edition = &preview.examples[0];

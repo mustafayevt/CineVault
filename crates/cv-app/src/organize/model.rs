@@ -215,6 +215,8 @@ pub enum ExampleKind {
     /// A colon in the title.
     Colon,
     Plain,
+    /// A TV episode of a built-in sample show (the folder holds the show and season folders).
+    Episode,
 }
 
 /// One live example of the templates.

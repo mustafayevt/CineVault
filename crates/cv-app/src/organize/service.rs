@@ -23,7 +23,7 @@ use cv_rename::{
 };
 
 use super::check::{FindingSeverity, check_pattern};
-use super::examples::examples;
+use super::examples::{episode_example, examples};
 use super::load::{Loaded, LoadedMovie, load, scope_ids};
 use super::model::{
     Applied, AppliedItem, AppliedStatus, ApplyRequest, BusyTitle, Choice, CompanionCounts,
@@ -1103,6 +1103,7 @@ impl OrganizeService {
             })
             .collect();
         planned.examples = examples(&movies, &movie_renamer);
+        planned.examples.extend(episode_example(&tv_renamer));
         Ok(planned)
     }
 }

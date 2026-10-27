@@ -18,6 +18,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Release notes of an available update, shown before you update, and a Release notes view with every version in Settings › Updates.
 - "What's new" after an update: a short card with the changes of the version you just installed.
 - Linux beta (AppImage, .deb, .rpm).
+- Settings › Naming: a Style control at the top fills the movie folder, movie file and TV episode templates from the same styles as the first-run setup. Editing a template switches it to Custom, and choosing a style over your own templates asks first.
 
 ### Changed
 
@@ -27,6 +28,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ### Fixed
 
+- Settings › Naming: the TV episode example is no longer empty, and every template field now has its token buttons (the TV one also has Channels).
 - A video ratio wider than its frame (for example 2.39:1 in a 16:9 file) is now reported instead of being cut to the frame.
 
 ## [1.0.1] - 2026-10-27

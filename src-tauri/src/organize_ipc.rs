@@ -840,7 +840,7 @@ impl From<Counts> for CountsDto {
 /// One live example of the templates.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct ExampleDto {
-    /// `edition`, `no_hdr`, `colon` or `plain`.
+    /// `edition`, `no_hdr`, `colon`, `plain` or `episode`.
     pub kind: String,
     pub title: String,
     pub year: u32,
@@ -858,6 +858,7 @@ impl From<Example> for ExampleDto {
                 ExampleKind::NoHdr => "no_hdr",
                 ExampleKind::Colon => "colon",
                 ExampleKind::Plain => "plain",
+                ExampleKind::Episode => "episode",
             }
             .to_owned(),
             title: e.title,

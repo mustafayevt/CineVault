@@ -38,6 +38,7 @@ export const EPISODE_TOKENS: readonly NamingToken[] = [
   { label: "HDR", engine: "hdrformat" },
   { label: "VideoCodec", engine: "videoCodec" },
   { label: "AudioCodec", engine: "audioCodec" },
+  { label: "Channels", engine: "audioChannelsDot" },
   { label: "Source", engine: "mediaSource" },
 ];
 

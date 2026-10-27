@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Button } from "../../components/Button";
 import { Field } from "../../components/Field";
+import { Popover } from "../../components/Popover";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { t } from "../../i18n/catalog";
 import { FormRow, SettingsSection } from "./FormParts";
@@ -22,10 +24,11 @@ const EXTENSION = /\.[A-Za-z0-9]{2,4}$/;
 function examplesOf(naming: NamingTemplates, colon: ColonStyle) {
   const preview = naming.preview;
   if (preview === undefined) return { folder: null, file: null, episode: null };
-  const pick = preview.examples.find((example) => example.kind === "colon") ?? preview.examples[0];
-  const show = preview.rows.find((row) => row.kind === "show");
-  const episode = show?.files.find((file) => file.kind === "episode")?.to[0];
-  const after = show === undefined ? "" : `${show.after}/`;
+  const movies = preview.examples.filter((example) => example.kind !== "episode");
+  const pick = movies.find((example) => example.kind === "colon") ?? movies[0];
+  // The backend renders the episode template on a built-in sample show, so there is an example
+  // whether or not the library holds a show.
+  const episode = preview.examples.find((example) => example.kind === "episode");
   return {
     folder: pick === undefined ? null : followColonStyle(pick.folder, pick.title, colon),
     file:
@@ -34,11 +37,7 @@ function examplesOf(naming: NamingTemplates, colon: ColonStyle) {
         : followColonStyle(pick.file, pick.title, colon) +
           (EXTENSION.test(pick.file) ? "" : ".mkv"),
     episode:
-      episode === undefined
-        ? null
-        : episode.startsWith(after)
-          ? episode.slice(after.length)
-          : episode,
+      episode === undefined ? null : episode.file + (EXTENSION.test(episode.file) ? "" : ".mkv"),
   };
 }
 
@@ -55,13 +54,15 @@ function Example({ text }: { text: string | null }) {
 /**
  * Settings, Naming (spec `renamer` "Naming templates in Settings" and "Colon in titles option"):
  * the Movie folder, Movie file and TV episode templates as mono text fields with a live example
- * under each, the token buttons that insert at the cursor of the field last used, and how a colon
+ * under each, the token buttons under each field that insert at its cursor, the Style control that fills all three at once, and how a colon
  * in a title is written.
  */
 export function NamingSection() {
   const naming = useNamingTemplates();
   const colon = colonStyleOf(useSettingsStore((state) => state.values[COLON_SETTING_KEY]));
-  const [focused, setFocused] = useState<NamingField>("movie_file");
+  // The preset waiting for the answer to "Replace your custom templates?".
+  const [asking, setAsking] = useState<string | null>(null);
+  const [styleProblem, setStyleProblem] = useState<string | null>(null);
   const inputs = useRef<Partial<Record<NamingField, HTMLInputElement | null>>>({});
   const caret = useRef<{ field: NamingField; at: number } | null>(null);
 
@@ -85,6 +86,18 @@ export function NamingSection() {
     naming.change(field, next.text, true);
   };
 
+  const presets = naming.styles.filter((style) => style.builtin);
+  const hasCustom = naming.styles.some((style) => !style.builtin);
+  const active = naming.activeStyle;
+  const customActive = active !== undefined && !active.builtin;
+  const customStyle = naming.styles.find((style) => !style.builtin);
+  const asked = presets.find((preset) => preset.id === asking);
+
+  const choose = async (id: string, discard?: string) => {
+    setAsking(null);
+    setStyleProblem(await naming.choose(id, discard));
+  };
+
   const examples = examplesOf(naming, colon);
   const row = (
     field: NamingField,
@@ -105,44 +118,109 @@ export function NamingSection() {
           disabled={!naming.ready}
           value={naming.valueOf(field)}
           error={naming.problemOf(field) ?? undefined}
-          onFocus={() => {
-            setFocused(field);
-          }}
           onChange={(event) => {
             naming.change(field, event.target.value);
           }}
         />
         <Example text={example} />
-        {focused === field ? (
-          <div
-            role="group"
-            aria-label={t("settingsPage.naming.tokens", { name: label })}
-            className="flex flex-wrap gap-[5px]"
-          >
-            {tokensOf(field).map((token) => (
-              <button
-                key={token.label}
-                type="button"
-                // Keeps the caret in the field while the button is pressed.
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                }}
-                onClick={() => {
-                  insert(field, token.label);
-                }}
-                className="cv-hoverable rounded-(--r-4) border border-solid border-line-edge bg-transparent px-1.5 py-px font-mono text-(length:--fs-11) text-text-2 hover:bg-surface-raised hover:text-text active:bg-surface-pressed"
-              >
-                {`{${token.label}}`}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        <div
+          role="group"
+          aria-label={t("settingsPage.naming.tokens", { name: label })}
+          className="flex flex-wrap gap-[5px]"
+        >
+          {tokensOf(field).map((token) => (
+            <button
+              key={token.label}
+              type="button"
+              // Keeps the caret in the field while the button is pressed.
+              onMouseDown={(event) => {
+                event.preventDefault();
+              }}
+              onClick={() => {
+                insert(field, token.label);
+              }}
+              className="cv-hoverable rounded-(--r-4) border border-solid border-line-edge bg-transparent px-1.5 py-px font-mono text-(length:--fs-11) text-text-2 hover:bg-surface-raised hover:text-text active:bg-surface-pressed"
+            >
+              {`{${token.label}}`}
+            </button>
+          ))}
+        </div>
       </div>
     </FormRow>
   );
 
   return (
     <SettingsSection id="naming" title={t("settingsPage.naming.title")}>
+      <FormRow
+        label={t("settingsPage.naming.style")}
+        hint={t("settingsPage.naming.style.hint")}
+        labelId="naming-style"
+        align="start"
+      >
+        <div className="flex flex-col gap-1.5">
+          <Popover
+            open={asked !== undefined}
+            onOpenChange={(open) => {
+              // Only the answer closes it; the wrapper is no button.
+              if (!open) setAsking(null);
+            }}
+            align="start"
+            aria-label={t("settingsPage.naming.replace.title")}
+            className="w-[340px]"
+            trigger={
+              <div className="inline-flex self-start">
+                <SegmentedControl<string>
+                  aria-label={t("settingsPage.naming.style")}
+                  value={active === undefined ? "" : active.builtin ? active.id : "custom"}
+                  options={[
+                    ...presets.map((preset) => ({ value: preset.id, label: preset.name })),
+                    ...(hasCustom
+                      ? [{ value: "custom", label: t("settingsPage.naming.style.custom") }]
+                      : []),
+                  ]}
+                  onChange={(value) => {
+                    if (!naming.ready) return;
+                    if (value === "custom") {
+                      if (!customActive && customStyle !== undefined) void choose(customStyle.id);
+                    } else if (value !== active?.id) {
+                      if (customActive) setAsking(value);
+                      else void choose(value);
+                    }
+                  }}
+                />
+              </div>
+            }
+          >
+            <p className="m-0 text-(length:--fs-13) text-text">
+              {t("settingsPage.naming.replace.body", { name: asked?.name ?? "" })}
+            </p>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setAsking(null);
+                }}
+              >
+                {t("settingsPage.naming.replace.cancel")}
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  if (asked !== undefined) void choose(asked.id, active?.id);
+                }}
+              >
+                {t("settingsPage.naming.replace.go")}
+              </Button>
+            </div>
+          </Popover>
+          {styleProblem === null ? null : (
+            <div role="alert" className="text-(length:--fs-12) text-danger">
+              {styleProblem}
+            </div>
+          )}
+        </div>
+      </FormRow>
       {row(
         "movie_folder",
         t("settingsPage.naming.movieFolder"),

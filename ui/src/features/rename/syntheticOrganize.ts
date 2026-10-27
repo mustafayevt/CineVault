@@ -281,21 +281,61 @@ function valueOf(movieRow: SampleMovie, name: string): string {
 
 /** Renders a template for a sample movie, with the clean-up rules of the renamer. */
 function render(template: string, movieRow: SampleMovie): string {
+  return renderWith(template, (name) => valueOf(movieRow, name));
+}
+
+/** The sample episode the TV example shows: Severance, season 2 episode 1. */
+function episodeValueOf(name: string): string {
+  switch (name) {
+    case "showTitle":
+      return "Severance";
+    case "showYear":
+      return "2022";
+    case "showTmdb":
+      return "95396";
+    case "seasonNr":
+      return "2";
+    case "seasonNr2":
+      return "02";
+    case "episodeNr":
+      return "1";
+    case "episodeNr2":
+      return "01";
+    case "title":
+      return "Hello, Ms. Cobel";
+    case "videoFormat":
+      return "1080p";
+    case "mediaSource":
+      return "BluRay";
+    case "hdr":
+    case "hdrformat":
+    case "hdrFormat":
+      return "HDR10";
+    case "audioCodec":
+      return "DTS";
+    case "audioChannelsDot":
+      return "5.1";
+    default:
+      return "";
+  }
+}
+
+function renderWith(template: string, lookup: (name: string) => string): string {
   const model = parseTemplate(template);
   let out = model.literals[0] ?? "";
   const skip: boolean[] = [];
   model.tokens.forEach((token, index) => {
     const literal = model.literals[index + 1] ?? "";
     let text = "";
-    if (token.kind === "token") text = valueOf(movieRow, token.name);
+    if (token.kind === "token") text = lookup(token.name);
     else if (token.kind === "optional") {
-      const value = valueOf(movieRow, token.name);
+      const value = lookup(token.name);
       text = value === "" ? "" : token.prefix + value + token.suffix;
     } else {
       const inner = token.source.slice(2, -1).trim();
       if (inner.startsWith("if ")) {
         const name = inner.slice(3).split(/[\s>]/)[0] ?? "";
-        skip.push(valueOf(movieRow, name) === "");
+        skip.push(lookup(name) === "");
       } else if (inner === "end") {
         skip.pop();
       }
@@ -540,6 +580,7 @@ export function createSyntheticOrganizeBackend(): OrganizeBackend {
       file: render(request.patterns.movie_file, source),
       sample: false,
     });
+    const render0 = (template: string) => renderWith(template, episodeValueOf);
     const first = movies[0];
     if (first === undefined) throw new Error("no sample titles");
     const find = (pick: (m: SampleMovie) => boolean) => movies.find(pick) ?? first;
@@ -560,6 +601,14 @@ export function createSyntheticOrganizeBackend(): OrganizeBackend {
           "colon",
           find((m) => m.title.includes(":")),
         ),
+        {
+          kind: "episode",
+          title: "Severance",
+          year: 2022,
+          folder: `${render0(request.patterns.show_folder)}/${render0(request.patterns.season_folder)}`,
+          file: render0(request.patterns.episode_file),
+          sample: true,
+        },
       ],
       problems: [],
     };

@@ -242,7 +242,8 @@ describe("Settings, Naming", () => {
     await user.click(field);
     await user.clear(field);
     await user.type(field, "{{Title} ({{Year})");
-    await user.click(screen.getByRole("button", { name: "{Resolution}" }));
+    const tokens = screen.getByRole("group", { name: "Tokens for Movie file" });
+    await user.click(within(tokens).getByRole("button", { name: "{Resolution}" }));
     expect(field).toHaveValue("{Title} ({Year}){Resolution}");
     expect(field).toHaveFocus();
     // The template is saved as a profile of the user's own, in the engine's syntax.
@@ -251,6 +252,101 @@ describe("Settings, Naming", () => {
       const active = profiles.profiles.find((profile) => profile.id === profiles.active);
       expect(active?.builtin).toBe(false);
       expect(active?.patterns.movie_file).toBe("${title} (${year})${videoFormat}");
+    });
+  });
+
+  it("shows a live example for the TV episode and the token buttons under every field", async () => {
+    setProvidersBackend(recordingBackend());
+    await renderSettings();
+    const field = await templateField("TV episode");
+    const row = field.closest("div[class*='grid']") as HTMLElement;
+    await waitFor(() => {
+      expect(within(row).getByText("Severance - S02E01 - Hello, Ms. Cobel.mkv")).toBeVisible();
+    });
+    for (const name of ["Movie folder", "Movie file", "TV episode"]) {
+      expect(screen.getByRole("group", { name: `Tokens for ${name}` })).toBeVisible();
+    }
+    const tv = screen.getByRole("group", { name: "Tokens for TV episode" });
+    for (const token of ["Show", "Season00", "Episode00", "EpisodeTitle", "Channels", "HDR"]) {
+      expect(within(tv).getByRole("button", { name: `{${token}}` })).toBeVisible();
+    }
+  });
+
+  describe("Style", () => {
+    const style = () => screen.findByRole("group", { name: "Style" });
+
+    it("fills the three templates at once from a preset", async () => {
+      const user = userEvent.setup();
+      const backend = createSyntheticOrganizeBackend();
+      setOrganizeBackend(backend);
+      setProvidersBackend(recordingBackend());
+      await renderSettings();
+      expect(await templateField("Movie folder")).toHaveValue("{Title} ({Year})");
+      await user.click(within(await style()).getByRole("button", { name: "Detailed" }));
+      await waitFor(() => {
+        expect(screen.getByLabelText("Movie folder template")).toHaveValue(
+          "{Title} ({Year}) [{Resolution}] [{Source}] [{HDR}] [{AudioCodec} {Channels}]",
+        );
+      });
+      expect(screen.getByLabelText("Movie file template")).toHaveValue(
+        "{Title} ({Year}) [{Resolution}] [{Source}] [{HDR}] [{AudioCodec} {Channels}]",
+      );
+      expect(screen.getByLabelText("TV episode template")).toHaveValue(
+        "{Show} - S{Season00}E{Episode00} - {EpisodeTitle} [{Resolution}] [{Source}] [{HDR}] [{AudioCodec} {Channels}]",
+      );
+      expect((await backend.profiles()).active).toBe("detailed");
+      expect(within(await style()).getByRole("button", { name: "Detailed" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      // A preset over a preset asks nothing.
+      expect(screen.queryByText(/Replace your custom templates/)).toBeNull();
+    });
+
+    it("switches to Custom when a field is edited, and asks before a preset replaces it", async () => {
+      const user = userEvent.setup();
+      const backend = createSyntheticOrganizeBackend();
+      setOrganizeBackend(backend);
+      setProvidersBackend(recordingBackend());
+      await renderSettings();
+      expect(within(await style()).queryByRole("button", { name: "Custom" })).toBeNull();
+      const field = await templateField("Movie folder");
+      await user.click(field);
+      await user.type(field, " x");
+      const group = await style();
+      await waitFor(() => {
+        expect(within(group).getByRole("button", { name: "Custom" })).toHaveAttribute(
+          "aria-pressed",
+          "true",
+        );
+      });
+      await settleSettingSaves();
+
+      await user.click(within(group).getByRole("button", { name: "Clean" }));
+      expect(
+        await screen.findByText(/Replace your custom templates with the Clean style/),
+      ).toBeVisible();
+      // Nothing is replaced until the answer.
+      expect(field).toHaveValue("{Title} ({Year}) x");
+      await user.click(screen.getByRole("button", { name: "Keep mine" }));
+      await waitFor(() => {
+        expect(screen.queryByText(/Replace your custom templates with/)).toBeNull();
+      });
+      expect(within(group).getByRole("button", { name: "Custom" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect((await backend.profiles()).profiles.some((p) => !p.builtin)).toBe(true);
+
+      await user.click(within(group).getByRole("button", { name: "Clean" }));
+      await user.click(await screen.findByRole("button", { name: "Replace" }));
+      await waitFor(() => {
+        expect(screen.getByLabelText("Movie folder template")).toHaveValue("{Title} ({Year})");
+      });
+      const saved = await backend.profiles();
+      expect(saved.active).toBe("clean");
+      expect(saved.profiles.some((p) => !p.builtin)).toBe(false);
+      expect(within(group).queryByRole("button", { name: "Custom" })).toBeNull();
     });
   });
 
