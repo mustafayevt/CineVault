@@ -315,7 +315,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cinevault-app updates`; LINUX CHECK same; manual in 9.3.
   - Commit: `feat(updates): update a Linux AppImage in place and send package installs to the release page`
 
-- [ ] 6.4 Players in their usual Linux places `[haiku]`
+- [x] 6.4 Players in their usual Linux places `[haiku]`
   - After: nothing. Wave 1.
   - Touch: `crates/cv-app/src/playback/player.rs` only.
   - Steps: `Os` (line 195) gains `Linux` (`cfg!(target_os = "linux")`); `known_locations` (line 232): `(Os::Linux, Mpv)` → `/usr/bin/mpv`, `/usr/local/bin/mpv`, `/snap/bin/mpv`, `/var/lib/flatpak/exports/bin/io.mpv.Mpv`, `$HOME/.local/share/flatpak/exports/bin/io.mpv.Mpv`; `(Os::Linux, Vlc)` → `/usr/bin/vlc`, `/usr/local/bin/vlc`, `/snap/bin/vlc`, `/var/lib/flatpak/exports/bin/org.videolan.VLC`, `$HOME/.local/share/flatpak/exports/bin/org.videolan.VLC` (take `$HOME` from `dirs::home_dir()` passed in as a parameter so the function stays pure). Fix any `match` on `Os` that becomes non-exhaustive.

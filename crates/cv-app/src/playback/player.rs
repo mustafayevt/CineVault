@@ -196,6 +196,7 @@ impl PlayerError {
 pub enum Os {
     Windows,
     MacOs,
+    Linux,
     Other,
 }
 
@@ -207,14 +208,17 @@ impl Os {
             Self::Windows
         } else if cfg!(target_os = "macos") {
             Self::MacOs
+        } else if cfg!(target_os = "linux") {
+            Self::Linux
         } else {
             Self::Other
         }
     }
 }
 
-/// The folders programs are installed in on Windows (`ProgramFiles`, `ProgramW6432`,
-/// `ProgramFiles(x86)`), without duplicates. Empty elsewhere.
+/// The folders programs are installed in beside the usual places, without duplicates: on
+/// Windows `ProgramFiles`, `ProgramW6432` and `ProgramFiles(x86)`; on Linux the Flatpak export
+/// folders (system and per-user), whose launchers are named by app id. Empty on macOS.
 #[must_use]
 pub fn program_dirs() -> Vec<PathBuf> {
     let mut dirs: Vec<PathBuf> = Vec::new();
@@ -225,6 +229,22 @@ pub fn program_dirs() -> Vec<PathBuf> {
                 dirs.push(dir);
             }
         }
+    }
+    if cfg!(target_os = "linux") {
+        for dir in flatpak_export_dirs(dirs::home_dir().as_deref()) {
+            if !dirs.contains(&dir) {
+                dirs.push(dir);
+            }
+        }
+    }
+    dirs
+}
+
+/// The Flatpak launcher folders: the system one, then the user's own under `home`.
+fn flatpak_export_dirs(home: Option<&Path>) -> Vec<PathBuf> {
+    let mut dirs = vec![PathBuf::from("/var/lib/flatpak/exports/bin")];
+    if let Some(home) = home {
+        dirs.push(home.join(".local/share/flatpak/exports/bin"));
     }
     dirs
 }
@@ -257,6 +277,16 @@ pub fn known_locations(kind: PlayerKind, os: Os, program_dirs: &[PathBuf]) -> Ve
         (Os::MacOs, PlayerKind::Iina) => {
             vec!["/Applications/IINA.app/Contents/MacOS/iina-cli".into()]
         }
+        (Os::Linux, PlayerKind::Mpv) => ["/usr/bin/mpv", "/usr/local/bin/mpv", "/snap/bin/mpv"]
+            .into_iter()
+            .map(PathBuf::from)
+            .chain(under("io.mpv.Mpv"))
+            .collect(),
+        (Os::Linux, PlayerKind::Vlc) => ["/usr/bin/vlc", "/usr/local/bin/vlc", "/snap/bin/vlc"]
+            .into_iter()
+            .map(PathBuf::from)
+            .chain(under("org.videolan.VLC"))
+            .collect(),
         _ => Vec::new(),
     }
 }
@@ -833,6 +863,84 @@ mod tests {
         assert_eq!(
             resolve_program(PlayerKind::Mpv, None, Os::MacOs, &[], &|_| false),
             PathBuf::from("mpv")
+        );
+    }
+
+    #[test]
+    fn linux_players_are_found_in_their_usual_places() {
+        let system = PathBuf::from("/var/lib/flatpak/exports/bin");
+        let user = PathBuf::from("/home/ana/.local/share/flatpak/exports/bin");
+        let dirs = [system.clone(), user.clone()];
+        assert_eq!(
+            known_locations(PlayerKind::Mpv, Os::Linux, &dirs),
+            [
+                PathBuf::from("/usr/bin/mpv"),
+                PathBuf::from("/usr/local/bin/mpv"),
+                PathBuf::from("/snap/bin/mpv"),
+                system.join("io.mpv.Mpv"),
+                user.join("io.mpv.Mpv"),
+            ]
+        );
+        assert_eq!(
+            known_locations(PlayerKind::Vlc, Os::Linux, &dirs),
+            [
+                PathBuf::from("/usr/bin/vlc"),
+                PathBuf::from("/usr/local/bin/vlc"),
+                PathBuf::from("/snap/bin/vlc"),
+                system.join("org.videolan.VLC"),
+                user.join("org.videolan.VLC"),
+            ]
+        );
+        let flatpak_mpv = user.join("io.mpv.Mpv");
+        let installed = |p: &Path| p == flatpak_mpv;
+        assert_eq!(
+            resolve_program(PlayerKind::Mpv, None, Os::Linux, &dirs, &installed),
+            flatpak_mpv
+        );
+        assert_eq!(
+            resolve_program(PlayerKind::Mpv, None, Os::Linux, &dirs, &|_| false),
+            PathBuf::from("mpv")
+        );
+    }
+
+    #[test]
+    fn flatpak_folders_include_the_user_folder_only_when_there_is_a_home() {
+        let home = Path::new("/home/ana");
+        assert_eq!(
+            flatpak_export_dirs(None),
+            [PathBuf::from("/var/lib/flatpak/exports/bin")]
+        );
+        assert_eq!(
+            flatpak_export_dirs(Some(home)),
+            [
+                PathBuf::from("/var/lib/flatpak/exports/bin"),
+                home.join(".local/share/flatpak/exports/bin"),
+            ]
+        );
+    }
+
+    #[test]
+    fn windows_and_macos_locations_are_unchanged() {
+        let program_files = PathBuf::from("C:\\Program Files");
+        assert_eq!(
+            known_locations(
+                PlayerKind::Vlc,
+                Os::Windows,
+                std::slice::from_ref(&program_files)
+            ),
+            [program_files.join("VideoLAN\\VLC\\vlc.exe")]
+        );
+        assert_eq!(
+            known_locations(PlayerKind::Mpv, Os::MacOs, &[]),
+            [
+                PathBuf::from("/opt/homebrew/bin/mpv"),
+                PathBuf::from("/usr/local/bin/mpv"),
+                PathBuf::from("/Applications/mpv.app/Contents/MacOS/mpv"),
+            ]
+        );
+        assert_eq!(
+            known_locations(PlayerKind::Vlc, Os::MacOs, &[]),
+            [PathBuf::from("/Applications/VLC.app/Contents/MacOS/VLC")]
         );
     }
 
