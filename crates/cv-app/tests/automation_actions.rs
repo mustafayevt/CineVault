@@ -84,7 +84,26 @@ fn own_copy(mock: &Path, dir: &Path, name: &str) -> PathBuf {
         name.to_owned()
     });
     std::fs::copy(mock, &target).unwrap();
+    #[cfg(unix)]
+    wait_until_runnable(&target);
     target
+}
+
+/// Linux refuses to run a file ("text file busy") while any process still holds it open for
+/// writing, and a process another test is starting at that moment briefly holds a copy of the
+/// descriptor we just closed. Runs the file until it is accepted, so the test's first real call
+/// does not hit that window.
+#[cfg(unix)]
+fn wait_until_runnable(program: &Path) {
+    const TEXT_FILE_BUSY: i32 = 26;
+    for _ in 0..200 {
+        match Command::new(program).arg("-version").output() {
+            Err(error) if error.raw_os_error() == Some(TEXT_FILE_BUSY) => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            _ => return,
+        }
+    }
 }
 
 // ---- the mock providers ---------------------------------------------------------------------
