@@ -364,7 +364,7 @@ fn the_executable_files_of_a_tree_stay_executable() {
         .resolve(ToolId::IndexerService)
         .expect("program")
         .path;
-    let mode =|p: &Path| fs::metadata(p).expect("metadata").permissions().mode() & 0o777;
+    let mode = |p: &Path| fs::metadata(p).expect("metadata").permissions().mode() & 0o777;
     assert_eq!(mode(&program), 0o755);
     assert_eq!(mode(&program.with_file_name("other")), 0o755);
     let data = program
