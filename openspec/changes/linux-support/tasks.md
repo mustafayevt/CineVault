@@ -155,7 +155,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib library_ops`; LINUX CHECK `cargo test -p cv-app --lib library_ops` and `cargo test -p cv-app --lib bin_live_round_trip -- --ignored` (needs a Trash under `$HOME`; it is created).
   - Commit: `feat(trash): use the freedesktop Trash on Linux and match its items exactly`
 
-- [ ] 3.5 PolicyBin and fallback tests for Linux refusals `[risky: needs Sonnet/Opus]`
+- [x] 3.5 PolicyBin and fallback tests for Linux refusals `[risky: needs Sonnet/Opus]`
   - After: 3.4. Wave 5.
   - Touch: `crates/cv-app/src/library_ops/policy_bin.rs` (tests module only), `crates/cv-app/src/library_ops/tests/safety.rs`.
   - Do NOT touch: non-test code. If a test exposes a bug, stop and write it in the commit body for 9.2 instead of fixing it here, unless the fix is under 20 lines in `policy_bin.rs`.
