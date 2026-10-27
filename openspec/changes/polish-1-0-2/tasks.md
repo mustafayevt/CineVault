@@ -12,7 +12,7 @@
 
 ## 4. Title page header actions
 
-- [ ] 4.1 Move Delete into the last place of the ⋯ menu (red, after a divider) and add "Change artwork" to the header buttons. Verified by the title page tests.
+- [x] 4.1 Move Delete into the last place of the ⋯ menu (red, after a divider) and add "Change artwork" to the header buttons. Verified by the title page tests.
 
 ## 5. Date added
 

@@ -188,14 +188,14 @@ export const MENU_GROUPS: readonly (readonly TitleActionId[])[] = [
   ["delete", "delete-permanently"],
 ];
 
-/** The buttons of a title page header; Delete follows after a 12px gap. */
+/** The buttons of a title page header; the ⋯ menu follows them, with Delete… last in it. */
 export const HEADER_ORDER: readonly TitleActionId[] = [
   "play",
   "scrape",
   "rename",
   "move",
   "open-folder",
-  "delete",
+  "artwork",
 ];
 
 /** The action's name on a button. */

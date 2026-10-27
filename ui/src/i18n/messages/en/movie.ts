@@ -216,6 +216,8 @@ export const movie = {
   "title.action.move": "Move",
   "title.action.openFolder": "Open folder",
   "title.action.delete": "Delete",
+  "title.action.changeArtwork": "Change artwork",
+  "title.menu.delete": "Delete…",
   "movie.renamedFrom.gone":
     "This rename can no longer be undone from here. Open History to see it.",
   "title.play.nothing": "There is nothing to play: no file is on disk",

@@ -95,14 +95,12 @@ describe("the TV show page", () => {
       "Rename",
       "Move",
       "Open folder",
-      "Delete",
+      "Change artwork",
     ]);
-    expect(within(bar).getByRole("button", { name: "Delete" })).not.toHaveAttribute(
-      "aria-disabled",
-    );
+    expect(within(bar).getByRole("button", { name: /More actions/ })).toBeInTheDocument();
   });
 
-  it("has the floating poster and backdrop buttons and Artwork… in the ⋯ menu", async () => {
+  it("has the floating poster and backdrop buttons", async () => {
     const user = userEvent.setup();
     const router = renderShow();
     await user.click(await screen.findByRole("button", { name: "Change poster" }));
@@ -110,15 +108,15 @@ describe("the TV show page", () => {
     expect(router.state.location.searchStr).toMatch(/type="?poster/);
   });
 
-  it("opens the picker on the fanart from the backdrop button and from the menu without a type", async () => {
+  it("opens the picker on the fanart from the backdrop button and from the header button without a type", async () => {
     const user = userEvent.setup();
     const router = renderShow();
     await user.click(await screen.findByRole("button", { name: "Change backdrop" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/artwork"));
     expect(router.state.location.searchStr).toMatch(/type="?fanart/);
     await router.navigate({ to: "/tv/$showId", params: { showId: SYNTHETIC_SHOW_ID } });
-    await user.click(await screen.findByRole("button", { name: /More actions/ }));
-    await user.click(screen.getByRole("menuitem", { name: "Artwork…" }));
+    const bar = await screen.findByRole("toolbar", { name: "Show actions" });
+    await user.click(within(bar).getByRole("button", { name: "Change artwork" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/artwork"));
     expect(router.state.location.searchStr).not.toContain("type=");
   });

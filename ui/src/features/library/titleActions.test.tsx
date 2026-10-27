@@ -141,7 +141,7 @@ describe("title actions", () => {
   it("shares icons, names and hints with the title page header", () => {
     // The page header reads the same list: its six buttons exist in the registry.
     for (const id of HEADER_ORDER) expect(TITLE_ACTIONS[id].icon).toBeDefined();
-    expect(HEADER_ORDER).toEqual(["play", "scrape", "rename", "move", "open-folder", "delete"]);
+    expect(HEADER_ORDER).toEqual(["play", "scrape", "rename", "move", "open-folder", "artwork"]);
     expect(TITLE_ACTIONS.rename.hint).toBe("F2");
     expect(TITLE_ACTIONS.delete.hint).toBe("Del");
     expect(TITLE_ACTIONS["delete-permanently"].hint).toBe("Shift Del");

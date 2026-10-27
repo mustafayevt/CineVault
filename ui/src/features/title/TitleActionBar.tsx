@@ -10,7 +10,7 @@ import type { TitleActions } from "./titleActions";
 
 /**
  * The action row of a title page: Play (the one gold button) · Scrape · Rename · Move · Open
- * folder, then a 12px gap before Delete (8px gap plus 4px), then the ⋯ menu. The same actions as the Library's selection bar, in the same order.
+ * folder · Change artwork, then the ⋯ menu, which ends with Delete… in the danger colour.
  */
 export function TitleActionBar({ actions, label }: { actions: TitleActions; label: string }) {
   return (
@@ -18,11 +18,10 @@ export function TitleActionBar({ actions, label }: { actions: TitleActions; labe
       {actions.header.map((action) => (
         <Button
           key={action.id}
-          variant={action.id === "play" ? "primary" : action.danger === true ? "danger" : "default"}
+          variant={action.id === "play" ? "primary" : "default"}
           icon={action.icon}
           onClick={action.onSelect}
           disabledReason={action.disabledReason}
-          className={action.id === "delete" ? "ml-1" : undefined}
           data-action={action.id}
         >
           {action.label}
