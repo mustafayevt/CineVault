@@ -88,7 +88,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-media` passes (the manifest parser test reads the embedded JSON); LINUX CHECK `bun run tools:fetch -- --dir $HOME/.cache/cv-tools` then `ls` shows `libmediainfo.so.0`, `ffmpeg`, the `Jackett` tree; LINUX CHECK `CINEVAULT_LIVE_TOOLS=1 cargo test -p cv-media --test tools_live`.
   - Commit: `feat(tools): pin MediaInfo, FFmpeg and the indexer service for Linux`
 
-- [ ] 2.4 Start the indexer service without system ICU on Linux `[haiku]`
+- [x] 2.4 Start the indexer service without system ICU on Linux `[haiku]`
   - After: 1.1. Wave 1.
   - Touch: `crates/cv-torrent/src/indexer_service/process.rs` only.
   - Steps: in `service_command` (line 111), add under `#[cfg(target_os = "linux")]` `command.env("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "1");` (on the child's `Command`, never on the app's environment), with a one-line comment why. Add a `#[cfg(target_os = "linux")]` unit test that builds the command and checks `get_envs()` contains the pair (copy the arrangement of an existing `service_command` test if there is one; otherwise build `StartParams` as other tests in the file do).

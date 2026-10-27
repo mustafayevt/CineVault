@@ -137,6 +137,12 @@ fn service_command(params: &StartParams<'_>, pid_file: &Path) -> Command {
         // Its own process group, so the whole tree can be ended together.
         command.process_group(0);
     }
+    #[cfg(target_os = "linux")]
+    {
+        // The service is a .NET program that exits at start-up when the system has no ICU
+        // libraries, as minimal Linux installs often lack. Invariant mode runs without them.
+        command.env("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "1");
+    }
     command
 }
 
@@ -555,5 +561,31 @@ mod tests {
         assert!(WATCHDOG_SCRIPT.contains(r#"kill -0 "$1""#));
         assert!(WATCHDOG_SCRIPT.contains(r#"kill -TERM -- "-$2""#));
         assert!(WATCHDOG_SCRIPT.contains(r#"kill -KILL -- "-$2""#));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_service_command_runs_in_invariant_globalization_mode_on_linux() {
+        use std::ffi::OsStr;
+
+        let temp = tempfile::tempdir().expect("temp dir");
+        let install = temp.path().join("indexer-service").join("1.0");
+        let data = temp.path().join("data");
+        let params = StartParams {
+            program: &install.join("jackett"),
+            install_dir: &install,
+            data_dir: &data,
+            solver_url: None,
+            ready_timeout: READY_TIMEOUT,
+        };
+        let command = service_command(&params, &data.join(SERVICE_PID_FILE));
+        let invariant = command.get_envs().any(|(key, value)| {
+            key == OsStr::new("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT")
+                && value == Some(OsStr::new("1"))
+        });
+        assert!(
+            invariant,
+            "the child command sets invariant globalization mode"
+        );
     }
 }
