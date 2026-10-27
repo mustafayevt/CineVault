@@ -46,6 +46,8 @@ const toolbar = (type: "movies" | "collections") => (
     onType={() => undefined}
     view="grid"
     onView={() => undefined}
+    posterSize="m"
+    onPosterSize={() => undefined}
     sort={[]}
     onSort={() => undefined}
     columns={[]}

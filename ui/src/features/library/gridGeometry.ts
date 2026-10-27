@@ -4,6 +4,9 @@
  * so the scroll position of any row is arithmetic and nothing is measured while scrolling.
  */
 const MIN_POSTER_WIDTH = 148;
+/** The poster sizes the toolbar offers: the narrowest a poster may be, so the row fits more or fewer. */
+export const POSTER_SIZES = { s: 120, m: MIN_POSTER_WIDTH, l: 200 } as const;
+export type PosterSize = keyof typeof POSTER_SIZES;
 const COLUMN_GAP = 18;
 const ROW_GAP = 22;
 /** The inset on each side of the grid. */
@@ -21,10 +24,16 @@ export interface GridGeometry {
   rowHeight: number;
 }
 
-/** The columns that fit `containerWidth`, the poster width that fills the row, the row height. */
-export function gridGeometry(containerWidth: number): GridGeometry {
+/**
+ * The columns that fit `containerWidth`, the poster width that fills the row, the row height.
+ * `minWidth` is the narrowest a poster may be (the chosen poster size).
+ */
+export function gridGeometry(
+  containerWidth: number,
+  minWidth: number = MIN_POSTER_WIDTH,
+): GridGeometry {
   const usable = Math.max(0, containerWidth - INSET * 2);
-  const columns = Math.max(1, Math.floor((usable + COLUMN_GAP) / (MIN_POSTER_WIDTH + COLUMN_GAP)));
+  const columns = Math.max(1, Math.floor((usable + COLUMN_GAP) / (minWidth + COLUMN_GAP)));
   const cellWidth = Math.max(1, (usable - COLUMN_GAP * (columns - 1)) / columns);
   const rowHeight = Math.round(cellWidth * POSTER_RATIO + CAPTION_HEIGHT + ROW_GAP);
   return { columns, cellWidth, rowHeight };

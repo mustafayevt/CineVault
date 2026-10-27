@@ -20,7 +20,7 @@
 
 ## 6. Poster size
 
-- [ ] 6.1 Persisted poster size control in the grid view. Verified by a library view test and the grid geometry tests.
+- [x] 6.1 Persisted poster size control in the grid view. Verified by a library view test and the grid geometry tests.
 
 ## 7. Big artwork preview
 

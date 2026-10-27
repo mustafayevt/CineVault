@@ -6,6 +6,10 @@ export const library = {
   "library.type.tv": "TV shows",
   "library.type.collections": "Collections",
   "library.scan": "Scan folders now",
+  "library.posterSize.label": "Poster size",
+  "library.posterSize.small": "Small posters",
+  "library.posterSize.medium": "Medium posters",
+  "library.posterSize.large": "Large posters",
   "library.reloadMedia.label": "Reload media info",
   "library.reloadMedia.confirm.movies":
     "Reload media info for {count, plural, one {# movie} other {# movies}}? This reads every file again and can take a few minutes.",

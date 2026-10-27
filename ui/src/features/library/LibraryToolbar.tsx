@@ -11,6 +11,7 @@ import type { LibrarySortKey } from "./libraryBackend";
 import { SORT_CHOICES, SORT_KEYS, SORT_LABEL, sortChoiceOf } from "./sortChoices";
 import type { SortChoice } from "./sortChoices";
 import type { LibraryType, LibraryView } from "./libraryStore";
+import type { PosterSize } from "./gridGeometry";
 import { LibraryColumnItems } from "./LibraryColumnItems";
 import type { ColumnChoice } from "./LibraryColumnItems";
 
@@ -21,6 +22,9 @@ interface LibraryToolbarProps {
   onType: (type: LibraryType) => void;
   view: LibraryView;
   onView: (view: LibraryView) => void;
+  /** How wide the grid's posters are; the control shows only in the grid view. */
+  posterSize: PosterSize;
+  onPosterSize: (size: PosterSize) => void;
   sort: readonly LibrarySortKey[];
   onSort: (sort: readonly LibrarySortKey[]) => void;
   /** The table's columns for the Columns menu. */
@@ -42,6 +46,8 @@ export function LibraryToolbar({
   onType,
   view,
   onView,
+  posterSize,
+  onPosterSize,
   sort,
   onSort,
   columns,
@@ -118,6 +124,18 @@ export function LibraryToolbar({
       {titles && (
         <>
           <span aria-hidden="true" className="h-[18px] w-px bg-line-section" />
+          {view === "grid" && (
+            <SegmentedControl<PosterSize>
+              aria-label={t("library.posterSize.label")}
+              value={posterSize}
+              onChange={onPosterSize}
+              options={[
+                { value: "s", label: "S", ariaLabel: t("library.posterSize.small") },
+                { value: "m", label: "M", ariaLabel: t("library.posterSize.medium") },
+                { value: "l", label: "L", ariaLabel: t("library.posterSize.large") },
+              ]}
+            />
+          )}
           <SegmentedControl<LibraryView>
             aria-label={t("library.view.label")}
             value={view}
