@@ -245,8 +245,8 @@ impl SystemBin for PolicyBin {
             if let Some(parent) = to.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            if let Err(error) = cv_fs::retry("restore", &place, || std::fs::rename(&place, to)) {
-                problems.push((item.original.clone(), error.to_string()));
+            if let Err(why) = super::trash_bin::put_back(&place, to) {
+                problems.push((item.original.clone(), why));
             }
         }
         if !problems.is_empty() {

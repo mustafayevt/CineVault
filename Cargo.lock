@@ -1193,6 +1193,7 @@ dependencies = [
 name = "cv-fs"
 version = "1.0.1"
 dependencies = [
+ "rustix",
  "tempfile",
  "tracing",
 ]

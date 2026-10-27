@@ -240,6 +240,72 @@ pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
     retry("a rename", from, || fs::rename(from, to))
 }
 
+/// Why [`rename_no_replace`] could not put a file back without risking another one.
+const NO_SAFE_RENAME: &str = "this file system cannot move it back without the risk of replacing \
+    a file that appears at the same moment";
+
+/// Renames `from` to `to` **only if nothing is at `to`**, as one step: a file or folder another
+/// program creates at `to` a moment earlier survives, because the check and the rename are not
+/// two separate calls. A rename alone replaces a file on Unix (and on Windows), so Undo and
+/// restore, which first check that the old place is free, use this one.
+///
+/// On Linux this is `renameat2` with `RENAME_NOREPLACE`. A file system without it (exFAT, FAT32,
+/// some network shares) falls back to a hard link for a file, which also fails when `to` exists;
+/// anything that cannot be moved safely either way is refused with
+/// [`io::ErrorKind::Unsupported`] and left where it is, never moved with a replacing rename.
+/// Elsewhere `to` is checked and `from` renamed, which leaves a very small window.
+///
+/// # Errors
+/// [`io::ErrorKind::AlreadyExists`] when `to` exists; [`io::ErrorKind::Unsupported`] when this
+/// file system cannot do it safely; another error when the rename itself failed. `from` is then
+/// where it was.
+pub fn rename_no_replace(from: &Path, to: &Path) -> io::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        use rustix::fs::{CWD, RenameFlags, renameat_with};
+        use rustix::io::Errno;
+        let renamed = retry("a rename", from, || {
+            renameat_with(CWD, from, CWD, to, RenameFlags::NOREPLACE).map_err(io::Error::from)
+        });
+        match renamed {
+            // EINVAL is what a file system that does not know the flag answers.
+            Err(error)
+                if [Errno::INVAL, Errno::NOSYS, Errno::OPNOTSUPP]
+                    .iter()
+                    .any(|errno| error.raw_os_error() == Some(errno.raw_os_error())) =>
+            {
+                link_then_unlink(from, to)
+            }
+            other => other,
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        if to.symlink_metadata().is_ok() {
+            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
+        }
+        rename(from, to)
+    }
+}
+
+/// A file moved by linking a second name and dropping the first. Linking never replaces, so it
+/// is as safe as a no-replace rename; a folder, a link or a volume without hard links is refused.
+#[cfg(target_os = "linux")]
+fn link_then_unlink(from: &Path, to: &Path) -> io::Result<()> {
+    let refused = || io::Error::new(io::ErrorKind::Unsupported, NO_SAFE_RENAME);
+    if !fs::symlink_metadata(from).is_ok_and(|meta| meta.is_file()) {
+        return Err(refused());
+    }
+    match fs::hard_link(from, to) {
+        Ok(()) => fs::remove_file(from).inspect_err(|_| {
+            // Both names must not stay: drop the one just made, which only we know about.
+            let _ = fs::remove_file(to);
+        }),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Err(error),
+        Err(_) => Err(refused()),
+    }
+}
+
 /// Removes a file, retrying [transient](is_transient) errors. Only for files CineVault itself
 /// made (temporary files, the copy left by a move); user files go to the trash folder instead.
 ///

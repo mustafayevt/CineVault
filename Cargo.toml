@@ -73,7 +73,7 @@ fancy-regex = "0.19"
 trash = { version = "5", default-features = false, features = ["coinit_apartmentthreaded", "chrono"] }
 # Windows Credential Manager, macOS Keychain, Linux Secret Service (links libdbus-1).
 keyring = { version = "3.6", default-features = false, features = ["windows-native", "apple-native", "sync-secret-service", "crypto-rust"] }
-# Safe getuid, access and O_DIRECT on Linux (cv-app).
+# Safe getuid, access, O_DIRECT and no-replace renames on Linux (cv-app, cv-fs).
 rustix = { version = "1", default-features = false, features = ["std", "fs", "process"] }
 # tar.xz tool downloads (cv-media).
 liblzma = { version = "0.4", default-features = false, features = ["static"] }

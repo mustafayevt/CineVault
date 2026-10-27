@@ -257,3 +257,64 @@ fn a_folder_held_by_an_open_file_below_it_is_renamed_once_the_file_is_closed() {
     assert!(retry_folder("rename", &renamed, || fs::rename(&renamed, &back)).is_err());
     assert!(started.elapsed() >= Duration::from_secs(3));
 }
+
+#[test]
+fn a_no_replace_rename_moves_into_a_free_place() {
+    let dir = tempfile::tempdir().unwrap();
+    let (from, to) = (dir.path().join("a.mkv"), dir.path().join("b.mkv"));
+    fs::write(&from, b"film").unwrap();
+    rename_no_replace(&from, &to).unwrap();
+    assert!(!from.exists());
+    assert_eq!(fs::read(&to).unwrap(), b"film");
+
+    let (folder, moved) = (dir.path().join("Heat"), dir.path().join("Heat (1995)"));
+    fs::create_dir(&folder).unwrap();
+    fs::write(folder.join("x.mkv"), b"x").unwrap();
+    rename_no_replace(&folder, &moved).unwrap();
+    assert!(!folder.exists() && moved.join("x.mkv").is_file());
+}
+
+#[test]
+fn a_no_replace_rename_never_replaces_what_is_there() {
+    let dir = tempfile::tempdir().unwrap();
+    let (from, to) = (dir.path().join("a.mkv"), dir.path().join("b.mkv"));
+    fs::write(&from, b"mine").unwrap();
+    fs::write(&to, b"theirs").unwrap();
+    let error = rename_no_replace(&from, &to).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+    assert_eq!(fs::read(&from).unwrap(), b"mine");
+    assert_eq!(fs::read(&to).unwrap(), b"theirs");
+
+    // A plain rename would have replaced an empty folder, too.
+    let (folder, empty) = (dir.path().join("Heat"), dir.path().join("Heat (1995)"));
+    fs::create_dir(&folder).unwrap();
+    fs::create_dir(&empty).unwrap();
+    let error = rename_no_replace(&folder, &empty).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+    assert!(folder.is_dir() && empty.is_dir());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_file_system_without_the_flag_moves_a_file_by_a_link_and_refuses_a_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let (from, to) = (dir.path().join("a.mkv"), dir.path().join("b.mkv"));
+    fs::write(&from, b"film").unwrap();
+    link_then_unlink(&from, &to).unwrap();
+    assert!(!from.exists());
+    assert_eq!(fs::read(&to).unwrap(), b"film");
+
+    // The link never replaces.
+    fs::write(&from, b"again").unwrap();
+    let error = link_then_unlink(&from, &to).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+    assert_eq!(fs::read(&to).unwrap(), b"film");
+    assert_eq!(fs::read(&from).unwrap(), b"again");
+
+    // A folder has no link: it is refused and stays where it is.
+    let (folder, free) = (dir.path().join("Heat"), dir.path().join("Heat (1995)"));
+    fs::create_dir(&folder).unwrap();
+    let error = link_then_unlink(&folder, &free).unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::Unsupported);
+    assert!(folder.is_dir() && !free.exists());
+}

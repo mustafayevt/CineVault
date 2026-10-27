@@ -113,6 +113,17 @@ pub const NOT_IN_BIN: &str = "It is no longer in the Recycle Bin or Trash";
 /// What a restore says when the old path is taken.
 pub const PATH_TAKEN: &str = "Something else is at this path now; nothing was replaced";
 
+/// Puts `from` back at `to` without ever replacing what is at `to`. The restore checks that the
+/// old path is free first, but a file can appear there before the rename, and a plain rename
+/// would replace it; this one fails instead ([`PATH_TAKEN`]). A file system that cannot do it
+/// safely says so, and the item stays in the bin.
+pub(super) fn put_back(from: &Path, to: &Path) -> Result<(), String> {
+    cv_fs::rename_no_replace(from, to).map_err(|error| match error.kind() {
+        std::io::ErrorKind::AlreadyExists => PATH_TAKEN.to_owned(),
+        _ => error.to_string(),
+    })
+}
+
 /// A bin that takes nothing: [`send_or_fallback`] moves every path to the library folder's own
 /// trash folder, which is restored by a rename. For services that were not given the system bin
 /// (tests, tools).
@@ -424,8 +435,8 @@ fn rename_back(
         if let Some(parent) = to.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        if let Err(error) = cv_fs::retry("restore", &from, || std::fs::rename(&from, to)) {
-            problems.push((item.original.clone(), error.to_string()));
+        if let Err(why) = put_back(&from, to) {
+            problems.push((item.original.clone(), why));
         }
     }
     if problems.is_empty() {
@@ -594,7 +605,7 @@ pub fn restore_all(bin: &dyn SystemBin, items: &[BinnedItem]) -> Result<(), Vec<
     let mut problems = Vec::new();
     let mut seen = BTreeSet::new();
     for (item, here) in items.iter().zip(present_all(bin, items)) {
-        if !seen.insert(item.original.to_lowercase()) {
+        if !seen.insert(cv_fs::paths::key(Path::new(&item.original))) {
             continue;
         }
         if Path::new(&item.original).symlink_metadata().is_ok() {
@@ -836,6 +847,24 @@ mod tests {
         std::fs::create_dir_all(&folder).unwrap();
         std::fs::write(folder.join("movie.mkv"), b"twelve bytes").unwrap();
         folder
+    }
+
+    #[test]
+    fn putting_back_never_replaces_what_appeared_at_the_old_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let kept = dir.path().join("kept");
+        let old = dir.path().join("old.mkv");
+        std::fs::write(&kept, b"in the bin").unwrap();
+        // Someone put a file at the old path after the check that found it free.
+        std::fs::write(&old, b"theirs").unwrap();
+        assert_eq!(put_back(&kept, &old).unwrap_err(), PATH_TAKEN);
+        assert_eq!(std::fs::read(&old).unwrap(), b"theirs");
+        assert_eq!(std::fs::read(&kept).unwrap(), b"in the bin");
+
+        std::fs::remove_file(&old).unwrap();
+        put_back(&kept, &old).unwrap();
+        assert_eq!(std::fs::read(&old).unwrap(), b"in the bin");
+        assert!(!kept.exists());
     }
 
     #[test]
