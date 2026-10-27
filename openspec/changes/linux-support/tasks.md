@@ -238,7 +238,7 @@ Read this block once; every task below relies on it.
 
 ## 5. Desktop shell and UI
 
-- [ ] 5.1 Linux Tauri configuration `[haiku]`
+- [x] 5.1 Linux Tauri configuration `[haiku]`
   - After: nothing. Wave 1.
   - Touch: new `src-tauri/tauri.linux.conf.json`, `src-tauri/src/chrome.rs` (tests and doc comment).
   - Do NOT touch: `tauri.conf.json`, the Windows or macOS config.

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "CineVault",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 680,
+        "decorations": false,
+        "backgroundColor": "#121211"
+      }
+    ]
+  },
+  "bundle": {
+    "targets": [
+      "appimage",
+      "deb",
+      "rpm"
+    ],
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      },
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libdbus-1-3"
+        ],
+        "section": "video"
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "gtk3",
+          "dbus-libs"
+        ]
+      }
+    }
+  }
+}
