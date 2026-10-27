@@ -996,6 +996,33 @@ impl ProbeMemory {
     }
 }
 
+/// Whether the library folder at `path` is there: a folder, and on Linux one whose drive is
+/// really mounted.
+fn folder_answers(path: &Path) -> bool {
+    answers(path, root_is_mounted(path))
+}
+
+/// `path` is a folder and its drive is mounted (`root_is_mounted`). An unplugged Linux drive
+/// leaves its empty mount-point folder behind on the system drive; that folder is a folder, but
+/// it must not pass for the library, so the drive counts as offline until it is mounted again.
+fn answers(path: &Path, root_is_mounted: bool) -> bool {
+    root_is_mounted && path.is_dir()
+}
+
+/// Whether the mount point that holds `path` (found by the path alone: `/media/<user>/<name>`,
+/// `/run/media/<user>/<name>` or `/mnt/<name>`) has a file system mounted on it. A folder
+/// anywhere else is on the system drive, which is always there.
+#[cfg(target_os = "linux")]
+fn root_is_mounted(path: &Path) -> bool {
+    let root = cv_fs::paths::linux_mount_root(&path.to_string_lossy());
+    root == "/" || cv_fs::paths::is_mount_point(Path::new(&root))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn root_is_mounted(_path: &Path) -> bool {
+    true
+}
+
 /// Whether each of `paths` is a folder, asked all at once: `Some(answer)`, or `None` when it did
 /// not answer within `timeout`. A dead network share can block a file-system call for a long
 /// time, so each probe runs on its own thread and is left behind when it is late.
@@ -1007,7 +1034,7 @@ fn probe_all<'a>(paths: impl Iterator<Item = &'a str>, timeout: Duration) -> Vec
             std::thread::Builder::new()
                 .name("cv-source-probe".to_owned())
                 .spawn(move || {
-                    let _ = sender.send(Path::new(&owned).is_dir());
+                    let _ = sender.send(folder_answers(Path::new(&owned)));
                 })
                 .ok()
                 .map(|_| receiver)
@@ -1102,6 +1129,35 @@ mod tests {
         let gone = dir.path().join("gone").to_string_lossy().into_owned();
         let answers = probe_all([here.as_str(), gone.as_str()].into_iter(), PROBE_TIMEOUT);
         assert_eq!(answers, [Some(true), Some(false)]);
+    }
+
+    #[test]
+    fn a_folder_on_a_drive_that_is_not_mounted_does_not_answer() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(answers(dir.path(), true));
+        // The empty folder an unplugged drive leaves behind.
+        assert!(!answers(dir.path(), false));
+        // A mounted drive without the folder, or with a file in its place, does not answer either.
+        assert!(!answers(&dir.path().join("gone"), true));
+        let file = dir.path().join("file");
+        std::fs::write(&file, b"x").unwrap();
+        assert!(!answers(&file, true));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_mount_shaped_path_with_nothing_mounted_is_offline_on_linux() {
+        let dir = tempfile::tempdir().unwrap();
+        // A folder on the system drive is online.
+        assert!(folder_answers(dir.path()));
+        // The root of a temp dir is `/`, so it is always mounted; a made-up drive is not.
+        assert!(root_is_mounted(dir.path()));
+        assert!(!root_is_mounted(Path::new(
+            "/mnt/cinevault-test-drive-that-is-not-there/Movies"
+        )));
+        assert!(!folder_answers(Path::new(
+            "/mnt/cinevault-test-drive-that-is-not-there/Movies"
+        )));
     }
 
     #[test]

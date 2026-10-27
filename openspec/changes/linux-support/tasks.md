@@ -227,7 +227,7 @@ Read this block once; every task below relies on it.
   - Accept: `cargo test -p cv-app --lib organize::startup`; LINUX CHECK same.
   - Commit: `fix(rename): defer recovery on unmounted Linux drives`
 
-- [ ] 4.5 Unmounted Linux mount points are offline `[risky: needs Sonnet/Opus]`
+- [x] 4.5 Unmounted Linux mount points are offline `[risky: needs Sonnet/Opus]`
   - After: 3.1. Wave 3.
   - Touch: `crates/cv-app/src/scanning.rs` (the probe at line 984 and its helpers only).
   - Do NOT touch: `SourceState` logic at line 956 beyond what the probe returns.
