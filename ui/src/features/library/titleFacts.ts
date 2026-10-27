@@ -50,6 +50,11 @@ export function problemNote(card: LibraryCard): string | null {
   }
 }
 
+/** Why the title needs attention, in the words of its first flag; empty when there is none. */
+export function problemReason(card: LibraryCard): string {
+  return card.lifecycle?.flags[0]?.reason ?? "";
+}
+
 /** The badge on a poster: the stage, or the warning triangle when the title needs attention. */
 export function stageBadgeOf(card: LibraryCard): StageBadgeKind {
   if (problemOf(card) !== null) return "attention";

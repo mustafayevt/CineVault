@@ -8,7 +8,7 @@
 
 ## 3. Stage column
 
-- [ ] 3.1 Labelled Stage header, New/Scraped/Renamed tags without a pointer cursor, problem colour and tooltip, app tooltip on the grid tick. Verified by the library table tests and a screenshot.
+- [x] 3.1 Labelled Stage header, New/Scraped/Renamed tags without a pointer cursor, problem colour and tooltip, app tooltip on the grid tick. Verified by the library table tests and a screenshot.
 
 ## 4. Title page header actions
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { SearchField } from "../../components/SearchField";
-import { StageBadge } from "../../components/StageBadge";
+import { StageTag } from "../../components/StageTag";
 import { t } from "../../i18n/catalog";
 import { usePreferOriginalTitle } from "../library/displayTitle";
 import type { LibraryCard } from "../library/libraryBackend";
@@ -43,23 +43,10 @@ interface SpotlightProps {
   onClear: () => void;
 }
 
-/** The stage of a title, as a glyph and a word: "Scraped", "Not matched". */
-function StageTag({ card }: { card: LibraryCard }) {
-  const stage = stageBadgeOf(card);
+/** The stage of a title as a tag: "Scraped", or its problem ("Not matched"). */
+function StageOf({ card }: { card: LibraryCard }) {
   const note = problemNote(card);
-  const word =
-    note ??
-    (stage === "new"
-      ? t("stage.new")
-      : stage === "renamed"
-        ? t("stage.renamed")
-        : t("stage.scraped"));
-  return (
-    <span className="flex shrink-0 items-center gap-1 text-(length:--fs-12) text-text-muted">
-      <StageBadge stage={stage} label={word} />
-      <span className={stage === "attention" ? "text-warn" : undefined}>{word}</span>
-    </span>
-  );
+  return <StageTag stage={stageBadgeOf(card)} {...(note === null ? {} : { label: note })} />;
 }
 
 /**
@@ -120,7 +107,7 @@ export function SpotlightSearch({
         meta: [kindWord(kind), card.year > 0 ? yearText(card.year) : ""]
           .filter(Boolean)
           .join(" · "),
-        badge: <StageTag card={card} />,
+        badge: <StageOf card={card} />,
         similar: isSimilarOnly(label, term),
         note: t("shell.search.similar"),
       };

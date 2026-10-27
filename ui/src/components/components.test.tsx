@@ -216,6 +216,17 @@ describe("StageBadge", () => {
     const warning = screen.getByRole("img", { name: "Not matched" }).querySelector("svg");
     expect(warning?.getAttribute("class")).toContain("text-warn");
   });
+
+  it("shows the app tooltip, never a native title, and keeps an arrow cursor", async () => {
+    render(<StageBadge stage="attention" label="Not matched" />);
+    const badge = screen.getByRole("img", { name: "Not matched" });
+    expect(badge).not.toHaveAttribute("title");
+    expect(badge.className).toContain("cursor-default");
+    await userEvent.hover(badge);
+    expect(await screen.findByRole("tooltip", {}, { timeout: 2000 })).toHaveTextContent(
+      "Not matched",
+    );
+  });
 });
 
 describe("SegmentedControl", () => {

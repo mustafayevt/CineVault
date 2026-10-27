@@ -5,7 +5,7 @@ import { Checkbox } from "../../components/Checkbox";
 import { FileSize } from "../../components/FileSize";
 import { QualityBadge } from "../../components/QualityBadge";
 import { Skeleton } from "../../components/Skeleton";
-import { StageBadge } from "../../components/StageBadge";
+import { StageTag } from "../../components/StageTag";
 import { Table } from "../../components/Table";
 import type { TableColumn, TableSort } from "../../components/Table";
 import { Tooltip } from "../../components/Tooltip";
@@ -27,6 +27,7 @@ import {
   cardTitle,
   libraryFolderOf,
   problemNote,
+  problemReason,
   qualityTier,
   ratingText,
   runtimeText,
@@ -135,18 +136,26 @@ export function LibraryTable({
       {
         id: "stage",
         label: label("stage"),
-        header: <span aria-hidden="true" />,
-        width: 34,
+        // Wide enough for the tag ("Renamed", "Not matched") beside the label's sort arrow.
+        width: 140,
         fixed: true,
         resizable: false,
         sortable: true,
-        cell: (slot) =>
-          slot.row === undefined ? null : (
-            <StageBadge
-              stage={stageBadgeOf(slot.row.card)}
-              label={problemNote(slot.row.card) ?? undefined}
+        ...first("stage"),
+        cell: (slot) => {
+          if (slot.row === undefined) return null;
+          const card = slot.row.card;
+          const stage = stageBadgeOf(card);
+          const note = problemNote(card);
+          const reason = problemReason(card);
+          return (
+            <StageTag
+              stage={stage}
+              {...(note === null ? {} : { label: note })}
+              {...(note === null || reason === "" ? {} : { tip: `${note}: ${reason}` })}
             />
-          ),
+          );
+        },
       },
       {
         id: "title",
