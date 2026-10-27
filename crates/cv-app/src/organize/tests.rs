@@ -1715,9 +1715,10 @@ fn names_in(dir: &Path) -> Vec<String> {
     names
 }
 
-#[cfg(any(windows, target_os = "macos"))]
+// On Windows and macOS the two spellings are one folder, so a case-only change must not be read
+// as a conflict with itself; on Linux they are two names and it is an ordinary rename.
 #[test]
-fn a_case_only_rename_is_previewed_applied_and_undone_on_a_case_insensitive_volume() {
+fn a_case_only_rename_is_previewed_applied_and_undone() {
     let lib = Lib::new();
     let heat = lib.movie("heat (1995)", "heat (1995)", "Heat", 1995);
     let request = lib.request(Scope::Items(vec![heat]));
