@@ -28,7 +28,7 @@
 
 ## 8. Episode expand animation
 
-- [ ] 8.1 Height and fade animation of about 180ms with a rotating chevron, instant under reduced motion. Verified by a TV show page test and by trying it in the app.
+- [x] 8.1 Height and fade animation of about 180ms with a rotating chevron, instant under reduced motion. Verified by a TV show page test and by trying it in the app.
 
 ## 9. Optional provider keys
 

@@ -6,7 +6,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -154,6 +154,56 @@ describe("the TV show page", () => {
       handleEscape({ defaultPrevented: false, target: document.body });
     });
     await waitFor(() => expect(second).toHaveAttribute("aria-expanded", "false"));
+  });
+
+  it("toggles an episode with Enter and Space on its title, turning the chevron with it", async () => {
+    const user = userEvent.setup();
+    renderShow();
+    const rows = await screen.findAllByTestId("episode-row");
+    const row = rows[0] as HTMLElement;
+    const toggle = within(row).getByRole("button");
+    const chevron = () => toggle.querySelector("svg");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(chevron()?.getAttribute("class")).not.toContain("rotate-90");
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(chevron()?.getAttribute("class")).toContain("rotate-90");
+    // The panel opens through the height track: it is flagged open once it has mounted closed.
+    const track = await waitFor(() => {
+      const found = row.querySelector<HTMLElement>(".cv-expand");
+      expect(found).not.toBeNull();
+      expect(found).toHaveAttribute("data-open", "true");
+      return found as HTMLElement;
+    });
+    expect(row).toHaveAttribute("data-state", "open");
+    await user.keyboard(" ");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(chevron()?.getAttribute("class")).not.toContain("rotate-90");
+    // Closing keeps the panel until its height has animated away, then it leaves.
+    expect(track).toBeInTheDocument();
+    await waitFor(() => expect(row.querySelector(".cv-expand")).toBeNull());
+  });
+
+  it("animates the chevron and the card's tint with the panel, and not at all under reduced motion", async () => {
+    const user = userEvent.setup();
+    renderShow();
+    const rows = await screen.findAllByTestId("episode-row");
+    const row = rows[0] as HTMLElement;
+    expect(row.className).toContain("duration-(--dur-expand)");
+    expect(row.className).toContain("transition-[background-color,box-shadow]");
+    document.documentElement.dataset.motion = "reduced";
+    try {
+      cleanup();
+      renderShow();
+      const again = (await screen.findAllByTestId("episode-row"))[0] as HTMLElement;
+      expect(again.className).not.toContain("transition-");
+      const toggle = within(again).getAllByRole("button")[0] as HTMLElement;
+      await user.click(toggle);
+      expect(toggle.querySelector("svg")?.getAttribute("class")).not.toContain("transition-");
+    } finally {
+      delete document.documentElement.dataset.motion;
+    }
   });
 
   it("lists an episode the library lacks as a muted row, not an error", async () => {
