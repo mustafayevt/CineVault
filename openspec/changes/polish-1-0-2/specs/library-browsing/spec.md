@@ -69,7 +69,7 @@ With the field empty and focused the panel SHALL list up to six recent searches 
 - **THEN** "heat" is listed under "Recent searches", and choosing it searches again
 
 ### Requirement: Date added is the file's creation time
-A title's "Date added" SHALL be the creation time of its main file when it is first inserted, falling back to the scan time when the file system gives none. Titles whose date added equals the library's first-scan time SHALL be repaired once from their file's creation time.
+A title's "Date added" SHALL be the creation time of its main file when it is first inserted, falling back to the scan time when the file system gives none. A show SHALL take the date of its oldest episode file, and a date SHALL never be later than the scan that found the title. Titles that share one identical date (at least ten) SHALL be dated once from their files at the next scan, and titles with their own dates SHALL be left alone.
 
 #### Scenario: Old file added today
 - **WHEN** a movie file created last year is scanned for the first time today

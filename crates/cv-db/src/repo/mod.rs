@@ -58,6 +58,7 @@ pub mod availability;
 mod children;
 mod codec;
 pub mod data_sources;
+pub mod date_added;
 pub mod drive_facts;
 pub mod facet;
 pub mod filter;

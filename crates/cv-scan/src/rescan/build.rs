@@ -96,6 +96,27 @@ pub(crate) fn is_stacked(files: &[ScannedFile]) -> bool {
         > 1
 }
 
+/// When a video joined the library: when the file was created, else last changed, else `now_ms`;
+/// never later than `now_ms`.
+pub(crate) fn added_ms_of(file: &ScannedFile, now_ms: i64) -> i64 {
+    let known = if file.created_ms > 0 {
+        file.created_ms
+    } else if file.modified_ms > 0 {
+        file.modified_ms
+    } else {
+        now_ms
+    };
+    known.min(now_ms)
+}
+
+/// The date added of a title with these videos: that of its main (first) video.
+fn main_video_added_ms(files: &[ScannedFile], now_ms: i64) -> i64 {
+    files
+        .iter()
+        .find(|f| f.kind == MediaFileType::Video)
+        .map_or(now_ms, |video| added_ms_of(video, now_ms))
+}
+
 /// The new movie for a scanned group, flagged by the caller.
 pub(crate) fn new_movie(movie: &ScannedMovie, data_source: &str, now_ms: i64) -> Item {
     let mut item = Item::movie(&movie.title);
@@ -103,7 +124,7 @@ pub(crate) fn new_movie(movie: &ScannedMovie, data_source: &str, now_ms: i64) ->
     item.core.path = movie.path.to_string_lossy().into_owned();
     item.core.year = movie.year.unwrap_or(0);
     item.core.ids = provider_ids(&movie.ids);
-    item.core.date_added_ms = now_ms;
+    item.core.date_added_ms = main_video_added_ms(&movie.files, now_ms);
     item.core.original_filename = first_video_name(&movie.files);
     item.core.media_files = movie.files.iter().map(media_file_of).collect();
     if let ItemDetail::Movie(m) = &mut item.detail {
@@ -124,7 +145,13 @@ pub(crate) fn new_show(show: &ScannedShow, data_source: &str, now_ms: i64) -> It
     item.core.path = show.path.to_string_lossy().into_owned();
     item.core.year = show.year.unwrap_or(0);
     item.core.ids = provider_ids(&show.ids);
-    item.core.date_added_ms = now_ms;
+    // A show is as old as its oldest episode file.
+    item.core.date_added_ms = show
+        .episodes
+        .iter()
+        .map(|episode| main_video_added_ms(&episode.files, now_ms))
+        .min()
+        .unwrap_or(now_ms);
     item.core.media_files = show.files.iter().map(media_file_of).collect();
     item
 }
@@ -190,7 +217,7 @@ pub(crate) fn new_episodes(episode: &ScannedEpisode, data_source: &str, now_ms: 
             item.parent_id = None;
             item.core.data_source = data_source.to_owned();
             item.core.path.clone_from(&folder);
-            item.core.date_added_ms = now_ms;
+            item.core.date_added_ms = main_video_added_ms(&episode.files, now_ms);
             item.core.original_filename = first_video_name(&episode.files);
             item.core.media_files = files.clone();
             if let ItemDetail::Episode(e) = &mut item.detail {

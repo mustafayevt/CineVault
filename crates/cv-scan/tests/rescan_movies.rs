@@ -619,5 +619,6 @@ fn a_title_gets_its_added_date_and_its_video_the_files_modified_time_and_keeps_t
             .date_added_ms
     };
     assert_eq!(added("Heat"), 1_700_000_000_000);
-    assert_eq!(added("Dune"), 1_800_000_000_000);
+    // Dune's date is when its file was created, no later than the scan's clock.
+    assert!(added("Dune") > added("Heat") && added("Dune") <= 1_800_000_000_000);
 }

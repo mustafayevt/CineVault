@@ -16,7 +16,7 @@
 
 ## 5. Date added
 
-- [ ] 5.1 Take date added from the main file's creation time on insert and repair rows that share the first-scan timestamp once, in a transaction. Verified by cv-db and cv-scan tests.
+- [x] 5.1 Take date added from the main file's creation time on insert and repair rows that share the first-scan timestamp once, in a transaction. Verified by cv-db and cv-scan tests.
 
 ## 6. Poster size
 

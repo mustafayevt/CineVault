@@ -371,6 +371,23 @@ impl ScanService {
         self.submit(targets)
     }
 
+    /// Dates the titles that an earlier scan stamped all at once from their files. It runs once,
+    /// in the background, ahead of the next scan, so the lists that refresh when that scan ends
+    /// already show the repaired dates.
+    fn repair_date_added(&self) {
+        let (db, settings) = (Arc::clone(&self.db), Arc::clone(&self.settings));
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|d| i64::try_from(d.as_millis()).ok())
+            .unwrap_or(i64::MAX);
+        drop(tokio::task::spawn_blocking(move || {
+            if let Err(error) = crate::date_added::repair(&db, &settings, now_ms) {
+                tracing::warn!(%error, "the date added repair could not run");
+            }
+        }));
+    }
+
     /// Queues a rescan of one data source, or returns `None` when it no longer exists.
     ///
     /// # Errors
@@ -398,6 +415,7 @@ impl ScanService {
     }
 
     fn submit(&self, targets: Vec<RescanTarget>) -> Result<RescanRun, ScanError> {
+        self.repair_date_added();
         let sources = targets
             .iter()
             .filter(|target| matches!(target, RescanTarget::Source { .. }))
