@@ -3,27 +3,41 @@
 // leaves that machine. The key path defaults to ~/.cinevault-keys/cinevault-update.pem and can be
 // overridden with --key or the CINEVAULT_UPDATE_KEY environment variable.
 //
+//   node scripts/release-publish.mjs --from-dir <folder> [--from-dir <folder> ...] [--version <x.y.z>]
+//       [--notes <file>] [--key <private-key.pem>] [--dry-run]
 //   node scripts/release-publish.mjs [--version <x.y.z>] [--notes <file>] [--key <private-key.pem>] [--dry-run]
 //   node scripts/release-publish.mjs --self-test
 //
-// 1. Downloads the assets of Release v<version> from the source repository.
-// 2. Checks every installer against the SHA256SUMS-<os>.txt files the release workflow wrote.
-// 3. Writes the manifest payload (version, date, notes, one build per platform: the NSIS setup
-//    exe for Windows, the DMG for macOS when it is there), signs it with the private key and
-//    verifies the envelope with the public key built into the app.
-// 4. Creates or updates Release v<version> in the public releases repository with the installers,
-//    the sums and manifest.json, and marks it latest. Rerunning is safe (--clobber); run it again
-//    after the macOS workflow to add the darwin builds.
-// 5. Uploads version-less copies of the installers (CineVault-setup-x64.exe, CineVault-x64.msi,
-//    CineVault-portable-x64.zip, CineVault-universal.dmg), so that
-//    .../releases/latest/download/<name> is a stable download link for the website.
+// Where the files come from:
+// - --from-dir (repeatable): the installers built on this machine, or in WSL for Linux, read from
+//   those folders as they are (not recursively: give target/release/bundle/nsis, .../msi, and so on).
+//   Only the files of --version are taken, so older builds left in a folder are skipped. The
+//   checksum files SHA256SUMS-Windows.txt, -macOS.txt and -Linux.txt are made here from those files.
+// - no --from-dir: the assets of Release v<version> in the source repository, as the release
+//   workflows (release-windows.yml, release-macos.yml) made them. Their SHA256SUMS-<os>.txt files
+//   are checked against the downloaded installers.
 //
-// --dry-run does steps 1 to 3 and uploads nothing.
+// Then, for either source:
+// 1. Checks every installer against the SHA256SUMS-<os>.txt files.
+// 2. Writes the manifest payload (version, date, notes, one build per platform: the NSIS setup
+//    exe for Windows, the DMG for macOS and the AppImage for Linux when they are there), signs it
+//    with the private key and verifies the envelope with the public key built into the app.
+//    In local mode the manifest is written from the folders given, so pass every folder of the
+//    version each time: a platform left out of them is left out of the manifest.
+// 3. Creates or updates Release v<version> in the public releases repository with the installers,
+//    the sums and manifest.json, and marks it latest. Rerunning is safe (--clobber); run it again
+//    after the macOS build to add the darwin builds.
+// 4. Uploads version-less copies of the installers (CineVault-setup-x64.exe, CineVault-x64.msi,
+//    CineVault-portable-x64.zip, CineVault-universal.dmg, CineVault-x86_64.AppImage,
+//    CineVault-amd64.deb, CineVault-x86_64.rpm), so that .../releases/latest/download/<name> is a
+//    stable download link for the website.
+//
+// --dry-run does steps 1 and 2 and uploads nothing.
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { copyFileSync, createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   builtInPublicKey,
@@ -54,9 +68,13 @@ export function parseSums(text) {
   return sums;
 }
 
+/** The architecture word of a Linux file name: `aarch64` for arm64, `x86_64` otherwise. */
+const linuxArch = (name) => (/arm64|aarch64/i.test(name) ? "aarch64" : "x86_64");
+
 /**
  * What a release file is: `sums`, an installer that goes into the manifest (`platforms`), an
- * installer that is only uploaded, or `null` for anything else.
+ * installer that is only uploaded, or `null` for anything else. `os` is the operating system the
+ * file is for; it decides which SHA256SUMS file lists the file.
  */
 export function classifyAsset(name) {
   if (/^SHA256SUMS-.+\.txt$/i.test(name)) return { kind: "sums" };
@@ -64,14 +82,23 @@ export function classifyAsset(name) {
     // The NSIS installer: per user, upgrades an older install in place (and offers to remove an
     // MSI install first), so it is the one the app hands to Windows.
     const arch = /arm64|aarch64/i.test(name) ? "aarch64" : "x86_64";
-    return { kind: "installer", platforms: [`windows-${arch}`] };
+    return { kind: "installer", os: "Windows", platforms: [`windows-${arch}`] };
   }
   if (/\.dmg$/i.test(name)) {
-    if (/universal/i.test(name)) return { kind: "installer", platforms: ["darwin-aarch64", "darwin-x86_64"] };
-    if (/aarch64|arm64/i.test(name)) return { kind: "installer", platforms: ["darwin-aarch64"] };
-    return { kind: "installer", platforms: ["darwin-x86_64"] };
+    const os = "macOS";
+    if (/universal/i.test(name)) return { kind: "installer", os, platforms: ["darwin-aarch64", "darwin-x86_64"] };
+    if (/aarch64|arm64/i.test(name)) return { kind: "installer", os, platforms: ["darwin-aarch64"] };
+    return { kind: "installer", os, platforms: ["darwin-x86_64"] };
   }
-  if (/\.msi$/i.test(name) || /-portable\.zip$/i.test(name)) return { kind: "upload" };
+  // The AppImage is the installer the app updates itself with. Tauri puts an underscore after
+  // the product name in the versioned file; the version-less copy (CineVault-x86_64.AppImage) does
+  // not, so it is not a second installer.
+  if (/^CineVault_.+\.AppImage$/i.test(name)) {
+    return { kind: "installer", os: "Linux", platforms: [`linux-${linuxArch(name)}`] };
+  }
+  // The .deb and .rpm packages are for package managers: uploaded, not in the manifest.
+  if (/\.(deb|rpm)$/i.test(name)) return { kind: "upload", os: "Linux" };
+  if (/\.msi$/i.test(name) || /-portable\.zip$/i.test(name)) return { kind: "upload", os: "Windows" };
   return null;
 }
 
@@ -80,12 +107,24 @@ export function classifyAsset(name) {
  * `releases/latest/download/<name>` always serves the newest build; `null` for other files.
  */
 export function stableName(name) {
+  if (/^CineVault_.+\.AppImage$/i.test(name)) return `CineVault-${linuxArch(name)}.AppImage`;
+  if (/\.deb$/i.test(name)) return `CineVault-${/arm64|aarch64/i.test(name) ? "arm64" : "amd64"}.deb`;
+  if (/\.rpm$/i.test(name)) return `CineVault-${linuxArch(name)}.rpm`;
   const arch = /arm64|aarch64/i.test(name) ? "arm64" : "x64";
   if (/-setup\.exe$/i.test(name)) return `CineVault-setup-${arch}.exe`;
   if (/\.msi$/i.test(name)) return `CineVault-${arch}.msi`;
   if (/-portable\.zip$/i.test(name)) return `CineVault-portable-${arch}.zip`;
   if (/\.dmg$/i.test(name)) return /universal/i.test(name) ? "CineVault-universal.dmg" : `CineVault-${arch}.dmg`;
   return null;
+}
+
+/**
+ * Whether a file name carries `version` as a part of its own, in either naming style:
+ * CineVault_1.2.0_x64-setup.exe or CineVault-1.2.0-1.x86_64.rpm. 1.2.10 does not match 1.2.1.
+ */
+export function namesVersion(name, version) {
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[_-])${escaped}(?=[_.-])`).test(name);
 }
 
 /** The download address of a file in the public release. */
@@ -185,7 +224,7 @@ export function previousTag(tags, version) {
 // Machine parts
 
 function parseArgs(argv) {
-  const options = { dryRun: false, selfTest: false };
+  const options = { dryRun: false, selfTest: false, fromDirs: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -198,6 +237,7 @@ function parseArgs(argv) {
     else if (arg === "--version") options.version = value().replace(/^v/, "");
     else if (arg === "--notes") options.notes = value();
     else if (arg === "--key") options.key = value();
+    else if (arg === "--from-dir") options.fromDirs.push(value());
     else throw new Error(`unknown option ${arg}`);
   }
   return options;
@@ -215,6 +255,62 @@ const sha256File = (path) =>
       .on("end", () => done(hash.digest("hex")));
   });
 
+/** Name, path, size and SHA-256 of a file. */
+async function describeFile(path) {
+  return { name: basename(path), path, size: statSync(path).size, sha256: await sha256File(path) };
+}
+
+/**
+ * The installers and packages of `version` in the build output folders, as [{ name, path }].
+ * A folder is read as it is, not recursively. Other versions left in a folder are reported in
+ * `skipped`; a file name found in two folders is refused, since either copy could be the build.
+ */
+export function findLocalFiles(folders, version) {
+  const found = new Map();
+  const skipped = [];
+  for (const folder of folders) {
+    if (!existsSync(folder) || !statSync(folder).isDirectory()) throw new Error(`${folder} is not a folder`);
+    for (const name of readdirSync(folder).sort()) {
+      const kind = classifyAsset(name)?.kind;
+      if (kind !== "installer" && kind !== "upload") continue;
+      const path = join(folder, name);
+      if (!statSync(path).isFile()) continue;
+      if (!namesVersion(name, version)) {
+        skipped.push(name);
+        continue;
+      }
+      if (found.has(name)) throw new Error(`${name} is in two folders: ${found.get(name).path} and ${path}`);
+      found.set(name, { name, path });
+    }
+  }
+  return { files: [...found.values()], skipped };
+}
+
+/**
+ * Local mode: copies the version's files from the build folders into `dir`, writes the checksum
+ * files for them (SHA256SUMS-<os>.txt, the names the release workflows use) and returns every
+ * file described, checksum files included. The sums are of the copies, so they match what is uploaded.
+ */
+async function fromBuildFolders(folders, version, dir) {
+  const { files: found, skipped } = findLocalFiles(folders, version);
+  for (const name of skipped) console.log(`  skipped ${name} (not version ${version})`);
+  if (found.length === 0) throw new Error(`no CineVault ${version} installers or packages in ${folders.join(", ")}`);
+  const files = [];
+  for (const { name, path } of found) {
+    const copy = join(dir, name);
+    copyFileSync(path, copy);
+    files.push(await describeFile(copy));
+  }
+  for (const os of ["Windows", "macOS", "Linux"]) {
+    const listed = files.filter((file) => classifyAsset(file.name)?.os === os);
+    if (listed.length === 0) continue;
+    const sumsPath = join(dir, `SHA256SUMS-${os}.txt`);
+    writeFileSync(sumsPath, listed.map((file) => `${file.sha256}  ${file.name}\n`).join(""));
+    files.push(await describeFile(sumsPath));
+  }
+  return files;
+}
+
 export function defaultKeyPath() {
   if (process.env.CINEVAULT_UPDATE_KEY) return process.env.CINEVAULT_UPDATE_KEY;
   return join(homedir(), ".cinevault-keys", "cinevault-update.pem");
@@ -227,7 +323,9 @@ function releaseNotes(options, version, body) {
   try {
     const tags = gh(["api", `repos/${SOURCE_REPO}/tags`, "--paginate", "--jq", ".[].name"]).split(/\r?\n/).filter(Boolean);
     const previous = previousTag(tags, version);
-    const range = previous ? `${previous}...v${version}` : null;
+    // A local build can come before its tag exists; the notes then run up to main.
+    const end = tags.includes(`v${version}`) ? `v${version}` : "main";
+    const range = previous ? `${previous}...${end}` : null;
     if (range) {
       const subjects = gh([
         "api",
@@ -256,17 +354,20 @@ async function publish(options) {
   if (!publicKey) throw new Error("BUILT_IN_PUBLIC_KEY is not set in crates/cv-app/src/updates/manifest.rs");
 
   console.log(`CineVault ${version}${options.dryRun ? " (dry run: nothing is uploaded)" : ""}`);
-  const release = JSON.parse(gh(["release", "view", tag, "-R", SOURCE_REPO, "--json", "body,publishedAt,assets"]));
+  const local = options.fromDirs.length > 0;
+  const release = local ? null : JSON.parse(gh(["release", "view", tag, "-R", SOURCE_REPO, "--json", "body,publishedAt,assets"]));
   const work = mkdtempSync(join(tmpdir(), `cinevault-publish-${version}-`));
   const assetsDir = join(work, "assets");
   mkdirSync(assetsDir);
-  console.log(`Downloading ${release.assets.length} files of ${SOURCE_REPO} ${tag} to ${assetsDir}`);
-  gh(["release", "download", tag, "-R", SOURCE_REPO, "-D", assetsDir, "--clobber"], { stdio: ["ignore", "pipe", "inherit"] });
-
-  const files = [];
-  for (const name of readdirSync(assetsDir).sort()) {
-    const path = join(assetsDir, name);
-    files.push({ name, path, size: statSync(path).size, sha256: await sha256File(path) });
+  let files;
+  if (local) {
+    console.log(`Reading the ${version} installers from ${options.fromDirs.join(", ")}`);
+    files = await fromBuildFolders(options.fromDirs.map((folder) => resolve(folder)), version, assetsDir);
+  } else {
+    console.log(`Downloading ${release.assets.length} files of ${SOURCE_REPO} ${tag} to ${assetsDir}`);
+    gh(["release", "download", tag, "-R", SOURCE_REPO, "-D", assetsDir, "--clobber"], { stdio: ["ignore", "pipe", "inherit"] });
+    files = [];
+    for (const name of readdirSync(assetsDir).sort()) files.push(await describeFile(join(assetsDir, name)));
   }
   const sums = new Map();
   for (const file of files.filter((f) => classifyAsset(f.name)?.kind === "sums")) {
@@ -281,8 +382,17 @@ async function publish(options) {
     else if (kind.kind !== "sums") console.log(`  ok  ${file.name}  ${file.size} bytes  sha256 ${file.sha256}`);
   }
 
-  const { notes, from } = releaseNotes(options, version, release.body);
-  const payload = buildPayload({ version, pubDate: release.publishedAt ?? new Date().toISOString(), notes, files });
+  const { notes, from } = releaseNotes(options, version, release?.body);
+  const payload = buildPayload({ version, pubDate: release?.publishedAt ?? new Date().toISOString(), notes, files });
+  if (local) {
+    const missing = ["Windows", "macOS", "Linux"].filter((os) => !files.some((f) => classifyAsset(f.name)?.os === os));
+    if (missing.length) {
+      console.warn(
+        `\nWarning: no ${missing.join(" or ")} files in these folders. The manifest is written from these folders alone, ` +
+          `so the platforms of ${missing.join(" and ")} are left out of it. Add their folders if the release has them.`,
+      );
+    }
+  }
   const payloadBytes = Buffer.from(JSON.stringify(payload, null, 2) + "\n", "utf8");
   writeFileSync(join(work, "payload.json"), payloadBytes);
 
@@ -359,7 +469,7 @@ async function publish(options) {
 // ---------------------------------------------------------------------------------------------
 // Self-test: node scripts/release-publish.mjs --self-test
 
-function selfTest() {
+async function selfTest() {
   const assert = (condition, message) => {
     if (!condition) throw new Error(`self-test failed: ${message}`);
   };
@@ -430,6 +540,130 @@ function selfTest() {
   assert(previousTag(["v0.1.0", "v0.2.0", "v0.2.1", "v0.3.0", "nightly"], "0.2.1") === "v0.2.0", "previous tag");
   assert(previousTag(["v0.2.1"], "0.2.1") === null, "no previous tag");
 
+  // Linux: the AppImage is the installer, the packages are only uploaded, and no version-less
+  // copy is a second installer.
+  const linuxFiles = [
+    { name: "CineVault_1.2.0_amd64.AppImage", sha256: hex("app"), size: 3 },
+    { name: "CineVault_1.2.0_amd64.deb", sha256: hex("deb"), size: 3 },
+    { name: "CineVault-1.2.0-1.x86_64.rpm", sha256: hex("rpm"), size: 3 },
+  ];
+  assert(
+    classifyAsset(linuxFiles[0].name)?.platforms?.join() === "linux-x86_64",
+    "the AppImage is the linux-x86_64 installer",
+  );
+  assert(classifyAsset("CineVault_1.2.0_aarch64.AppImage")?.platforms?.join() === "linux-aarch64", "an arm64 AppImage");
+  assert(
+    classifyAsset(linuxFiles[1].name)?.kind === "upload" && classifyAsset(linuxFiles[2].name)?.kind === "upload",
+    "packages are uploaded, not in the manifest",
+  );
+  assert(classifyAsset("CineVault-x86_64.AppImage") === null, "the version-less AppImage is not an installer");
+  assert(stableName("CineVault_1.2.0_amd64.AppImage") === "CineVault-x86_64.AppImage", "stable AppImage name");
+  assert(stableName("CineVault_1.2.0_aarch64.AppImage") === "CineVault-aarch64.AppImage", "stable arm64 AppImage name");
+  assert(stableName("CineVault_1.2.0_amd64.deb") === "CineVault-amd64.deb", "stable deb name");
+  assert(stableName("CineVault-1.2.0-1.x86_64.rpm") === "CineVault-x86_64.rpm", "stable rpm name");
+  for (const name of [...files, ...linuxFiles].map((f) => f.name)) {
+    const stable = stableName(name);
+    assert(
+      stable === null || classifyAsset(stable)?.kind !== "installer",
+      `the stable copy of ${name} is not a second installer`,
+    );
+  }
+  const everything = buildPayload({
+    version: "1.2.0",
+    pubDate: "x",
+    notes: "",
+    files: [...files, ...linuxFiles, { name: "CineVault_1.2.0_universal.dmg", sha256: hex("dmg"), size: 4 }],
+  });
+  assert(
+    Object.keys(everything.platforms).join() === "darwin-aarch64,darwin-x86_64,linux-x86_64,windows-x86_64",
+    "platform keys sort with the Linux AppImage in",
+  );
+  assert(
+    everything.platforms["linux-x86_64"].url ===
+      "https://github.com/mustafayevt/CineVault-releases/releases/download/v1.2.0/CineVault_1.2.0_amd64.AppImage",
+    "AppImage download address",
+  );
+  assert(
+    namesVersion("CineVault_1.2.0_x64-setup.exe", "1.2.0") && namesVersion("CineVault-1.2.0-1.x86_64.rpm", "1.2.0"),
+    "a version is found in both naming styles",
+  );
+  assert(
+    !namesVersion("CineVault_1.2.10_x64-setup.exe", "1.2.1") && !namesVersion("CineVault_1.2.0_x64-setup.exe", "1.2.1"),
+    "another version is not",
+  );
+
+  // Local mode, with fake build folders: an older build and a stale checksum file are left in them.
+  const refuses = async (run, pattern) => {
+    try {
+      await run();
+    } catch (error) {
+      return pattern.test(error.message);
+    }
+    return false;
+  };
+  const root = mkdtempSync(join(tmpdir(), "cinevault-selftest-"));
+  try {
+    const nsis = join(root, "nsis");
+    const linux = join(root, "linux");
+    mkdirSync(nsis);
+    mkdirSync(linux);
+    writeFileSync(join(nsis, "CineVault_1.2.0_x64-setup.exe"), "exe");
+    writeFileSync(join(nsis, "CineVault_1.1.0_x64-setup.exe"), "older build");
+    writeFileSync(join(nsis, "SHA256SUMS-Windows.txt"), "stale checksums");
+    writeFileSync(join(linux, "CineVault_1.2.0_amd64.AppImage"), "app");
+    writeFileSync(join(linux, "CineVault_1.2.0_amd64.deb"), "deb");
+    writeFileSync(join(linux, "CineVault-1.2.0-1.x86_64.rpm"), "rpm");
+    writeFileSync(join(linux, "notes.txt"), "not a release file");
+    const found = findLocalFiles([nsis, linux], "1.2.0");
+    assert(found.files.length === 4 && found.skipped.join() === "CineVault_1.1.0_x64-setup.exe", "only the version's files are taken");
+
+    const dup = join(root, "dup");
+    mkdirSync(dup);
+    writeFileSync(join(dup, "CineVault_1.2.0_amd64.deb"), "another copy");
+    assert(
+      await refuses(() => findLocalFiles([linux, dup], "1.2.0"), /is in two folders/),
+      "a file in two folders is refused",
+    );
+    assert(
+      await refuses(() => findLocalFiles([join(root, "missing")], "1.2.0"), /is not a folder/),
+      "a missing folder is refused",
+    );
+
+    const work = join(root, "work");
+    mkdirSync(work);
+    assert(
+      await refuses(() => fromBuildFolders([nsis], "9.9.9", work), /no CineVault 9\.9\.9 installers/),
+      "a folder without that version is refused",
+    );
+    const local = await fromBuildFolders([nsis, linux], "1.2.0", work);
+    const sumsFiles = local.filter((f) => classifyAsset(f.name)?.kind === "sums");
+    assert(
+      sumsFiles.map((f) => f.name).sort().join() === "SHA256SUMS-Linux.txt,SHA256SUMS-Windows.txt",
+      "one checksum file per operating system",
+    );
+    const localSums = new Map();
+    for (const file of sumsFiles) {
+      for (const [name, hash] of parseSums(readFileSync(file.path, "utf8"))) localSums.set(name, hash);
+    }
+    assert(checkAgainstSums(local, localSums).length === 0, "the made checksums match the copies");
+    assert(
+      localSums.get("CineVault_1.2.0_x64-setup.exe") === hex("exe") &&
+        localSums.get("CineVault-1.2.0-1.x86_64.rpm") === hex("rpm"),
+      "checksums are of the copied bytes",
+    );
+    assert(
+      readFileSync(join(work, "CineVault_1.2.0_amd64.AppImage"), "utf8") === "app",
+      "the installer is copied into the work folder",
+    );
+    const localPayload = buildPayload({ version: "1.2.0", pubDate: "x", notes: "", files: local });
+    assert(
+      Object.keys(localPayload.platforms).join() === "linux-x86_64,windows-x86_64",
+      "a local build gives the Windows and Linux entries",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+
   // Signing round trip with a throwaway key, and the checks that must fail.
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const publicText = rawPublicKey(publicKey).toString("base64");
@@ -461,7 +695,7 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 if (isMain) {
   try {
     const options = parseArgs(process.argv.slice(2));
-    if (options.selfTest) selfTest();
+    if (options.selfTest) await selfTest();
     else await publish(options);
   } catch (error) {
     console.error(`release:publish: ${error.message}`);

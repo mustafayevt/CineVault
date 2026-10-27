@@ -335,7 +335,7 @@ Read this block once; every task below relies on it.
   - Accept: `node scripts/check-bundle.mjs` passes; `bunx --bun yaml-lint` is not available, so parse each YAML with `node -e "require('fs')"` plus `bun x js-yaml <file>` (prints JSON, fails on a syntax error).
   - Commit: `ci(release): build the Linux AppImage, deb and rpm`
 
-- [ ] 7.2 Publish Linux files and the manifest entry `[haiku]`
+- [x] 7.2 Publish Linux files and the manifest entry `[haiku]`
   - After: nothing. Wave 1.
   - Touch: `scripts/release-publish.mjs` only.
   - Steps: `classifyAsset` (line 61): `/\.AppImage$/i` → `{ kind: "installer", platforms: ["linux-x86_64"] }` (`aarch64|arm64` → `linux-aarch64`); `/\.deb$/i`, `/\.rpm$/i` → `{ kind: "upload" }`. `stableName` (line 82): AppImage → `CineVault-x86_64.AppImage` (`CineVault-aarch64.AppImage` for arm), deb → `CineVault-amd64.deb` (`-arm64.deb`), rpm → `CineVault-x86_64.rpm` (`-aarch64.rpm`); note the existing `arch` variable is x64/arm64 for Windows names, so compute Linux arch names separately. Header comment (lines 16-19) lists the Linux names.
