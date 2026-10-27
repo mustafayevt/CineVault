@@ -205,7 +205,13 @@ async fn closing_the_app_removes_the_endpoint_and_a_new_app_replaces_it() {
     let engine = BatchEngine::new(Arc::clone(&app.services), EngineOptions::default());
     let second = IpcServer::start(engine, &app.location).unwrap();
     assert_ne!(second.endpoint().token, first.token);
-    assert_ne!(second.endpoint().address, first.address);
+    // Windows opens a pipe with a fresh name each launch; elsewhere the socket always has the same
+    // path in the data folder, and the token alone tells the launches apart.
+    if cfg!(windows) {
+        assert_ne!(second.endpoint().address, first.address);
+    } else {
+        assert_eq!(second.endpoint().address, first.address);
+    }
     let mut dry = BatchRequest::new(EntityKind::Movie);
     dry.steps.nfo = true;
     dry.dry_run = true;
