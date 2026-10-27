@@ -45,11 +45,7 @@ fn visit(dir: &Path, hits: &mut Vec<String>, needles: &[String], this_file: &Pat
         if path.is_dir() {
             if matches!(
                 name.as_str(),
-                "target"
-                    | "node_modules"
-                    | ".git"
-                    | ".dev-tools"
-                    | "dist"
+                "target" | "node_modules" | ".git" | ".dev-tools" | "dist"
             ) {
                 continue;
             }
