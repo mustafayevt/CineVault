@@ -361,12 +361,13 @@ Read this block once; every task below relies on it.
 
 ## 9. Integration and review
 
-- [ ] 9.1 Workspace green on Linux `[risky: needs Sonnet/Opus]`
+- [x] 9.1 Workspace green on Linux `[risky: needs Sonnet/Opus]`
   - After: every task above except 9.2 and 9.3.
   - Touch: only what the failures need; each fix in its own commit with its own Conventional message.
   - Steps: LINUX CHECK `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`; Windows `cargo test --workspace` and the UI suite. Tests that are Windows-only by nature get `#[cfg(windows)]`; tests that assume case-insensitive paths get a Linux twin rather than being disabled. Then LINUX CHECK `bun install && cd ui && bun install && cd .. && bun run tauri build` and confirm `target/release/bundle/{appimage,deb,rpm}` hold one file each, then `node scripts/check-bundle.mjs --artifacts`. Finish every task left with "LINUX CHECK pending".
   - Accept: all of the above pass; the commit bodies list what changed.
   - Commit: per fix, e.g. `fix(linux): …` / `test(linux): …`
+  - Result: fmt, clippy (`-D warnings`) and `cargo test --workspace` pass on Windows and on Linux (WSL, TMPDIR on the Linux disk; the tree-mode test skips itself with a printed reason when TMPDIR is on /mnt/c), and the UI suite passes on Windows. The `bun run tauri build` bundle check of the Linux package is not part of this run.
 
 - [ ] 9.2 Opus review of the whole branch `[risky: needs Opus]`
   - After: 9.1.
