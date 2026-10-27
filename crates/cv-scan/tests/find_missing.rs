@@ -126,3 +126,20 @@ fn a_missing_source_folder_is_reported_not_listed() {
     assert!(report.unreadable);
     assert!(report.videos.is_empty());
 }
+
+#[test]
+fn a_file_known_under_another_case_is_the_same_file_only_where_names_ignore_case() {
+    let lib = Lib::movies();
+    let path = lib.put("Heat (1995)/Heat (1995).mkv", "heat!");
+    lib.rescan();
+    let shouted = path.with_file_name("HEAT (1995).mkv");
+    std::fs::rename(&path, &shouted).unwrap();
+
+    let report = find(&lib);
+    if cv_fs::paths::CASE_SENSITIVE {
+        // On Linux that is another file, which no title has.
+        assert_eq!(relatives(&report), vec!["Heat (1995)/HEAT (1995).mkv"]);
+    } else {
+        assert!(relatives(&report).is_empty(), "{:?}", report.videos);
+    }
+}

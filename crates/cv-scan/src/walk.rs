@@ -312,7 +312,7 @@ impl TvScanReport {
 /// `source` leaves them out, so their files belong to their own library only.
 pub fn nested_sources(source: &DataSource, all: &[DataSource]) -> Vec<String> {
     let fold = |path: &str| {
-        let mut text = path.trim().replace('\\', "/").to_lowercase();
+        let mut text = cv_fs::paths::fold_name(&path.trim().replace('\\', "/"));
         while text.ends_with('/') {
             text.pop();
         }

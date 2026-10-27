@@ -612,12 +612,10 @@ fn join(base: &Path, relative: &str) -> PathBuf {
     path
 }
 
-/// The path without its extension, lower case and with `/`, for comparing file names.
+/// The path without its extension and with `/`, for comparing file names: lower case where the
+/// platform's file names ignore case, as written on Linux.
 fn without_extension(path: &Path) -> String {
-    path.with_extension("")
-        .to_string_lossy()
-        .replace('\\', "/")
-        .to_lowercase()
+    cv_fs::paths::fold_name(&path.with_extension("").to_string_lossy().replace('\\', "/"))
 }
 
 fn kind_word(kind: MediaFileType) -> &'static str {

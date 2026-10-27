@@ -40,6 +40,29 @@ pub fn key_with(path: &str, case_sensitive: bool) -> String {
     }
 }
 
+/// `name` (a file or folder name) folded the way this platform compares names: lower-cased where
+/// the volumes ignore case (Windows, macOS), unchanged on Linux. Compare folded names only with
+/// each other.
+#[must_use]
+pub fn fold_name(name: &str) -> String {
+    if CASE_SENSITIVE {
+        name.to_owned()
+    } else {
+        name.to_lowercase()
+    }
+}
+
+/// Whether the file or folder names `a` and `b` are the same name on this platform: equal
+/// ignoring ASCII case where the volumes ignore case (Windows, macOS), exactly equal on Linux.
+#[must_use]
+pub fn same_name(a: &str, b: &str) -> bool {
+    if CASE_SENSITIVE {
+        a == b
+    } else {
+        a.eq_ignore_ascii_case(b)
+    }
+}
+
 /// The comparison key of `path` on this platform (see [`CASE_SENSITIVE`]).
 #[must_use]
 pub fn key(path: &Path) -> String {
@@ -249,5 +272,20 @@ mod tests {
         assert!(drive_is_mounted(Path::new(r"D:\Movies")));
         let unplugged = Path::new("/mnt/cinevault-test-drive-that-is-not-there/Movies");
         assert_eq!(drive_is_mounted(unplugged), !cfg!(target_os = "linux"));
+    }
+
+    #[test]
+    fn names_fold_and_compare_by_the_platform_rule() {
+        assert_eq!(
+            fold_name("Movie.MKV"),
+            if CASE_SENSITIVE {
+                "Movie.MKV"
+            } else {
+                "movie.mkv"
+            }
+        );
+        assert!(same_name("Movie.mkv", "Movie.mkv"));
+        assert!(!same_name("Movie.mkv", "Movies.mkv"));
+        assert_eq!(same_name("Movie.mkv", "movie.MKV"), !CASE_SENSITIVE);
     }
 }

@@ -90,7 +90,7 @@ fn looks_moved(show: &ScannedShow, stored: &StoredItem, videos: &[&StoredFile]) 
     let same_name = scanned.iter().any(|(key, _)| {
         videos
             .iter()
-            .any(|f| name_of(key).eq_ignore_ascii_case(&f.filename))
+            .any(|f| cv_fs::paths::same_name(name_of(key), &f.filename))
     });
     let same_title = show.year.is_some_and(|y| y > 0 && y == stored.year)
         && !simple(&show.title).is_empty()
