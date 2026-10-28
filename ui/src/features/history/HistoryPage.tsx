@@ -24,6 +24,8 @@ import { t } from "../../i18n/catalog";
 import type { MessageKey } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { notify } from "../notifications/notificationStore";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { showToast } from "../toasts/toastStore";
 import { currentHistoryBackend, HISTORY_KEY } from "./historyBackend";
 import type { HistoryEntry, HistoryFilter, HistoryTitle } from "./historyBackend";
@@ -283,12 +285,13 @@ function DaySection({ day }: { day: Day }) {
 /**
  * The History page (`/history`): every rename, move, delete, artwork change and
  * change of match, newest first and grouped by day, with the tabs All · Renames · Moves · Deletes
- * · Artwork and matches and how much is still in the Recycle Bin. Each entry offers one action:
+ * · Artwork and matches and how much is still in the bin. Each entry offers one action:
  * Undo, Undo all, Restore, Undone or No undo. An entry of several titles expands to their old and
  * new names. The page follows `history-changed`, so a change made anywhere shows at once.
  */
 export function HistoryPage() {
   const format = useFormat();
+  const binLabel = binName(detectPlatform());
   const client = useQueryClient();
   const [filter, setFilter] = useState<HistoryFilter>("all");
 
@@ -340,10 +343,10 @@ export function HistoryPage() {
           {bin.data !== null && bin.data !== undefined && (
             <span
               className="text-(length:--fs-12) text-text-muted"
-              title={t("history.bin.tip")}
+              title={t("history.bin.tip", { bin: binLabel })}
               data-testid="bin-total"
             >
-              {t("history.bin", { size: format.size(bin.data) })}
+              {t("history.bin", { size: format.size(bin.data), bin: binLabel })}
             </span>
           )}
         </div>

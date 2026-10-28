@@ -1,0 +1,27 @@
+name: Release (Linux)
+
+# Run by hand (Actions → "Release (Linux)" → Run workflow, or gh workflow run release-linux.yml).
+# Builds the Linux installers (AppImage, .deb and .rpm) and puts them on the GitHub Release
+# v<version> for the version in src-tauri/tauri.conf.json, creating the release when needed and
+# replacing files from an earlier run of the same version. Pushes never start it.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Put the installers on the GitHub Release (off = workflow artifacts only)
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-linux-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/release-build.yml
+    with:
+      os: linux
+      publish: ${{ inputs.publish }}

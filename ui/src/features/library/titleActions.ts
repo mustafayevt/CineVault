@@ -17,6 +17,8 @@ import type { LucideIcon } from "lucide-react";
 
 import { t } from "../../i18n/catalog";
 import type { MessageKey } from "../../i18n/catalog";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 
 /** Every action on a title, in the words of the three verbs (Scan, Scrape, Rename) and the rest. */
 export type TitleActionId =
@@ -205,5 +207,5 @@ export function shortLabel(id: TitleActionId): string {
 
 /** The action's name in a menu, with the count when several titles are selected. */
 export function fullLabel(id: TitleActionId, count: number): string {
-  return t(TITLE_ACTIONS[id].full, { count });
+  return t(TITLE_ACTIONS[id].full, { count, bin: binName(detectPlatform()) });
 }

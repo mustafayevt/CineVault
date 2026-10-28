@@ -28,6 +28,7 @@ fn undo_all(journal: &mut dyn JournalStore, roots: &[PathBuf], batch: &str) -> U
 
 /// Runs `items` over `fs`, checks they were all done and changed the tree, undoes the batch and
 /// checks the tree is exactly as before (names spelled the same, bytes the same).
+#[cfg(windows)]
 fn rename_and_undo(tree: &Tree, fs: &dyn Fs, items: &[BatchItem]) {
     let before = tree.live();
     let mut journal = MemoryJournal::new();
@@ -696,4 +697,40 @@ fn a_title_on_a_network_share_is_renamed_and_undone_through_its_unc_path() {
     let undone = undo_all(&mut journal, &[share], "b1");
     assert!(undone.is_complete(), "{undone:?}");
     assert_eq!(tree.live(), before);
+}
+
+// ---- names that differ only in case, on a case-sensitive file system --------------------------
+
+#[cfg(target_os = "linux")]
+#[test]
+fn on_linux_two_files_differing_only_in_case_are_two_files_and_neither_is_lost() {
+    let tree = Tree::new();
+    tree.write("Example (2020)/movie.mkv", "first");
+    tree.write("Example (2020)/Movie.mkv", "other");
+    let item = batch_item(
+        &tree,
+        "1",
+        "Example (2020)",
+        "Example (2020)",
+        FolderChange::Unchanged,
+        vec![carried(
+            "Example (2020)/movie.mkv",
+            "Example (2020)/Movie.mkv",
+            VIDEO,
+        )],
+    );
+    let mut journal = MemoryJournal::new();
+    let report = run_with(&StdFs, &mut journal, ExecOptions::new("b1"), &[item]);
+    assert_eq!(report.done(), 1, "{report:?}");
+    // Not a case-only rename through a temporary name: the second file was a different file,
+    // so it went to the trash before the first took its name.
+    assert_eq!(tree.read("Example (2020)/Movie.mkv"), "first");
+    assert!(!tree.exists("Example (2020)/movie.mkv"));
+    let trashed: Vec<String> = tree.trashed().into_values().collect();
+    assert_eq!(trashed, ["other"], "the file in the way must be kept");
+    // Undo puts both back where they were, with their bytes.
+    let undone = undo_all(&mut journal, std::slice::from_ref(&tree.root), "b1");
+    assert!(undone.is_complete(), "{undone:?}");
+    assert_eq!(tree.read("Example (2020)/movie.mkv"), "first");
+    assert_eq!(tree.read("Example (2020)/Movie.mkv"), "other");
 }

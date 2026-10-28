@@ -84,7 +84,26 @@ fn own_copy(mock: &Path, dir: &Path, name: &str) -> PathBuf {
         name.to_owned()
     });
     std::fs::copy(mock, &target).unwrap();
+    #[cfg(unix)]
+    wait_until_runnable(&target);
     target
+}
+
+/// Linux refuses to run a file ("text file busy") while any process still holds it open for
+/// writing, and a process another test is starting at that moment briefly holds a copy of the
+/// descriptor we just closed. Runs the file until it is accepted, so the test's first real call
+/// does not hit that window.
+#[cfg(unix)]
+fn wait_until_runnable(program: &Path) {
+    const TEXT_FILE_BUSY: i32 = 26;
+    for _ in 0..200 {
+        match Command::new(program).arg("-version").output() {
+            Err(error) if error.raw_os_error() == Some(TEXT_FILE_BUSY) => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            _ => return,
+        }
+    }
 }
 
 // ---- the mock providers ---------------------------------------------------------------------
@@ -1518,18 +1537,28 @@ async fn a_ratings_fetch_announces_its_start_as_a_stage_change_and_its_end_as_ra
     let seen = record_changes(&rig);
 
     rig.services.actions().fetch_ratings(&[id]).await;
-
+    // The NFO is written again with the new ratings (announced as Files, unless a background
+    // write got there first), and the title's names are checked again in the background (one
+    // more Stage). When those finish is up to the machine, and announcements of one burst leave
+    // in an order of their own, so check what was announced, not their order, and that the start
+    // came first.
+    let arrived =
+        wait_until(|| parts_for(&seen, id).contains(&vec![ChangePart::Ratings, ChangePart::Stage]))
+            .await;
     let parts = parts_for(&seen, id);
-    assert_eq!(
-        parts,
-        vec![
-            vec![ChangePart::Stage],
-            // The NFO is written again with the new ratings.
-            vec![ChangePart::Files],
-            vec![ChangePart::Ratings, ChangePart::Stage],
-        ],
-        "the start comes first, then the stored ratings"
-    );
+    assert!(arrived, "{parts:?}");
+    assert_eq!(parts[0], vec![ChangePart::Stage], "the start comes first");
+    for part in &parts {
+        assert!(
+            [
+                vec![ChangePart::Stage],
+                vec![ChangePart::Files],
+                vec![ChangePart::Ratings, ChangePart::Stage],
+            ]
+            .contains(part),
+            "{parts:?}"
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

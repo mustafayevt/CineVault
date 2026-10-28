@@ -994,7 +994,7 @@ fn originals_the_bin_refuses_go_to_the_trash_folder() {
         applied.items[0]
             .notes
             .iter()
-            .any(|n| n.contains("Recycle Bin refused")),
+            .any(|n| n.contains(&format!("{} refused", crate::library_ops::BIN_NAME))),
         "{applied:?}"
     );
     let outcome = lab

@@ -11,19 +11,36 @@ use cv_domain::{
 use crate::parse::ParsedIds;
 use crate::walk::{ScannedEpisode, ScannedFile, ScannedMovie, ScannedShow};
 
-/// A lower-cased path with `/` separators and no trailing separator: the key two spellings of
-/// the same file share.
+/// A path with `/` separators and no trailing separator, lower-cased where the platform's file
+/// names ignore case (Windows and macOS; Linux keeps it): the key two spellings of the same file
+/// share. Windows and macOS keys are the same text as ever, because libraries rely on them.
 pub(crate) fn path_key(path: &str) -> String {
-    let mut key = path.replace('\\', "/").to_lowercase();
+    path_key_with(path, cv_fs::paths::CASE_SENSITIVE)
+}
+
+fn path_key_with(path: &str, case_sensitive: bool) -> String {
+    let mut key = fold_case(&path.replace('\\', "/"), case_sensitive);
     while key.len() > 1 && key.ends_with('/') {
         key.pop();
     }
     key
 }
 
+fn fold_case(text: &str, case_sensitive: bool) -> String {
+    if case_sensitive {
+        text.to_owned()
+    } else {
+        text.to_lowercase()
+    }
+}
+
 /// The key of the file `name` in folder `directory`.
 pub(crate) fn file_key(directory: &str, name: &str) -> String {
-    format!("{}/{}", path_key(directory), name.to_lowercase())
+    format!(
+        "{}/{}",
+        path_key(directory),
+        fold_case(name, cv_fs::paths::CASE_SENSITIVE)
+    )
 }
 
 /// The key of a scanned file.
@@ -243,4 +260,27 @@ fn calendar_date(year: u32, month: u32, day: u32) -> Option<CalendarDate> {
         u8::try_from(month).ok()?,
         u8::try_from(day).ok()?,
     )
+}
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+
+    #[test]
+    fn keys_keep_case_only_when_asked_to() {
+        assert_eq!(path_key_with(r"D:\Movies\Heat\", false), "d:/movies/heat");
+        assert_eq!(path_key_with(r"D:\Movies\Heat\", true), "D:/Movies/Heat");
+        assert_eq!(path_key_with("/", true), "/");
+    }
+
+    #[test]
+    fn two_spellings_share_a_key_only_where_the_platform_folds_case() {
+        let folds = !cv_fs::paths::CASE_SENSITIVE;
+        assert_eq!(path_key("/lib/Movies") == path_key("/lib/movies"), folds);
+        assert_eq!(
+            file_key("/lib/Movies", "Heat.mkv") == file_key("/lib/Movies", "heat.mkv"),
+            folds
+        );
+        assert_eq!(path_key("/lib/Movies/"), path_key(r"\lib\Movies"));
+    }
 }

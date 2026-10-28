@@ -232,16 +232,22 @@ fn remap_leaves_metadata_untouched() {
 }
 
 #[test]
-fn remap_matches_the_old_root_ignoring_case() {
+fn remap_matches_the_old_root_with_the_platforms_case_rule() {
     let conn = memory_db();
     let source = insert_source(&conn, SourceKind::Movie, "D:\\Movies").unwrap();
-    // An item written with different letter case still belongs to the source.
+    // An item written with different letter case belongs to the source on Windows and macOS;
+    // on Linux that is another folder and the remap leaves it alone.
     let id = movie(&conn, "d:\\movies", "Alien (1979)");
     let report = remap_source(&conn, source.id, "E:\\Films")
         .unwrap()
         .unwrap();
-    assert_eq!(report.items, 1);
-    assert_eq!(path_of(&conn, id).1, "E:\\Films\\Alien (1979)");
+    if cv_fs::paths::CASE_SENSITIVE {
+        assert_eq!(report.items, 0);
+        assert_eq!(path_of(&conn, id).1, "d:\\movies\\Alien (1979)");
+    } else {
+        assert_eq!(report.items, 1);
+        assert_eq!(path_of(&conn, id).1, "E:\\Films\\Alien (1979)");
+    }
 }
 
 #[test]

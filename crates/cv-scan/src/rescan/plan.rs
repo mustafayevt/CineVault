@@ -532,9 +532,9 @@ fn rebase_stored(
         let hit = movie.files.iter().enumerate().find(|(n, f)| {
             !used[*n]
                 && f.kind == old.kind
-                && f.path
-                    .file_name()
-                    .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case(&old.filename))
+                && f.path.file_name().is_some_and(|name| {
+                    cv_fs::paths::same_name(&name.to_string_lossy(), &old.filename)
+                })
         });
         if let Some((n, f)) = hit {
             used[n] = true;

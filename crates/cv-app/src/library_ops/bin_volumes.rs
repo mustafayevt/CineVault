@@ -14,8 +14,16 @@
 //! send still notices an item that did not reach the bin.
 //!
 //! macOS keeps its behaviour: every volume is taken to have a Trash (see the manual checks).
+//!
+//! On Linux a volume has a Trash only when the freedesktop Trash can keep an item there by one
+//! rename on the same file system (`xdg_dirs`): not on a network or read-only file system, and
+//! only when a Trash folder on the same device can be used. Whenever that is unclear the
+//! answer is no, and the item goes to the library folder's trash folder instead; it is never
+//! copied into a Trash on another drive.
 
 use std::path::Path;
+
+use super::BIN_NAME;
 
 /// Why a volume has no system bin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +36,11 @@ pub enum NoBin {
     TurnedOff,
     /// Not a local fixed drive the system lists (a mapped or substituted drive, a disc).
     NotLocal,
+    /// Linux: no Trash folder on this drive's file system can be used, so an item could not be
+    /// kept there by a rename (and is never copied into another drive's Trash).
+    NoTrashFolder,
+    /// Linux: the file system is mounted read-only.
+    ReadOnly,
 }
 
 /// What the system bin can take on the volume of a path.
@@ -53,19 +66,18 @@ pub fn bin_refusal(
     size: impl FnOnce(&Path) -> u64,
 ) -> Option<String> {
     match volumes.bin_of(path) {
-        VolumeBin::None(why) => Some(
-            match why {
-                NoBin::Network => "This is a network drive, which has no Recycle Bin",
-                NoBin::Removable => "This is a removable drive, which has no Recycle Bin",
-                NoBin::TurnedOff => "The Recycle Bin is turned off for this drive",
-                NoBin::NotLocal => "This drive has no Recycle Bin",
-            }
-            .to_owned(),
-        ),
+        VolumeBin::None(why) => Some(match why {
+            NoBin::Network => format!("This is a network drive, which has no {BIN_NAME}"),
+            NoBin::Removable => format!("This is a removable drive, which has no {BIN_NAME}"),
+            NoBin::TurnedOff => format!("The {BIN_NAME} is turned off for this drive"),
+            NoBin::NotLocal => format!("This drive has no {BIN_NAME}"),
+            NoBin::NoTrashFolder => "This drive has no Trash folder CineVault can use".to_owned(),
+            NoBin::ReadOnly => "This drive is read-only".to_owned(),
+        }),
         VolumeBin::Takes {
             max_bytes: Some(max),
         } if size(path) > max => Some(format!(
-            "{} is larger than the Recycle Bin of its drive can hold",
+            "{} is larger than the {BIN_NAME} of its drive can hold",
             path.file_name().map_or_else(
                 || path.display().to_string(),
                 |n| n.to_string_lossy().into_owned()
@@ -79,10 +91,22 @@ pub fn bin_refusal(
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemVolumes;
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
 impl BinVolumes for SystemVolumes {
     fn bin_of(&self, _path: &Path) -> VolumeBin {
         VolumeBin::Takes { max_bytes: None }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl BinVolumes for SystemVolumes {
+    fn bin_of(&self, path: &Path) -> VolumeBin {
+        // The freedesktop Trash has no size limit CineVault can read; the check after the
+        // send still reports an item that left its place but is not in the Trash.
+        match super::xdg_dirs::trash_dir_for(path) {
+            Ok(_) => VolumeBin::Takes { max_bytes: None },
+            Err(why) => VolumeBin::None(why),
+        }
     }
 }
 
@@ -133,6 +157,7 @@ fn plain(path: &str) -> String {
 }
 
 /// A Windows network path (`\\server\share\...`, `\\?\UNC\...`; not `\\?\C:\...`).
+#[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn is_network_path(path: &str) -> bool {
     if !cfg!(windows) {
         return false;
@@ -284,6 +309,22 @@ mod tests {
     }
 
     #[test]
+    fn the_network_reason_names_the_bin_of_the_system() {
+        let said = bin_refusal(
+            &Fixed(VolumeBin::None(NoBin::Network)),
+            Path::new("/mnt/nas/Heat"),
+            |_| 0,
+        )
+        .unwrap();
+        let bin = if cfg!(windows) {
+            "Recycle Bin"
+        } else {
+            "Trash"
+        };
+        assert_eq!(said, format!("This is a network drive, which has no {bin}"));
+    }
+
+    #[test]
     fn an_item_larger_than_the_bin_is_refused() {
         let bin = Fixed(VolumeBin::Takes {
             max_bytes: Some(1000),
@@ -294,17 +335,50 @@ mod tests {
 
     #[test]
     fn drives_without_a_bin_are_refused_without_sizing() {
+        let no_bin = format!("no {BIN_NAME}");
         for (why, text) in [
             (NoBin::Network, "network drive"),
             (NoBin::Removable, "removable drive"),
             (NoBin::TurnedOff, "turned off"),
-            (NoBin::NotLocal, "no Recycle Bin"),
+            (NoBin::NotLocal, no_bin.as_str()),
+            (NoBin::NoTrashFolder, "no Trash folder CineVault can use"),
+            (NoBin::ReadOnly, "read-only"),
         ] {
             let said = bin_refusal(&Fixed(VolumeBin::None(why)), Path::new("Z:/Heat"), |_| {
                 panic!("a drive without a bin needs no size")
             })
             .unwrap();
             assert!(said.contains(text), "{said}");
+        }
+    }
+
+    #[test]
+    fn no_reason_names_a_bin_the_system_does_not_have() {
+        let mut said: Vec<String> = [
+            NoBin::Network,
+            NoBin::Removable,
+            NoBin::TurnedOff,
+            NoBin::NotLocal,
+            NoBin::NoTrashFolder,
+            NoBin::ReadOnly,
+        ]
+        .into_iter()
+        .filter_map(|why| bin_refusal(&Fixed(VolumeBin::None(why)), Path::new("/x"), |_| 0))
+        .collect();
+        said.extend(bin_refusal(
+            &Fixed(VolumeBin::Takes { max_bytes: Some(1) }),
+            Path::new("/x/Heat"),
+            |_| 2,
+        ));
+        assert_eq!(said.len(), 7);
+        for text in said {
+            assert!(
+                text.contains(BIN_NAME) || !text.contains("Recycle Bin"),
+                "{text}"
+            );
+            if !cfg!(windows) {
+                assert!(!text.contains("Recycle Bin"), "{text}");
+            }
         }
     }
 

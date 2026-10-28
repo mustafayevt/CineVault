@@ -30,6 +30,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+pub mod paths;
 mod readers;
 pub mod volume;
 
@@ -237,6 +238,96 @@ pub fn write_atomic(target: &Path, bytes: &[u8]) -> io::Result<()> {
 /// The rename failed.
 pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
     retry("a rename", from, || fs::rename(from, to))
+}
+
+/// Why [`rename_no_replace`] could not put a file back without risking another one.
+#[cfg(target_os = "linux")]
+const NO_SAFE_RENAME: &str = "this file system cannot move it back without the risk of replacing \
+    a file that appears at the same moment";
+
+/// Renames `from` to `to` **only if nothing is at `to`**, as one step: a file or folder another
+/// program creates at `to` a moment earlier survives, because the check and the rename are not
+/// two separate calls. A rename alone replaces a file on Unix (and on Windows), so Undo and
+/// restore, which first check that the old place is free, use this one.
+///
+/// On Linux this is `renameat2` with `RENAME_NOREPLACE`, which the kernel's own drivers take
+/// (ext4, Btrfs, XFS, FAT, exFAT, NTFS3). A file system without it (NFS, FUSE mounts such as
+/// ntfs-3g, exfat-fuse or sshfs) falls back to a hard link for a file, which also fails when `to` exists,
+/// and for a folder to a rename over an empty folder made at `to` first (a rename replaces only
+/// an empty folder); anything that cannot be moved safely either way is refused with
+/// [`io::ErrorKind::Unsupported`] and left where it is, never moved with a replacing rename.
+/// Elsewhere `to` is checked and `from` renamed, which leaves a very small window.
+///
+/// # Errors
+/// [`io::ErrorKind::AlreadyExists`] when `to` exists; [`io::ErrorKind::Unsupported`] when this
+/// file system cannot do it safely; another error when the rename itself failed. `from` is then
+/// where it was.
+pub fn rename_no_replace(from: &Path, to: &Path) -> io::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        use rustix::fs::{CWD, RenameFlags, renameat_with};
+        use rustix::io::Errno;
+        let renamed = retry("a rename", from, || {
+            renameat_with(CWD, from, CWD, to, RenameFlags::NOREPLACE).map_err(io::Error::from)
+        });
+        match renamed {
+            // EINVAL is what a file system that does not know the flag answers.
+            Err(error)
+                if [Errno::INVAL, Errno::NOSYS, Errno::OPNOTSUPP]
+                    .iter()
+                    .any(|errno| error.raw_os_error() == Some(errno.raw_os_error())) =>
+            {
+                link_then_unlink(from, to)
+            }
+            other => other,
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        if to.symlink_metadata().is_ok() {
+            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
+        }
+        rename(from, to)
+    }
+}
+
+/// A file moved by linking a second name and dropping the first. Linking never replaces, so it
+/// is as safe as a no-replace rename. A folder goes through [`folder_into_placeholder`]; a link,
+/// or a file on a volume without hard links, is refused.
+#[cfg(target_os = "linux")]
+fn link_then_unlink(from: &Path, to: &Path) -> io::Result<()> {
+    let refused = || io::Error::new(io::ErrorKind::Unsupported, NO_SAFE_RENAME);
+    let Ok(meta) = fs::symlink_metadata(from) else {
+        return Err(refused());
+    };
+    if meta.is_dir() {
+        return folder_into_placeholder(from, to);
+    }
+    if !meta.is_file() {
+        return Err(refused());
+    }
+    match fs::hard_link(from, to) {
+        Ok(()) => fs::remove_file(from).inspect_err(|_| {
+            // Both names must not stay: drop the one just made, which only we know about.
+            let _ = fs::remove_file(to);
+        }),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Err(error),
+        Err(_) => Err(refused()),
+    }
+}
+
+/// A folder moved where the no-replace flag is missing (NFS, FUSE mounts): `to` is first made as
+/// an empty folder, which fails when anything is there, and the folder is then renamed over that
+/// empty folder. A rename replaces a folder only while it is empty, so nothing another program
+/// puts at `to` can be lost: if something lands in the placeholder first, the rename fails and
+/// the folder stays where it was.
+#[cfg(target_os = "linux")]
+fn folder_into_placeholder(from: &Path, to: &Path) -> io::Result<()> {
+    fs::create_dir(to)?;
+    retry_folder("a rename", from, || fs::rename(from, to)).inspect_err(|_| {
+        // Removed only while it is still empty, so only the folder made above.
+        let _ = fs::remove_dir(to);
+    })
 }
 
 /// Removes a file, retrying [transient](is_transient) errors. Only for files CineVault itself

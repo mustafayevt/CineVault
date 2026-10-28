@@ -8,6 +8,8 @@ import { Switch } from "../../components/Switch";
 import { t } from "../../i18n/catalog";
 import { cx } from "../../lib/cx";
 import { currentPickerBackend } from "../pickers/pickerBackend";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { EraseConfirmDialog } from "../trash/EraseConfirmDialog";
 import { FormRow, SettingsSection } from "./FormParts";
 import { useSetting, useSettingsStore } from "./settingsStore";
@@ -22,13 +24,14 @@ const AUTO_EMPTY = ["off", "7", "30", "90"] as const;
 
 /**
  * Settings, Deleted files (spec `title-deletion` "Where deleted files go"): where Delete, a move's
- * originals, rename leftovers and replaced artwork or NFO files go: the Recycle Bin (default),
+ * originals, rename leftovers and replaced artwork or NFO files go: the bin (default),
  * the trash folder on each drive, a custom trash folder, or erased at once. Choosing Delete
  * permanently asks for the typed confirmation of Shift+Delete first. Below it, whether Delete asks
  * first (`delete.confirm`; Delete permanently always asks) and the automatic
  * emptying of CineVault's own trash folders (off by default).
  */
 export function DeletedFilesSection() {
+  const binLabel = binName(detectPlatform());
   const mode = useSetting<string>("files.deleted-mode") as DeletedMode;
   const folder = useSetting<string>("files.trash-folder");
   const autoEmpty = useSetting<string>("files.auto-empty-days");
@@ -102,7 +105,7 @@ export function DeletedFilesSection() {
                       value === "erase" ? "text-danger" : "text-text",
                     )}
                   >
-                    {t(`settings.files.deleted-mode.option.${value}`)}
+                    {t(`settings.files.deleted-mode.option.${value}`, { bin: binLabel })}
                   </span>
                   <span
                     className={cx(
@@ -110,7 +113,7 @@ export function DeletedFilesSection() {
                       value === "erase" ? "text-danger" : "text-text-muted",
                     )}
                   >
-                    {t(`settingsPage.deleted.help.${value}`)}
+                    {t(`settingsPage.deleted.help.${value}`, { bin: binLabel })}
                   </span>
                 </label>
               </div>
@@ -157,7 +160,7 @@ export function DeletedFilesSection() {
       </FormRow>
       <FormRow
         label={t("settings.files.auto-empty-days.title")}
-        hint={t("settings.files.auto-empty-days.description")}
+        hint={t("settings.files.auto-empty-days.description", { bin: binLabel })}
       >
         <Select
           className="w-[160px]"

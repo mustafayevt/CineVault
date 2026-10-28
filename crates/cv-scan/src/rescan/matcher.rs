@@ -173,7 +173,7 @@ fn looks_moved(scanned: &Probe, stored: &Probe) -> bool {
         stored
             .videos
             .iter()
-            .any(|b| stem_of(a).eq_ignore_ascii_case(stem_of(b)))
+            .any(|b| cv_fs::paths::same_name(stem_of(a), stem_of(b)))
     });
     let same_title = match (&scanned.title_key, &stored.title_key) {
         (Some(a), Some(b)) => a == b && !a.ends_with("|0"),

@@ -29,6 +29,25 @@ pub struct SourceQuality {
     pub sd: u64,
 }
 
+/// The key `source_usage` and `source_quality` file a library folder under, for looking it up.
+#[must_use]
+pub fn source_key(path: &str) -> String {
+    if cv_fs::paths::CASE_SENSITIVE {
+        path.to_owned()
+    } else {
+        path.to_lowercase()
+    }
+}
+
+/// The SQL that gives the same key as [`source_key`] for the `data_source` column.
+const fn source_key_sql() -> &'static str {
+    if cv_fs::paths::CASE_SENSITIVE {
+        "data_source"
+    } else {
+        "lower(data_source)"
+    }
+}
+
 fn count(value: i64) -> u64 {
     u64::try_from(value).unwrap_or(0)
 }
@@ -42,19 +61,21 @@ const fn path_key() -> &'static str {
     }
 }
 
-/// Titles and bytes per library folder, by the folder's path as the items store it (compared
-/// ignoring case). Titles whose drive is offline still count, so an offline drive's card keeps
-/// its numbers; missing titles and hidden ones do not. A file shared by several rows counts once.
+/// Titles and bytes per library folder, by the folder's path as the items store it. The map key is
+/// [`source_key`]: the path lower-cased where file names ignore case (Windows and macOS), as
+/// stored on Linux, where `Movies` and `movies` are two folders. Titles whose drive is offline
+/// still count, so an offline drive's card keeps its numbers; missing titles and hidden ones do not. A file shared by several rows counts once.
 ///
 /// # Errors
 /// The library cannot be read.
 pub fn source_usage(conn: &Connection) -> DbResult<HashMap<String, SourceUsage>> {
     let mut usage: HashMap<String, SourceUsage> = HashMap::new();
-    let mut titles = conn.prepare(
-        "SELECT lower(data_source), COUNT(*) FROM item \
+    let src = source_key_sql();
+    let mut titles = conn.prepare(&format!(
+        "SELECT {src}, COUNT(*) FROM item \
          WHERE kind IN ('movie', 'show') AND availability IN ('online', 'offline') AND trashed_entry IS NULL \
-         GROUP BY lower(data_source)",
-    )?;
+         GROUP BY {src}"
+    ))?;
     for row in titles.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))? {
         let (root, n) = row?;
         usage.entry(root).or_default().titles = count(n);
@@ -62,7 +83,7 @@ pub fn source_usage(conn: &Connection) -> DbResult<HashMap<String, SourceUsage>>
     // A show's files hang off its episodes (and their seasons): the title a file counts for is
     // the movie or show above it, and a file shared by several rows counts once per title.
     let mut bytes = conn.prepare(&format!(
-        "SELECT lower(data_source), SUM(size) FROM ( \
+        "SELECT {src}, SUM(size) FROM ( \
              SELECT t.data_source AS data_source, MAX(m.size_bytes) AS size \
              FROM media_file m \
              JOIN item mi ON mi.id = m.item_id \
@@ -72,7 +93,7 @@ pub fn source_usage(conn: &Connection) -> DbResult<HashMap<String, SourceUsage>>
              WHERE t.kind IN ('movie', 'show') AND t.availability IN ('online', 'offline') \
                AND t.trashed_entry IS NULL \
              GROUP BY t.id, {key}) \
-         GROUP BY lower(data_source)",
+         GROUP BY {src}",
         key = path_key()
     ))?;
     for row in bytes.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))? {
@@ -88,8 +109,9 @@ pub fn source_usage(conn: &Connection) -> DbResult<HashMap<String, SourceUsage>>
 /// # Errors
 /// The library cannot be read.
 pub fn source_quality(conn: &Connection) -> DbResult<HashMap<String, SourceQuality>> {
-    let mut stmt = conn.prepare(
-        "SELECT lower(data_source), \
+    let src = source_key_sql();
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {src}, \
                 CASE WHEN best >= 2000 THEN 0 WHEN best >= 1000 THEN 1 WHEN best >= 700 THEN 2 \
                      ELSE 3 END AS class, COUNT(*) \
          FROM ( \
@@ -104,8 +126,8 @@ pub fn source_quality(conn: &Connection) -> DbResult<HashMap<String, SourceQuali
              WHERE t.kind IN ('movie', 'show') AND t.availability IN ('online', 'offline') \
                AND t.trashed_entry IS NULL) \
          WHERE best > 0 \
-         GROUP BY lower(data_source), class",
-    )?;
+         GROUP BY {src}, class"
+    ))?;
     let mut quality: HashMap<String, SourceQuality> = HashMap::new();
     let rows = stmt.query_map([], |r| {
         Ok((
@@ -216,14 +238,14 @@ mod tests {
 
         let usage = source_usage(&conn).unwrap();
         assert_eq!(
-            usage["d:/movies"],
+            usage[&source_key("D:/Movies")],
             SourceUsage {
                 titles: 3,
                 bytes: 6_700
             }
         );
         assert_eq!(
-            usage["e:/archive"],
+            usage[&source_key("E:/Archive")],
             SourceUsage {
                 titles: 2,
                 bytes: 11_499
@@ -232,7 +254,7 @@ mod tests {
         );
         let quality = source_quality(&conn).unwrap();
         assert_eq!(
-            quality["d:/movies"],
+            quality[&source_key("D:/Movies")],
             SourceQuality {
                 p2160: 1,
                 p1080: 1,
@@ -240,7 +262,7 @@ mod tests {
                 sd: 1
             }
         );
-        assert_eq!(quality["e:/archive"].p720, 1);
+        assert_eq!(quality[&source_key("E:/Archive")].p720, 1);
     }
 
     #[test]
@@ -263,13 +285,16 @@ mod tests {
         }
         let usage = source_usage(&conn).unwrap();
         assert_eq!(
-            usage["d:/tv"],
+            usage[&source_key("D:/TV")],
             SourceUsage {
                 titles: 1,
                 bytes: 2_000
             }
         );
-        assert_eq!(source_quality(&conn).unwrap()["d:/tv"].p2160, 1);
+        assert_eq!(
+            source_quality(&conn).unwrap()[&source_key("D:/TV")].p2160,
+            1
+        );
     }
 
     #[test]
@@ -295,5 +320,25 @@ mod tests {
             1
         );
         assert_eq!(sources_last_seen(&conn).unwrap()[&source.id], 61_000);
+    }
+
+    #[test]
+    fn folders_differing_only_in_case_share_figures_only_where_the_platform_folds_case() {
+        let conn = memory_db();
+        movie(&conn, "/lib/Movies", "Alien", 4_000, 2160);
+        movie(&conn, "/lib/movies", "Heat", 1_500, 720);
+
+        let usage = source_usage(&conn).unwrap();
+        let quality = source_quality(&conn).unwrap();
+        if cv_fs::paths::CASE_SENSITIVE {
+            assert_eq!(usage.len(), 2, "{usage:?}");
+            assert_eq!(usage[&source_key("/lib/Movies")].bytes, 4_000);
+            assert_eq!(usage[&source_key("/lib/movies")].bytes, 1_500);
+            assert_eq!(quality[&source_key("/lib/Movies")].p2160, 1);
+            assert_eq!(quality[&source_key("/lib/movies")].p720, 1);
+        } else {
+            assert_eq!(usage.len(), 1, "{usage:?}");
+            assert_eq!(usage[&source_key("/lib/Movies")].titles, 2);
+        }
     }
 }

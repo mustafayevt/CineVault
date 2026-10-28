@@ -11,6 +11,8 @@ import { useFormat } from "../../i18n/useFormat";
 import { useSetting } from "../settings/settingsStore";
 import { currentLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import type { RemovalPlan } from "../library-ops/libraryOpsBackend";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { deleteToBin, erasePermanently, useDeleteStore } from "./deleteActions";
 import type { DeleteTarget } from "./deleteActions";
 
@@ -25,8 +27,9 @@ function nameOf(row: { title: string; year: number }): string {
 /**
  * The permanent-delete dialog (spec `title-deletion` "Shift+Delete asks for a typed confirmation"), also
  * what Delete opens when Settings › Deleted files is Delete permanently: how many titles, each with its folder and size on a well list, the words
- * "This skips the Recycle Bin and cannot be undone", a field for DELETE, and the buttons Cancel,
- * "Send to Recycle Bin instead" and "Delete permanently", which stays off until the field holds
+ * "This skips the bin and cannot be undone" (the bin is the Recycle Bin on Windows, the Trash
+ * elsewhere), a field for DELETE, and the buttons Cancel, "Send to the bin instead" and "Delete
+ * permanently", which stays off until the field holds
  * exactly DELETE. The list is what the backend says it will touch; the titles it would refuse
  * (an offline drive) are named apart and are not sent.
  */
@@ -53,9 +56,10 @@ function Confirmation({
   onClose: () => void;
 }) {
   const format = useFormat();
+  const bin = binName(detectPlatform());
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
-  // Under Delete permanently a delete erases too, so there is no Recycle Bin to offer instead.
+  // Under Delete permanently a delete erases too, so there is no bin to offer instead.
   const erasing = useSetting<string>("files.deleted-mode") === "erase";
   const ids = targets.map((target) => target.id);
 
@@ -105,13 +109,14 @@ function Confirmation({
             : t("delete.dialog.body", {
                 count: rows.length,
                 files: t("delete.dialog.files", { count: files }),
+                bin,
               })
       }
       footer={
         <div className="flex w-full items-center gap-2">
           {erasing ? null : (
             <Button variant="ghost" onClick={sendToBin} disabled={busy}>
-              {t("delete.dialog.toBin")}
+              {t("delete.dialog.toBin", { bin })}
             </Button>
           )}
           <span className="flex-1" />

@@ -71,6 +71,10 @@ fn extract_files(
             let file = open(archive)?;
             extract_tar(flate2::read::GzDecoder::new(file), files, dest_dir)
         }
+        ArchiveFormat::TarXz => {
+            let file = open(archive)?;
+            extract_tar(liblzma::read::XzDecoder::new(file), files, dest_dir)
+        }
     }
 }
 
@@ -328,6 +332,9 @@ fn extract_tree(
         ArchiveFormat::TarGz => {
             tree_from_tar(flate2::read::GzDecoder::new(open(archive)?), &mut writer)?;
         }
+        ArchiveFormat::TarXz => {
+            tree_from_tar(liblzma::read::XzDecoder::new(open(archive)?), &mut writer)?;
+        }
         ArchiveFormat::Raw => return Err(archive_error("a raw download cannot be a tree")),
     }
     writer.finish()
@@ -393,6 +400,8 @@ fn tree_from_tar(reader: impl Read, writer: &mut TreeWriter<'_>) -> Result<(), T
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -451,5 +460,96 @@ mod tests {
         let w = writer("", temp.path());
         assert_eq!(w.relative("a/b").expect("ok").as_deref(), Some("a/b"));
         assert!(w.relative("a/../b").is_err());
+    }
+
+    /// A `.tar.xz` holding `(path, contents)` regular files.
+    fn tar_xz_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let encoder = liblzma::write::XzEncoder::new(Vec::new(), 1);
+        let mut builder = tar::Builder::new(encoder);
+        for (path, contents) in entries {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(contents.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, path, *contents)
+                .expect("append");
+        }
+        builder
+            .into_inner()
+            .expect("finish tar")
+            .finish()
+            .expect("finish xz")
+    }
+
+    #[test]
+    fn a_tar_xz_download_unpacks_the_listed_files() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let archive = temp.path().join("pkg.tar.xz");
+        fs::write(
+            &archive,
+            tar_xz_of(&[
+                ("pkg/bin/tool", b"tool bytes"),
+                ("pkg/LICENSE", b"licence"),
+                ("pkg/unused", b"skipped"),
+            ]),
+        )
+        .expect("write archive");
+        let dest = temp.path().join("out");
+        fs::create_dir(&dest).expect("dest");
+        // The hash and size are checked by the download, not by unpacking.
+        let artifact: Artifact = serde_json::from_value(json!({
+            "url": "https://example.test/pkg.tar.xz",
+            "sha256": "",
+            "size": 0,
+            "format": "tar.xz",
+            "files": [
+                { "provides": "tool", "from": "pkg/bin/tool", "to": "tool" },
+                { "from": "pkg/LICENSE", "to": "LICENSE.txt" }
+            ]
+        }))
+        .expect("artifact");
+        let extracted = extract(&artifact, &archive, &dest).expect("extract");
+        assert_eq!(fs::read(dest.join("tool")).expect("tool"), b"tool bytes");
+        assert_eq!(
+            fs::read(dest.join("LICENSE.txt")).expect("licence"),
+            b"licence"
+        );
+        assert!(!dest.join("unused").exists());
+        assert_eq!(extracted.len(), 2);
+    }
+
+    #[test]
+    fn a_tar_xz_tree_keeps_its_shape_below_its_root() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let archive = temp.path().join("pkg.tar.xz");
+        fs::write(
+            &archive,
+            tar_xz_of(&[("Pkg/run", b"#!/bin/sh\n"), ("Pkg/lib/data.bin", b"data")]),
+        )
+        .expect("write archive");
+        let dest = temp.path().join("out");
+        fs::create_dir(&dest).expect("dest");
+        let artifact: Artifact = serde_json::from_value(json!({
+            "url": "https://example.test/pkg.tar.xz",
+            "sha256": "",
+            "size": 0,
+            "format": "tar.xz",
+            "mode": "tree",
+            "root": "Pkg/",
+            "program": { "provides": "indexer-service", "path": "run" }
+        }))
+        .expect("artifact");
+        let extracted = extract(&artifact, &archive, &dest).expect("extract");
+        assert_eq!(fs::read(dest.join("run")).expect("program"), b"#!/bin/sh\n");
+        assert_eq!(
+            fs::read(dest.join("lib").join("data.bin")).expect("data"),
+            b"data"
+        );
+        assert!(
+            extracted
+                .iter()
+                .any(|file| file.name == "run" && file.tool.as_deref() == Some("indexer-service"))
+        );
     }
 }

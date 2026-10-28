@@ -22,6 +22,7 @@ import {
 import { setOpenFolderBackend } from "../detail/openFolderBackend";
 import { setScanBackend, unavailableScanBackend } from "../scan/scanBackend";
 import { restoreLayout, stubLayout } from "../../test/layout";
+import { restorePlatform, stubPlatform } from "../../test/platform";
 import { useSettingsStore } from "../settings/settingsStore";
 import { useMoveToStore } from "../move-to/moveToStore";
 import { createSyntheticHistoryBackend } from "../history/syntheticHistory";
@@ -82,6 +83,7 @@ function renderMovie(path = `/movies/${SYNTHETIC_MOVIE_ID}`): Rendered {
 
 beforeEach(() => {
   stubLayout();
+  stubPlatform("windows");
   setDetailBackend(backendOf(syntheticMovieDetail()));
   setRenameHistoryBackend({
     renamedFrom: () => Promise.resolve(null),
@@ -91,6 +93,7 @@ beforeEach(() => {
 
 afterEach(() => {
   restoreLayout();
+  restorePlatform();
   setDetailBackend(null);
   setRenameHistoryBackend(null);
   setHistoryBackend(null);

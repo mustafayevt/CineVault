@@ -47,12 +47,16 @@ pub trait FileProbe {
 pub struct StdFileProbe;
 
 impl FileProbe for StdFileProbe {
+    // A path under the folder of an unplugged Linux drive (`/media/<user>/<name>`, `/mnt/<name>`)
+    // answers on the system drive, where the empty folder stays behind; it is not on the drive, so
+    // nothing there exists and the data source reads as offline rather than as full of missing
+    // titles.
     fn dir_exists(&self, path: &str) -> bool {
-        Path::new(path).is_dir()
+        cv_fs::paths::drive_is_mounted(Path::new(path)) && Path::new(path).is_dir()
     }
 
     fn file_exists(&self, path: &str) -> bool {
-        Path::new(path).is_file()
+        cv_fs::paths::drive_is_mounted(Path::new(path)) && Path::new(path).is_file()
     }
 }
 

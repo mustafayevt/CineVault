@@ -95,12 +95,28 @@ fn query(conn: &Connection, condition: &str) -> DbResult<Vec<ReviewCandidate>> {
     Ok(out)
 }
 
-/// The key that makes two folders "the same" for the review: separators unified, case folded,
-/// no trailing separator.
+/// The key that makes two folders "the same" for the review: separators unified, no trailing
+/// separator, and case folded where the platform's file names ignore it (not on Linux).
 fn fold(path: &str) -> String {
-    path.trim_end_matches(['\\', '/'])
-        .replace('\\', "/")
-        .to_lowercase()
+    fold_with(path, cv_fs::paths::CASE_SENSITIVE)
+}
+
+fn fold_with(path: &str, case_sensitive: bool) -> String {
+    let text = path.trim_end_matches(['\\', '/']).replace('\\', "/");
+    if case_sensitive {
+        text
+    } else {
+        text.to_lowercase()
+    }
+}
+
+/// A file name as part of a review key, folded like [`fold`].
+fn fold_name(name: &str) -> String {
+    if cv_fs::paths::CASE_SENSITIVE {
+        name.to_owned()
+    } else {
+        name.to_lowercase()
+    }
 }
 
 /// Groups of two or more titles that hold the same thing: the same video file for movies, the
@@ -120,7 +136,7 @@ fn duplicate_groups(conn: &Connection) -> DbResult<Vec<Vec<ItemId>>> {
             let key = format!(
                 "{}/{}",
                 fold(&r.get::<_, String>(1)?),
-                r.get::<_, String>(2)?.to_lowercase()
+                fold_name(&r.get::<_, String>(2)?)
             );
             let members = groups.entry((false, key)).or_default();
             if !members.contains(&id) {
@@ -307,11 +323,18 @@ pub fn relocate_tree(conn: &Connection, id: ItemId, from: &str, to: &str) -> DbR
         ("item", "path", "id"),
         ("media_file", "directory", "item_id"),
     ] {
+        // The old folder is matched the way the file system does: ignoring case on Windows and
+        // macOS, exactly on Linux, where `/lib/Movies` and `/lib/movies` are two folders.
+        let same_start = if cv_fs::paths::CASE_SENSITIVE {
+            format!("substr({column}, 1, ?2) = ?3")
+        } else {
+            format!("lower(substr({column}, 1, ?2)) = lower(?3)")
+        };
         changed += conn.execute(
             &format!(
                 "UPDATE {table} SET {column} = ?1 || substr({column}, ?2 + 1) \
                  WHERE {owner} IN (SELECT value FROM json_each(?4)) \
-                   AND lower(substr({column}, 1, ?2)) = lower(?3) \
+                   AND {same_start} \
                    AND (length({column}) = ?2 OR substr({column}, ?2 + 1, 1) IN ('\\', '/'))"
             ),
             params![new, old_len, old, ids],
@@ -335,4 +358,52 @@ pub fn relocate_tree(conn: &Connection, id: ItemId, from: &str, to: &str) -> DbR
         )?;
     }
     Ok(u64::try_from(changed).unwrap_or(u64::MAX))
+}
+
+#[cfg(test)]
+mod tests {
+    use cv_domain::Item;
+
+    use super::*;
+    use crate::repo::{get_item, insert_item};
+
+    fn memory_db() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", true).unwrap();
+        crate::schema::migrate(&mut conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn the_review_key_keeps_case_only_when_asked_to() {
+        assert_eq!(fold_with(r"D:\Movies\Heat\", false), "d:/movies/heat");
+        assert_eq!(fold_with(r"D:\Movies\Heat\", true), "D:/Movies/Heat");
+    }
+
+    #[test]
+    fn a_folder_in_another_case_is_relocated_only_where_the_platform_folds_case() {
+        let conn = memory_db();
+        let mut movie = Item::movie("Heat");
+        movie.core.path = "/lib/Movies/Heat".into();
+        let id = insert_item(&conn, &movie).unwrap();
+
+        // `from` differs from the stored folder in case only.
+        relocate_tree(&conn, id, "/lib/movies/Heat", "/lib/Films/Heat").unwrap();
+        let path = get_item(&conn, id).unwrap().unwrap().core.path;
+        if cv_fs::paths::CASE_SENSITIVE {
+            assert_eq!(
+                path, "/lib/Movies/Heat",
+                "another folder must not be re-pointed"
+            );
+        } else {
+            assert_eq!(path, "/lib/Films/Heat");
+        }
+
+        // The exact spelling is always re-pointed.
+        relocate_tree(&conn, id, &path, "/lib/Films/Heat 2").unwrap();
+        assert_eq!(
+            get_item(&conn, id).unwrap().unwrap().core.path,
+            "/lib/Films/Heat 2"
+        );
+    }
 }

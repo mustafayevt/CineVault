@@ -18,6 +18,7 @@ const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const base = readJson(join(tauriDir, "tauri.conf.json"));
 const windows = readJson(join(tauriDir, "tauri.windows.conf.json"));
 const macos = readJson(join(tauriDir, "tauri.macos.conf.json"));
+const linux = readJson(join(tauriDir, "tauri.linux.conf.json"));
 
 // 1. Bundling is on and each OS asks for the installers the spec names.
 if (base.bundle?.active !== true) fail("bundle.active must be true");
@@ -28,6 +29,7 @@ const need = (conf, name, targets) => {
 };
 need(windows, "tauri.windows.conf.json", ["msi", "nsis"]);
 need(macos, "tauri.macos.conf.json", ["dmg"]);
+need(linux, "tauri.linux.conf.json", ["appimage", "deb", "rpm"]);
 
 // 2. Every icon the bundle lists exists, and the icon set covers each platform format.
 const icons = base.bundle?.icon ?? [];
@@ -83,7 +85,7 @@ else if (!existsSync(join(tauriDir, nsisHooks))) fail(`nsis.installerHooks names
 if (base.bundle?.resources) fail("bundle.resources must be empty (nothing is shipped but the app)");
 if (base.bundle?.externalBin) fail("bundle.externalBin must be empty (tools are downloaded on demand)");
 if (base.plugins?.updater) fail("the Tauri updater plugin is not used (updates use the signed manifest)");
-const configText = [base, windows, macos].map((c) => JSON.stringify(c)).join("\n");
+const configText = [base, windows, macos, linux].map((c) => JSON.stringify(c)).join("\n");
 for (const key of ["signingIdentity", "certificateThumbprint", "providerShortName", "pubkey"]) {
   if (configText.includes(`"${key}"`)) fail(`configuration must not set ${key}; signing is a release-time step`);
 }
@@ -99,7 +101,11 @@ for (const file of existsSync(workflowDir) ? readdirSync(workflowDir) : []) {
     fail(`${file} sets a key, token or password variable`);
   }
 }
-for (const file of ["release-build.yml", "release-windows.yml", "release-macos.yml"]) {
+// The Linux release workflow is required wherever it is present. Make it unconditional once
+// it is always in the repository.
+const workflows = ["release-build.yml", "release-windows.yml", "release-macos.yml"];
+if (existsSync(join(workflowDir, "release-linux.yml"))) workflows.push("release-linux.yml");
+for (const file of workflows) {
   if (!existsSync(join(workflowDir, file))) fail(`missing .github/workflows/${file}`);
 }
 
@@ -123,7 +129,9 @@ if (process.argv.includes("--artifacts")) {
       ? [["msi", ".msi"], ["nsis", ".exe"]]
       : process.platform === "darwin"
         ? [["dmg", ".dmg"]]
-        : [];
+        : process.platform === "linux"
+          ? [["appimage", ".AppImage"], ["deb", ".deb"], ["rpm", ".rpm"]]
+          : [];
   for (const [folder, ext] of wanted) {
     const dir = join(bundle, folder);
     const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(ext)) : [];

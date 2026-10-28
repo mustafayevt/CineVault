@@ -723,8 +723,24 @@ pub(crate) fn parent_exists(path: &Path) -> bool {
     path.parent().is_some_and(Path::is_dir)
 }
 
-/// Whether two paths name the same file, ignoring the separator and the letter case.
+/// Whether two paths name the same file, ignoring the separator, and the letter case where the
+/// platform's file names ignore it (not on Linux, where `A.nfo` and `a.nfo` are two files).
 fn same_path(a: &Path, b: &Path) -> bool {
-    let normal = |p: &Path| p.to_string_lossy().replace('\\', "/");
-    normal(a).eq_ignore_ascii_case(&normal(b))
+    cv_fs::paths::same_path(a, b)
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    #[test]
+    fn nfo_paths_differing_only_in_case_are_one_file_only_where_the_platform_folds_case() {
+        let folds = !cv_fs::paths::CASE_SENSITIVE;
+        let (a, b) = (
+            Path::new("/lib/Heat (1995)/Movie.nfo"),
+            Path::new("/lib/Heat (1995)/movie.nfo"),
+        );
+        assert_eq!(same_path(a, b), folds);
+        assert!(same_path(a, Path::new(r"\lib\Heat (1995)\Movie.nfo")));
+    }
 }

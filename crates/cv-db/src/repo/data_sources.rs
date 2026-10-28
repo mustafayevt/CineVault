@@ -11,6 +11,7 @@
 use cv_domain::{DataSource, SourceKind};
 use rusqlite::{Connection, OptionalExtension, params};
 
+use super::path_case::{self, COLLATE};
 use crate::error::{DbError, DbResult};
 
 const SELECT: &str = "SELECT id, kind, path, position, created_ms, label FROM data_source";
@@ -155,7 +156,9 @@ pub fn label_of_root(
 ) -> DbResult<Option<String>> {
     Ok(conn
         .query_row(
-            "SELECT label FROM data_source WHERE kind = ?1 AND path = ?2 COLLATE NOCASE",
+            &format!(
+                "SELECT label FROM data_source WHERE kind = ?1 AND path = ?2 COLLATE {COLLATE}"
+            ),
             params![kind.as_str(), data_source],
             |r| r.get(0),
         )
@@ -165,7 +168,7 @@ pub fn label_of_root(
 /// The number of items that live under a source root (movies, shows, seasons and episodes).
 pub fn count_items_under(conn: &Connection, path: &str) -> DbResult<u64> {
     let n: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM item WHERE data_source = ?1 COLLATE NOCASE",
+        &format!("SELECT COUNT(*) FROM item WHERE data_source = ?1 COLLATE {COLLATE}"),
         [path],
         |r| r.get(0),
     )?;
@@ -176,8 +179,9 @@ pub fn count_items_under(conn: &Connection, path: &str) -> DbResult<u64> {
 /// belong to their show and are not counted.
 pub fn count_titles_under(conn: &Connection, path: &str) -> DbResult<u64> {
     let n: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM item WHERE data_source = ?1 COLLATE NOCASE \
-         AND kind IN ('movie', 'show') AND trashed_entry IS NULL",
+        &format!(
+            "SELECT COUNT(*) FROM item WHERE data_source = ?1 COLLATE {COLLATE} AND kind IN ('movie', 'show') AND trashed_entry IS NULL"
+        ),
         [path],
         |r| r.get(0),
     )?;
@@ -311,8 +315,9 @@ fn trim_separators(path: &str) -> &str {
 /// Rewrites `column` of `table` for rows whose value is the old root or lies under it.
 ///
 /// `scope` is an extra `AND ...` condition that may use `:old_root`, to limit the rows to the
-/// items of that root; `None` for no limit. Matching ignores ASCII case and requires a folder boundary, so
-/// `D:\Movies2` is not under `D:\Movies`. Empty values are left alone.
+/// items of that root; `None` for no limit. Matching ignores ASCII case (not on Linux, see
+/// [`path_case`]) and requires a folder boundary, so `D:\Movies2` is not under `D:\Movies`. Empty
+/// values are left alone.
 fn repoint(
     conn: &Connection,
     table: &str,
@@ -322,12 +327,14 @@ fn repoint(
     old_root: &str,
 ) -> DbResult<u64> {
     let scope_sql = scope.unwrap_or("");
+    let head = path_case::fold(&format!("substr({column}, 1, :old_len)"));
+    let want = path_case::fold(":old_core");
     let sql = format!(
         "UPDATE {table} SET {column} = CASE \
              WHEN length({column}) = :old_len THEN :new_root \
              ELSE :new_core || replace(substr({column}, :old_len + 1), :old_sep, :new_sep) END \
          WHERE {column} <> '' \
-           AND lower(substr({column}, 1, :old_len)) = lower(:old_core) \
+           AND {head} = {want} \
            AND (length({column}) = :old_len OR substr({column}, :old_len + 1, 1) IN ('\\', '/')) \
            {scope_sql}"
     );
@@ -381,7 +388,7 @@ pub fn remap_source(conn: &Connection, id: i64, new_path: &str) -> DbResult<Opti
     // Items found under this source. Paths first: the scope reads `data_source`, which is
     // rewritten last.
     let old_root = old.path.as_str();
-    let in_source = "data_source = :old_root COLLATE NOCASE";
+    let in_source = format!("data_source = :old_root COLLATE {COLLATE}");
     repoint(
         conn,
         "item",
@@ -414,17 +421,19 @@ pub fn remap_source(conn: &Connection, id: i64, new_path: &str) -> DbResult<Opti
         conn,
         "fingerprint",
         "path",
-        Some("AND data_source = :old_root COLLATE NOCASE"),
+        Some(&format!("AND data_source = :old_root COLLATE {COLLATE}")),
         &rewrite,
         old_root,
     )?;
     conn.execute(
-        "UPDATE fingerprint SET data_source = ?1 WHERE data_source = ?2 COLLATE NOCASE",
+        &format!(
+            "UPDATE fingerprint SET data_source = ?1 WHERE data_source = ?2 COLLATE {COLLATE}"
+        ),
         params![new_path, old.path],
     )?;
 
     let items = conn.execute(
-        "UPDATE item SET data_source = ?1 WHERE data_source = ?2 COLLATE NOCASE",
+        &format!("UPDATE item SET data_source = ?1 WHERE data_source = ?2 COLLATE {COLLATE}"),
         params![new_path, old.path],
     )?;
 

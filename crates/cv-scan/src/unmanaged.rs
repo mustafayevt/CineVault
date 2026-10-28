@@ -133,13 +133,10 @@ pub fn find_unmanaged_all(
         .collect()
 }
 
-/// A lower-cased path with `/` separators and no trailing separator.
+/// A path with `/` separators and no trailing separator, lower-cased where the platform's file
+/// names ignore case.
 fn key(path: &str) -> String {
-    let mut key = path.replace('\\', "/").to_lowercase();
-    while key.len() > 1 && key.ends_with('/') {
-        key.pop();
-    }
-    key
+    cv_fs::paths::key_with(path, cv_fs::paths::CASE_SENSITIVE)
 }
 
 /// The keys of the stored videos, with the folders of stored discs.
@@ -165,7 +162,11 @@ fn managed_keys(items: &[cv_db::repo::fingerprint::StoredItem]) -> Managed {
     let mut prefixes = Vec::new();
     for item in items {
         for f in item.files.iter().filter(|f| f.kind == MediaFileType::Video) {
-            let k = format!("{}/{}", key(&f.directory), f.filename.to_lowercase());
+            let k = format!(
+                "{}/{}",
+                key(&f.directory),
+                cv_fs::paths::fold_name(&f.filename)
+            );
             // A disc is stored as a video named like its disc folder.
             if is_disc_name(&f.filename) {
                 prefixes.push(k.clone());

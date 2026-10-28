@@ -1,12 +1,14 @@
 // Fills in the current version, installer size and release date from the public releases API, and
-// tells Mac visitors that their version is still on its way. The buttons are written for Windows
-// with the version-less releases/latest/download link, so they work without this script.
+// tells Mac visitors that their version is still on its way. Linux visitors get the AppImage in the
+// hero. The buttons are written for Windows with the version-less releases/latest/download link, so
+// they work without this script.
 (function () {
   "use strict";
   var API = "https://api.github.com/repos/mustafayevt/CineVault-releases/releases/latest";
   var DOWNLOAD = "https://github.com/mustafayevt/CineVault-releases/releases/latest/download/";
   var RELEASES = "https://github.com/mustafayevt/CineVault-releases/releases";
   var SETUP = "CineVault-setup-x64.exe";
+  var APPIMAGE = "CineVault-x86_64.AppImage";
 
   function megabytes(bytes) {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
@@ -30,6 +32,25 @@
     return /Macintosh|Mac OS X/i.test(navigator.userAgent) && navigator.maxTouchPoints < 2;
   }
 
+  // A desktop Linux visitor. Android and ChromeOS also say Linux in the user agent, but they cannot
+  // run the desktop build, so they keep the default page.
+  function isLinux() {
+    var agent = navigator.userAgent || "";
+    return /Linux|X11/i.test(agent) && !/Android|CrOS/i.test(agent);
+  }
+
+  // A Linux visitor: the hero offers the AppImage, which runs without a package manager.
+  function showLinux() {
+    all("[data-dl]").forEach(function (button) {
+      var label = button.querySelector("[data-dl-label]");
+      var note = button.querySelector("[data-dl-note]");
+      button.href = DOWNLOAD + APPIMAGE;
+      if (label) label.textContent = "Download for Linux (beta)";
+      if (note) note.textContent = "AppImage, 64-bit";
+    });
+    setAll("[data-dl-fine]", "Free. CineVault for Linux is a beta for 64-bit (x86_64) systems. macOS is coming soon.");
+  }
+
   // A Mac visitor: an honest "coming soon" with the Windows installer one click away.
   function showMac() {
     all("[data-dl]").forEach(function (button) {
@@ -49,6 +70,7 @@
   }
 
   if (isMac()) showMac();
+  else if (isLinux()) showLinux();
   if (!window.fetch) return;
   fetch(API, { headers: { Accept: "application/vnd.github+json" } })
     .then(function (response) {

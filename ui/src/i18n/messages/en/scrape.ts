@@ -147,7 +147,7 @@ export const scrape = {
   "matchPicker.compare.files": "NFO, artwork",
   "matchPicker.compare.folder": "Folder",
   "matchPicker.compare.filesNow": "{count, plural, one {# file} other {# files}}",
-  "matchPicker.compare.filesAfter": "Replaced (old files to Recycle Bin)",
+  "matchPicker.compare.filesAfter": "Replaced (old files to {bin})",
   "matchPicker.compare.folderLater": "at next Rename",
   "matchPicker.compare.runtimeWarning": "Runtime differs from your file by {minutes} minutes",
   "matchPicker.compare.unknown": "–",

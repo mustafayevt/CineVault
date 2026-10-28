@@ -121,6 +121,10 @@ pub struct WalkOptions {
     /// Worker threads that read folders side by side. `0` picks one per core (at most 16);
     /// `1` reads on the calling thread.
     pub threads: usize,
+    /// Whether the drive that holds a source is mounted; a source on a drive that is not, even
+    /// one whose mount-point folder is still there with files in it, is not read. Tests replace
+    /// it, since a real mount cannot be made there.
+    pub drive_is_mounted: fn(&Path) -> bool,
 }
 
 impl WalkOptions {
@@ -130,6 +134,7 @@ impl WalkOptions {
             bad_words,
             extract_vsmeta_artwork: false,
             threads: 0,
+            drive_is_mounted: cv_fs::paths::drive_is_mounted,
         }
     }
 
@@ -307,7 +312,7 @@ impl TvScanReport {
 /// `source` leaves them out, so their files belong to their own library only.
 pub fn nested_sources(source: &DataSource, all: &[DataSource]) -> Vec<String> {
     let fold = |path: &str| {
-        let mut text = path.trim().replace('\\', "/").to_lowercase();
+        let mut text = cv_fs::paths::fold_name(&path.trim().replace('\\', "/"));
         while text.ends_with('/') {
             text.pop();
         }
@@ -319,6 +324,22 @@ pub fn nested_sources(source: &DataSource, all: &[DataSource]) -> Vec<String> {
         .filter(|other| fold(&other.path).starts_with(&root))
         .map(|other| other.path.clone())
         .collect()
+}
+
+/// True, with a problem added, when the drive that holds `root` is not mounted. An unplugged
+/// Linux drive leaves its mount-point folder behind on the system drive, and that folder can hold
+/// files of its own (a program or a download wrote there); reading it would show those as the
+/// library and mark the titles of the real drive missing, so the source is reported unreadable.
+fn drive_missing(root: &Path, options: &WalkOptions, problems: &mut Vec<ScanProblem>) -> bool {
+    if (options.drive_is_mounted)(root) {
+        return false;
+    }
+    problems.push(ScanProblem {
+        kind: ProblemKind::SourceUnavailable,
+        path: root.to_path_buf(),
+        message: "The drive is not mounted. Plug it in or mount it again.".into(),
+    });
+    true
 }
 
 /// Walks the movie data sources in position order (ties by id). TV sources are ignored, except
@@ -342,6 +363,12 @@ pub fn scan_movie_sources(sources: &[DataSource], options: &WalkOptions) -> Scan
 /// Walks one movie data source. Movies come back sorted by folder, then title.
 pub fn scan_movie_source(root: &Path, source_id: Option<i64>, options: &WalkOptions) -> ScanReport {
     let mut problems = Vec::new();
+    if drive_missing(root, options, &mut problems) {
+        return ScanReport {
+            movies: Vec::new(),
+            problems,
+        };
+    }
     let Some(tree) = tree::read_tree(root, &options.skip, options.worker_threads(), &mut problems)
     else {
         return ScanReport {
@@ -391,6 +418,12 @@ pub fn scan_tv_sources(sources: &[DataSource], options: &WalkOptions) -> TvScanR
 /// [`WalkOptions::tv_defaults`] for the TV skip rules.
 pub fn scan_tv_source(root: &Path, source_id: Option<i64>, options: &WalkOptions) -> TvScanReport {
     let mut problems = Vec::new();
+    if drive_missing(root, options, &mut problems) {
+        return TvScanReport {
+            shows: Vec::new(),
+            problems,
+        };
+    }
     let Some(tree) = tree::read_tree(root, &options.skip, options.worker_threads(), &mut problems)
     else {
         return TvScanReport {

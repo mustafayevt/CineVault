@@ -48,6 +48,9 @@ sysinfo.workspace = true
 [target.'cfg(windows)'.dependencies]
 winreg.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix.workspace = true
+
 [dev-dependencies]
 cv-artwork.workspace = true
 # The fault-injection file system (`cv_rename::exec::fault`) for the safety tests.

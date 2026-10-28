@@ -31,6 +31,7 @@ mod episode_scrape_ipc;
 mod history_ipc;
 mod img_ipc;
 mod instance;
+mod instance_lock;
 mod ipc;
 mod jobs_ipc;
 mod library_facets;
@@ -154,6 +155,11 @@ fn main() {
             // Logging, the library, settings, the thumbnail cache and the job manager are built
             // once, here; the state objects borrow from this.
             let boot = boot::Boot::start();
+            // Another copy holds the data folder's lock (Linux). Say so and end this copy; it opens
+            // no library, so the rest of setup only fills the state objects with empty services.
+            if boot.already_running() {
+                instance_lock::report_already_running(app.handle());
+            }
             // What changed for which titles reaches open pages as one typed event.
             if let Some(services) = boot.services() {
                 changes_ipc::relay(app.handle().clone(), services.changes());

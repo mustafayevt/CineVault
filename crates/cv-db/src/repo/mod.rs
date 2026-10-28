@@ -76,6 +76,7 @@ pub mod locks;
 pub mod match_targets;
 pub mod media_info;
 pub mod organize_state;
+pub(crate) mod path_case;
 pub mod people;
 pub mod query;
 pub mod ratings;

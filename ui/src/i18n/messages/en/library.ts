@@ -98,7 +98,7 @@ export const library = {
   "library.act.artwork": "Artwork…",
   "library.act.artwork.short": "Artwork",
   "library.act.move": "Move to…",
-  "library.act.delete": "Delete to Recycle Bin",
+  "library.act.delete": "Delete to {bin}",
   "library.act.deletePermanently": "Delete permanently…",
   "library.act.needOne": "Select one title",
   "library.act.needSome": "Select a title first",

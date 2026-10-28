@@ -69,10 +69,14 @@ governor = { version = "0.10", default-features = false, features = ["std"] }
 httpdate = "1"
 # PCRE-style expressions of Kodi XML scrapers (cv-providers): look-around and back-references.
 fancy-regex = "0.19"
-# Move files to the system trash / Recycle Bin (cv-app, delete with files).
-trash = { version = "5", default-features = false, features = ["coinit_apartmentthreaded"] }
-# Desktop only (Windows Credential Manager, macOS Keychain); no Linux store is enabled.
-keyring = { version = "3.6", default-features = false, features = ["windows-native", "apple-native"] }
+# Move files to the system trash (cv-app, delete with files): Recycle Bin, macOS Trash, freedesktop Trash (read side on Linux).
+trash = { version = "5", default-features = false, features = ["coinit_apartmentthreaded", "chrono"] }
+# Windows Credential Manager, macOS Keychain, Linux Secret Service (links libdbus-1).
+keyring = { version = "3.6", default-features = false, features = ["windows-native", "apple-native", "sync-secret-service", "crypto-rust"] }
+# Safe getuid, access, O_DIRECT and no-replace renames on Linux (cv-app, cv-fs).
+rustix = { version = "1", default-features = false, features = ["std", "fs", "process"] }
+# tar.xz tool downloads (cv-media).
+liblzma = { version = "0.4", default-features = false, features = ["static"] }
 
 # Local mock servers in the torrent search tests (cv-torrent).
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }

@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { restoreLayout, stubLayout } from "../../test/layout";
+import { restorePlatform, stubPlatform } from "../../test/platform";
 import { validateLibrarySearch } from "../../router";
 import { setHistoryBackend } from "../history/historyBackend";
 import type { HistoryBackend } from "../history/historyBackend";
@@ -81,6 +82,7 @@ function spiedHistory() {
 
 beforeEach(() => {
   stubLayout();
+  stubPlatform("windows");
   window.localStorage.clear();
   resetLibraryStore();
   setLibraryBackend(createSyntheticBackend(181));
@@ -91,6 +93,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   restoreLayout();
+  restorePlatform();
   setLibraryBackend(null);
   setLibraryOpsBackend(null);
   setHistoryBackend(null);
@@ -221,6 +224,22 @@ describe("Delete from the Library", () => {
     await waitFor(() => expect(deleteTitles).toHaveBeenCalledTimes(1));
     expect(eraseTitles).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("names the Trash on Linux, in the dialog and in the toast", async () => {
+    stubPlatform("linux");
+    const user = userEvent.setup();
+    const { deleteTitles, eraseTitles } = spiedHistory();
+    renderApp();
+    await user.click(await tile(0));
+    await user.keyboard("{Shift>}{Delete}{/Shift}");
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/This skips the Trash and cannot be undone/)).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Send to Trash instead" }));
+    await waitFor(() => expect(deleteTitles).toHaveBeenCalledTimes(1));
+    expect(eraseTitles).not.toHaveBeenCalled();
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    expect(useToastStore.getState().toasts[0]?.message).toMatch(/^Deleted .* to the Trash$/);
   });
 
   it("closes the dialog with Cancel and Esc without touching anything", async () => {

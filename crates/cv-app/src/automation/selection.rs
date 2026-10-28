@@ -77,11 +77,7 @@ impl Selection {
 fn fold(text: &str) -> String {
     let slashed = text.replace('\\', "/");
     let trimmed = slashed.trim_end_matches('/');
-    if cfg!(any(windows, target_os = "macos")) {
-        trimmed.to_lowercase()
-    } else {
-        trimmed.to_owned()
-    }
+    cv_fs::paths::fold_name(trimmed)
 }
 
 /// True when `child` is `parent` or lies below it.

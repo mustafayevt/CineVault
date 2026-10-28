@@ -13,7 +13,7 @@
 //!   writes a `.cinevaultignore` marker into the title's folder so the next scan skips it. The
 //!   library is only ever changed by this explicit call, never by a scan.
 //! * [`RemovalService::delete_with_files`] sends the files to the system bin (Recycle Bin, macOS
-//!   Trash) through [`SystemBin`], which remembers where each one went, and hides the titles under
+//!   Trash, freedesktop Trash on Linux, sent by one rename) through [`SystemBin`], which remembers where each one went, and hides the titles under
 //!   one History entry; History's Undo restores both. Where the bin cannot take a path (a network
 //!   share), the files go to `<data source>/.deletedByCineVault/<batch>/` instead. Files are never
 //!   deleted for good here, unless Settings › Deleted files is Delete permanently (chosen behind
@@ -43,6 +43,9 @@ pub(crate) mod tests;
 pub(crate) mod trash_bin;
 pub(crate) mod uncached;
 mod volume;
+pub(crate) mod xdg_dirs;
+#[cfg(unix)]
+pub(crate) mod xdg_trash;
 
 use cv_db::DbError;
 use cv_domain::{Item, ItemDetail, ItemId};
@@ -77,6 +80,13 @@ pub use review::{
 pub use trash_bin::{
     BinError, Binned, BinnedItem, FOLDER_PREFIX, FolderOnly, NOT_IN_BIN, OsTrash, PATH_TAKEN,
     SendOutcome, SystemBin, SystemTrash, present_all, restore_all, send_or_fallback,
+};
+
+/// What the system bin is called in words: the Recycle Bin on Windows, the Trash elsewhere.
+pub const BIN_NAME: &str = if cfg!(windows) {
+    "Recycle Bin"
+} else {
+    "Trash"
 };
 
 /// The name of the marker file that hides a folder from scans.
@@ -151,8 +161,10 @@ pub(crate) fn unique(ids: &[ItemId]) -> Vec<ItemId> {
 }
 
 /// The parts of `path` below `root`, or `None` when it is not below it. Compared without regard
-/// to case or separator style; the parts keep their spelling. A path with a `.` or `..` part
-/// below the root is never below it (it may name the root itself or a place outside).
+/// to separator style, and to case where the platform's file names ignore it (Windows, macOS;
+/// on Linux `Films` and `films` are two folders); the parts keep their spelling. A path with a
+/// `.` or `..` part below the root is never below it (it may name the root itself or a place
+/// outside).
 pub(crate) fn parts_below(root: &str, path: &str) -> Option<Vec<String>> {
     let split = |text: &str| -> Vec<String> {
         text.split(['\\', '/'])
@@ -167,7 +179,7 @@ pub(crate) fn parts_below(root: &str, path: &str) -> Option<Vec<String>> {
     let same = root
         .iter()
         .zip(&path)
-        .all(|(a, b)| a.to_lowercase() == b.to_lowercase());
+        .all(|(a, b)| cv_fs::paths::fold_name(a) == cv_fs::paths::fold_name(b));
     let rest = &path[root.len()..];
     // `.` and `..` name the root itself or a place outside it, whatever the parts say.
     if !same || rest.iter().any(|part| part == "." || part == "..") {

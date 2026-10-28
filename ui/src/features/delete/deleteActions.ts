@@ -9,6 +9,8 @@ import { undoHistoryEntry } from "../history/historyUndo";
 import { notify } from "../notifications/notificationStore";
 import type { DeletedMode } from "../settings/DeletedFilesSection";
 import { readSetting } from "../settings/settingsStore";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { showToast } from "../toasts/toastStore";
 
 /** A title to delete: its id and the name the messages use. */
@@ -103,6 +105,7 @@ async function refreshAll(): Promise<void> {
 
 function toastFor(result: DeleteResult): string {
   const count = result.deleted.length;
+  const bin = binName(detectPlatform());
   const [first] = result.deleted;
   const inFolder = result.deleted.some((entry) => entry.went_to === "trash_folder");
   const onDisk = result.deleted.some((entry) => entry.went_to !== "nothing_on_disk");
@@ -114,9 +117,12 @@ function toastFor(result: DeleteResult): string {
   }
   if (count === 1 && first !== undefined) {
     if (!onDisk) return t("delete.toast.nothingOnDisk", { title: first.title });
-    return t(inFolder ? "delete.toast.folder.one" : "delete.toast.one", { title: first.title });
+    return t(inFolder ? "delete.toast.folder.one" : "delete.toast.one", {
+      title: first.title,
+      bin,
+    });
   }
-  return t(inFolder ? "delete.toast.folder.many" : "delete.toast.many", { count });
+  return t(inFolder ? "delete.toast.folder.many" : "delete.toast.many", { count, bin });
 }
 
 /**

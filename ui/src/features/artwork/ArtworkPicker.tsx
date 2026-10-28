@@ -12,6 +12,8 @@ import { t } from "../../i18n/catalog";
 import { activeLocale } from "../../i18n/locale";
 import { cx } from "../../lib/cx";
 import { ProviderNotes } from "../scrape/CandidateList";
+import { binName } from "../shell/binName";
+import { detectPlatform } from "../shell/platform";
 import { ArtworkFooter } from "./ArtworkFooter";
 import { ArtworkLightbox } from "./ArtworkLightbox";
 import { ArtworkTile } from "./ArtworkGrid";
@@ -263,7 +265,7 @@ export function ArtworkPicker({
   const useTip =
     current === null
       ? t("artworkPicker.use.tipNew", { type })
-      : t("artworkPicker.use.tip", { type });
+      : t("artworkPicker.use.tip", { type, bin: binName(detectPlatform()) });
 
   return (
     <div className="flex h-full min-h-0 flex-col">

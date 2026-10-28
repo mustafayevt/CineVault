@@ -167,16 +167,11 @@ pub fn custom_trash_path(custom: &Path, batch: &str, path: &Path) -> Option<Path
     ))
 }
 
-/// Whether `path` is `folder` or below it, compared without regard to case or separators.
+/// Whether `path` is `folder` or below it, compared without regard to separators, and to case
+/// where the platform's file names ignore it (Windows and macOS; Linux keeps it).
 #[must_use]
 pub fn inside(path: &Path, folder: &Path) -> bool {
-    let norm = |p: &Path| {
-        let text = p.to_string_lossy().replace('/', "\\");
-        let text = text.strip_prefix(r"\\?\").unwrap_or(&text).to_owned();
-        text.trim_end_matches('\\').to_lowercase()
-    };
-    let (path, folder) = (norm(path), norm(folder));
-    !folder.is_empty() && (path == folder || path.starts_with(&format!("{folder}\\")))
+    crate::paths::is_within(path, folder)
 }
 
 #[cfg(test)]
@@ -217,6 +212,13 @@ mod tests {
             None
         );
         assert!(same_volume(Path::new(r"d:\a"), Path::new(r"\\?\D:\b")));
+    }
+
+    #[test]
+    fn a_path_inside_follows_the_platforms_case_rules() {
+        let (upper, lower) = (Path::new("/a/Trash/x"), Path::new("/a/trash"));
+        assert_eq!(inside(upper, lower), !crate::paths::CASE_SENSITIVE);
+        assert!(inside(Path::new("/a/trash/x"), lower));
     }
 
     #[test]

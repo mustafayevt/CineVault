@@ -101,6 +101,7 @@
   color: var(--text);
   background-color: color-mix(in srgb, var(--surface-window) 55%, transparent);
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
   backdrop-filter: blur(12px) saturate(1.2);
   transition:
     opacity var(--dur-hover) var(--ease-out),

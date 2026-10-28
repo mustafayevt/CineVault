@@ -26,8 +26,8 @@ function libraryQuery(pathname: string, search: unknown): string {
  * The title bar over the content column: 38px on the
  * window ground with no line under it. The bar is a drag region (a drag moves the window, a
  * double-click maximises or restores it); the library search sits in its centre, 440px wide, in
- * the card colour, with the Ctrl F hint; on Windows the caption buttons sit flush at the top
- * right, 46 by 32. On macOS the traffic lights are in the sidebar panel's top row, so the bar
+ * the card colour, with the Ctrl F hint; on Windows and Linux the caption buttons sit flush at the
+ * top right, 46 by 32. On macOS the traffic lights are in the sidebar panel's top row, so the bar
  * holds only the search. The search suggests titles as you type (see `SpotlightSearch`); Enter
  * with no suggestion highlighted opens the Library with `?q=`.
  */
@@ -81,7 +81,7 @@ export function TitleBar({ platform, windowApi }: TitleBarProps) {
         data-tauri-drag-region
         className="flex min-w-0 flex-1 basis-0 items-start justify-end self-stretch"
       >
-        {platform === "windows" ? (
+        {platform === "windows" || platform === "linux" ? (
           <CaptionButtons windowApi={windowApi} maximized={maximized} />
         ) : null}
       </div>

@@ -107,10 +107,14 @@ mod tests {
 
     #[test]
     fn plugins_register_on_a_runtime_in_the_required_order() {
+        // The mock context has an empty identifier, which Linux turns into an invalid D-Bus name
+        // for the single-instance plugin; give it the app's own.
+        let mut context = mock_context(noop_assets());
+        context.config_mut().identifier = "app.cinevault.desktop".into();
         let app = mock_builder()
             .plugin(single_instance_plugin())
             .plugin(window_state_plugin())
-            .build(mock_context(noop_assets()));
-        assert!(app.is_ok());
+            .build(context);
+        assert!(app.is_ok(), "{:?}", app.err());
     }
 }

@@ -10,6 +10,9 @@ publish.workspace = true
 [dependencies]
 tracing.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 

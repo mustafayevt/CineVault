@@ -314,7 +314,7 @@ fn read_full(file: &mut File, buf: &mut [u8]) -> io::Result<usize> {
 }
 
 /// True when `path` is the same as `root` or lies below it. Compared by components, ignoring
-/// ASCII case (the volumes CineVault runs on do).
+/// case where the platform's file systems do (Windows and macOS), and keeping it on Linux.
 pub(crate) fn is_within(root: &Path, path: &Path) -> bool {
     let a = comparable(root);
     let b = comparable(path);
@@ -326,15 +326,44 @@ pub(crate) fn same_path(a: &Path, b: &Path) -> bool {
 }
 
 pub(crate) fn comparable(path: &Path) -> Vec<String> {
+    comparable_with(path, cv_fs::paths::CASE_SENSITIVE)
+}
+
+/// The components of `path` to compare, lower-cased unless `case_sensitive`. On Linux
+/// `Movie.mkv` and `movie.mkv` are two files, so folding them together there could make a
+/// rename or clean-up act on the wrong one.
+pub(crate) fn comparable_with(path: &Path, case_sensitive: bool) -> Vec<String> {
     path.components()
         .filter(|c| !matches!(c, Component::CurDir))
-        .map(|c| c.as_os_str().to_string_lossy().to_lowercase())
+        .map(|c| {
+            let name = c.as_os_str().to_string_lossy();
+            if case_sensitive {
+                name.into_owned()
+            } else {
+                name.to_lowercase()
+            }
+        })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn components_fold_case_only_where_the_platform_does() {
+        let (a, b) = (
+            Path::new("/lib/Movies/x.mkv"),
+            Path::new("/lib/movies/x.mkv"),
+        );
+        assert_eq!(comparable_with(a, false), comparable_with(b, false));
+        assert_ne!(comparable_with(a, true), comparable_with(b, true));
+        assert_eq!(
+            same_path(a, b),
+            !cv_fs::paths::CASE_SENSITIVE,
+            "same_path must follow the platform"
+        );
+    }
 
     #[test]
     fn drive_paths_get_the_extended_prefix_and_are_normalised() {
@@ -366,10 +395,14 @@ mod tests {
     }
 
     #[test]
-    fn containment_is_by_component_and_ignores_case() {
+    fn containment_is_by_component_and_follows_the_platforms_case_rules() {
         let root = Path::new("/d/Movies");
-        assert!(is_within(root, Path::new("/d/movies")));
-        assert!(is_within(root, Path::new("/d/MOVIES/Heat/a.mkv")));
+        // Windows and macOS fold case; on Linux `movies` is another folder than `Movies`.
+        let folds = !cv_fs::paths::CASE_SENSITIVE;
+        assert_eq!(is_within(root, Path::new("/d/movies")), folds);
+        assert_eq!(is_within(root, Path::new("/d/MOVIES/Heat/a.mkv")), folds);
+        assert!(is_within(root, Path::new("/d/Movies")));
+        assert!(is_within(root, Path::new("/d/Movies/Heat/a.mkv")));
         assert!(!is_within(root, Path::new("/d/Movies2/Heat")));
         assert!(!is_within(root, Path::new("/d")));
     }

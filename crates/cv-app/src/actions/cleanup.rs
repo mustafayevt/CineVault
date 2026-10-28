@@ -145,7 +145,7 @@ impl ActionsService {
             // A folder shared by several titles is tidied once.
             let paths: Vec<PathBuf> = paths
                 .into_iter()
-                .filter(|path| seen_dirs.insert(path.to_string_lossy().to_lowercase()))
+                .filter(|path| seen_dirs.insert(cv_fs::paths::key(path)))
                 .collect();
             if paths.is_empty() {
                 run.items.push(ItemOutcome::of(
@@ -322,7 +322,7 @@ fn find_unwanted(
         let names = unwanted_files_in(&fs, &dir, patterns).map_err(|error| error.to_string())?;
         for name in names {
             let path = dir.join(name);
-            if !protected.contains(&path.to_string_lossy().to_lowercase()) {
+            if !protected.contains(&cv_fs::paths::key(&path)) {
                 found.push(path);
             }
         }
@@ -330,7 +330,8 @@ fn find_unwanted(
     Ok(found)
 }
 
-/// The lower-cased paths of the videos the library holds for the title and everything below it.
+/// The comparison keys (`cv_fs::paths::key`: case folded except on Linux) of the paths of the
+/// videos the library holds for the title and everything below it.
 fn known_videos(db: &Database, id: ItemId) -> Result<HashSet<String>, cv_db::DbError> {
     db.read(|conn| {
         let mut videos = HashSet::new();
@@ -341,7 +342,7 @@ fn known_videos(db: &Database, id: ItemId) -> Result<HashSet<String>, cv_db::DbE
                         .media_files
                         .iter()
                         .filter(|file| file.kind == MediaFileType::Video)
-                        .map(|file| file.path().to_string_lossy().to_lowercase()),
+                        .map(|file| cv_fs::paths::key(&file.path())),
                 );
             }
         }

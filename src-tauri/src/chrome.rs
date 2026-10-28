@@ -1,10 +1,11 @@
 //! Custom window chrome: the native side of the title bar drawn by the UI.
 //!
 //! The title bar itself is React (`ui/src/features/shell`). The window is created without native
-//! decorations on Windows (`tauri.windows.conf.json`) and with an overlay title bar that keeps the
-//! native traffic lights on macOS (`tauri.macos.conf.json`). On Windows 11 the snap-layout flyout
-//! needs a native hit-test region over the maximize button, which `tauri-plugin-snap-layout`
-//! provides; it finds the button by the id below.
+//! decorations on Windows (`tauri.windows.conf.json`) and on Linux (`tauri.linux.conf.json`), and
+//! with an overlay title bar that keeps the native traffic lights on macOS
+//! (`tauri.macos.conf.json`). On Windows 11 the snap-layout flyout needs a native hit-test region
+//! over the maximize button, which `tauri-plugin-snap-layout` provides; it finds the button by the
+//! id below.
 
 /// DOM id of the Windows maximize button. Must match `MAXIMIZE_BUTTON_ID` in the UI.
 pub const MAXIMIZE_BUTTON_ID: &str = "cv-caption-maximize";
@@ -110,6 +111,33 @@ mod tests {
         let config = read_json("tauri.windows.conf.json");
         assert_eq!(main_window(&config)["label"], "main");
         assert_eq!(main_window(&config)["decorations"], false);
+    }
+
+    #[test]
+    fn platform_linux_keeps_the_base_title_and_sizes_after_merge() {
+        let base = read_json("tauri.conf.json");
+        let merged = effective_config("tauri.linux.conf.json");
+        let windows = merged["app"]["windows"].as_array().expect("windows array");
+        assert_eq!(
+            windows.len(),
+            1,
+            "tauri.linux.conf.json: exactly one window"
+        );
+        let window = &windows[0];
+        for key in ["label", "title", "width", "height", "minWidth", "minHeight"] {
+            assert!(
+                !window[key].is_null(),
+                "tauri.linux.conf.json: {key} is missing after merge"
+            );
+            assert_eq!(
+                window[key],
+                main_window(&base)[key],
+                "tauri.linux.conf.json: {key} changed"
+            );
+        }
+        assert_eq!(window["minWidth"], 1100);
+        assert_eq!(window["minHeight"], 680);
+        assert_eq!(window["decorations"], false);
     }
 
     #[test]

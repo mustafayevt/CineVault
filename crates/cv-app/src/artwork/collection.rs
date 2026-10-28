@@ -69,18 +69,18 @@ fn movie_folders(movies: &[Item]) -> Vec<SetMovieFolder> {
     folders
 }
 
-/// A path without its extension, in lower case, for comparing artwork names.
+/// A path without its extension, as a comparison key, for artwork names (letter case ignored
+/// except on Linux, where file names keep it).
 fn name_key(path: &Path) -> String {
-    path.with_extension("").to_string_lossy().to_lowercase()
+    cv_fs::paths::key(&path.with_extension(""))
 }
 
-/// Whether two paths are the same (letter case ignored).
+/// Whether two paths are the same (letter case ignored except on Linux).
 fn same_path(a: &Path, b: &Path) -> bool {
-    a.to_string_lossy()
-        .eq_ignore_ascii_case(&b.to_string_lossy())
+    cv_fs::paths::same_path(a, b)
 }
 
-/// Whether `path` is somewhere below `dir` (letter case ignored).
+/// Whether `path` is somewhere below `dir` (letter case ignored except on Linux).
 fn is_below(path: &Path, dir: &Path) -> bool {
     path.ancestors()
         .skip(1)
@@ -417,5 +417,28 @@ impl ArtworkService {
                 }
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn names_that_differ_only_in_case_are_the_same_only_where_the_platform_folds_case() {
+        let folds = !cv_fs::paths::CASE_SENSITIVE;
+        let (a, b) = (
+            Path::new("/m/Heat/Poster.jpg"),
+            Path::new("/m/heat/poster.jpg"),
+        );
+        assert_eq!(same_path(a, b), folds);
+        assert_eq!(name_key(a) == name_key(b), folds);
+        assert_eq!(is_below(a, Path::new("/m/heat")), folds);
+        assert!(is_below(a, Path::new("/m/Heat")));
+        assert_eq!(
+            name_key(Path::new("/m/Heat/poster.jpg")),
+            name_key(Path::new("/m/Heat/poster.png")),
+            "the extension is not part of the key"
+        );
     }
 }

@@ -743,8 +743,10 @@ fn a_move_finished_by_resume_gets_a_history_entry_that_undoes_it() {
 
     let entry = entry_of(&lab, &batch).expect("Resume writes the entry");
     assert_eq!(entry.kind, crate::history::HistoryKind::Move);
+    // The summary names the places: on Windows both lab folders sit on one drive ("to C:"), on
+    // Linux they are told apart by path ("from /tmp/.. to /tmp/..").
     assert!(
-        entry.summary.starts_with("Moved Heat (1995) to "),
+        entry.summary.starts_with("Moved Heat (1995) ") && entry.summary.contains(" to "),
         "{entry:?}"
     );
     assert_eq!(entry.titles_total, 1);

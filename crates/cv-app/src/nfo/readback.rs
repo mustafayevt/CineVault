@@ -341,7 +341,7 @@ impl NfoService {
         for (index, episode) in data.episodes.iter().enumerate() {
             if let Some(video) = main_video(episode) {
                 files
-                    .entry(video.path().to_string_lossy().to_lowercase())
+                    .entry(cv_fs::paths::key(&video.path()))
                     .or_default()
                     .push(index);
             }

@@ -9,14 +9,22 @@
 //! when it is on, a check that finds an update also downloads and verifies it in the background,
 //! and the close request of the main window ([`install_on_close`]) starts the same verified setup
 //! the confirm button starts, then lets the window close. The setup waits for the app to exit,
-//! installs and starts the new version. Nothing is asked, and nothing happens for a portable
-//! copy or a Mac.
+//! installs and starts the new version. A Linux AppImage replaces itself the same way: the
+//! verified download is put over the AppImage file and a helper starts it once the app has
+//! exited. Nothing is asked, and nothing happens for a portable copy, a package install or a Mac.
 //!
 //! "Update now" on a copy the Windows setup installed: the verified setup starts with fixed
 //! switches (`cv_app::updates::silent_setup_arguments`), and the app quits about a second later
 //! through `AppHandle::exit`, the same shutdown as closing the window (jobs paused, services
 //! stopped, the library closed). The setup waits for the app to exit, installs over it and
 //! starts the new version. A running job first asks the user (`jobs_running`).
+//!
+//! "Update now" on a Linux AppImage whose folder takes a new file: the verified download is
+//! copied beside the AppImage, checked, and renamed over it in one step
+//! (`cv_app::updates::replace_appimage_and_relaunch`); the old file is untouched until then, so
+//! a failure leaves a working app. A helper starts the new AppImage after this process has
+//! exited, and the app quits through the same shutdown as above. A package install (`.deb`,
+//! `.rpm`) opens the public release page instead.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,7 +33,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use cv_app::data_location::DataLocation;
 use cv_app::updates::{
     CheckOutcome, CloseUpdate, InstallMethod, OpenReason, UpdateError, UpdateOffer, UpdateService,
-    install_method, install_on_close as start_update_on_close, start_silent_setup,
+    VerifiedInstaller, install_method_for_current, install_on_close_with, start_silent_setup,
 };
 use cv_jobs::JobState;
 use serde::{Deserialize, Serialize};
@@ -36,6 +44,9 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::boot::Boot;
 use crate::settings_ipc::SettingsState;
+
+/// Where a package install (`.deb`, `.rpm`) finds the new version.
+const RELEASES_PAGE: &str = "https://github.com/mustafayevt/CineVault-releases/releases/latest";
 
 /// Held in Tauri state.
 pub struct UpdatesState {
@@ -65,6 +76,14 @@ impl UpdatesState {
         let sweeping = Arc::clone(&service);
         std::thread::spawn(move || {
             sweeping.sweep_downloads();
+            // A half-made copy of an interrupted AppImage update sits beside the AppImage.
+            #[cfg(unix)]
+            if let Some(folder) = std::env::var_os("APPIMAGE")
+                .map(std::path::PathBuf::from)
+                .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+            {
+                cv_app::updates::remove_stale_parts(&folder);
+            }
             // Before the downloads moved to `tmp`, they were kept in the cache folder.
             if let Some(location) = location {
                 let old = location.cache_dir().join("updates");
@@ -119,7 +138,8 @@ impl UpdatesState {
 
 /// The main window was asked to close: with "Install updates when I close the app" on and a
 /// verified update downloaded, starts its setup (checked once more first) and lets the close go
-/// on. Quick: the setup is only started here, not waited for.
+/// on. Quick: the setup is only started here, not waited for. A Linux AppImage is replaced here
+/// instead (a copy of the download, so it takes a moment), and a helper starts it after exit.
 pub fn install_on_close(app: &tauri::AppHandle) {
     let Some(state) = app.try_state::<UpdatesState>() else {
         return;
@@ -134,15 +154,40 @@ pub fn install_on_close(app: &tauri::AppHandle) {
     else {
         return;
     };
-    match start_update_on_close(&state.service, &exe_dir, cfg!(windows), &start_silent_setup) {
+    match install_on_close_with(
+        &state.service,
+        &exe_dir,
+        &install_method_for_current,
+        &start_silent_setup,
+        &replace_and_relaunch,
+    ) {
         CloseUpdate::Nothing => {}
         CloseUpdate::Started { version } => {
             state.installing.store(true, Ordering::SeqCst);
-            tracing::info!(%version, "the update setup started on close");
+            tracing::info!(%version, "the update started on close");
         }
         CloseUpdate::Failed(error) => {
             tracing::warn!(%error, "the update was not installed on close");
         }
+    }
+}
+
+/// Puts the verified download over the AppImage at `target` and has the new one started after
+/// this process exits. Only a Linux copy is ever given an AppImage to replace.
+fn replace_and_relaunch(
+    installer: &VerifiedInstaller,
+    target: &std::path::Path,
+) -> Result<(), UpdateError> {
+    #[cfg(unix)]
+    {
+        cv_app::updates::replace_appimage_and_relaunch(installer, target)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (installer, target);
+        Err(UpdateError::Io(
+            "this system has no AppImage to replace".to_owned(),
+        ))
     }
 }
 
@@ -433,7 +478,7 @@ async fn download_and_start(
         .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
         .map_or(
             InstallMethod::OpenInstaller(OpenReason::NotSetupInstall),
-            |dir| install_method(&dir, installer.path(), cfg!(windows)),
+            |dir| install_method_for_current(&dir, installer.path()),
         );
     match method {
         InstallMethod::SilentSetup { install_dir } => {
@@ -443,15 +488,27 @@ async fn download_and_start(
             .await
             .map_err(unexpected)??;
             tracing::info!("the update setup started; CineVault quits for it");
-            let quitting = app.clone();
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(QUIT_DELAY).await;
-                // The same shutdown as closing the window (`RunEvent::Exit` in main).
-                quitting.exit(0);
-            });
+            Ok(quit_for_update(app))
+        }
+        InstallMethod::OpenInstaller(OpenReason::LinuxPackage) => {
+            // A package is installed by the system's package tool, so the release page is what
+            // helps; the downloaded file is not opened.
+            let reason = OpenReason::LinuxPackage;
+            tracing::info!(
+                reason = reason.code(),
+                "the update is a package install; the release page is opened"
+            );
+            app.opener()
+                .open_url(RELEASES_PAGE, None::<&str>)
+                .map_err(|error| UpdateCommandError {
+                    code: "launch".to_owned(),
+                    message: format!(
+                        "The release page {RELEASES_PAGE} could not be opened: {error}"
+                    ),
+                })?;
             Ok(UpdateInstallDto {
-                restarting: true,
-                reason: None,
+                restarting: false,
+                reason: Some(reason.message().to_owned()),
             })
         }
         InstallMethod::OpenInstaller(reason) => {
@@ -477,6 +534,36 @@ async fn download_and_start(
                 reason: Some(reason.message().to_owned()),
             })
         }
+        InstallMethod::ReplaceAppImage { target } => {
+            tracing::info!(
+                version = %installer.version(),
+                target = %target.display(),
+                "installing the update over the AppImage"
+            );
+            // A failure here leaves the old AppImage as it was and the app running; the page
+            // shows the message and the update stays on offer.
+            tauri::async_runtime::spawn_blocking(move || replace_and_relaunch(&installer, &target))
+                .await
+                .map_err(unexpected)??;
+            tracing::info!("the AppImage was replaced; CineVault quits and the new one starts");
+            Ok(quit_for_update(app))
+        }
+    }
+}
+
+/// Quits the app a moment from now, through the same shutdown as closing the window, so the
+/// reply reaches the page first. Whatever took over (the setup, or the helper that starts the
+/// new AppImage) waits for this process to exit.
+fn quit_for_update(app: &tauri::AppHandle) -> UpdateInstallDto {
+    let quitting = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(QUIT_DELAY).await;
+        // The same shutdown as closing the window (`RunEvent::Exit` in main).
+        quitting.exit(0);
+    });
+    UpdateInstallDto {
+        restarting: true,
+        reason: None,
     }
 }
 

@@ -36,9 +36,12 @@ pub mod manifest;
 mod service;
 
 pub use install::{
-    CloseUpdate, InstallMethod, OpenReason, VerifiedInstaller, install_method, install_on_close,
-    silent_setup_arguments, start_silent_setup,
+    CloseUpdate, InstallMethod, OpenReason, VerifiedInstaller, install_method,
+    install_method_for_current, install_on_close, install_on_close_with, silent_setup_arguments,
+    start_silent_setup,
 };
+#[cfg(unix)]
+pub use install::{remove_stale_parts, replace_appimage_and_relaunch};
 pub use manifest::{
     BUILT_IN_PUBLIC_KEY, Manifest, ManifestArtifact, parse_public_key, platform_id, verify_manifest,
 };
