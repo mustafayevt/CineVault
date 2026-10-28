@@ -296,7 +296,7 @@ fn a_no_replace_rename_never_replaces_what_is_there() {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn a_file_system_without_the_flag_moves_a_file_by_a_link_and_refuses_a_folder() {
+fn a_file_system_without_the_flag_moves_a_file_by_a_link_and_a_folder_into_a_placeholder() {
     let dir = tempfile::tempdir().unwrap();
     let (from, to) = (dir.path().join("a.mkv"), dir.path().join("b.mkv"));
     fs::write(&from, b"film").unwrap();
@@ -311,10 +311,49 @@ fn a_file_system_without_the_flag_moves_a_file_by_a_link_and_refuses_a_folder() 
     assert_eq!(fs::read(&to).unwrap(), b"film");
     assert_eq!(fs::read(&from).unwrap(), b"again");
 
-    // A folder has no link: it is refused and stays where it is.
+    // A folder has no link: it moves over an empty folder made for it, with its content.
     let (folder, free) = (dir.path().join("Heat"), dir.path().join("Heat (1995)"));
     fs::create_dir(&folder).unwrap();
-    let error = link_then_unlink(&folder, &free).unwrap_err();
+    fs::write(folder.join("x.mkv"), b"x").unwrap();
+    link_then_unlink(&folder, &free).unwrap();
+    assert!(!folder.exists());
+    assert_eq!(fs::read(free.join("x.mkv")).unwrap(), b"x");
+
+    // Something already at the place, even an empty folder, is never replaced.
+    for taken in ["empty", "full", "file"] {
+        let (folder, place) = (dir.path().join("Src"), dir.path().join(taken));
+        fs::create_dir(&folder).unwrap();
+        fs::write(folder.join("x.mkv"), b"mine").unwrap();
+        match taken {
+            "empty" => fs::create_dir(&place).unwrap(),
+            "full" => {
+                fs::create_dir(&place).unwrap();
+                fs::write(place.join("y.mkv"), b"theirs").unwrap();
+            }
+            _ => fs::write(&place, b"theirs").unwrap(),
+        }
+        let error = link_then_unlink(&folder, &place).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::AlreadyExists, "{taken}");
+        assert_eq!(fs::read(folder.join("x.mkv")).unwrap(), b"mine", "{taken}");
+        match taken {
+            "empty" => assert!(place.is_dir() && names(&place).is_empty()),
+            "full" => assert_eq!(names(&place), ["y.mkv"]),
+            _ => assert_eq!(fs::read(&place).unwrap(), b"theirs"),
+        }
+        fs::remove_dir_all(&folder).unwrap();
+    }
+
+    // A failed rename removes the placeholder and leaves the folder where it was: a folder
+    // cannot move into itself.
+    let (outer, inner) = (dir.path().join("Outer"), dir.path().join("Outer/inner"));
+    fs::create_dir(&outer).unwrap();
+    assert!(link_then_unlink(&outer, &inner).is_err());
+    assert!(outer.is_dir() && !inner.exists());
+
+    // A link is still refused.
+    let link = dir.path().join("link");
+    std::os::unix::fs::symlink(&free, &link).unwrap();
+    let error = link_then_unlink(&link, &dir.path().join("moved-link")).unwrap_err();
     assert_eq!(error.kind(), io::ErrorKind::Unsupported);
-    assert!(folder.is_dir() && !free.exists());
+    assert!(fs::symlink_metadata(&link).is_ok());
 }

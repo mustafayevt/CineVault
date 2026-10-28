@@ -250,9 +250,11 @@ const NO_SAFE_RENAME: &str = "this file system cannot move it back without the r
 /// two separate calls. A rename alone replaces a file on Unix (and on Windows), so Undo and
 /// restore, which first check that the old place is free, use this one.
 ///
-/// On Linux this is `renameat2` with `RENAME_NOREPLACE`. A file system without it (exFAT, FAT32,
-/// some network shares) falls back to a hard link for a file, which also fails when `to` exists;
-/// anything that cannot be moved safely either way is refused with
+/// On Linux this is `renameat2` with `RENAME_NOREPLACE`, which the kernel's own drivers take
+/// (ext4, Btrfs, XFS, FAT, exFAT, NTFS3). A file system without it (NFS, FUSE mounts such as
+/// ntfs-3g, exfat-fuse or sshfs) falls back to a hard link for a file, which also fails when `to` exists,
+/// and for a folder to a rename over an empty folder made at `to` first (a rename replaces only
+/// an empty folder); anything that cannot be moved safely either way is refused with
 /// [`io::ErrorKind::Unsupported`] and left where it is, never moved with a replacing rename.
 /// Elsewhere `to` is checked and `from` renamed, which leaves a very small window.
 ///
@@ -290,11 +292,18 @@ pub fn rename_no_replace(from: &Path, to: &Path) -> io::Result<()> {
 }
 
 /// A file moved by linking a second name and dropping the first. Linking never replaces, so it
-/// is as safe as a no-replace rename; a folder, a link or a volume without hard links is refused.
+/// is as safe as a no-replace rename. A folder goes through [`folder_into_placeholder`]; a link,
+/// or a file on a volume without hard links, is refused.
 #[cfg(target_os = "linux")]
 fn link_then_unlink(from: &Path, to: &Path) -> io::Result<()> {
     let refused = || io::Error::new(io::ErrorKind::Unsupported, NO_SAFE_RENAME);
-    if !fs::symlink_metadata(from).is_ok_and(|meta| meta.is_file()) {
+    let Ok(meta) = fs::symlink_metadata(from) else {
+        return Err(refused());
+    };
+    if meta.is_dir() {
+        return folder_into_placeholder(from, to);
+    }
+    if !meta.is_file() {
         return Err(refused());
     }
     match fs::hard_link(from, to) {
@@ -305,6 +314,20 @@ fn link_then_unlink(from: &Path, to: &Path) -> io::Result<()> {
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Err(error),
         Err(_) => Err(refused()),
     }
+}
+
+/// A folder moved where the no-replace flag is missing (NFS, FUSE mounts): `to` is first made as
+/// an empty folder, which fails when anything is there, and the folder is then renamed over that
+/// empty folder. A rename replaces a folder only while it is empty, so nothing another program
+/// puts at `to` can be lost: if something lands in the placeholder first, the rename fails and
+/// the folder stays where it was.
+#[cfg(target_os = "linux")]
+fn folder_into_placeholder(from: &Path, to: &Path) -> io::Result<()> {
+    fs::create_dir(to)?;
+    retry_folder("a rename", from, || fs::rename(from, to)).inspect_err(|_| {
+        // Removed only while it is still empty, so only the folder made above.
+        let _ = fs::remove_dir(to);
+    })
 }
 
 /// Removes a file, retrying [transient](is_transient) errors. Only for files CineVault itself
