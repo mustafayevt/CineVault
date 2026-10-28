@@ -91,21 +91,22 @@ for (const key of ["signingIdentity", "certificateThumbprint", "providerShortNam
 }
 
 // 4. The workflows use no repository secrets and no API-key variables (the built-in
-//    `github.token` passed to the gh CLI as GH_TOKEN is allowed).
+//    `github.token` passed to the gh CLI as GH_TOKEN is allowed). The one exception is the
+//    update-signing key, `secrets.CINEVAULT_UPDATE_KEY`, which only release.yml may read.
 const workflowDir = join(root, ".github", "workflows");
 for (const file of existsSync(workflowDir) ? readdirSync(workflowDir) : []) {
   const text = readFileSync(join(workflowDir, file), "utf8");
-  if (/\$\{\{\s*secrets\.(?!GITHUB_TOKEN\b)/.test(text)) fail(`${file} reads a repository secret`);
+  const allowedSecrets = file === "release.yml" ? ["GITHUB_TOKEN", "CINEVAULT_UPDATE_KEY"] : ["GITHUB_TOKEN"];
+  for (const [, name] of text.matchAll(/\$\{\{\s*secrets\.(\w+)/g)) {
+    if (!allowedSecrets.includes(name)) fail(`${file} reads the repository secret ${name}`);
+  }
   const vars = text.replace(/GITHUB_TOKEN/g, "").replace(/GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/g, "");
   if (/(API_KEY|APP_KEY|_TOKEN|PRIVATE_KEY|PASSWORD)\s*:/.test(vars)) {
     fail(`${file} sets a key, token or password variable`);
   }
 }
-// The Linux release workflow is required wherever it is present. Make it unconditional once
-// it is always in the repository.
-const workflows = ["release-build.yml", "release-windows.yml", "release-macos.yml"];
-if (existsSync(join(workflowDir, "release-linux.yml"))) workflows.push("release-linux.yml");
-for (const file of workflows) {
+// The three workflows the project has: checks on every push, the tag-driven release, the site.
+for (const file of ["ci.yml", "release.yml", "site.yml"]) {
   if (!existsSync(join(workflowDir, file))) fail(`missing .github/workflows/${file}`);
 }
 
