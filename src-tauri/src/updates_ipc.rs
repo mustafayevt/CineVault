@@ -46,7 +46,7 @@ use crate::boot::Boot;
 use crate::settings_ipc::SettingsState;
 
 /// Where a package install (`.deb`, `.rpm`) finds the new version.
-const RELEASES_PAGE: &str = "https://github.com/mustafayevt/CineVault-releases/releases/latest";
+const RELEASES_PAGE: &str = "https://github.com/mustafayevt/CineVault/releases/latest";
 
 /// Held in Tauri state.
 pub struct UpdatesState {

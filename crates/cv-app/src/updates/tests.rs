@@ -246,6 +246,110 @@ fn the_built_in_channel_is_read_when_the_setting_is_empty() {
     assert_eq!(f.server.hits(), 1);
 }
 
+/// A service on the built-in channel (setting empty) whose channels are the two test paths.
+fn built_in_service(f: &Fixture, primary: &str, fallback: &str) -> UpdateService {
+    f.settings.set(CHANNEL_KEY, json!("")).expect("empty");
+    f.settings
+        .set(PUBLIC_KEY_KEY, json!(public_text(&f.key)))
+        .expect("key");
+    let dir = tempfile::tempdir().expect("tempdir");
+    UpdateService::new(Arc::clone(&f.settings), "1.0.0", dir.path().join("u"))
+        .with_platform(PLATFORM)
+        .with_default_channel(Some(&f.server.url(primary)))
+        .with_fallback_channel(Some(&f.server.url(fallback)))
+}
+
+fn signed_offer(f: &Fixture, version: &str) -> Vec<u8> {
+    let doc = payload(version, &f.server.url("/i.exe"), b"installer");
+    envelope(&f.key, &doc)
+}
+
+#[test]
+fn the_new_channel_is_read_first_and_the_old_one_is_left_alone() {
+    assert!(BUILT_IN_CHANNEL.contains("/mustafayevt/CineVault/releases/"));
+    assert!(FALLBACK_CHANNEL.contains("/mustafayevt/CineVault-releases/releases/"));
+    let f = fixture(false);
+    f.server.serve("/manifest.json", signed_offer(&f, "1.2.0"));
+    f.server
+        .serve("/old/manifest.json", signed_offer(&f, "1.3.0"));
+    f.server.redirect("/new/manifest.json", "/manifest.json");
+    let service = built_in_service(&f, "/new/manifest.json", "/old/manifest.json");
+    let offer = offer_of(service.check_if_due(NOW).expect("check"));
+    assert_eq!(offer.version, "1.2.0");
+    // The redirect and the manifest: the fallback was never asked.
+    assert_eq!(f.server.hits(), 2);
+}
+
+#[test]
+fn a_missing_new_channel_falls_back_to_the_old_one() {
+    let f = fixture(false);
+    f.server
+        .serve("/old/manifest.json", signed_offer(&f, "1.2.0"));
+    // /new/manifest.json is not served: the server answers 404.
+    let service = built_in_service(&f, "/new/manifest.json", "/old/manifest.json");
+    let offer = offer_of(service.check_if_due(NOW).expect("check"));
+    assert_eq!(offer.version, "1.2.0");
+    assert_eq!(f.server.hits(), 2);
+}
+
+#[test]
+fn an_unreachable_new_channel_falls_back_to_the_old_one() {
+    let f = fixture(false);
+    f.server
+        .serve("/old/manifest.json", signed_offer(&f, "1.2.0"));
+    let dead = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = dead.local_addr().expect("addr").port();
+    drop(dead);
+    f.settings.set(CHANNEL_KEY, json!("")).expect("empty");
+    f.settings
+        .set(PUBLIC_KEY_KEY, json!(public_text(&f.key)))
+        .expect("key");
+    let dir = tempfile::tempdir().expect("tempdir");
+    let service = UpdateService::new(Arc::clone(&f.settings), "1.0.0", dir.path().join("u"))
+        .with_platform(PLATFORM)
+        .with_default_channel(Some(&format!("http://127.0.0.1:{port}/manifest.json")))
+        .with_fallback_channel(Some(&f.server.url("/old/manifest.json")));
+    let offer = offer_of(service.check_if_due(NOW).expect("check"));
+    assert_eq!(offer.version, "1.2.0");
+}
+
+#[test]
+fn a_bad_signature_on_the_new_channel_does_not_fall_back() {
+    let f = fixture(false);
+    let doc = payload("1.2.0", &f.server.url("/i.exe"), b"installer");
+    f.server
+        .serve("/new/manifest.json", envelope(&signing_key(), &doc));
+    f.server
+        .serve("/old/manifest.json", signed_offer(&f, "1.2.0"));
+    let service = built_in_service(&f, "/new/manifest.json", "/old/manifest.json");
+    let error = service.check_if_due(NOW).expect_err("refused");
+    assert!(matches!(error, UpdateError::BadSignature), "{error:?}");
+    assert_eq!(f.server.hits(), 1);
+}
+
+#[test]
+fn both_channels_failing_reports_the_first_error() {
+    let f = fixture(false);
+    let service = built_in_service(&f, "/new/manifest.json", "/old/manifest.json");
+    let error = service.check_if_due(NOW).expect_err("both missing");
+    assert!(matches!(error, UpdateError::Network(_)), "{error:?}");
+    assert_eq!(f.server.hits(), 2);
+}
+
+#[test]
+fn a_channel_the_user_set_never_falls_back() {
+    let f = fixture(true);
+    f.server
+        .serve("/old/manifest.json", signed_offer(&f, "1.2.0"));
+    let service = UpdateService::new(Arc::clone(&f.settings), "1.0.0", f._dir.path().join("u"))
+        .with_platform(PLATFORM)
+        .with_fallback_channel(Some(&f.server.url("/old/manifest.json")));
+    // The user's own address (/manifest.json) is not served.
+    let error = service.check_if_due(NOW).expect_err("no fallback");
+    assert!(matches!(error, UpdateError::Network(_)), "{error:?}");
+    assert_eq!(f.server.hits(), 1);
+}
+
 #[test]
 fn redirects_are_followed_to_the_signed_manifest_and_the_installer() {
     let f = fixture(true);

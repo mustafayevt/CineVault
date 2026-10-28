@@ -25,9 +25,14 @@ pub const CHECK_KEY: &str = "general.check-updates";
 /// [`BUILT_IN_CHANNEL`]; an address here overrides it.
 pub const CHANNEL_KEY: &str = "general.update-channel";
 /// The channel this build reads when `general.update-channel` is empty: the signed manifest of
-/// the newest release in the public releases repository. The address redirects to the file of
-/// the latest release, so it never changes.
+/// the newest release in the project repository. The address redirects to the file of the
+/// latest release, so it never changes.
 pub const BUILT_IN_CHANNEL: &str =
+    "https://github.com/mustafayevt/CineVault/releases/latest/download/manifest.json";
+/// Read instead when [`BUILT_IN_CHANNEL`] cannot be reached or answers an error (the earlier
+/// releases repository, which the project moved out of). Never used for a channel the user set,
+/// and never after a signature or manifest failure.
+pub const FALLBACK_CHANNEL: &str =
     "https://github.com/mustafayevt/CineVault-releases/releases/latest/download/manifest.json";
 /// Setting: how often to look, `daily` (default), `weekly` or `monthly`.
 pub const INTERVAL_KEY: &str = "general.update-interval";
@@ -318,6 +323,16 @@ fn fetch(
     Err(wrap("the server redirected too many times".to_owned()))
 }
 
+/// Reads the manifest document at `url` (at most [`MAX_MANIFEST_BYTES`]).
+fn read_manifest(url: &str) -> Result<Vec<u8>, UpdateError> {
+    fetch(url, MANIFEST_TIMEOUT, UpdateError::Network)?
+        .body_mut()
+        .with_config()
+        .limit(MAX_MANIFEST_BYTES)
+        .read_to_vec()
+        .map_err(|error| UpdateError::Network(error.to_string()))
+}
+
 pub(super) fn hex(bytes: &[u8]) -> String {
     use std::fmt::Write as _;
     bytes
@@ -363,6 +378,8 @@ pub struct UpdateService {
     downloads: PathBuf,
     /// The channel used when the setting is empty.
     default_channel: Option<String>,
+    /// Read when the built-in channel cannot be reached (only while the setting is empty).
+    fallback_channel: Option<String>,
     /// The key used when the setting is empty.
     built_in_key: Option<String>,
     offered: Mutex<Option<Offered>>,
@@ -384,6 +401,7 @@ impl UpdateService {
             platform: platform_id(),
             downloads,
             default_channel: Some(BUILT_IN_CHANNEL.to_owned()),
+            fallback_channel: Some(FALLBACK_CHANNEL.to_owned()),
             built_in_key: BUILT_IN_PUBLIC_KEY.map(str::to_owned),
             offered: Mutex::new(None),
             ready: Mutex::new(None),
@@ -392,10 +410,18 @@ impl UpdateService {
     }
 
     /// Replaces the built-in channel used when the setting is empty (`None`: no channel). For
-    /// tests, which must never reach the real channel.
+    /// tests, which must never reach the real channel; the fallback is switched off with it.
     #[must_use]
     pub fn with_default_channel(mut self, channel: Option<&str>) -> Self {
         self.default_channel = channel.map(str::to_owned);
+        self.fallback_channel = None;
+        self
+    }
+
+    /// Replaces the channel read when the built-in one cannot be reached. For tests.
+    #[must_use]
+    pub fn with_fallback_channel(mut self, channel: Option<&str>) -> Self {
+        self.fallback_channel = channel.map(str::to_owned);
         self
     }
 
@@ -532,12 +558,22 @@ impl UpdateService {
         // The address is the first thing that can be wrong, so it is checked before the key.
         check_url(url)?;
         let key = self.verifying_key()?;
-        let body = fetch(url, MANIFEST_TIMEOUT, UpdateError::Network)?
-            .body_mut()
-            .with_config()
-            .limit(MAX_MANIFEST_BYTES)
-            .read_to_vec()
-            .map_err(|error| UpdateError::Network(error.to_string()))?;
+        let body = match read_manifest(url) {
+            Ok(body) => body,
+            // Only the built-in channel has a fallback, and only a failed request (no network,
+            // or an error answer such as 404) leads to it: a bad signature never does.
+            Err(first @ UpdateError::Network(_)) => {
+                let fallback = self
+                    .fallback_channel
+                    .as_deref()
+                    .filter(|_| self.text_setting(CHANNEL_KEY).is_none());
+                match fallback {
+                    Some(other) if other != url => read_manifest(other).map_err(|_| first)?,
+                    _ => return Err(first),
+                }
+            }
+            Err(other) => return Err(other),
+        };
         let manifest = verify_manifest(&body, &key)?;
         self.settings.set(LAST_CHECK_KEY, Value::from(now))?;
 

@@ -16,7 +16,7 @@
 //!   the app; otherwise (portable, MSI, macOS): hand the file to the operating system
 //! ```
 //!
-//! * The update checker is **on by default** and reads [`BUILT_IN_CHANNEL`] unless Settings name
+//! * The update checker is **on by default** and reads [`BUILT_IN_CHANNEL`] (then [`FALLBACK_CHANNEL`] when that cannot be reached) unless Settings name
 //!   another channel; an empty setting means the built-in one.
 //! * **Install on close.** With `updates.install-on-close` on (default off), an update that was
 //!   downloaded and verified installs when the app closes, without asking: the window's close
@@ -46,9 +46,9 @@ pub use manifest::{
     BUILT_IN_PUBLIC_KEY, Manifest, ManifestArtifact, parse_public_key, platform_id, verify_manifest,
 };
 pub use service::{
-    BUILT_IN_CHANNEL, CHANNEL_KEY, CHECK_KEY, CheckOutcome, INSTALL_ON_CLOSE_KEY, INTERVAL_KEY,
-    LAST_CHECK_KEY, PUBLIC_KEY_KEY, UpdateConfig, UpdateError, UpdateInterval, UpdateOffer,
-    UpdateService,
+    BUILT_IN_CHANNEL, CHANNEL_KEY, CHECK_KEY, CheckOutcome, FALLBACK_CHANNEL, INSTALL_ON_CLOSE_KEY,
+    INTERVAL_KEY, LAST_CHECK_KEY, PUBLIC_KEY_KEY, UpdateConfig, UpdateError, UpdateInterval,
+    UpdateOffer, UpdateService,
 };
 
 #[cfg(test)]
