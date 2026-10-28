@@ -30,7 +30,7 @@ The manifest payload SHALL hold `version`, `pub_date`, `notes` and `platforms`, 
 - **THEN** the manifest gains the `linux-x86_64` entry for the AppImage, the packages are uploaded but not in the manifest, and the other entries stay
 
 ### Requirement: Published to a public releases repository
-`bun run release:publish` SHALL create the release in a public releases repository as a draft, upload the installers, the checksum files, version-less copies (`CineVault-setup-x64.exe`, `CineVault-x64.msi`, `CineVault-portable-x64.zip`, `CineVault-universal.dmg`, `CineVault-x86_64.AppImage`, `CineVault-amd64.deb`, `CineVault-x86_64.rpm`) and `manifest.json`, then publish it as the latest release. Running it again SHALL be safe. `--dry-run` SHALL do everything except the upload, and `--self-test` SHALL check the payload, notes and signing logic offline.
+`bun run release:publish` SHALL create the release in a public releases repository as a draft, upload the installers, the checksum files, version-less copies (`CineVault-setup-x64.exe`, `CineVault-x64.msi`, `CineVault-portable-x64.zip`, `CineVault-universal.dmg`, `CineVault-x86_64.AppImage`, `CineVault-amd64.deb`, `CineVault-x86_64.rpm`) and `manifest.json`, then publish it as the latest release. It SHALL publish the same files, notes and signed manifest to each repository given with `--repo <owner/name>` (repeatable; by default the project repository `mustafayevt/CineVault` and the earlier releases repository `mustafayevt/CineVault-releases`), with the installer addresses of the manifest pointing at the first one, and in the project repository it SHALL tag the release `v<version>` at the commit that is checked out. Running it again SHALL be safe. `--dry-run` SHALL do everything except the upload, and `--self-test` SHALL check the payload, notes and signing logic offline.
 
 #### Scenario: macOS added later
 - **WHEN** the script is run again after the macOS workflow added the DMG
@@ -39,6 +39,10 @@ The manifest payload SHALL hold `version`, `pub_date`, `notes` and `platforms`, 
 #### Scenario: Stable download link
 - **WHEN** a release is published
 - **THEN** `releases/latest/download/CineVault-setup-x64.exe` in the public releases repository serves the newest setup
+
+#### Scenario: Two repositories
+- **WHEN** a release is published without `--repo`
+- **THEN** both repositories get the same files and the same signed manifest, and the project repository's release is tagged at the checked-out commit
 
 #### Scenario: Stable Linux link
 - **WHEN** a release with Linux files is published

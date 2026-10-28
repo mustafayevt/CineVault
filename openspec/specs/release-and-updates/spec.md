@@ -95,11 +95,26 @@ The app SHALL look for updates when `general.check-updates` ("Check for updates"
 - **THEN** the last-check time is not updated and the next hourly ask contacts the channel again
 
 ### Requirement: Update channel
-The channel SHALL be the address in `general.update-channel` ("Update channel") when it holds one, and the built-in channel, the manifest of the latest release in the public releases repository, when it is empty. The manifest SHALL be verified with `general.update-public-key` when set, else the built-in key; with no key at all no request SHALL be made.
+The channel SHALL be the address in `general.update-channel` ("Update channel") when it holds one, and the built-in channel, the manifest of the latest release in the project repository (`mustafayevt/CineVault`), when it is empty. The manifest SHALL be verified with `general.update-public-key` when set, else the built-in key; with no key at all no request SHALL be made.
 
 #### Scenario: Fresh install uses the built-in channel
 - **WHEN** the update channel setting is empty and the interval has passed
 - **THEN** the app reads the signed manifest from the built-in channel and verifies it with the built-in key
+
+### Requirement: Update channel fallback
+The earlier releases repository (`mustafayevt/CineVault-releases`) SHALL be the fallback for the built-in channel only, when it cannot be reached or answers an error.
+
+#### Scenario: Project repository unreachable
+- **WHEN** the built-in channel answers 404 or the network fails
+- **THEN** the app reads the earlier releases repository's manifest and verifies it with the same key
+
+#### Scenario: Bad signature does not fall back
+- **WHEN** the built-in channel's manifest is signed by another key
+- **THEN** the check fails and the other repository is not asked
+
+#### Scenario: Own channel does not fall back
+- **WHEN** a channel set in Settings cannot be reached
+- **THEN** the check fails and no other channel is asked
 
 ### Requirement: Update notice
 A background check that finds a newer version SHALL show a toast "CineVault <version> is available" with "Show", which opens Settings › Updates. Nothing SHALL be downloaded or installed until the user presses "Update now", unless installing on close is on. A failed background check SHALL interrupt no one.
