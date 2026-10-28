@@ -83,16 +83,18 @@ impl Fixture {
         let folder = if inside { &self.install } else { &self.other };
         let copy = folder.join(format!("idle-{program}", program = program_name()));
         fs::copy(STUB, &copy).expect("copy the stub");
-        let child = Command::new(&copy)
-            .arg("--idle")
-            .arg("--PIDFile")
-            .arg(pid_file)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map(Ended)
-            .expect("start an idle stub");
+        let child = spawn_when_not_busy(|| {
+            Command::new(&copy)
+                .arg("--idle")
+                .arg("--PIDFile")
+                .arg(pid_file)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+        })
+        .map(Ended)
+        .expect("start an idle stub");
         // The stub writes its PID file as its first act.
         let deadline = Instant::now() + Duration::from_secs(10);
         while !pid_file.exists() && Instant::now() < deadline {
@@ -100,6 +102,26 @@ impl Fixture {
         }
         assert!(pid_file.exists(), "the idle stub did not start");
         child
+    }
+}
+
+/// Starts a program that was copied a moment ago. On Linux the start can fail with "Text file
+/// busy" while another test, running in parallel, still holds the copy's write handle open in a
+/// process it is forking; that ends within milliseconds, so the start is tried again.
+fn spawn_when_not_busy(
+    mut start: impl FnMut() -> std::io::Result<Child>,
+) -> std::io::Result<Child> {
+    let mut attempts = 0;
+    loop {
+        match start() {
+            Err(error)
+                if error.kind() == std::io::ErrorKind::ExecutableFileBusy && attempts < 100 =>
+            {
+                attempts += 1;
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            other => return other,
+        }
     }
 }
 
