@@ -169,7 +169,7 @@ export function TitleHeader({
           <div className="flex items-center gap-2.5">
             <Tag variant={tag.variant}>{tag.label}</Tag>
             {context === undefined ? null : (
-              <span className="text-(length:--fs-12) text-text-2">{context}</span>
+              <span className="text-(length:--fs-12) font-(weight:--fw-500) text-text">{context}</span>
             )}
           </div>
           <h1 className="type-hero m-0 leading-[1.1]">{title}</h1>
