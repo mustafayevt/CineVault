@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CineVault has moved</title>
+<meta name="description" content="The CineVault website is now at https://mustafayevt.github.io/CineVault/.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url=https://mustafayevt.github.io/CineVault/">
+<link rel="canonical" href="https://mustafayevt.github.io/CineVault/">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #121211;
+    --card: #1a1a19;
+    --line: rgba(255, 255, 255, 0.1);
+    --text: #ebe9e4;
+    --text-2: #aaa8a2;
+    --gold: #cbb68a;
+    --gold-hover: #d6c49c;
+    --on-gold: #121211;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      color-scheme: light;
+      --bg: #f2f1ee;
+      --card: #fbfaf8;
+      --line: rgba(0, 0, 0, 0.1);
+      --text: #1a1a19;
+      --text-2: #5d5c58;
+      --gold: #7a6438;
+      --gold-hover: #6b5730;
+      --on-gold: #f2f1ee;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Archivo, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+    -webkit-text-size-adjust: 100%;
+  }
+  main {
+    width: 100%;
+    max-width: 480px;
+    padding: 32px 28px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    text-align: center;
+  }
+  .mark { width: 44px; height: 44px; color: var(--gold); }
+  .mark-frame { fill: currentColor; }
+  h1 { margin: 16px 0 8px; font-size: 24px; line-height: 1.2; }
+  p { margin: 0 0 20px; color: var(--text-2); }
+  .btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 10px;
+    background: var(--gold);
+    color: var(--on-gold);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .btn:hover { background: var(--gold-hover); }
+  .btn:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+  .url { margin: 18px 0 0; font-size: 14px; word-break: break-all; }
+  .url a { color: var(--text-2); }
+</style>
+</head>
+<body>
+<main>
+  <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M35.743 6.59A21 21 0 1 0 35.743 41.41A3 3 0 0 0 32.388 36.436A15 15 0 1 1 32.388 11.564A3 3 0 0 0 35.743 6.59Z" fill="currentColor"/><path d="M28.5 15H37.5A1.5 1.5 0 0 1 39 16.5V31.5A1.5 1.5 0 0 1 37.5 33H28.5A1.5 1.5 0 0 1 27 31.5V16.5A1.5 1.5 0 0 1 28.5 15Z" class="mark-frame"/></svg>
+  <h1>CineVault has moved</h1>
+  <p>The website and the downloads now live with the project on GitHub. You are being taken there.</p>
+  <a class="btn" id="go" href="https://mustafayevt.github.io/CineVault/">Go to the new website</a>
+  <p class="url"><a href="https://mustafayevt.github.io/CineVault/">https://mustafayevt.github.io/CineVault/</a></p>
+</main>
+<script>
+  // Keep the page and the part after # of an old link: /CineVault-releases/changelog.html goes to
+  // /CineVault/changelog.html.
+  (function () {
+    var NEW = "https://mustafayevt.github.io/CineVault/";
+    var rest = location.pathname.replace(/^\/CineVault-releases\/?/, "");
+    var target = NEW + (/^[\w.\/-]*$/.test(rest) && rest.indexOf("..") < 0 ? rest : "") + location.search + location.hash;
+    document.getElementById("go").href = target;
+    location.replace(target);
+  })();
+</script>
+</body>
+</html>

@@ -14,8 +14,8 @@ import { bodyHtml, inlineHtml, parseChangelog, readChangelog } from "./changelog
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const outputPath = resolve(root, "site", "changelog.html");
 
-const RELEASES = "https://github.com/mustafayevt/CineVault-releases/releases";
-const SITE = "https://mustafayevt.github.io/CineVault-releases/";
+const RELEASES = "https://github.com/mustafayevt/CineVault/releases";
+const SITE = "https://mustafayevt.github.io/CineVault/";
 const MARK =
   '<svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M35.743 6.59A21 21 0 1 0 35.743 41.41A3 3 0 0 0 32.388 36.436A15 15 0 1 1 32.388 11.564A3 3 0 0 0 35.743 6.59Z" fill="currentColor"/><path d="M28.5 15H37.5A1.5 1.5 0 0 1 39 16.5V31.5A1.5 1.5 0 0 1 37.5 33H28.5A1.5 1.5 0 0 1 27 31.5V16.5A1.5 1.5 0 0 1 28.5 15Z" class="mark-frame"/></svg>';
 

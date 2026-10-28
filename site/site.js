@@ -4,9 +4,9 @@
 // they work without this script.
 (function () {
   "use strict";
-  var API = "https://api.github.com/repos/mustafayevt/CineVault-releases/releases/latest";
-  var DOWNLOAD = "https://github.com/mustafayevt/CineVault-releases/releases/latest/download/";
-  var RELEASES = "https://github.com/mustafayevt/CineVault-releases/releases";
+  var API = "https://api.github.com/repos/mustafayevt/CineVault/releases/latest";
+  var DOWNLOAD = "https://github.com/mustafayevt/CineVault/releases/latest/download/";
+  var RELEASES = "https://github.com/mustafayevt/CineVault/releases";
   var SETUP = "CineVault-setup-x64.exe";
   var APPIMAGE = "CineVault-x86_64.AppImage";
 
