@@ -329,7 +329,7 @@ fn a_file_held_open_stops_a_same_volume_move_and_the_title_stays_whole() {
 // ---- network (UNC) paths -------------------------------------------------------------------------
 
 /// The administrative share path (`\\localhost\C$\...`) of a local folder, when this machine
-/// serves it.
+/// serves it and lets this session write through it.
 #[cfg(windows)]
 fn unc_of(path: &Path) -> Option<String> {
     let text = path.to_string_lossy();
@@ -338,7 +338,17 @@ fn unc_of(path: &Path) -> Option<String> {
         return None;
     }
     let unc = format!(r"\\localhost\{}$\{}", &text[..1], &text[3..]);
-    fs::metadata(&unc).is_ok().then_some(unc)
+    fs::metadata(&unc).ok()?;
+    // The share can exist and still refuse writes to a non-elevated session (a hosted CI runner
+    // does): the test creates, writes, renames and removes through it, so try exactly that.
+    let probe = format!(r"{unc}\share-probe");
+    let worked = fs::create_dir_all(format!(r"{probe}\a"))
+        .and_then(|()| fs::write(format!(r"{probe}\a\a.txt"), b"x"))
+        .and_then(|()| fs::rename(format!(r"{probe}\a\a.txt"), format!(r"{probe}\a\b.txt")))
+        .and_then(|()| fs::rename(format!(r"{probe}\a"), format!(r"{probe}\c")))
+        .is_ok();
+    let _ = fs::remove_dir_all(&probe);
+    worked.then_some(unc)
 }
 
 #[cfg(windows)]
