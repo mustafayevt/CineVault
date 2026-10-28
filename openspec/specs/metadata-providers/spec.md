@@ -6,18 +6,26 @@ Covers the online metadata sources CineVault uses and how it talks to them. TMDB
 ## Requirements
 
 ### Requirement: Keys the user can enter
-Settings › Providers SHALL offer exactly three keys: "TMDB key" (hint "Needed for Scrape."), "OMDb key" (hint "Adds IMDb, Rotten Tomatoes and Metacritic ratings.") and "MDBList key" (hint "Adds Letterboxd and more ratings."), each with a "Get a free key" link to the provider's own key page. The app SHALL ship no keys: every key is the user's own. The section hint SHALL read "Keys are stored in the system credential store, never in files."
+Settings › Providers SHALL offer the required "TMDB key" (hint "Needed for Scrape.") and the optional "OMDb key" (hint "Adds IMDb, Rotten Tomatoes and Metacritic ratings."), "MDBList key" (hint "Adds Letterboxd and more ratings."), "Fanart.tv key" (hint "Adds more artwork.") and "TheTVDB key" (hint "Adds TV artwork and episode data."), each with a "Get a free key" link to the provider's own key page. The app SHALL ship no keys: every key is the user's own. The section hint SHALL read "Keys are stored in the system credential store, never in files." The Fanart.tv and TheTVDB sources SHALL take part only once their key is saved, and any link in the app that says one of them needs a key SHALL open Settings › Providers at that key.
 
 #### Scenario: Fresh install
 - **WHEN** a user opens Settings › Providers on a fresh install
-- **THEN** the three key fields are empty and each offers "Get a free key"
+- **THEN** the five key fields are empty and each offers "Get a free key"
+
+#### Scenario: Key link in search
+- **WHEN** a search says "TheTVDB needs a key" and the user follows the link
+- **THEN** Settings › Providers opens at the TheTVDB key field
 
 ### Requirement: Keys live in the system credential store
-Keys SHALL be stored in the operating system credential store (Windows Credential Manager or the macOS Keychain), never in the settings file. A portable copy SHALL use a credential service of its own, so it starts with no keys and never changes an installed copy's keys.
+Keys SHALL be stored in the operating system credential store (Windows Credential Manager, the macOS Keychain, or the Secret Service on Linux), never in the settings file. A portable copy SHALL use a credential service of its own, so it starts with no keys and never changes an installed copy's keys.
 
 #### Scenario: Settings file holds no key
 - **WHEN** the user saves a TMDB key and the settings file is inspected
 - **THEN** the file does not contain the key
+
+#### Scenario: Key kept in GNOME Keyring
+- **WHEN** the user saves a TMDB key on a Linux desktop running GNOME Keyring and restarts CineVault
+- **THEN** the key is still configured, and the keyring lists it under the service `CineVault`
 
 ### Requirement: Test, save and remove a key
 A key field SHALL show a saved key only as dots and offer Show and Hide for a key being typed. Test (or Enter) SHALL check a typed key with the provider and save it only when accepted; a refused key SHALL show the provider's message or "<name> did not accept this key. Check that it is copied whole." A working key SHALL show "Works" and a refused saved key "Rejected". Remove SHALL delete the key and confirm with a toast whose Undo puts it back.

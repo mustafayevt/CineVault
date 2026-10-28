@@ -164,17 +164,6 @@ With `media.detect-aspect-ratio` on (default off), the app SHALL measure the vis
 - **WHEN** detection runs with the default mode on a two-hour film
 - **THEN** six samples of two seconds each are measured
 
-### Requirement: Aspect ratio sampling and rounding
-Samples SHALL skip the first 2% and the last 8% of the runtime, stacked parts counting as one timeline. Each sample SHALL be rounded to the nearest standard ratio, or to the next wider one while `media.aspect-round-up` is on, and the samples vote. A ratio wider than the frame itself SHALL NOT be stored.
-
-#### Scenario: Picture narrower than its frame
-- **WHEN** a 1920×1080 video shows a 4:3 picture with black bars at the sides
-- **THEN** its aspect ratio is stored as 1.33:1
-
-#### Scenario: Impossible ratio
-- **WHEN** the samples of a video whose frame is 1.78:1 vote for 2.39:1
-- **THEN** the ratio MediaInfo reported for the frame stays
-
 ### Requirement: Films that change ratio
 For a film that changes ratio, `media.aspect-multi-format` SHALL pick the ratio seen most often (default), the taller picture or the wider picture. Accurate mode SHALL also store a secondary ratio held by at least 6% of the samples.
 
@@ -243,7 +232,7 @@ The app SHALL use MediaInfo (a library it loads), FFmpeg and, for torrent search
 - **THEN** MediaInfo and FFmpeg are downloaded in the background into the app's tools folder
 
 ### Requirement: Verified tool downloads
-Downloads SHALL be pinned in a built-in manifest with an exact https URL, size and SHA-256 per platform. A download SHALL be hashed while written to a staging folder, discarded on a mismatch, and only then unpacked; the finished folder SHALL replace the old install in one rename. A program-tree package SHALL be refused when an entry is absolute, holds `..`, a drive letter, a link or a special file, or lies outside its root.
+Downloads SHALL be pinned in a built-in manifest with an exact https URL, size and SHA-256 per platform (`windows-x86_64`, `macos-x86_64`, `macos-aarch64` and `linux-x86_64`). Archives SHALL be zip, tar.gz, tar.bz2 or tar.xz, or the program itself. A download SHALL be hashed while written to a staging folder, discarded on a mismatch, and only then unpacked; the finished folder SHALL replace the old install in one rename. A program-tree package SHALL be refused when an entry is absolute, holds `..`, a drive letter, a link or a special file, or lies outside its root.
 
 #### Scenario: Checksum mismatch
 - **WHEN** a downloaded FFmpeg archive does not match its expected SHA-256
@@ -252,3 +241,29 @@ Downloads SHALL be pinned in a built-in manifest with an exact https URL, size a
 #### Scenario: Archive entry outside the package
 - **WHEN** a downloaded program-tree archive holds an entry with `..` or an absolute path
 - **THEN** nothing is installed and the install fails with a plain error
+
+#### Scenario: Linux downloads
+- **WHEN** the first-run setup finishes on Linux with the recommended tools ticked
+- **THEN** `libmediainfo.so.0` and `ffmpeg` are downloaded from the `linux-x86_64` entries into the app's tools folder, and the Technical card reads video details
+
+### Requirement: Detected ratio is the picture's own shape
+Samples SHALL skip the first 2% and the last 8% of the runtime, stacked parts counting as one timeline. Each sample SHALL be rounded to the nearest standard ratio, or to the next wider one while `media.aspect-round-up` is on, and the samples vote. The detected ratio SHALL be stored as measured, wider or narrower than the frame, because black bars above and below make a picture wider than its frame.
+
+#### Scenario: Picture narrower than its frame
+- **WHEN** a 1920×1080 video shows a 4:3 picture with black bars at the sides
+- **THEN** its aspect ratio is stored as 1.33:1
+
+#### Scenario: Scope film in a 16:9 frame
+- **WHEN** crop detection finds a 1920×804 picture inside a 1920×1080 frame
+- **THEN** the aspect ratio is stored as 2.39:1
+
+### Requirement: Reload media info on demand
+Reload media info SHALL forget the stored file details of the chosen titles (a show: of its episodes), clear the "unreadable" marks of their videos and read the files again, never from a sidecar, as a background job named "Reload media info" that shows in the sidebar progress card and can be cancelled. Titles that cannot be read again SHALL be listed in the notification centre. Without MediaInfo installed nothing SHALL be cleared.
+
+#### Scenario: Only the chosen titles
+- **WHEN** two movies hold out-of-date details and one of them is reloaded
+- **THEN** only that movie's file is read again and its details match the file, and the other keeps what it had
+
+#### Scenario: MediaInfo missing
+- **WHEN** MediaInfo is not installed and the user reloads a title
+- **THEN** its stored details stay as they were and the notification centre says MediaInfo is needed

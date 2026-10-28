@@ -141,11 +141,15 @@ A settings file that cannot be used (invalid JSON, wrong shape, written by a new
 - **THEN** no defaults are saved over it, Activity shows "Your settings could not be loaded", and the first save renames it to `settings.json.unreadable-<time>` before writing
 
 ### Requirement: Secrets in the operating system credential store
-API keys, passwords and tokens SHALL be stored in the operating system credential store (Windows Credential Manager, macOS Keychain) under the service name `CineVault`, addressed by account names such as `tmdb.api_key`, and never in the settings file. Settings SHALL hold only non-secret facts, such as whether a key is configured.
+API keys, passwords and tokens SHALL be stored in the operating system credential store (Windows Credential Manager, macOS Keychain, or on Linux the Secret Service such as GNOME Keyring or KWallet) under the service name `CineVault`, addressed by account names such as `tmdb.api_key`, and never in the settings file. Settings SHALL hold only non-secret facts, such as whether a key is configured. When no credential store is reachable (on Linux, no Secret Service is running), saving a key SHALL fail with "No system keyring is running. Install or unlock GNOME Keyring or KWallet, then try again." and the key SHALL NOT be written to any file.
 
 #### Scenario: API key not in the settings file
 - **WHEN** the user saves a TMDB API key
 - **THEN** the settings file contains no key material, and the key is available after restart
+
+#### Scenario: No keyring on Linux
+- **WHEN** the user saves a TMDB key on a Linux desktop where no Secret Service is running
+- **THEN** the save fails with the message above, and no file in the data folder contains the key
 
 ### Requirement: Portable copy keeps its own secrets
 A portable copy SHALL file its secrets under a service of its own, `CineVault portable <id>`, with a random id kept in `credential-store-id` in its data folder (derived from the folder path when that file cannot be written). It SHALL never read or change the keys of an installed copy or of another portable copy.
@@ -173,7 +177,7 @@ The log detail SHALL follow the setting `advanced.log-level` ("Log detail"), wit
 - **THEN** CineVault's own debug lines are logged from that moment, without a restart, and secrets stay masked
 
 ### Requirement: Data folder location
-The data folder SHALL be chosen in this order: portable mode when a file named `portable` sits next to the executable (data in a `data` folder beside it); else a custom folder named in `data-location.json` in the per-user configuration folder; else the per-user application-data folder (`%APPDATA%\CineVault` on Windows, `~/Library/Application Support/CineVault` on macOS). A pointer file that cannot be used SHALL fall back to the per-user folder with a warning and SHALL not be overwritten.
+The data folder SHALL be chosen in this order: portable mode when a file named `portable` sits next to the executable (data in a `data` folder beside it); else a custom folder named in `data-location.json` in the per-user configuration folder; else the per-user application-data folder (`%APPDATA%\CineVault` on Windows, `~/Library/Application Support/CineVault` on macOS, `$XDG_DATA_HOME/CineVault` on Linux, which is `~/.local/share/CineVault` by default). On Linux the per-user configuration folder SHALL be `$XDG_CONFIG_HOME/CineVault` (by default `~/.config/CineVault`). A pointer file that cannot be used SHALL fall back to the per-user folder with a warning and SHALL not be overwritten.
 
 #### Scenario: Portable mode
 - **WHEN** a `portable` marker file exists next to the executable
@@ -182,6 +186,10 @@ The data folder SHALL be chosen in this order: portable mode when a file named `
 #### Scenario: Broken pointer file
 - **WHEN** `data-location.json` holds a relative path
 - **THEN** the app uses the per-user folder, reports a warning and leaves the pointer file as it is
+
+#### Scenario: Linux default
+- **WHEN** CineVault starts for the first time on Linux with `XDG_DATA_HOME` unset
+- **THEN** its library and settings are in `~/.local/share/CineVault`
 
 ### Requirement: Contents of the data folder
 The data folder SHALL hold `library.db`, `settings.json` and `cache`, and SHALL gain `tools` (downloaded external tools), `tmp` (work in progress such as update downloads) and `nfo-undo` (what Read NFO and Rewrite NFO need to undo an action) when they are first needed.

@@ -24,11 +24,15 @@ Settings SHALL offer "Video player" (`player.kind`) with "System default" (`syst
 - **THEN** Play uses the system default player
 
 ### Requirement: Finding the player
-When "Player program" is empty, CineVault SHALL look for the chosen player in its usual install places (on Windows under the Program Files folders, on macOS in `/Applications`) and then on the `PATH`. A configured macOS application bundle (`VLC.app`) SHALL stand for the program inside it. When the player cannot be found, Play SHALL say "The player <name> was not found. Check its location in the settings."
+When "Player program" is empty, CineVault SHALL look for the chosen player in its usual install places (on Windows under the Program Files folders, on macOS in `/Applications`, on Linux in `/usr/bin`, `/usr/local/bin`, `/snap/bin` and the system and per-user Flatpak export folders) and then on the `PATH`. A configured macOS application bundle (`VLC.app`) SHALL stand for the program inside it. When the player cannot be found, Play SHALL say "The player <name> was not found. Check its location in the settings."
 
 #### Scenario: VLC in its usual place
 - **WHEN** the player is VLC, "Player program" is empty and VLC is installed in its default folder on Windows
 - **THEN** Play starts that VLC with the file
+
+#### Scenario: mpv from the distribution on Linux
+- **WHEN** the player is mpv, "Player program" is empty and mpv is installed as `/usr/bin/mpv` on Linux
+- **THEN** Play starts `/usr/bin/mpv` with the file
 
 ### Requirement: Parts and discs in order
 Mpv, VLC, MPC-HC / MPC-BE and IINA SHALL receive every part of a stacked movie on their command line in part order, so the player queues them as one playlist. A title kept as a disc folder (`VIDEO_TS`, `BDMV`) SHALL be passed as the disc folder: mpv SHALL open a DVD folder with `--dvd-device=<folder> dvd://` and a Blu-ray folder with `--bluray-device=<folder> bd://`, and MPC-HC / MPC-BE SHALL get `/dvd` for a DVD folder. A disc image SHALL be passed as a plain file.

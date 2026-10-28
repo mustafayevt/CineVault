@@ -60,7 +60,7 @@ The TMDB key step SHALL explain that titles, posters and plots come from TMDB an
 - **THEN** the Scrape page later says "Add your TMDB key to start scraping"
 
 ### Requirement: Ratings keys step
-The Ratings keys step SHALL offer the optional OMDb key ("Adds IMDb, Rotten Tomatoes and Metacritic ratings") and MDBList key, each marked Optional with Test, and SHALL say both can be added later in Settings.
+The Ratings keys step ("Add your optional keys") SHALL offer the optional OMDb key ("Adds IMDb, Rotten Tomatoes and Metacritic ratings"), MDBList key, Fanart.tv key ("Adds more artwork") and TheTVDB key ("Adds TV artwork and episode data"), each marked Optional with Test, and SHALL say all of them can be added later in Settings.
 
 #### Scenario: Ratings keys skipped
 - **WHEN** the user presses "Skip this step" on the Ratings keys step
