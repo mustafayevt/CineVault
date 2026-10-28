@@ -1,7 +1,7 @@
 # release-and-updates Specification
 
 ## Purpose
-Covers how CineVault is built, released and updated: the installers per platform, the version kept equal across the project files, the release workflows run by hand, the signed update manifest published to a public releases repository, the private signing key kept out of the repository, and the in-app update check, download, verification and install on Windows and macOS, including the Updates section in Settings and installing on close.
+Covers how CineVault is built, released and updated: the installers per platform, the version kept equal across the project files, the tag-driven release workflow, the signed update manifest published to a public releases repository, the private signing key kept out of the repository and handed to the workflow only as a secret, and the in-app update check, download, verification and install on Windows and macOS, including the Updates section in Settings and installing on close.
 
 ## Requirements
 
@@ -9,47 +9,58 @@ Covers how CineVault is built, released and updated: the installers per platform
 A Windows release SHALL consist of an MSI package, an NSIS setup program (`CineVault_<version>_x64-setup.exe`, installed per user) and a portable zip (`CineVault_<version>_x64-portable.zip`, holding `CineVault.exe` and an empty `portable` marker file). A macOS release SHALL be one universal DMG for Apple Silicon and Intel; macOS SHALL have no portable package. A Linux release (x86_64, marked beta) SHALL consist of an AppImage (`CineVault_<version>_amd64.AppImage`), a `.deb` package (`CineVault_<version>_amd64.deb`) and an `.rpm` package (`CineVault-<version>-1.x86_64.rpm`); Linux SHALL have no portable package. `bun run tauri build` SHALL make the platform's installers and `bun run package:portable` the portable zip.
 
 #### Scenario: Windows release files
-- **WHEN** the Windows release workflow finishes for version 1.2.0
+- **WHEN** the release workflow finishes for version 1.2.0
 - **THEN** the release holds the MSI, `CineVault_1.2.0_x64-setup.exe`, `CineVault_1.2.0_x64-portable.zip` and `SHA256SUMS-Windows.txt`
 
 #### Scenario: Linux release files
-- **WHEN** the Linux release workflow finishes for version 1.2.0
+- **WHEN** the release workflow finishes for version 1.2.0
 - **THEN** the release holds `CineVault_1.2.0_amd64.AppImage`, `CineVault_1.2.0_amd64.deb`, `CineVault-1.2.0-1.x86_64.rpm` and `SHA256SUMS-Linux.txt`
 
 ### Requirement: Builds carry no secrets
-The build SHALL contain no API keys, tokens or signing material. `bun run bundle:check` SHALL fail when the bundle configuration adds bundled resources, external binaries, the Tauri updater plugin or code-signing settings, or when a workflow reads a repository secret other than the built-in GitHub token.
+The build SHALL contain no API keys, tokens or signing material. `bun run bundle:check` SHALL fail when the bundle configuration adds bundled resources, external binaries, the Tauri updater plugin or code-signing settings, or when a workflow reads a repository secret other than the built-in GitHub token (the update-signing key `CINEVAULT_UPDATE_KEY` may be read by `release.yml` only).
 
 #### Scenario: Secret in a workflow
-- **WHEN** a workflow file reads `secrets.SOME_TOKEN`
+- **WHEN** a workflow file reads `secrets.SOME_TOKEN`, or any file but `release.yml` reads `secrets.CINEVAULT_UPDATE_KEY`
 - **THEN** `bun run bundle:check` fails and names the file
 
 ### Requirement: Versions kept equal
-The version SHALL be the same in `src-tauri/tauri.conf.json`, the root `package.json`, `ui/package.json` and the root `Cargo.toml` (`[workspace.package] version`), and a version bump SHALL change all four together. `bun run bundle:check` SHALL fail when the Cargo workspace version and the Tauri configuration version differ. The release workflows SHALL read the version from `src-tauri/tauri.conf.json`.
+The version SHALL be the same in `src-tauri/tauri.conf.json`, the root `package.json`, `ui/package.json` and the root `Cargo.toml` (`[workspace.package] version`), and a version bump SHALL change all four together. `bun run bundle:check` SHALL fail when the Cargo workspace version and the Tauri configuration version differ. `node scripts/check-version.mjs` SHALL fail when the four files differ, or when they do not say the version it is given. The release workflow SHALL stop unless the pushed tag `v<version>` matches all four.
 
 #### Scenario: Mismatched version
 - **WHEN** `Cargo.toml` says 1.2.0 and `src-tauri/tauri.conf.json` says 1.1.0
 - **THEN** `bun run bundle:check` fails with a version mismatch and the release build stops
 
-### Requirement: Release workflows run by hand
-`.github/workflows/release-windows.yml`, `.github/workflows/release-macos.yml` and `.github/workflows/release-linux.yml` SHALL start only by hand (`workflow_dispatch`), each on its own; pushes and tags SHALL never start them. All three SHALL use `.github/workflows/release-build.yml`, which checks the bundling configuration, builds the installers, checks that they exist, makes the portable zip on Windows and writes `SHA256SUMS-<os>.txt`. The Linux build SHALL run on Ubuntu 22.04. They SHALL use only the built-in GitHub token.
+### Requirement: Tag-driven release workflow
+`.github/workflows/release.yml` SHALL start on a pushed tag `v*`, or by hand (`workflow_dispatch`) with a version input, and nothing else SHALL start a release. A tag that does not match the version files stops it before anything is built. It SHALL build the Windows installers (NSIS, MSI, portable zip) and the Linux packages (AppImage, deb, rpm, on Ubuntu 22.04) in parallel, each after checking the bundling configuration and that the installers exist, and then publish them in one job that is the only one with write access, with `node scripts/release-publish.mjs --from-dir` for the release of `mustafayevt/CineVault` (never the earlier releases repository). A by-hand run SHALL create the tag at the commit it runs on when it does not exist, and stop when the tag points elsewhere.
 
 #### Scenario: Push to main
 - **WHEN** a commit is pushed to `main`
 - **THEN** no release workflow starts
 
-### Requirement: Release files on the GitHub Release
-With the `publish` input on (the default), the release build SHALL put the files on the GitHub Release `v<version>`, creating it when missing and replacing that system's files from an earlier run of the same version. With `publish` off it SHALL keep the files as workflow artifacts for one day.
+#### Scenario: Tag that does not match
+- **WHEN** `v1.3.0` is pushed while `src-tauri/tauri.conf.json` says 1.2.0
+- **THEN** the workflow stops at the version check and builds nothing
 
-#### Scenario: Rebuild one system
-- **WHEN** the macOS workflow is run again for a version that already has Windows and macOS files
-- **THEN** only the macOS files on Release `v<version>` are replaced and the Windows files stay
+### Requirement: Signed or unsigned publication
+When the repository secret `CINEVAULT_UPDATE_KEY` is set, the publish job SHALL write the key to a private temporary file outside the repository, pass it by path with `--key`, remove it afterwards and never print it, and the release SHALL be published with its signed manifest as the latest release. Without the secret the job SHALL run `release-publish.mjs --unsigned`: the installers, the `SHA256SUMS-<os>.txt` files and the notes from `CHANGELOG.md` are put on the release, which is published as a pre-release (never the latest) with no manifest and no version-less copies, and the job SHALL print a notice that the maintainer must sign it with `release-publish.mjs --version <x.y.z>`. An unsigned run SHALL refuse to change a release that is already published as signed.
 
-#### Scenario: Build without publishing
-- **WHEN** the Windows workflow is run with `-f publish=false`
-- **THEN** the installers are kept as workflow artifacts and no release is created or changed
+#### Scenario: No signing key in CI
+- **WHEN** the release workflow runs without `CINEVAULT_UPDATE_KEY`
+- **THEN** Release `v<version>` holds the installers and notes as a pre-release, installed apps still see the previous version, and the log says the maintainer must publish the signed manifest
+
+#### Scenario: Signing later
+- **WHEN** `bun run release:publish -- --version <x.y.z>` is run on the maintainer's machine for an unsigned release
+- **THEN** the release gets its manifest and stable copies and becomes the latest release
+
+### Requirement: Website deployed by workflow
+`.github/workflows/site.yml` SHALL deploy `site/` (without its README) to GitHub Pages on a push to `main` that changes `site/**` or `CHANGELOG.md`, and by hand, after `bun run site:changelog -- --check` passes. GitHub Pages SHALL use the GitHub Actions source.
+
+#### Scenario: Changelog changed
+- **WHEN** a pull request that changes `CHANGELOG.md` and `site/changelog.html` is merged into `main`
+- **THEN** the site is redeployed
 
 ### Requirement: Checked release files
-`bun run release:publish` SHALL download every file of Release `v<version>` (version from `src-tauri/tauri.conf.json` or `--version`) and check every installer against the `SHA256SUMS-<os>.txt` files. It SHALL publish nothing when a file does not match or a listed file is missing.
+`bun run release:publish` without `--from-dir` SHALL download every file of Release `v<version>` (version from `src-tauri/tauri.conf.json` or `--version`) and check every installer against the `SHA256SUMS-<os>.txt` files. It SHALL publish nothing when a file does not match or a listed file is missing.
 
 #### Scenario: Checksum mismatch
 - **WHEN** a downloaded installer does not match its line in `SHA256SUMS-Windows.txt`
@@ -63,14 +74,14 @@ The manifest payload SHALL hold `version`, `pub_date`, `notes` and `platforms`, 
 - **THEN** the script refuses to publish
 
 #### Scenario: Linux added later
-- **WHEN** the script is run after the Linux workflow added the AppImage, `.deb` and `.rpm`
+- **WHEN** the script is run after the Linux build added the AppImage, `.deb` and `.rpm`
 - **THEN** the manifest gains the `linux-x86_64` entry for the AppImage, the packages are uploaded but not in the manifest, and the other entries stay
 
 ### Requirement: Published to a public releases repository
 `bun run release:publish` SHALL create the release in a public releases repository as a draft, upload the installers, the checksum files, version-less copies (`CineVault-setup-x64.exe`, `CineVault-x64.msi`, `CineVault-portable-x64.zip`, `CineVault-universal.dmg`, `CineVault-x86_64.AppImage`, `CineVault-amd64.deb`, `CineVault-x86_64.rpm`) and `manifest.json`, then publish it as the latest release. It SHALL publish the same files, notes and signed manifest to each repository given with `--repo <owner/name>` (repeatable; by default the project repository `mustafayevt/CineVault` and the earlier releases repository `mustafayevt/CineVault-releases`), with the installer addresses of the manifest pointing at the first one, and in the project repository it SHALL tag the release `v<version>` at the commit that is checked out. Running it again SHALL be safe. `--dry-run` SHALL do everything except the upload, and `--self-test` SHALL check the payload, notes and signing logic offline.
 
 #### Scenario: macOS added later
-- **WHEN** the script is run again after the macOS workflow added the DMG
+- **WHEN** the script is run again after the macOS build added the DMG
 - **THEN** the manifest gains the `darwin-aarch64` and `darwin-x86_64` entries and the Windows entry stays
 
 #### Scenario: Stable download link
@@ -86,7 +97,7 @@ The manifest payload SHALL hold `version`, `pub_date`, `notes` and `platforms`, 
 - **THEN** `releases/latest/download/CineVault-x86_64.AppImage` serves the newest AppImage
 
 ### Requirement: Private signing key never in the repository
-The update-signing private key SHALL live only on the maintainer's machine, read from `--key`, else `CINEVAULT_UPDATE_KEY`, else `~/.cinevault-keys/cinevault-update.pem`. It SHALL never be in the repository, a CI secret or a workflow, and the tools SHALL only read it, never print or copy it. Only the public key SHALL be built into the app (`BUILT_IN_PUBLIC_KEY`), and tests SHALL generate their own key pairs.
+The update-signing private key SHALL live only on the maintainer's machine, read from `--key`, else `CINEVAULT_UPDATE_KEY`, else `~/.cinevault-keys/cinevault-update.pem`. It SHALL never be in the repository or a workflow file, and the tools SHALL only read it, never print or copy it. The one other place it may live is the repository secret `CINEVAULT_UPDATE_KEY`, which only the publish job of `release.yml` reads. Only the public key SHALL be built into the app (`BUILT_IN_PUBLIC_KEY`), and tests SHALL generate their own key pairs.
 
 #### Scenario: Key never printed
 - **WHEN** `bun run release:publish` signs a manifest
