@@ -16,7 +16,7 @@ You need:
 
 - the [Rust](https://rustup.rs) stable toolchain (the MSVC target on Windows);
 - [bun](https://bun.sh);
-- the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) (WebView2 on Windows, the Xcode command-line tools on macOS);
+- the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) (WebView2 on Windows, the WebKitGTK and `libdbus` development packages on Linux, the Xcode command-line tools on macOS);
 - the [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec) if you work on a feature.
 
 Then, from the repository root:
@@ -52,7 +52,7 @@ bun run test
 bun run build
 ```
 
-CI runs the same checks on every pull request, on Windows and macOS.
+CI runs the same checks on every pull request, on Windows, Linux and macOS.
 
 Also, when it applies:
 

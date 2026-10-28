@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/mustafayevt/CineVault/security/advisories/new
     about: Please report security problems privately, not in a public issue.
   - name: Download CineVault
-    url: https://mustafayevt.github.io/CineVault-releases/
-    about: The latest installers for Windows and macOS.
+    url: https://mustafayevt.github.io/CineVault/
+    about: The latest installers for Windows and Linux.
