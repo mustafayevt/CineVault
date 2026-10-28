@@ -1,8 +1,17 @@
 # CineVault: guide for contributors and AI coding assistants
 
-CineVault is a fast desktop movie and TV library manager for Windows and macOS. It scans media folders, identifies titles from online providers, writes NFO and artwork files in the Kodi, Jellyfin and Emby formats, renames folders and files from templates with a preview and Undo, and offers drive moves, torrent-search hand-off, collections and a full change History. It is built for fresh users; there are no importers from other apps.
+CineVault is a fast desktop movie and TV library manager for Windows, Linux (beta) and macOS. It scans media folders, identifies titles from online providers, writes NFO and artwork files in the Kodi, Jellyfin and Emby formats, renames folders and files from templates with a preview and Undo, and offers drive moves, torrent-search hand-off, collections and a full change History. It is built for fresh users; there are no importers from other apps.
 
 Human contributors: read [CONTRIBUTING.md](CONTRIBUTING.md) too. `CLAUDE.md` points here.
+
+## Workflow rules (read first)
+
+1. **Never push to `main`.** Start every change on a short-lived branch from `main` (`feat/<topic>`, `fix/<topic>`, `docs/<topic>`, `chore/<topic>`).
+2. **Open a pull request** for it (`gh pr create`), describing what changed, why, and how it was checked. CI must pass; then it is squash-merged with a Conventional Commit title.
+3. **Behaviour changes go through OpenSpec** (proposal → apply → archive, see below); bug fixes that keep specified behaviour don't need a change folder.
+4. **UI changes also update** the screenshots (`.github/assets/`, `site/img/`), the landing page wording, the README and `CHANGELOG.md` (then `bun run site:changelog`) in the same pull request.
+5. **Commits:** Conventional Commits, a short body saying what and why, and no AI attribution of any kind (no `Co-Authored-By`, no "Generated with" footers).
+6. **Releases** are cut from `main` by pushing a `v<version>` tag after the version bump has been merged; never by pushing to `main`.
 
 ## Source of truth
 
