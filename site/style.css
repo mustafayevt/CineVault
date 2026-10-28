@@ -797,6 +797,48 @@ h2 {
   text-underline-offset: 3px;
 }
 
+/* Open source */
+
+.oss {
+  padding: 0 0 140px;
+}
+
+.oss-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 32px 48px;
+  padding: 40px;
+  background: var(--surface-card);
+  border: 1px solid var(--line-section);
+  border-radius: var(--r-14);
+}
+
+.oss-copy p:last-child {
+  margin-top: 14px;
+  max-width: 560px;
+  color: var(--text-2);
+  font-size: 17px;
+}
+
+.oss-card h2 {
+  font-size: clamp(26px, 3vw, 36px);
+}
+
+.oss-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 860px) {
+  .oss-card {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 28px 22px;
+  }
+}
+
 /* Motion: content is visible without script; with it, items rise in once. */
 
 .js .reveal {
