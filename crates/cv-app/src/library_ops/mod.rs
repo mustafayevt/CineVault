@@ -161,8 +161,10 @@ pub(crate) fn unique(ids: &[ItemId]) -> Vec<ItemId> {
 }
 
 /// The parts of `path` below `root`, or `None` when it is not below it. Compared without regard
-/// to case or separator style; the parts keep their spelling. A path with a `.` or `..` part
-/// below the root is never below it (it may name the root itself or a place outside).
+/// to separator style, and to case where the platform's file names ignore it (Windows, macOS;
+/// on Linux `Films` and `films` are two folders); the parts keep their spelling. A path with a
+/// `.` or `..` part below the root is never below it (it may name the root itself or a place
+/// outside).
 pub(crate) fn parts_below(root: &str, path: &str) -> Option<Vec<String>> {
     let split = |text: &str| -> Vec<String> {
         text.split(['\\', '/'])
@@ -177,7 +179,7 @@ pub(crate) fn parts_below(root: &str, path: &str) -> Option<Vec<String>> {
     let same = root
         .iter()
         .zip(&path)
-        .all(|(a, b)| a.to_lowercase() == b.to_lowercase());
+        .all(|(a, b)| cv_fs::paths::fold_name(a) == cv_fs::paths::fold_name(b));
     let rest = &path[root.len()..];
     // `.` and `..` name the root itself or a place outside it, whatever the parts say.
     if !same || rest.iter().any(|part| part == "." || part == "..") {

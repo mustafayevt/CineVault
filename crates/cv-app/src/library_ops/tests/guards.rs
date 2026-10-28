@@ -112,3 +112,23 @@ fn a_title_whose_scrape_steps_still_write_is_not_deleted() {
     let report = lab.removal(&trash).delete_with_files(&[heat]).unwrap();
     assert_eq!(report.deleted.len(), 1, "{report:?}");
 }
+
+#[test]
+fn a_folder_below_a_root_is_judged_by_the_platforms_case_rule() {
+    assert_eq!(
+        parts_below("/data/Films", "/data/Films/Heat (1995)"),
+        Some(vec!["Heat (1995)".to_owned()])
+    );
+    assert_eq!(
+        parts_below(r"D:\Films", "D:/Films/Heat"),
+        Some(vec!["Heat".to_owned()])
+    );
+    // On Linux `films` is another folder than `Films`: nothing in it is below the root, so no
+    // delete or permanent delete takes it for a folder of this library.
+    let other = parts_below("/data/Films", "/data/films/Heat (1995)");
+    assert_eq!(other.is_none(), cv_fs::paths::CASE_SENSITIVE, "{other:?}");
+    assert_eq!(
+        same_folder("/data/Films", "/data/films"),
+        !cv_fs::paths::CASE_SENSITIVE
+    );
+}
