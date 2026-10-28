@@ -17,11 +17,13 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Optional Fanart.tv and TheTVDB keys in Settings › Providers and in the first-run setup, and a "needs a key" link in search that opens them.
 - Release notes of an available update, shown before you update, and a Release notes view with every version in Settings › Updates.
 - "What's new" after an update: a short card with the changes of the version you just installed.
-- Linux beta (AppImage, .deb, .rpm).
+- CineVault for Linux, as a beta for 64-bit systems: an AppImage, a .deb package for Debian and Ubuntu and an .rpm package for Fedora. Deleted titles go to the system Trash of their own drive, API keys are kept in the system keyring (GNOME Keyring, KWallet or KeePassXC), and the AppImage updates itself from inside the app.
+- CineVault is now open source under the Apache-2.0 licence. The code, the issue tracker and the releases are at github.com/mustafayevt/CineVault, and contributions are welcome (see CONTRIBUTING.md).
 - Settings › Naming: a Style control at the top fills the movie folder, movie file and TV episode templates from the same styles as the first-run setup. Editing a template switches it to Custom, and choosing a style over your own templates asks first.
 
 ### Changed
 
+- Downloads, updates and the website moved to the project's own GitHub page. The app now looks for updates there first and uses the earlier releases page only when that cannot be reached. Installed copies update as before, and nothing needs to be done.
 - Delete… is now the last item of a title's ⋯ menu, in red, after a divider.
 - The date a title was added now comes from its video file's creation time, and titles that all got the date of the first scan are corrected once.
 - Opening and closing an episode on a TV show page is smoother, and it stays instant when you have reduced motion on.
@@ -74,4 +76,4 @@ CineVault 1.0 is a new design and a fresh start. It does not read the library of
 
 ## Earlier versions
 
-Versions before 1.0 are described on the [releases page](https://github.com/mustafayevt/CineVault-releases/releases).
+Versions before 1.0 are described on the [releases page](https://github.com/mustafayevt/CineVault/releases).
