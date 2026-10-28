@@ -308,15 +308,22 @@ async fn quick_providers_answer_before_the_slow_one_and_a_failure_can_be_retried
         ["tmdb", "fanart", "imdb", "tvdb"]
     );
     let seen = kinds(&events.lock().unwrap());
-    assert_eq!(
-        seen[..4],
-        [
-            "started tmdb",
-            "started fanart",
-            "started imdb",
-            "started tvdb"
-        ]
-    );
+    // The providers run side by side, so a quick one can answer (here imdb failing at once)
+    // before the last one has announced itself: every provider announces itself, and before it
+    // answers, but the order among the announcements is not fixed.
+    for provider in ["tmdb", "fanart", "imdb", "tvdb"] {
+        let started = seen
+            .iter()
+            .position(|kind| *kind == format!("started {provider}"))
+            .unwrap_or_else(|| panic!("{provider} never started: {seen:?}"));
+        let answered = seen
+            .iter()
+            .position(|kind| {
+                kind.split(' ').nth(1) == Some(provider) && !kind.starts_with("started")
+            })
+            .unwrap_or(seen.len());
+        assert!(started < answered, "{provider} answered first: {seen:?}");
+    }
     // The slow provider answers last, after the others and just before Done.
     assert_eq!(seen[seen.len() - 2], "results tmdb 2", "{seen:?}");
     assert_eq!(seen[seen.len() - 1], "done");
