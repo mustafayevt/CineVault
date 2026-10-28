@@ -52,7 +52,7 @@ bun run test
 bun run build
 ```
 
-CI runs the same checks on every pull request, on Windows, Linux and macOS.
+CI runs the same checks on every pull request, on Windows and Linux (macOS comes with the 1.2.0 work), and the two build jobs must pass before a pull request is merged. Pull requests are squash-merged with a Conventional Commit title.
 
 Also, when it applies:
 

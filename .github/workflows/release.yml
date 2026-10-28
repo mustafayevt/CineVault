@@ -1,0 +1,186 @@
+name: Release
+
+# Cut a release by pushing a tag from main:
+#
+#   (bump the version in a pull request and merge it, then)
+#   git switch main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z
+#
+# The Windows (NSIS, MSI, portable zip) and Linux (AppImage, deb, rpm) installers are built in
+# parallel, the tag is checked against the version in src-tauri/tauri.conf.json, and then the
+# release of this repository is published with the installers, their checksums, the notes from
+# CHANGELOG.md and the signed update manifest.
+#
+# The signing key is the repository secret CINEVAULT_UPDATE_KEY (the contents of the private key
+# file; add it in Settings → Secrets and variables → Actions). Without it the release still gets its
+# installers and notes, but as a pre-release with no manifest, so installed apps do not see it yet:
+# the maintainer then signs it with `node scripts/release-publish.mjs --version X.Y.Z` on the machine
+# that holds the key. Publishing from local builds with --from-dir keeps working as the fallback.
+#
+# By hand: Actions → Release → Run workflow on the branch or tag to release, with its version. The
+# tag vX.Y.Z is created at that commit when it does not exist yet.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, for example 1.2.0 (must match src-tauri/tauri.conf.json at the chosen ref)
+        type: string
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  verify:
+    name: Check the version
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag and version files agree
+        id: version
+        env:
+          REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          requested="${REQUESTED#v}"
+          node scripts/check-version.mjs "$requested"
+          echo "version=$requested" >> "$GITHUB_OUTPUT"
+          echo "tag=v$requested" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Installers (${{ matrix.os }})
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: true
+      matrix:
+        # Linux is built on 22.04 so the AppImage runs on older distributions (glibc 2.35 baseline).
+        os: [windows-latest, ubuntu-22.04]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-build
+        with:
+          cache-key: installers
+
+      - name: Check the bundling configuration
+        run: node scripts/check-bundle.mjs
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd ui && bun install --frozen-lockfile
+
+      # `tauri build` runs the UI build first (beforeBuildCommand) and bundles per system:
+      # MSI and NSIS on Windows (tauri.windows.conf.json), AppImage, .deb and .rpm on Linux
+      # (tauri.linux.conf.json).
+      - name: Build installers
+        run: bun run tauri build
+
+      - name: Check the installers exist
+        run: node scripts/check-bundle.mjs --artifacts
+
+      - name: Build the portable zip (Windows)
+        if: runner.os == 'Windows'
+        run: node scripts/package-portable.mjs
+
+      - name: Collect installers
+        run: |
+          mkdir -p out
+          bundle=target/release/bundle
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp "$bundle"/msi/*.msi "$bundle"/nsis/*.exe "$bundle"/portable/*.zip out/
+          else
+            cp "$bundle"/appimage/*.AppImage "$bundle"/deb/*.deb "$bundle"/rpm/*.rpm out/
+          fi
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ runner.os }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Publish the release
+    needs: [verify, build]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    # The build and the tag check are done; only this job can write to the repository.
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      TAG: ${{ needs.verify.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The release is created on a tag. A tag push already has it; for a manual run it is created
+      # at the checked-out commit. A tag that points elsewhere stops the run.
+      - name: Tag the commit
+        run: |
+          remote=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}" | tail -n 1 | cut -f1)
+          if [ -z "$remote" ]; then
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$TAG"
+          elif [ "$remote" != "$GITHUB_SHA" ]; then
+            echo "::error::$TAG already points at $remote, not at $GITHUB_SHA. Delete the tag or run from the tag."
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: dist
+
+      - name: Publish
+        env:
+          UPDATE_KEY: ${{ secrets.CINEVAULT_UPDATE_KEY }}
+        run: |
+          set -euo pipefail
+          # One --from-dir per build folder (the script reads each folder as it is).
+          args=()
+          for dir in dist/*/; do args+=(--from-dir "${dir%/}"); done
+          ls -l dist/*/
+          if [ -n "$UPDATE_KEY" ]; then
+            # The key goes to a private temporary file outside the repository, is passed by path and
+            # removed again. It is never printed.
+            umask 077
+            key="$RUNNER_TEMP/cinevault-update-key.pem"
+            trap 'rm -f "$key"' EXIT
+            printf '%s\n' "$UPDATE_KEY" > "$key"
+            node scripts/release-publish.mjs --version "$VERSION" "${args[@]}" --repo mustafayevt/CineVault --key "$key"
+          else
+            msg="CINEVAULT_UPDATE_KEY is not set: $TAG is published as a pre-release with its installers and notes but no signed update manifest, so installed apps do not see it yet. Sign it on the machine that holds the key: node scripts/release-publish.mjs --version $VERSION"
+            echo "::notice title=Release is not signed::$msg"
+            echo "### Release $TAG is not signed" >> "$GITHUB_STEP_SUMMARY"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            node scripts/release-publish.mjs --unsigned --version "$VERSION" "${args[@]}" --repo mustafayevt/CineVault
+          fi
+
+      - name: Remove the key file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cinevault-update-key.pem"

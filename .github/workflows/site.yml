@@ -1,0 +1,58 @@
+name: Deploy site
+
+# Publishes site/ (the landing page, https://mustafayevt.github.io/CineVault/) to GitHub Pages when
+# a push to main changes it or CHANGELOG.md (the changelog page is generated from it), and by hand:
+# Actions → Deploy site → Run workflow. Pages must use the "GitHub Actions" source (Settings →
+# Pages → Build and deployment).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "CHANGELOG.md"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      # site/changelog.html must be what CHANGELOG.md gives (bun run site:changelog regenerates it).
+      - name: Site changelog is current
+        run: bun run site:changelog -- --check
+
+      # The website is the contents of site/ without its README.
+      - name: Stage the site
+        run: |
+          mkdir -p _site
+          cp -R site/. _site/
+          rm -f _site/README.md
+          touch _site/.nojekyll
+          ls -l _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

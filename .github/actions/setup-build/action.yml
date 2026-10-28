@@ -1,0 +1,45 @@
+name: Set up the build
+description: Rust, bun and the system libraries Tauri needs, with caches. Shared by ci.yml and release.yml.
+
+inputs:
+  rust-components:
+    description: Extra Rust components to install (comma separated)
+    default: ""
+  cache-key:
+    description: Extra cache key, so jobs that build different things do not share one cache
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # Windows runners have slow NTFS disks; a Dev Drive (ReFS) mounted as the cargo target folder
+    # makes Rust builds much faster there. Nothing else changes: the target folder stays at ./target.
+    - name: Dev Drive for the target folder (Windows)
+      if: runner.os == 'Windows'
+      uses: samypr100/setup-dev-drive@v4
+      with:
+        drive-size: 30GB
+        drive-format: ReFS
+        drive-type: Dynamic
+        mount-path: ${{ github.workspace }}/target
+        trusted-dev-drive: true
+
+    # WebKitGTK, GTK and the other system libraries Tauri links against on Linux. The AppImage,
+    # .deb and .rpm bundlers also need patchelf, file and rpm.
+    - name: Linux build packages
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libdbus-1-dev libxdo-dev patchelf file rpm
+
+    - name: Set up Rust (stable)
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: ${{ inputs.rust-components }}
+
+    - name: Cache cargo
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ inputs.cache-key }}
+
+    - name: Set up bun
+      uses: oven-sh/setup-bun@v2

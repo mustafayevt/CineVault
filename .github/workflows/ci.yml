@@ -1,8 +1,15 @@
 name: CI
 
-# Runs on every pull request to main, and by hand: Actions → CI → Run workflow, or
-# gh workflow run ci.yml [--ref <branch>]. Pushes to main do not start it on their own.
+# Every pull request to main and every push to main (and by hand: Actions → CI → Run workflow, or
+# gh workflow run ci.yml --ref <branch>). Runs the Rust and UI checks on Windows and Linux. Pushes
+# to main also build the installers and keep them as workflow artifacts for 7 days, so every commit
+# on main has a test build.
+#
+# macOS is left out until the macOS work in 1.2.0: the last run failed on its own (the UI format
+# check, since fixed), and no macOS build has been brought up on the new CI yet.
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -20,70 +27,47 @@ env:
 
 jobs:
   check:
-    name: Build, lint and test (${{ matrix.os }})
+    # The name is what branch protection requires: keep it in step with the rules on main.
+    name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-22.04]
+        os: [windows-latest, ubuntu-22.04]
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
 
-      # Windows runners have slow NTFS disks; a Dev Drive (ReFS) mounted as the cargo target folder
-      # makes Rust builds much faster there. Nothing else changes: the target folder stays at ./target.
-      - name: Dev Drive for the target folder (Windows)
-        if: runner.os == 'Windows'
-        uses: samypr100/setup-dev-drive@v4
+      - uses: ./.github/actions/setup-build
         with:
-          drive-size: 30GB
-          drive-format: ReFS
-          drive-type: Dynamic
-          mount-path: ${{ github.workspace }}/target
-          trusted-dev-drive: true
+          rust-components: rustfmt, clippy
 
-      # Same system libraries as release-build.yml: Tauri links WebKitGTK and GTK on Linux.
-      - name: Linux build packages
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libdbus-1-dev libxdo-dev patchelf file rpm
-
-      - name: Set up Rust (stable)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Set up bun
-        uses: oven-sh/setup-bun@v2
-
-      # The Tauri app embeds ui/dist at compile time, so the UI is built first on both systems.
-      # UI lint, typecheck and tests are platform independent and run on macOS only (faster runner).
+      # The Tauri app embeds ui/dist at compile time, so the UI is built before the Rust checks.
       - name: UI install
         working-directory: ui
         run: bun install --frozen-lockfile
 
+      # UI lint, typecheck, format and tests do not depend on the system: they run once, on Linux.
       - name: UI lint
-        if: runner.os == 'macOS'
+        if: runner.os == 'Linux'
         working-directory: ui
         run: bun run lint
 
       - name: UI typecheck
-        if: runner.os == 'macOS'
+        if: runner.os == 'Linux'
         working-directory: ui
         run: bun run typecheck
 
       - name: UI format
-        if: runner.os == 'macOS'
+        if: runner.os == 'Linux'
         working-directory: ui
         run: bun run format:check
 
       - name: UI test
-        if: runner.os == 'macOS'
+        if: runner.os == 'Linux'
         working-directory: ui
         run: bun run test
 
@@ -92,10 +76,87 @@ jobs:
         run: bun run build
 
       - name: Rust format
-        run: cargo fmt --all -- --check
+        run: cargo fmt --all --check
 
       - name: Rust clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Rust test
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
+
+      - name: Compatibility fixtures
+        run: cargo test -p cv-compat
+
+      - name: Bundling configuration
+        run: node scripts/check-bundle.mjs
+
+      - name: Version files agree
+        run: |
+          node scripts/check-version.mjs --self-test
+          node scripts/check-version.mjs
+
+      - name: Release script self-test
+        run: node scripts/release-publish.mjs --self-test
+
+      - name: Changelog self-test
+        run: node scripts/changelog.mjs --self-test
+
+      - name: Site changelog is current
+        run: bun run site:changelog -- --check
+
+      # The specs have a few long requirements, which strict mode reports as warnings; errors still
+      # fail the check. Strict mode can come back once those requirements are split.
+      - name: OpenSpec specs
+        if: runner.os == 'Linux'
+        run: npx --yes @fission-ai/openspec@1.14.3 validate --specs
+
+  # Test builds of the installers for every commit on main (not for pull requests).
+  installers:
+    name: Installers (${{ matrix.os }})
+    if: github.event_name == 'push'
+    needs: check
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows
+            paths: |
+              target/release/bundle/nsis/*.exe
+              target/release/bundle/msi/*.msi
+          - os: ubuntu-22.04
+            artifact: linux
+            paths: |
+              target/release/bundle/appimage/*.AppImage
+              target/release/bundle/deb/*.deb
+              target/release/bundle/rpm/*.rpm
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-build
+        with:
+          cache-key: installers
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd ui && bun install --frozen-lockfile
+
+      # `tauri build` runs the UI build first (beforeBuildCommand) and bundles per system.
+      - name: Build installers
+        run: bun run tauri build
+
+      - name: Check the installers exist
+        run: node scripts/check-bundle.mjs --artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cinevault-${{ matrix.artifact }}-${{ github.sha }}
+          path: ${{ matrix.paths }}
+          if-no-files-found: error
+          retention-days: 7

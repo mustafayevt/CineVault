@@ -15,7 +15,6 @@
     "release:keys": "node scripts/release-keys.mjs",
     "release:publish": "node scripts/release-publish.mjs",
     "site:changelog": "node scripts/site-changelog.mjs",
-    "site:deploy": "node scripts/site-deploy.mjs",
     "releases:copy-old": "node scripts/copy-old-releases.mjs"
   },
   "devDependencies": {

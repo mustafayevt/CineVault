@@ -7,7 +7,15 @@
 //       [--notes <file>] [--key <private-key.pem>] [--repo <owner/name> ...] [--dry-run]
 //   node scripts/release-publish.mjs [--version <x.y.z>] [--notes <file>] [--key <private-key.pem>]
 //       [--repo <owner/name> ...] [--dry-run]
+//   node scripts/release-publish.mjs --unsigned --from-dir <folder> [--from-dir <folder> ...]
+//       [--version <x.y.z>] [--notes <file>] [--repo <owner/name> ...] [--dry-run]
 //   node scripts/release-publish.mjs --self-test
+//
+// --unsigned is what the release workflow (.github/workflows/release.yml) runs when it holds no
+// signing key: it needs no key, uploads the installers and their SHA256SUMS files to the release
+// and publishes it as a pre-release (never "latest", with no manifest and no version-less copies),
+// so installed apps keep seeing the previous version. A maintainer then runs the signed publish
+// without --from-dir, which reads that release's assets, signs the manifest and makes it latest.
 //
 // Where the files come from:
 // - --from-dir (repeatable): the installers built on this machine, or in WSL for Linux, read from
@@ -15,8 +23,8 @@
 //   Only the files of --version are taken, so older builds left in a folder are skipped. The
 //   checksum files SHA256SUMS-Windows.txt, -macOS.txt and -Linux.txt are made here from those files.
 // - no --from-dir: the assets of Release v<version> in the source repository, as the release
-//   workflows (release-windows.yml, release-macos.yml) made them. Their SHA256SUMS-<os>.txt files
-//   are checked against the downloaded installers.
+//   workflow (release.yml) made them when it held no signing key (--unsigned). Their
+//   SHA256SUMS-<os>.txt files are checked against the downloaded installers.
 //
 // Then, for either source:
 // 1. Checks every installer against the SHA256SUMS-<os>.txt files.
@@ -64,7 +72,7 @@ import {
 } from "./update-signing.mjs";
 import { notesFor, readChangelog, sectionFor } from "./changelog.mjs";
 
-/** The project repository: the CI release workflows build into it and the app reads its channel first. */
+/** The project repository: the release workflow publishes into it and the app reads its channel first. */
 export const SOURCE_REPO = "mustafayevt/CineVault";
 /** The earlier releases repository: installed copies of 1.0.x still look here for updates. */
 export const RELEASES_REPO = "mustafayevt/CineVault-releases";
@@ -90,6 +98,17 @@ export function normalizeRepos(list) {
 export function createReleaseArgs({ repo, tag, title, notesPath, headSha }) {
   const args = ["release", "create", tag, "-R", repo, "--title", title, "--notes-file", notesPath, "--draft"];
   if (repo === SOURCE_REPO && headSha) args.push("--verify-tag");
+  return args;
+}
+
+/**
+ * The `gh release edit` arguments that publish the draft. Signed: public and the latest release
+ * (also clearing the pre-release mark an earlier unsigned run set). Unsigned: a pre-release, which
+ * GitHub never offers as latest, so the update channel keeps serving the previous signed version.
+ */
+export function editReleaseArgs({ repo, tag, title, notesPath, unsigned = false }) {
+  const args = ["release", "edit", tag, "-R", repo, "--title", title, "--notes-file", notesPath, "--draft=false"];
+  args.push(...(unsigned ? ["--prerelease", "--latest=false"] : ["--prerelease=false", "--latest"]));
   return args;
 }
 
@@ -276,7 +295,7 @@ export function previousTag(tags, version) {
 // Machine parts
 
 function parseArgs(argv) {
-  const options = { dryRun: false, selfTest: false, fromDirs: [], repos: [] };
+  const options = { dryRun: false, selfTest: false, unsigned: false, fromDirs: [], repos: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -286,6 +305,7 @@ function parseArgs(argv) {
     };
     if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--self-test") options.selfTest = true;
+    else if (arg === "--unsigned") options.unsigned = true;
     else if (arg === "--version") options.version = value().replace(/^v/, "");
     else if (arg === "--notes") options.notes = value();
     else if (arg === "--key") options.key = value();
@@ -341,7 +361,7 @@ export function findLocalFiles(folders, version) {
 
 /**
  * Local mode: copies the version's files from the build folders into `dir`, writes the checksum
- * files for them (SHA256SUMS-<os>.txt, the names the release workflows use) and returns every
+ * files for them (SHA256SUMS-<os>.txt, the names the release workflow uses) and returns every
  * file described, checksum files included. The sums are of the copies, so they match what is uploaded.
  */
 async function fromBuildFolders(folders, version, dir) {
@@ -405,13 +425,18 @@ function releaseNotes(options, version, body) {
 }
 
 /** Uploads the files to one repository's release, makes it the latest and reads its channel back. */
-async function publishToRepo({ repo, tag, version, notesPath, headSha, uploads, stableUploads, manifestPath, envelope }) {
+async function publishToRepo({ repo, tag, version, notesPath, headSha, uploads, stableUploads, manifestPath, envelope, unsigned }) {
   const title = `CineVault ${version}`;
-  let exists = true;
+  let state = null;
   try {
-    gh(["release", "view", tag, "-R", repo, "--json", "tagName"]);
+    state = JSON.parse(gh(["release", "view", tag, "-R", repo, "--json", "isDraft,isPrerelease"]));
   } catch {
-    exists = false;
+    state = null;
+  }
+  const exists = state !== null;
+  // An unsigned run must never take a published, signed release back to a pre-release.
+  if (unsigned && state && !state.isDraft && !state.isPrerelease) {
+    throw new Error(`${repo} ${tag} is already published; an unsigned upload would demote it. Use the signed publish.`);
   }
   if (!exists) {
     // A draft first, so the manifest is never public before the installers it names.
@@ -423,8 +448,14 @@ async function publishToRepo({ repo, tag, version, notesPath, headSha, uploads, 
     console.log(`Uploading ${stableUploads.length} version-less copies for the stable download links`);
     gh(["release", "upload", tag, "-R", repo, "--clobber", ...stableUploads], { stdio: ["ignore", "inherit", "inherit"] });
   }
+  if (unsigned) {
+    gh(editReleaseArgs({ repo, tag, title, notesPath, unsigned }));
+    console.log(`\nPublished ${repo} ${tag} as a pre-release without a signed manifest.`);
+    console.log(`Sign it on the maintainer's machine: node scripts/release-publish.mjs --version ${version}`);
+    return;
+  }
   gh(["release", "upload", tag, "-R", repo, "--clobber", manifestPath], { stdio: ["ignore", "inherit", "inherit"] });
-  gh(["release", "edit", tag, "-R", repo, "--title", title, "--notes-file", notesPath, "--draft=false", "--latest"]);
+  gh(editReleaseArgs({ repo, tag, title, notesPath }));
 
   // Read the channel back the way the app does (anonymously, following the redirects).
   const channel = `https://github.com/${repo}/releases/latest/download/manifest.json`;
@@ -441,13 +472,21 @@ async function publish(options) {
   const version = options.version ?? JSON.parse(readFileSync(resolve(repoRoot, "src-tauri/tauri.conf.json"), "utf8")).version;
   const tag = `v${version}`;
   const repos = normalizeRepos(options.repos);
-  const keyPath = options.key ?? defaultKeyPath();
-  if (insideRepo(keyPath)) throw new Error("the private key must not be inside the repository");
-  if (!existsSync(keyPath)) throw new Error(`no private key at ${keyPath} (use --key or CINEVAULT_UPDATE_KEY)`);
-  const publicKey = builtInPublicKey();
-  if (!publicKey) throw new Error("BUILT_IN_PUBLIC_KEY is not set in crates/cv-app/src/updates/manifest.rs");
+  const unsigned = options.unsigned;
+  let keyPath = null;
+  let publicKey = null;
+  if (unsigned) {
+    if (options.fromDirs.length === 0) throw new Error("--unsigned needs --from-dir: it publishes freshly built installers");
+  } else {
+    keyPath = options.key ?? defaultKeyPath();
+    if (insideRepo(keyPath)) throw new Error("the private key must not be inside the repository");
+    if (!existsSync(keyPath)) throw new Error(`no private key at ${keyPath} (use --key or CINEVAULT_UPDATE_KEY)`);
+    publicKey = builtInPublicKey();
+    if (!publicKey) throw new Error("BUILT_IN_PUBLIC_KEY is not set in crates/cv-app/src/updates/manifest.rs");
+  }
 
-  console.log(`CineVault ${version}${options.dryRun ? " (dry run: nothing is uploaded)" : ""} -> ${repos.join(", ")}`);
+  const mode = `${unsigned ? " (unsigned: no manifest)" : ""}${options.dryRun ? " (dry run: nothing is uploaded)" : ""}`;
+  console.log(`CineVault ${version}${mode} -> ${repos.join(", ")}`);
   const local = options.fromDirs.length > 0;
   const release = local ? null : JSON.parse(gh(["release", "view", tag, "-R", SOURCE_REPO, "--json", "body,publishedAt,assets"]));
   const work = mkdtempSync(join(tmpdir(), `cinevault-publish-${version}-`));
@@ -478,7 +517,63 @@ async function publish(options) {
 
   const { notes, from } = releaseNotes(options, version, release?.body);
   // One manifest for every repository; its installer addresses are those of the first one.
-  const payload = buildPayload({ version, pubDate: release?.publishedAt ?? new Date().toISOString(), notes, files, repo: repos[0] });
+  let envelope = null;
+  let manifestPath = null;
+  if (!unsigned) {
+    const signed = signManifest({ version, publishedAt: release?.publishedAt, notes, files, repo: repos[0], keyPath, publicKey, work, local });
+    ({ envelope, manifestPath } = signed);
+  }
+  console.log(`\nNotes from ${from}:\n${notes === "" ? "(none)" : notes.replace(/^/gm, "  ")}`);
+
+  const uploads = files.filter((f) => classifyAsset(f.name)).map((f) => f.path);
+  // Version-less copies for the stable website links (releases/latest/download/<name>). Not made
+  // for an unsigned release: they would be mistaken for a second installer when it is signed later.
+  const stableDir = join(work, "stable");
+  mkdirSync(stableDir);
+  const stableUploads = [];
+  for (const file of unsigned ? [] : files) {
+    const stable = stableName(file.name);
+    if (!stable || classifyAsset(file.name)?.kind === "sums") continue;
+    const target = join(stableDir, stable);
+    if (stableUploads.includes(target)) throw new Error(`two installers would be uploaded as ${stable}`);
+    copyFileSync(file.path, target);
+    stableUploads.push(target);
+    console.log(`  stable copy  ${stable}  (from ${file.name})`);
+  }
+  if (options.dryRun) {
+    const count = uploads.length + stableUploads.length + (unsigned ? 0 : 1);
+    for (const repo of repos) {
+      const tagged = repo === SOURCE_REPO ? ` and tag ${tag} at the checked-out commit` : "";
+      const state = unsigned ? "a pre-release (not latest)" : "latest";
+      console.log(`\nDry run: would upload ${count} files to ${repo} ${tag}${tagged} and mark it ${state}.`);
+    }
+    return;
+  }
+
+  // The tag of the project repository is made at the commit now checked out, so that commit has
+  // to be on GitHub already. Checked before anything is uploaded anywhere.
+  let headSha = null;
+  if (repos.includes(SOURCE_REPO)) {
+    headSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).trim();
+    try {
+      gh(["api", `repos/${SOURCE_REPO}/commits/${headSha}`, "--jq", ".sha"]);
+    } catch {
+      throw new Error(`the checked-out commit ${headSha.slice(0, 8)} is not on GitHub in ${SOURCE_REPO}; push main first`);
+    }
+  }
+
+  const notesPath = join(work, "notes.md");
+  writeFileSync(notesPath, (notes === "" ? `CineVault ${version}` : notes) + "\n");
+  for (const repo of repos) {
+    await publishToRepo({ repo, tag, version, notesPath, headSha, uploads, stableUploads, manifestPath, envelope, unsigned });
+  }
+  rmSync(work, { recursive: true, force: true });
+}
+
+/** Builds the manifest, signs it with the private key and checks it with the built-in public key. */
+function signManifest({ version, publishedAt, notes, files, repo, keyPath, publicKey, work, local }) {
+  // One manifest for every repository; its installer addresses are those of the first one.
+  const payload = buildPayload({ version, pubDate: publishedAt ?? new Date().toISOString(), notes, files, repo });
   if (local) {
     const missing = ["Windows", "macOS", "Linux"].filter((os) => !files.some((f) => classifyAsset(f.name)?.os === os));
     if (missing.length) {
@@ -501,54 +596,12 @@ async function publish(options) {
   const manifestPath = join(work, "manifest.json");
   writeFileSync(manifestPath, envelope + "\n");
 
-  console.log(`\nNotes from ${from}:\n${notes === "" ? "(none)" : notes.replace(/^/gm, "  ")}`);
   console.log(`\nManifest (signature verified with the built-in public key):`);
   for (const [platform, build] of Object.entries(payload.platforms)) {
     console.log(`  ${platform}: ${build.url} (${build.size} bytes)`);
   }
   console.log(`  written to ${manifestPath}`);
-
-  const uploads = files.filter((f) => classifyAsset(f.name)).map((f) => f.path);
-  // Version-less copies for the stable website links (releases/latest/download/<name>).
-  const stableDir = join(work, "stable");
-  mkdirSync(stableDir);
-  const stableUploads = [];
-  for (const file of files) {
-    const stable = stableName(file.name);
-    if (!stable || classifyAsset(file.name)?.kind === "sums") continue;
-    const target = join(stableDir, stable);
-    if (stableUploads.includes(target)) throw new Error(`two installers would be uploaded as ${stable}`);
-    copyFileSync(file.path, target);
-    stableUploads.push(target);
-    console.log(`  stable copy  ${stable}  (from ${file.name})`);
-  }
-  if (options.dryRun) {
-    const count = uploads.length + stableUploads.length + 1;
-    for (const repo of repos) {
-      const tagged = repo === SOURCE_REPO ? ` and tag ${tag} at the checked-out commit` : "";
-      console.log(`\nDry run: would upload ${count} files to ${repo} ${tag}${tagged} and mark it latest.`);
-    }
-    return;
-  }
-
-  // The tag of the project repository is made at the commit now checked out, so that commit has
-  // to be on GitHub already. Checked before anything is uploaded anywhere.
-  let headSha = null;
-  if (repos.includes(SOURCE_REPO)) {
-    headSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).trim();
-    try {
-      gh(["api", `repos/${SOURCE_REPO}/commits/${headSha}`, "--jq", ".sha"]);
-    } catch {
-      throw new Error(`the checked-out commit ${headSha.slice(0, 8)} is not on GitHub in ${SOURCE_REPO}; push main first`);
-    }
-  }
-
-  const notesPath = join(work, "notes.md");
-  writeFileSync(notesPath, (notes === "" ? `CineVault ${version}` : notes) + "\n");
-  for (const repo of repos) {
-    await publishToRepo({ repo, tag, version, notesPath, headSha, uploads, stableUploads, manifestPath, envelope });
-  }
-  rmSync(work, { recursive: true, force: true });
+  return { envelope, manifestPath };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -602,6 +655,10 @@ async function selfTest() {
   }
   const options = parseArgs(["--repo", "a/b", "--repo", "c/d", "--dry-run"]);
   assert(options.repos.join() === "a/b,c/d" && options.dryRun, "--repo is repeatable");
+  assert(parseArgs(["--unsigned", "--from-dir", "x"]).unsigned === true && !options.unsigned, "--unsigned is off unless given");
+  const edit = (unsigned) => editReleaseArgs({ repo: "a/b", tag: "v1.2.0", title: "T", notesPath: "n.md", unsigned }).join(" ");
+  assert(edit(false).endsWith("--draft=false --prerelease=false --latest"), "a signed release becomes the latest, not a pre-release");
+  assert(edit(true).endsWith("--draft=false --prerelease --latest=false"), "an unsigned release is a pre-release, never latest");
   const mainCreate = createReleaseArgs({ repo: SOURCE_REPO, tag: "v1.2.0", title: "T", notesPath: "n.md", headSha: "abc123" });
   assert(
     mainCreate.join(" ") ===
