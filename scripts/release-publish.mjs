@@ -4,8 +4,9 @@
 // overridden with --key or the CINEVAULT_UPDATE_KEY environment variable.
 //
 //   node scripts/release-publish.mjs --from-dir <folder> [--from-dir <folder> ...] [--version <x.y.z>]
-//       [--notes <file>] [--key <private-key.pem>] [--dry-run]
-//   node scripts/release-publish.mjs [--version <x.y.z>] [--notes <file>] [--key <private-key.pem>] [--dry-run]
+//       [--notes <file>] [--key <private-key.pem>] [--repo <owner/name> ...] [--dry-run]
+//   node scripts/release-publish.mjs [--version <x.y.z>] [--notes <file>] [--key <private-key.pem>]
+//       [--repo <owner/name> ...] [--dry-run]
 //   node scripts/release-publish.mjs --self-test
 //
 // Where the files come from:
@@ -35,6 +36,15 @@
 //    CineVault-amd64.deb, CineVault-x86_64.rpm), so that .../releases/latest/download/<name> is a
 //    stable download link for the website.
 //
+// Where it publishes: --repo <owner/name> (repeatable). The default is both
+// mustafayevt/CineVault (the project repository, where the app looks first) and
+// mustafayevt/CineVault-releases (the earlier releases repository, where installed copies of
+// 1.0.x still look). Every repository gets the same files, notes and signed manifest. The manifest
+// is signed once, and its installer addresses point at the FIRST repository given, so the
+// downloads (and their counts) land there whichever repository served the manifest. In
+// mustafayevt/CineVault the release also gets the tag v<version> at the commit now checked out
+// (HEAD), which must already be pushed.
+//
 // --dry-run does steps 1 and 2 and uploads nothing.
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync } from "node:crypto";
@@ -54,8 +64,31 @@ import {
 } from "./update-signing.mjs";
 import { notesFor, readChangelog, sectionFor } from "./changelog.mjs";
 
+/** The project repository: the CI release workflows build into it and the app reads its channel first. */
 export const SOURCE_REPO = "mustafayevt/CineVault";
+/** The earlier releases repository: installed copies of 1.0.x still look here for updates. */
 export const RELEASES_REPO = "mustafayevt/CineVault-releases";
+/** Where a release goes when --repo is not given; the first one holds the installer addresses. */
+export const DEFAULT_REPOS = [SOURCE_REPO, RELEASES_REPO];
+
+/** The repositories to publish to: the --repo values (checked, without repeats) or the default. */
+export function normalizeRepos(list) {
+  const repos = list.length > 0 ? list : DEFAULT_REPOS;
+  for (const repo of repos) {
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error(`--repo wants owner/name, got "${repo}"`);
+  }
+  return [...new Set(repos)];
+}
+
+/**
+ * The `gh release create` arguments for a new (draft) release. In the project repository the
+ * release gets its tag at `headSha`; the earlier releases repository has no source to tag.
+ */
+export function createReleaseArgs({ repo, tag, title, notesPath, headSha }) {
+  const args = ["release", "create", tag, "-R", repo, "--title", title, "--notes-file", notesPath, "--draft"];
+  if (repo === SOURCE_REPO && headSha) args.push("--target", headSha);
+  return args;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Pure parts (covered by --self-test)
@@ -132,7 +165,7 @@ export function namesVersion(name, version) {
 }
 
 /** The download address of a file in the public release. */
-export const assetUrl = (version, name, repo = RELEASES_REPO) =>
+export const assetUrl = (version, name, repo = SOURCE_REPO) =>
   `https://github.com/${repo}/releases/download/v${version}/${encodeURIComponent(name)}`;
 
 /**
@@ -158,7 +191,7 @@ export function checkAgainstSums(files, sums) {
 }
 
 /** The manifest payload: version, date, notes and one signed build per platform. */
-export function buildPayload({ version, pubDate, notes, files, repo = RELEASES_REPO }) {
+export function buildPayload({ version, pubDate, notes, files, repo = SOURCE_REPO }) {
   const platforms = {};
   for (const file of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
     const kind = classifyAsset(file.name);
@@ -240,7 +273,7 @@ export function previousTag(tags, version) {
 // Machine parts
 
 function parseArgs(argv) {
-  const options = { dryRun: false, selfTest: false, fromDirs: [] };
+  const options = { dryRun: false, selfTest: false, fromDirs: [], repos: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -254,6 +287,7 @@ function parseArgs(argv) {
     else if (arg === "--notes") options.notes = value();
     else if (arg === "--key") options.key = value();
     else if (arg === "--from-dir") options.fromDirs.push(value());
+    else if (arg === "--repo") options.repos.push(value());
     else throw new Error(`unknown option ${arg}`);
   }
   return options;
@@ -367,16 +401,50 @@ function releaseNotes(options, version, body) {
   return { notes: "", from: "nothing (no notes found)" };
 }
 
+/** Uploads the files to one repository's release, makes it the latest and reads its channel back. */
+async function publishToRepo({ repo, tag, version, notesPath, headSha, uploads, stableUploads, manifestPath, envelope }) {
+  const title = `CineVault ${version}`;
+  let exists = true;
+  try {
+    gh(["release", "view", tag, "-R", repo, "--json", "tagName"]);
+  } catch {
+    exists = false;
+  }
+  if (!exists) {
+    // A draft first, so the manifest is never public before the installers it names.
+    gh(createReleaseArgs({ repo, tag, title, notesPath, headSha }));
+  }
+  console.log(`\nUploading ${uploads.length} installers and checksum files to ${repo} ${tag}`);
+  gh(["release", "upload", tag, "-R", repo, "--clobber", ...uploads], { stdio: ["ignore", "inherit", "inherit"] });
+  if (stableUploads.length) {
+    console.log(`Uploading ${stableUploads.length} version-less copies for the stable download links`);
+    gh(["release", "upload", tag, "-R", repo, "--clobber", ...stableUploads], { stdio: ["ignore", "inherit", "inherit"] });
+  }
+  gh(["release", "upload", tag, "-R", repo, "--clobber", manifestPath], { stdio: ["ignore", "inherit", "inherit"] });
+  gh(["release", "edit", tag, "-R", repo, "--title", title, "--notes-file", notesPath, "--draft=false", "--latest"]);
+
+  // Read the channel back the way the app does (anonymously, following the redirects).
+  const channel = `https://github.com/${repo}/releases/latest/download/manifest.json`;
+  const response = await fetch(channel, { redirect: "follow" });
+  const served = response.ok ? (await response.text()).trim() : "";
+  if (served !== envelope) {
+    console.warn(`\nWarning: ${channel} does not serve the new manifest yet (HTTP ${response.status}). Check the release page.`);
+  } else {
+    console.log(`\nPublished. ${channel} serves the signed manifest for ${version}.`);
+  }
+}
+
 async function publish(options) {
   const version = options.version ?? JSON.parse(readFileSync(resolve(repoRoot, "src-tauri/tauri.conf.json"), "utf8")).version;
   const tag = `v${version}`;
+  const repos = normalizeRepos(options.repos);
   const keyPath = options.key ?? defaultKeyPath();
   if (insideRepo(keyPath)) throw new Error("the private key must not be inside the repository");
   if (!existsSync(keyPath)) throw new Error(`no private key at ${keyPath} (use --key or CINEVAULT_UPDATE_KEY)`);
   const publicKey = builtInPublicKey();
   if (!publicKey) throw new Error("BUILT_IN_PUBLIC_KEY is not set in crates/cv-app/src/updates/manifest.rs");
 
-  console.log(`CineVault ${version}${options.dryRun ? " (dry run: nothing is uploaded)" : ""}`);
+  console.log(`CineVault ${version}${options.dryRun ? " (dry run: nothing is uploaded)" : ""} -> ${repos.join(", ")}`);
   const local = options.fromDirs.length > 0;
   const release = local ? null : JSON.parse(gh(["release", "view", tag, "-R", SOURCE_REPO, "--json", "body,publishedAt,assets"]));
   const work = mkdtempSync(join(tmpdir(), `cinevault-publish-${version}-`));
@@ -406,7 +474,8 @@ async function publish(options) {
   }
 
   const { notes, from } = releaseNotes(options, version, release?.body);
-  const payload = buildPayload({ version, pubDate: release?.publishedAt ?? new Date().toISOString(), notes, files });
+  // One manifest for every repository; its installer addresses are those of the first one.
+  const payload = buildPayload({ version, pubDate: release?.publishedAt ?? new Date().toISOString(), notes, files, repo: repos[0] });
   if (local) {
     const missing = ["Windows", "macOS", "Linux"].filter((os) => !files.some((f) => classifyAsset(f.name)?.os === os));
     if (missing.length) {
@@ -452,39 +521,29 @@ async function publish(options) {
   }
   if (options.dryRun) {
     const count = uploads.length + stableUploads.length + 1;
-    console.log(`\nDry run: would upload ${count} files to ${RELEASES_REPO} ${tag} and mark it latest.`);
+    for (const repo of repos) {
+      const tagged = repo === SOURCE_REPO ? ` and tag ${tag} at the checked-out commit` : "";
+      console.log(`\nDry run: would upload ${count} files to ${repo} ${tag}${tagged} and mark it latest.`);
+    }
     return;
+  }
+
+  // The tag of the project repository is made at the commit now checked out, so that commit has
+  // to be on GitHub already. Checked before anything is uploaded anywhere.
+  let headSha = null;
+  if (repos.includes(SOURCE_REPO)) {
+    headSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).trim();
+    try {
+      gh(["api", `repos/${SOURCE_REPO}/commits/${headSha}`, "--jq", ".sha"]);
+    } catch {
+      throw new Error(`the checked-out commit ${headSha.slice(0, 8)} is not on GitHub in ${SOURCE_REPO}; push main first`);
+    }
   }
 
   const notesPath = join(work, "notes.md");
   writeFileSync(notesPath, (notes === "" ? `CineVault ${version}` : notes) + "\n");
-  let exists = true;
-  try {
-    gh(["release", "view", tag, "-R", RELEASES_REPO, "--json", "tagName"]);
-  } catch {
-    exists = false;
-  }
-  if (!exists) {
-    // A draft first, so the manifest is never public before the installers it names.
-    gh(["release", "create", tag, "-R", RELEASES_REPO, "--title", `CineVault ${version}`, "--notes-file", notesPath, "--draft"]);
-  }
-  console.log(`\nUploading ${uploads.length} installers and checksum files to ${RELEASES_REPO} ${tag}`);
-  gh(["release", "upload", tag, "-R", RELEASES_REPO, "--clobber", ...uploads], { stdio: ["ignore", "inherit", "inherit"] });
-  if (stableUploads.length) {
-    console.log(`Uploading ${stableUploads.length} version-less copies for the stable download links`);
-    gh(["release", "upload", tag, "-R", RELEASES_REPO, "--clobber", ...stableUploads], { stdio: ["ignore", "inherit", "inherit"] });
-  }
-  gh(["release", "upload", tag, "-R", RELEASES_REPO, "--clobber", manifestPath], { stdio: ["ignore", "inherit", "inherit"] });
-  gh(["release", "edit", tag, "-R", RELEASES_REPO, "--title", `CineVault ${version}`, "--notes-file", notesPath, "--draft=false", "--latest"]);
-
-  // Read the channel back the way the app does (anonymously, following the redirects).
-  const channel = `https://github.com/${RELEASES_REPO}/releases/latest/download/manifest.json`;
-  const response = await fetch(channel, { redirect: "follow" });
-  const served = response.ok ? (await response.text()).trim() : "";
-  if (served !== envelope) {
-    console.warn(`\nWarning: ${channel} does not serve the new manifest yet (HTTP ${response.status}). Check the release page.`);
-  } else {
-    console.log(`\nPublished. ${channel} serves the signed manifest for ${version}.`);
+  for (const repo of repos) {
+    await publishToRepo({ repo, tag, version, notesPath, headSha, uploads, stableUploads, manifestPath, envelope });
   }
   rmSync(work, { recursive: true, force: true });
 }
@@ -518,9 +577,36 @@ async function selfTest() {
   assert(Object.keys(windows.platforms).join() === "windows-x86_64", "Windows only: one platform, the setup exe");
   assert(
     windows.platforms["windows-x86_64"].url ===
-      "https://github.com/mustafayevt/CineVault-releases/releases/download/v1.2.0/CineVault_1.2.0_x64-setup.exe",
-    "public download address",
+      "https://github.com/mustafayevt/CineVault/releases/download/v1.2.0/CineVault_1.2.0_x64-setup.exe",
+    "public download address (the project repository by default)",
   );
+  const oldRepo = buildPayload({ version: "1.2.0", pubDate: "x", notes: "", files, repo: RELEASES_REPO });
+  assert(
+    oldRepo.platforms["windows-x86_64"].url ===
+      "https://github.com/mustafayevt/CineVault-releases/releases/download/v1.2.0/CineVault_1.2.0_x64-setup.exe",
+    "the address follows the repository given",
+  );
+  assert(normalizeRepos([]).join() === "mustafayevt/CineVault,mustafayevt/CineVault-releases", "both repositories by default");
+  assert(normalizeRepos(["a/b", "c/d", "a/b"]).join() === "a/b,c/d", "--repo values are kept in order without repeats");
+  for (const bad of ["nope", "a/b/c", "a b/c", "/x"]) {
+    let rejected = false;
+    try {
+      normalizeRepos([bad]);
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, `--repo "${bad}" is refused`);
+  }
+  const options = parseArgs(["--repo", "a/b", "--repo", "c/d", "--dry-run"]);
+  assert(options.repos.join() === "a/b,c/d" && options.dryRun, "--repo is repeatable");
+  const mainCreate = createReleaseArgs({ repo: SOURCE_REPO, tag: "v1.2.0", title: "T", notesPath: "n.md", headSha: "abc123" });
+  assert(
+    mainCreate.join(" ") ===
+      "release create v1.2.0 -R mustafayevt/CineVault --title T --notes-file n.md --draft --target abc123",
+    "the project release is tagged at the checked-out commit",
+  );
+  const oldCreate = createReleaseArgs({ repo: RELEASES_REPO, tag: "v1.2.0", title: "T", notesPath: "n.md", headSha: "abc123" });
+  assert(!oldCreate.includes("--target") && oldCreate.includes("--draft"), "the earlier repository gets no tag target");
   assert(windows.platforms["windows-x86_64"].sha256 === hex("exe") && windows.platforms["windows-x86_64"].size === 3, "hash and size");
 
   const withMac = buildPayload({
@@ -626,7 +712,7 @@ async function selfTest() {
   );
   assert(
     everything.platforms["linux-x86_64"].url ===
-      "https://github.com/mustafayevt/CineVault-releases/releases/download/v1.2.0/CineVault_1.2.0_amd64.AppImage",
+      "https://github.com/mustafayevt/CineVault/releases/download/v1.2.0/CineVault_1.2.0_amd64.AppImage",
     "AppImage download address",
   );
   assert(
