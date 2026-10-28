@@ -82,7 +82,7 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Rust test
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
 
       - name: Compatibility fixtures
         run: cargo test -p cv-compat
