@@ -108,9 +108,10 @@ fn volume_reachable(path: &Path) -> bool {
 
 /// Whether the volume root `root` can be worked on. On Linux an unplugged drive leaves its empty
 /// mount-point folder behind on the system drive, and that folder answers like a drive would, so
-/// the root must be a mount point, or at least hold something (a bind mount or a plain folder
-/// below `/mnt`, see `cv_fs::paths::mount_root_answers`); recovery then waits instead of reading
-/// the empty folder as "the files are gone".
+/// the root must have its drive mounted (`cv_fs::paths::mount_root_answers`: a mount point, a
+/// bind mount the mount list names, or a plain folder below `/mnt` that no `/etc/fstab` line
+/// mounts a drive on); recovery then waits instead of reading the empty folder as "the files are
+/// gone".
 fn reachable_root(root: &Path) -> bool {
     #[cfg(target_os = "linux")]
     {
@@ -193,12 +194,12 @@ mod tests {
     #[test]
     fn a_real_folder_on_the_system_drive_is_not_a_mount_point() {
         let dir = tempfile::tempdir().unwrap();
-        // Empty, as an unplugged drive leaves its folder.
-        assert!(!reachable_root(dir.path()));
         assert!(reachable_root(Path::new("/")));
-        // Holding files without being a mount point (a bind mount on the same file system).
-        std::fs::create_dir(dir.path().join("Movies")).unwrap();
-        assert!(reachable_root(dir.path()));
+        // A removable drive's folder with nothing mounted on it is what an unplugged drive
+        // leaves; `cv_fs::paths::mount_root_answers_with` covers bind mounts and `/etc/fstab`.
+        assert!(!reachable_root(Path::new(
+            "/media/cinevault-test-user/cinevault-test-drive"
+        )));
         // Under a mount-shaped path with nothing mounted there, recovery waits.
         assert!(!volume_reachable(Path::new(
             "/mnt/cinevault-test-drive-that-is-not-there/Movies/x.mkv"

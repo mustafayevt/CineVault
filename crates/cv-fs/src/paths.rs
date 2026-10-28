@@ -130,22 +130,86 @@ pub fn is_mount_point(path: &Path) -> bool {
     }
 }
 
-/// Whether the folder `root` (a [`linux_mount_root`]) has its drive: a file system is mounted on
-/// it, or it holds something. An unplugged drive leaves an empty folder behind, which must not
-/// pass for the drive. A folder that is no mount point of its own but holds files is used as it
-/// is: a bind mount of a folder on the same file system, a link to another folder, or a plain
-/// folder someone made below `/mnt`. Such a folder would otherwise read as offline forever.
-#[cfg(unix)]
+/// Whether the folder `root` (a [`linux_mount_root`]) has its drive, read from the system's mount
+/// list and `/etc/fstab` (see [`mount_root_answers_with`]).
+#[cfg(target_os = "linux")]
 #[must_use]
 pub fn mount_root_answers(root: &Path) -> bool {
-    is_mount_point(root)
-        || std::fs::read_dir(root).is_ok_and(|mut entries| entries.next().is_some())
+    if is_mount_point(root) {
+        return true;
+    }
+    let read = |file: &str| std::fs::read_to_string(file).unwrap_or_default();
+    mount_root_answers_with(
+        &root.to_string_lossy(),
+        root.is_dir(),
+        &read("/proc/self/mountinfo"),
+        &read("/etc/fstab"),
+    )
+}
+
+/// Whether the folder `root` (a [`linux_mount_root`], not a mount point by device) has its drive,
+/// given the text of `/proc/self/mountinfo` and of `/etc/fstab`:
+///
+/// * a folder the mount list names is there: a bind mount of a folder on the same file system
+///   has no device of its own, but it is mounted;
+/// * below `/media` and `/run/media` the system makes the folder for a removable drive, so one
+///   that is not mounted is what an unplugged drive left behind;
+/// * below `/mnt`, a folder `/etc/fstab` mounts a drive on is missing its drive; any other
+///   folder there (made by hand, or a link to another folder) is used as it is, or it would read
+///   as offline forever.
+///
+/// An unmounted drive's folder can hold files a program wrote there meanwhile, so its content
+/// says nothing. Pure, so it is tested on every platform.
+#[must_use]
+pub fn mount_root_answers_with(root: &str, is_dir: bool, mountinfo: &str, fstab: &str) -> bool {
+    let root = root.trim_end_matches('/');
+    let names_root = |text: &str, field: usize| {
+        text.lines()
+            .map(str::trim)
+            .filter(|line| !line.starts_with('#'))
+            .filter_map(|line| line.split_whitespace().nth(field))
+            .any(|point| unescape_octal(point).trim_end_matches('/') == root)
+    };
+    if !is_dir {
+        return false;
+    }
+    if names_root(mountinfo, 4) {
+        return true;
+    }
+    if root.starts_with("/media/") || root.starts_with("/run/media/") {
+        return false;
+    }
+    !names_root(fstab, 1)
+}
+
+/// Decodes the `\040`-style octal escapes the mount list and `fstab` use for spaces, tabs and
+/// backslashes in a path.
+fn unescape_octal(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let digits = bytes
+            .get(i + 1..i + 4)
+            .filter(|digits| bytes[i] == b'\\' && digits.iter().all(|d| (b'0'..=b'7').contains(d)));
+        if let Some(byte) = digits
+            .map(|d| d.iter().fold(0u32, |acc, d| acc * 8 + u32::from(d - b'0')))
+            .and_then(|value| u8::try_from(value).ok())
+        {
+            out.push(byte);
+            i += 4;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Whether the drive that holds `path` is really there. On Linux a path under `/media`,
 /// `/run/media` or `/mnt` belongs to a mount point (see [`linux_mount_root`]); when the drive is
-/// unplugged that folder stays behind, empty, on the system drive, and must not pass for the
-/// drive ([`mount_root_answers`]). True for any other path (the system drive is always there).
+/// unplugged that folder stays behind on the system drive and must not pass for the drive
+/// ([`mount_root_answers`]). True for any other path (the system drive is always there).
 /// Always true off Linux.
 #[must_use]
 pub fn drive_is_mounted(path: &Path) -> bool {
@@ -276,25 +340,97 @@ mod tests {
         assert!(!is_mount_point(&dir.path().join("missing")));
     }
 
-    #[cfg(unix)]
+    const MOUNTINFO: &str = "\
+28 1 8:2 / / rw,relatime shared:1 - ext4 /dev/sda2 rw
+40 28 8:2 /srv/films /mnt/films rw,relatime shared:1 - ext4 /dev/sda2 rw
+41 28 8:17 / /media/alex/My\\040Disk rw,relatime - exfat /dev/sdb1 rw
+";
+
+    const FSTAB: &str = "\
+# <file system> <mount point> <type> <options> <dump> <pass>
+UUID=1234 / ext4 errors=remount-ro 0 1
+nas:/export /mnt/nas nfs4 defaults,nofail 0 0
+/srv/films /mnt/films none bind 0 0
+UUID=5678 /mnt/Backup\\040Disk ext4 nofail 0 2
+";
+
     #[test]
-    fn an_empty_mount_folder_is_no_drive_but_a_bind_mount_or_plain_folder_with_files_is() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        // What an unplugged drive leaves behind: an empty folder on the system drive.
-        let unplugged = dir.path().join("Films");
-        std::fs::create_dir(&unplugged).expect("folder");
-        assert!(!mount_root_answers(&unplugged));
-        assert!(!mount_root_answers(&dir.path().join("missing")));
-        // The same kind of folder holding a library: a bind mount of a folder on the same file
-        // system, or a folder made by hand below `/mnt`. It is not a mount point, yet it is there.
-        std::fs::create_dir(unplugged.join("Movies")).expect("library");
-        assert!(!is_mount_point(&unplugged));
-        assert!(mount_root_answers(&unplugged));
-        // A link to such a folder is followed.
-        let link = dir.path().join("link");
-        std::os::unix::fs::symlink(&unplugged, &link).expect("link");
-        assert!(mount_root_answers(&link));
+    fn a_bind_mount_and_a_listed_removable_drive_are_there() {
+        // Same device as `/`, so no mount point by device, but the mount list names it.
+        assert!(mount_root_answers_with(
+            "/mnt/films",
+            true,
+            MOUNTINFO,
+            FSTAB
+        ));
+        assert!(mount_root_answers_with(
+            "/media/alex/My Disk",
+            true,
+            MOUNTINFO,
+            FSTAB
+        ));
+    }
+
+    #[test]
+    fn the_folder_an_unplugged_drive_leaves_is_not_its_drive() {
+        // A drive the system is told to mount at `/mnt`, not mounted now.
+        assert!(!mount_root_answers_with("/mnt/nas", true, MOUNTINFO, FSTAB));
+        assert!(!mount_root_answers_with(
+            "/mnt/Backup Disk",
+            true,
+            MOUNTINFO,
+            FSTAB
+        ));
+        // A removable drive's folder that nothing is mounted on.
+        assert!(!mount_root_answers_with(
+            "/media/alex/Films",
+            true,
+            MOUNTINFO,
+            FSTAB
+        ));
+        assert!(!mount_root_answers_with(
+            "/run/media/alex/Films",
+            true,
+            MOUNTINFO,
+            FSTAB
+        ));
+        // No folder at all.
+        assert!(!mount_root_answers_with(
+            "/mnt/films",
+            false,
+            MOUNTINFO,
+            FSTAB
+        ));
+    }
+
+    #[test]
+    fn a_plain_folder_or_link_below_mnt_is_used_as_it_is() {
+        // Made by hand, or a link to a folder elsewhere: neither mount list names it.
+        assert!(mount_root_answers_with(
+            "/mnt/movies",
+            true,
+            MOUNTINFO,
+            FSTAB
+        ));
+        // A commented line mounts nothing.
+        assert!(mount_root_answers_with(
+            "/mnt/movies",
+            true,
+            MOUNTINFO,
+            "# nas:/export /mnt/movies nfs4 defaults 0 0\n"
+        ));
+        // With no fstab and no mount list, only a folder below `/mnt` is taken.
+        assert!(mount_root_answers_with("/mnt/movies", true, "", ""));
+        assert!(!mount_root_answers_with("/media/alex/Films", true, "", ""));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_root_answers_and_a_made_up_drive_does_not() {
         assert!(mount_root_answers(Path::new("/")));
+        assert!(!mount_root_answers(Path::new(
+            "/mnt/cinevault-test-drive-that-is-not-there"
+        )));
     }
 
     #[test]
