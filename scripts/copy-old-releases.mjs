@@ -126,7 +126,9 @@ async function run(options) {
           "release", "create", tag, "-R", to,
           "--title", release.name,
           "--notes-file", notesPath,
-          "--target", sha,
+          // The tag is pushed over git first (creating it through the API needs the token's
+          // "workflow" scope when the commit holds workflow files), so the release only uses it.
+          "--verify-tag",
           "--draft",
           "--latest=false",
           ...(release.isPrerelease ? ["--prerelease"] : []),

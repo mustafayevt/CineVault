@@ -82,11 +82,14 @@ export function normalizeRepos(list) {
 
 /**
  * The `gh release create` arguments for a new (draft) release. In the project repository the
- * release gets its tag at `headSha`; the earlier releases repository has no source to tag.
+ * tag `v<version>` must already be pushed over git (`git tag v<version> && git push origin
+ * v<version>`): creating it through the API needs the token's "workflow" scope because the commit
+ * holds workflow files, so the release only uses the existing tag. The earlier releases
+ * repository has no source to tag.
  */
 export function createReleaseArgs({ repo, tag, title, notesPath, headSha }) {
   const args = ["release", "create", tag, "-R", repo, "--title", title, "--notes-file", notesPath, "--draft"];
-  if (repo === SOURCE_REPO && headSha) args.push("--target", headSha);
+  if (repo === SOURCE_REPO && headSha) args.push("--verify-tag");
   return args;
 }
 
@@ -602,11 +605,11 @@ async function selfTest() {
   const mainCreate = createReleaseArgs({ repo: SOURCE_REPO, tag: "v1.2.0", title: "T", notesPath: "n.md", headSha: "abc123" });
   assert(
     mainCreate.join(" ") ===
-      "release create v1.2.0 -R mustafayevt/CineVault --title T --notes-file n.md --draft --target abc123",
+      "release create v1.2.0 -R mustafayevt/CineVault --title T --notes-file n.md --draft --verify-tag",
     "the project release is tagged at the checked-out commit",
   );
   const oldCreate = createReleaseArgs({ repo: RELEASES_REPO, tag: "v1.2.0", title: "T", notesPath: "n.md", headSha: "abc123" });
-  assert(!oldCreate.includes("--target") && oldCreate.includes("--draft"), "the earlier repository gets no tag target");
+  assert(!oldCreate.includes("--verify-tag") && oldCreate.includes("--draft"), "the earlier repository needs no tag");
   assert(windows.platforms["windows-x86_64"].sha256 === hex("exe") && windows.platforms["windows-x86_64"].size === 3, "hash and size");
 
   const withMac = buildPayload({
