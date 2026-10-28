@@ -130,17 +130,29 @@ pub fn is_mount_point(path: &Path) -> bool {
     }
 }
 
+/// Whether the folder `root` (a [`linux_mount_root`]) has its drive: a file system is mounted on
+/// it, or it holds something. An unplugged drive leaves an empty folder behind, which must not
+/// pass for the drive. A folder that is no mount point of its own but holds files is used as it
+/// is: a bind mount of a folder on the same file system, a link to another folder, or a plain
+/// folder someone made below `/mnt`. Such a folder would otherwise read as offline forever.
+#[cfg(unix)]
+#[must_use]
+pub fn mount_root_answers(root: &Path) -> bool {
+    is_mount_point(root)
+        || std::fs::read_dir(root).is_ok_and(|mut entries| entries.next().is_some())
+}
+
 /// Whether the drive that holds `path` is really there. On Linux a path under `/media`,
 /// `/run/media` or `/mnt` belongs to a mount point (see [`linux_mount_root`]); when the drive is
-/// unplugged that folder stays behind, empty or not, on the system drive, and must not pass for
-/// the drive. True when a file system is mounted on it, and for any other path (the system
-/// drive is always there). Always true off Linux.
+/// unplugged that folder stays behind, empty, on the system drive, and must not pass for the
+/// drive ([`mount_root_answers`]). True for any other path (the system drive is always there).
+/// Always true off Linux.
 #[must_use]
 pub fn drive_is_mounted(path: &Path) -> bool {
     #[cfg(target_os = "linux")]
     {
         let root = linux_mount_root(&path.to_string_lossy());
-        root == "/" || is_mount_point(Path::new(&root))
+        root == "/" || mount_root_answers(Path::new(&root))
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -262,6 +274,27 @@ mod tests {
         std::fs::create_dir(&sub).expect("sub folder");
         assert!(!is_mount_point(&sub));
         assert!(!is_mount_point(&dir.path().join("missing")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_empty_mount_folder_is_no_drive_but_a_bind_mount_or_plain_folder_with_files_is() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        // What an unplugged drive leaves behind: an empty folder on the system drive.
+        let unplugged = dir.path().join("Films");
+        std::fs::create_dir(&unplugged).expect("folder");
+        assert!(!mount_root_answers(&unplugged));
+        assert!(!mount_root_answers(&dir.path().join("missing")));
+        // The same kind of folder holding a library: a bind mount of a folder on the same file
+        // system, or a folder made by hand below `/mnt`. It is not a mount point, yet it is there.
+        std::fs::create_dir(unplugged.join("Movies")).expect("library");
+        assert!(!is_mount_point(&unplugged));
+        assert!(mount_root_answers(&unplugged));
+        // A link to such a folder is followed.
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&unplugged, &link).expect("link");
+        assert!(mount_root_answers(&link));
+        assert!(mount_root_answers(Path::new("/")));
     }
 
     #[test]
