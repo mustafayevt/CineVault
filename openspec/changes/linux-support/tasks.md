@@ -369,12 +369,13 @@ Read this block once; every task below relies on it.
   - Commit: per fix, e.g. `fix(linux): …` / `test(linux): …`
   - Result: fmt, clippy (`-D warnings`) and `cargo test --workspace` pass on Windows and on Linux (WSL, TMPDIR on the Linux disk; the tree-mode test skips itself with a printed reason when TMPDIR is on /mnt/c), and the UI suite passes on Windows. The `bun run tauri build` bundle check of the Linux package is not part of this run.
 
-- [ ] 9.2 Opus review of the whole branch `[risky: needs Opus]`
+- [x] 9.2 Opus review of the whole branch `[risky: needs Opus]`
   - After: 9.1.
   - Scope: `git diff main...linux`, reading every changed code path that writes, moves, renames or deletes files in media folders or replaces the app: `library_ops/{xdg_dirs,xdg_trash,trash_bin,bin_volumes,policy_bin,uncached}.rs`, every switched path comparison (3.6-3.8), `drives.rs`, `organize/startup.rs`, `scanning.rs`, `updates/install.rs`, `updates_ipc.rs`, `instance_lock.rs`.
   - Check against design D1-D9: no copy into any Trash; every failure leaves the item in place or in a `.deletedByCineVault`; no case-folded comparison on Linux decides which file is renamed, restored or purged; recovery never writes below an unmounted root; the AppImage is replaced only by a verified, same-folder rename; no `unsafe`, no `set_var`, no secret in logs; Windows and macOS behaviour unchanged (diff of Windows strings and keys is empty). Every finding gets a test and a fix commit (`fix(trash): …`), or a written reason it is not a problem in the final commit body.
   - Accept: `openspec validate linux-support --strict`; full Windows and LINUX CHECK suites green after the fixes.
   - Commit: per finding; final `docs(openspec): record the Linux review` ticking this box.
+  - Result: `review.md` in this change: 14 findings, 3 fixed with tests (folder restore on NFS/FUSE mounts, bind mounts and plain folders below `/mnt` read as offline, case-folded library-folder guard), no blocker open.
 
 - [ ] 9.3 WSL2 manual test (WSLg on Windows 11) `[human]`
   - After: 9.1 (an AppImage, `.deb` and `.rpm` from the local Linux build in 9.1 or from `gh workflow run release-linux.yml -f publish=false`).
