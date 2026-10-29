@@ -14,7 +14,7 @@ cv-domain.workspace = true
 cv-providers.workspace = true
 cv-scan.workspace = true
 data-encoding.workspace = true
-getrandom = "0.3"
+getrandom = "0.4"
 quick-xml.workspace = true
 regex.workspace = true
 reqwest = { workspace = true, features = ["cookies"] }
