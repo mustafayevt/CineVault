@@ -175,7 +175,8 @@ describe("What's new after an update", () => {
     expect(
       within(card).getByRole("heading", { name: `Updated to CineVault ${RELEASED}` }),
     ).toBeVisible();
-    expect(within(card).getAllByRole("listitem").length).toBeGreaterThan(2);
+    // The newest real section: a patch release may list a single change.
+    expect(within(card).getAllByRole("listitem").length).toBeGreaterThan(0);
     expect(useSettingsStore.getState().values[LAST_SEEN_VERSION_KEY]).toBe(RELEASED);
     first.unmount();
 
