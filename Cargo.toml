@@ -68,7 +68,7 @@ reqwest = { version = "0.13", default-features = false, features = ["native-tls"
 governor = { version = "0.10", default-features = false, features = ["std"] }
 httpdate = "1"
 # PCRE-style expressions of Kodi XML scrapers (cv-providers): look-around and back-references.
-fancy-regex = "0.19"
+fancy-regex = "0.20"
 # Move files to the system trash (cv-app, delete with files): Recycle Bin, macOS Trash, freedesktop Trash (read side on Linux).
 trash = { version = "5", default-features = false, features = ["coinit_apartmentthreaded", "chrono"] }
 # Windows Credential Manager, macOS Keychain, Linux Secret Service (links libdbus-1).
