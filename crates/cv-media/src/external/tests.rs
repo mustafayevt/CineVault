@@ -174,3 +174,18 @@ fn an_index_before_the_extension_leaves_the_language_and_flags_alone() {
     assert_eq!(info.language, "");
     assert!(info.flags.is_empty());
 }
+
+/// Names as the renamer writes them, with bracketed tags in the video name (seen in a real
+/// library): the tags are part of the base name, not languages or flags.
+#[test]
+fn bracketed_tags_in_the_video_name_are_not_read_as_languages() {
+    let base = "Example (2008) [2160p] [Web-DL] [HDR10+] [AC3 5.1]";
+    let info = detect_external_stream(base, &format!("{base}.eng.srt"));
+    assert_eq!(info.language, "en");
+    assert!(info.flags.is_empty(), "{:?}", info.flags);
+    assert_eq!(info.title, "");
+
+    let info = detect_external_stream(base, &format!("{base}.eng.sdh.srt"));
+    assert_eq!(info.language, "en");
+    assert_eq!(info.flags, flags(&[StreamFlag::HearingImpaired]));
+}

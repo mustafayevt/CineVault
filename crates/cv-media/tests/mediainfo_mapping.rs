@@ -150,6 +150,34 @@ fn dolby_vision_hdr10_with_truehd_atmos_and_subtitles() {
 }
 
 #[test]
+fn ultra_hd_blu_ray_with_a_dolby_vision_enhancement_layer_stream() {
+    // Recorded from a real disc: MediaInfo reports the enhancement layer as a second, plain HDR10
+    // HEVC stream (packet id 0x1015). The main picture is the first one, and the disc is Dolby
+    // Vision profile 7 over HDR10.
+    let file = mapped("real-uhd-bluray-dolby-vision-dual-layer.txt", "00000.m2ts");
+    assert_eq!(file.container_format, "m2ts");
+    assert_eq!(file.duration_secs, 5113);
+    assert_eq!(file.video_codec, "HEVC");
+    assert_eq!((file.width, file.height), (3840, 2160));
+    assert_eq!(file.exact_video_format, "2160p");
+    assert_eq!(file.bit_depth, 10);
+    assert!((file.frame_rate - 23.976).abs() < 1e-9);
+    assert_eq!(file.hdr_formats, ["Dolby Vision", "HDR10"]);
+    assert_eq!(file.hdr_details.dolby_vision_profile, "7");
+    assert_eq!(file.hdr_details.dolby_vision_compatibility, "Blu-ray");
+    assert_eq!(file.hdr_details.mastering_primaries, "Display P3");
+    assert_eq!(file.hdr_details.mastering_min_nits, Some(0.0001));
+    assert_eq!(file.hdr_details.mastering_max_nits, Some(1000.0));
+    let audio: Vec<_> = file
+        .audio_streams
+        .iter()
+        .map(|a| (a.codec.as_str(), a.channels))
+        .collect();
+    assert_eq!(audio, [("AC3", 6), ("TrueHD Atmos", 8)]);
+    assert_eq!(file.subtitles.len(), 4);
+}
+
+#[test]
 fn every_dts_variant_and_plain_truehd() {
     let file = mapped("bluray-dts-variants.txt", "Heat (1995).mkv");
     assert_eq!(file.video_codec, "AVC");

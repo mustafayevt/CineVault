@@ -5,7 +5,8 @@
 //! * **video:** codec, resolution (halved for side-by-side and top-and-bottom multi-view),
 //!   scan type, frame rate, bit depth, bit rate, aspect ratio from the pixel aspect ratio;
 //! * **HDR:** Dolby Vision, HDR10+, HDR10 and HLG from the `HDR_Format*` fields, with the
-//!   colour description as the fallback;
+//!   colour description as the fallback; a Dolby Vision enhancement layer carried as a video
+//!   stream of its own (Ultra HD Blu-ray, dual-track files) counts for the main picture;
 //! * **3D:** multi-view layout, then the filename, then the frame-size heuristics;
 //! * **audio:** codec variants (DTS-X, DTS-HD MA, TrueHD Atmos, E-AC-3 Atmos ...), channels,
 //!   bit rate, bit depth, language, title and flags;
@@ -82,6 +83,15 @@ pub fn apply_snapshot(file: &mut MediaFile, snapshot: &MediaSnapshot) {
     let video = main_video(snapshot);
     if let Some(video) = video {
         apply_video(file, video);
+        // A Dolby Vision enhancement layer that travels as a stream of its own (UHD Blu-ray)
+        // belongs to the main picture.
+        if dolby_vision_position(video).is_none()
+            && let Some(layer) = enhancement_layer(snapshot, video)
+        {
+            let merged = with_dolby_vision_layer(video, &layer);
+            file.hdr_formats = hdr_formats(&merged);
+            file.hdr_details = hdr_details(&merged);
+        }
     }
     file.duration_secs = duration_secs(general, video);
 
@@ -103,13 +113,120 @@ pub fn apply_snapshot(file: &mut MediaFile, snapshot: &MediaSnapshot) {
 }
 
 /// The first video stream that is a moving picture, not an attached cover (some containers list
-/// a JPEG or PNG cover as a video stream).
+/// a JPEG or PNG cover as a video stream) and not the Dolby Vision enhancement layer of a Blu-ray
+/// stream file.
 fn main_video(snapshot: &MediaSnapshot) -> Option<&StreamInfo> {
     let streams = snapshot.streams(StreamKind::Video);
-    streams
-        .iter()
-        .find(|s| !matches!(s.get("Format"), Some("JPEG" | "PNG" | "BMP" | "GIF")))
+    let pictures = || streams.iter().filter(|s| !is_cover(s));
+    pictures()
+        .find(|s| !is_bluray_enhancement_layer(snapshot, s))
+        .or_else(|| pictures().next())
         .or_else(|| streams.first())
+}
+
+fn is_cover(video: &StreamInfo) -> bool {
+    matches!(video.get("Format"), Some("JPEG" | "PNG" | "BMP" | "GIF"))
+}
+
+/// The packet id the Ultra HD Blu-ray format gives the Dolby Vision enhancement layer (0x1015);
+/// the main picture is 0x1011.
+const BLURAY_ENHANCEMENT_LAYER_ID: u64 = 0x1015;
+
+/// True for the Dolby Vision enhancement layer of an Ultra HD Blu-ray stream file: an HEVC stream
+/// with the packet id 0x1015 in a Blu-ray (BDAV) or MPEG transport stream. MediaInfo lists it as
+/// a second, 1080p HEVC stream and, unless the stream file carries a Dolby Vision descriptor,
+/// does not say what it is.
+fn is_bluray_enhancement_layer(snapshot: &MediaSnapshot, video: &StreamInfo) -> bool {
+    let transport = snapshot
+        .general()
+        .and_then(|g| g.get("Format"))
+        .is_some_and(|f| matches!(f, "BDAV" | "MPEG-TS"));
+    transport
+        && video.get("Format") == Some("HEVC")
+        && video.get_u64("ID") == Some(BLURAY_ENHANCEMENT_LAYER_ID)
+}
+
+/// The fields of one `HDR_Format*` layer, in the order MediaInfo lists them.
+const HDR_LAYER_FIELDS: [&str; 8] = [
+    "HDR_Format",
+    "HDR_Format_Commercial",
+    "HDR_Format_Version",
+    "HDR_Format_Profile",
+    "HDR_Format_Level",
+    "HDR_Format_Settings",
+    "HDR_Format_Compression",
+    "HDR_Format_Compatibility",
+];
+
+/// The Dolby Vision layer of an Ultra HD Blu-ray (profile 7, base and enhancement layer and
+/// metadata), as MediaInfo reports it when it recognises one: `dvhe.07`, `BL+EL+RPU`, compatible
+/// with `Blu-ray`. The level and version are not known without the metadata, so they are left
+/// out.
+#[must_use]
+pub fn bluray_dolby_vision_layer() -> Vec<(&'static str, String)> {
+    vec![
+        ("HDR_Format", "Dolby Vision".to_owned()),
+        ("HDR_Format_Commercial", "Blu-ray".to_owned()),
+        ("HDR_Format_Profile", "dvhe.07".to_owned()),
+        ("HDR_Format_Settings", "BL+EL+RPU".to_owned()),
+        ("HDR_Format_Compatibility", "Blu-ray".to_owned()),
+    ]
+}
+
+/// The Dolby Vision layer that another video stream than `main` carries: a stream MediaInfo
+/// found Dolby Vision in (its Dolby Vision part of each `HDR_Format*` field), or the enhancement
+/// layer of an Ultra HD Blu-ray stream file. `None` when no other stream has one.
+fn enhancement_layer(
+    snapshot: &MediaSnapshot,
+    main: &StreamInfo,
+) -> Option<Vec<(&'static str, String)>> {
+    let others = || {
+        snapshot
+            .streams(StreamKind::Video)
+            .iter()
+            .filter(|s| !std::ptr::eq(*s, main) && !is_cover(s))
+    };
+    if let Some((stream, position)) =
+        others().find_map(|s| dolby_vision_position(s).map(|position| (s, position)))
+    {
+        return Some(
+            HDR_LAYER_FIELDS
+                .into_iter()
+                .filter_map(|name| {
+                    let parts: Vec<&str> = stream.get(name)?.split('/').map(str::trim).collect();
+                    let part = parts.get(position).copied().unwrap_or_default();
+                    (!part.is_empty()).then(|| (name, part.to_owned()))
+                })
+                .collect(),
+        );
+    }
+    let main_is_hevc = main.get("Format") == Some("HEVC");
+    (main_is_hevc && others().any(|s| is_bluray_enhancement_layer(snapshot, s)))
+        .then(bluray_dolby_vision_layer)
+}
+
+/// `video` with a Dolby Vision layer put in front of its own `HDR_Format*` layers, the way
+/// MediaInfo lists a Dolby Vision layer over an HDR10 base (`Dolby Vision / SMPTE ST 2086`).
+#[must_use]
+pub fn with_dolby_vision_layer(video: &StreamInfo, layer: &[(&str, String)]) -> StreamInfo {
+    let mut merged = video.clone();
+    let layered = video.get("HDR_Format").is_some();
+    for name in HDR_LAYER_FIELDS {
+        let own = video.get(name);
+        let part = layer
+            .iter()
+            .find(|(field, _)| *field == name)
+            .map(|(_, value)| value.as_str())
+            .unwrap_or_default();
+        let value = match own {
+            Some(own) => format!("{part} / {own}"),
+            None if part.is_empty() => continue,
+            None if layered => format!("{part} / "),
+            None => part.to_owned(),
+        };
+        merged.set(name, value);
+    }
+    merged
 }
 
 fn apply_video(file: &mut MediaFile, video: &StreamInfo) {
@@ -141,7 +258,17 @@ fn apply_video(file: &mut MediaFile, video: &StreamInfo) {
     file.aspect_ratio = aspect_ratio(video, width, height, halve != Halve::Neither);
     file.video_bitrate_kbps = bitrate_kbps(video, false);
     file.bit_depth = video.get_u64("BitDepth").unwrap_or(0) as u32;
-    file.frame_rate = ["FrameRate", "FrameRate_Original"]
+    // Interlaced video stored as separate fields reports the field rate (59.940) and the frame
+    // rate as the original (29.970).
+    let separate_fields = video
+        .get("ScanType_StoreMethod")
+        .is_some_and(|method| method.eq_ignore_ascii_case("SeparatedFields"));
+    let rates = if separate_fields {
+        ["FrameRate_Original", "FrameRate"]
+    } else {
+        ["FrameRate", "FrameRate_Original"]
+    };
+    file.frame_rate = rates
         .into_iter()
         .filter_map(|name| video.get_f64(name))
         .find(|rate| *rate > 0.0)
@@ -437,24 +564,13 @@ impl HdrSeen {
 /// The Dolby Vision profile number (`8` for `dvhe.08`), when the video has a Dolby Vision layer.
 #[must_use]
 pub fn dolby_vision_profile(video: &StreamInfo) -> Option<u8> {
-    // Layers are listed in the same order in every `HDR_Format_*` field; Dolby Vision is the
-    // layer whose format says so.
-    let position = video
-        .get("HDR_Format")?
-        .split('/')
-        .position(|layer| layer.to_ascii_lowercase().contains("dolby vision"))?;
-    let profile = video
-        .get("HDR_Format_Profile")?
-        .split('/')
-        .nth(position)?
-        .trim();
-    profile.rsplit('.').next()?.parse().ok()
+    dolby_vision_layer(video)?.profile
 }
 
 /// The Dolby Vision profile and what is under it, the mastering display and the light levels of a
 /// video, from `HDR_Format_Profile`, `HDR_Format_Compatibility`, `MasteringDisplay_ColorPrimaries`,
-/// `MasteringDisplay_Luminance`, `MaxCLL` and `MaxFALL`. Whatever the file does not say stays
-/// empty.
+/// `MasteringDisplay_Luminance`, `MaxCLL` and `MaxFALL` (or, from libraries that only had it, the
+/// combined `HDR_Format/String`). Whatever the file does not say stays empty.
 ///
 /// The profile is written the way people name it: `8.1` is profile 8 with an HDR10 base layer,
 /// `8.2` with an SDR one and `8.4` with an HLG one (likewise profile 10); the other profiles are
@@ -462,18 +578,9 @@ pub fn dolby_vision_profile(video: &StreamInfo) -> Option<u8> {
 #[must_use]
 pub fn hdr_details(video: &StreamInfo) -> HdrDetails {
     let mut details = HdrDetails::default();
-    if let Some(position) = dolby_vision_position(video) {
-        let layer = |name: &str| -> Option<String> {
-            let parts: Vec<&str> = video.get(name)?.split('/').map(str::trim).collect();
-            parts
-                .get(position)
-                .or_else(|| parts.last())
-                .map(|part| (*part).to_owned())
-        };
-        let compatibility = layer("HDR_Format_Compatibility")
-            .map(|text| compatibility_name(&text))
-            .unwrap_or_default();
-        if let Some(profile) = layer("HDR_Format_Profile").and_then(|text| profile_number(&text)) {
+    if let Some(layer) = dolby_vision_layer(video) {
+        let compatibility = layer.compatibility;
+        if let Some(profile) = layer.profile {
             let id = match (profile, compatibility.as_str()) {
                 (8 | 10, "HDR10" | "HDR10+") => ".1",
                 (8 | 10, "SDR") => ".2",
@@ -497,6 +604,55 @@ pub fn hdr_details(video: &StreamInfo) -> HdrDetails {
     details
 }
 
+/// What a video says about its Dolby Vision layer.
+struct DolbyVisionLayer {
+    profile: Option<u8>,
+    /// The base layer's format (`HDR10`, `SDR`, `HLG`, `Blu-ray` ...), empty when not stated.
+    compatibility: String,
+}
+
+/// The Dolby Vision layer of a video: from the split `HDR_Format*` fields, whose layers are listed
+/// in the same order in every field, or else from the combined `HDR_Format/String` of older
+/// libraries (`Dolby Vision, Version 1.0, dvhe.05.06, BL+RPU`).
+fn dolby_vision_layer(video: &StreamInfo) -> Option<DolbyVisionLayer> {
+    if let Some(position) = dolby_vision_position(video) {
+        let layer = |name: &str| -> Option<String> {
+            let parts: Vec<&str> = video.get(name)?.split('/').map(str::trim).collect();
+            parts
+                .get(position)
+                .or_else(|| parts.last())
+                .map(|part| (*part).to_owned())
+        };
+        return Some(DolbyVisionLayer {
+            profile: layer("HDR_Format_Profile")
+                .and_then(|text| profile_number(&text))
+                .or_else(|| layer("HDR_Format/String").and_then(|text| codec_profile(&text))),
+            compatibility: layer("HDR_Format_Compatibility")
+                .map(|text| compatibility_name(&text))
+                .unwrap_or_default(),
+        });
+    }
+    if video.get("HDR_Format").is_some() {
+        return None;
+    }
+    let combined = first_of(video, &["HDR_Format/String", "HDR_Format_String"])?;
+    let part = combined
+        .split('/')
+        .find(|layer| layer.to_ascii_lowercase().contains("dolby vision"))?;
+    let compatibility = part
+        .split(',')
+        .map(str::trim)
+        .find_map(|item| {
+            item.strip_suffix(" compatible")
+                .map(|name| compatibility_name(name.trim()))
+        })
+        .unwrap_or_default();
+    Some(DolbyVisionLayer {
+        profile: codec_profile(part),
+        compatibility,
+    })
+}
+
 /// Which `/`-separated layer of the `HDR_Format*` fields is Dolby Vision.
 fn dolby_vision_position(video: &StreamInfo) -> Option<usize> {
     video
@@ -505,13 +661,24 @@ fn dolby_vision_position(video: &StreamInfo) -> Option<usize> {
         .position(|layer| layer.to_ascii_lowercase().contains("dolby vision"))
 }
 
-/// The profile number in `dvhe.08`, `dvhe.08.06` or `Profile 8`.
+/// The Dolby Vision codec strings: `dvhe` and `dvh1` (HEVC), `dvav` and `dva1` (AVC), `dav1`
+/// (AV1), followed by `.` and the two-digit profile.
+static CODEC_PROFILE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(?:dvhe|dvh1|dvav|dva1|dav1)\.(\d{1,2})").expect("codec profile regex")
+});
+
+/// The profile number in a text that holds a Dolby Vision codec string (`dvhe.08.06`).
+fn codec_profile(text: &str) -> Option<u8> {
+    CODEC_PROFILE.captures(text)?.get(1)?.as_str().parse().ok()
+}
+
+/// The profile number in `dvhe.08`, `dvhe.08.06`, `dav1.10` or `Profile 8`.
 fn profile_number(text: &str) -> Option<u8> {
+    if let Some(profile) = codec_profile(text) {
+        return Some(profile);
+    }
     let lower = text.trim().to_ascii_lowercase();
-    let digits = match lower.split_once('.') {
-        Some((_, rest)) if lower.starts_with("dv") => rest,
-        _ => lower.trim_start_matches(|c: char| !c.is_ascii_digit()),
-    };
+    let digits = lower.trim_start_matches(|c: char| !c.is_ascii_digit());
     let number: String = digits.chars().take_while(char::is_ascii_digit).collect();
     number.parse().ok()
 }
@@ -629,7 +796,14 @@ pub fn audio_codec(audio: &StreamInfo) -> String {
                 "TrueHD".to_owned()
             }
         }
-        "E-AC-3" => {
+        // A Blu-ray stream file's E-AC-3 track can come out as `AC-3` with the dependent
+        // substream (`Dep`) and the Dolby Digital Plus name.
+        "E-AC-3" | "AC-3"
+            if format == "E-AC-3"
+                || commercial.contains("digital plus")
+                || features.contains(&"DEP")
+                || features.contains(&"JOC") =>
+        {
             if atmos || features.contains(&"JOC") {
                 "E-AC-3 Atmos".to_owned()
             } else {
@@ -679,8 +853,12 @@ fn dts_variant(commercial: &str, features: &[&str], profile: &str) -> String {
 
 /// Channels: the larger of `Channel(s)` and `Channel(s)_Original`. A value such as `16 objects`
 /// counts audio objects, not channels, and is ignored.
+///
+/// Height speakers are not counted either: a DTS:X track that MediaInfo reports with 12 channels
+/// (`... Tfl Tfr Tbl Tbr` in `ChannelLayout`) is 7.1 with four height channels, written as 7.1 the
+/// way a TrueHD Atmos 7.1 bed is.
 fn audio_channels(audio: &StreamInfo) -> u32 {
-    ["Channel(s)", "Channel(s)_Original"]
+    let reported = ["Channel(s)", "Channel(s)_Original"]
         .into_iter()
         .filter_map(|name| audio.get(name))
         .flat_map(|text| text.split('/'))
@@ -688,7 +866,29 @@ fn audio_channels(audio: &StreamInfo) -> u32 {
         .filter_map(|part| first_number(part.trim()))
         .map(|n| n.round() as u32)
         .max()
-        .unwrap_or(0)
+        .unwrap_or(0);
+    let Some(layout) = audio.get("ChannelLayout") else {
+        return reported;
+    };
+    let speakers: Vec<&str> = layout.split_whitespace().collect();
+    let heights = speakers.iter().filter(|s| is_height_speaker(s)).count();
+    let beds = speakers.len() - heights;
+    if heights > 0 && beds > 0 && speakers.len() as u32 == reported {
+        beds as u32
+    } else {
+        reported
+    }
+}
+
+/// A height speaker in MediaInfo's `ChannelLayout`: the top (`Tfl`, `Tfr`, `Tfc`, `Tbl`, `Tbr`,
+/// `Tbc`, `Tsl`, `Tsr`, `Tc`) and vertical height (`Vhl`, `Vhr`, `Vhc`) positions.
+fn is_height_speaker(name: &str) -> bool {
+    let mut chars = name.chars();
+    match (chars.next(), chars.next()) {
+        (Some('T'), Some(next)) => next.is_ascii_lowercase(),
+        (Some('V'), Some('h')) => true,
+        _ => false,
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -42,6 +42,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "hdr_details",
         sql: include_str!("migrations/102_hdr_details.sql"),
     },
+    Migration {
+        version: 103,
+        name: "reread_media_info",
+        sql: include_str!("migrations/103_reread_media_info.sql"),
+    },
 ];
 
 /// The schema version of this build: the last migration, or [`BASE_VERSION`] when there is none.

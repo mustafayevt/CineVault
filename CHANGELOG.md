@@ -2,11 +2,20 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.2.0] - unreleased
+## [Unreleased]
 
 ### Changed
 
 - Deleting a title that shares its folder with other titles, or sits directly in a library folder, now also removes the subtitles, posters, NFO files, trailers and other files named after it, even ones added since the last Scan. Deleting an episode does the same for its files. Files of the other titles stay, the confirmation counts the extra files, and Undo brings them back.
+
+### Fixed
+
+- Ultra HD Blu-ray folders and images with Dolby Vision now show Dolby Vision (profile 7) next to HDR10. The disc's second video layer was taken for a plain HDR10 stream, so only HDR10 was shown.
+- Blu-ray folders and images now show the language of every audio and subtitle track, read from the disc's own track list.
+- Dolby Digital Plus tracks that were shown as AC3 (in Blu-ray files and some MKV files) are now called E-AC-3, with Atmos when they have it.
+- DTS:X tracks with height speakers now show their real layout, such as 7.1, instead of 11.1.
+- Interlaced videos stored as separate fields now show their frame rate (29.97 instead of 59.94).
+- After the update, CineVault reads the media info of Blu-ray discs, disc images, Blu-ray files and the videos above once more, so they show the corrected details.
 
 ## [1.1.1] - 2026-10-29
 
