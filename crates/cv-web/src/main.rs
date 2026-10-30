@@ -4,14 +4,16 @@
 //! interface and answers the typed command surface over HTTP through the shared `cv-ipc` layer.
 //! This is the read-path skeleton: sign-in, the write commands and the SSE stream land next.
 
+mod auth;
+
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::http::{HeaderMap, StatusCode, Uri, header};
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use cv_app::data_location::DataLocation;
@@ -36,6 +38,7 @@ use tokio::fs;
 struct WebState {
     services: Arc<AppServices>,
     images: Arc<ImageContext>,
+    auth: Arc<auth::Auth>,
     ui_dir: PathBuf,
 }
 
@@ -65,6 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let location = DataLocation::resolve_for_process()
         .ok_or("CineVault could not find a folder for its data.")?;
+    let auth = Arc::new(auth::Auth::open(location.root())?);
     let services = AppServices::boot(
         BootOptions::new(location, Arc::new(SecretStore::in_memory()))
             .without_providers()
@@ -76,10 +80,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = WebState {
         services,
         images,
+        auth,
         ui_dir: ui_dir.clone(),
     };
     let app = Router::new()
         .route("/healthz", get(health))
+        .route("/login", get(login_page))
+        .route("/setup", get(setup_page))
+        .route("/api/login", post(login))
+        .route("/api/setup", post(setup))
+        .route("/api/logout", post(logout))
         .route("/api/invoke", post(invoke))
         .route("/api/stream", get(stream))
         .route("/img/{key}/{size}", get(image))
@@ -92,9 +102,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui_dir.display()
     );
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown())
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown())
+    .await?;
     Ok(())
 }
 
@@ -113,6 +126,154 @@ async fn health(State(state): State<WebState>) -> Response {
     Json(json!({ "status": "ok" })).into_response()
 }
 
+fn is_secure(headers: &HeaderMap) -> bool {
+    headers
+        .get("x-forwarded-proto")
+        .and_then(|value| value.to_str().ok())
+        == Some("https")
+}
+
+fn session_of(state: &WebState, headers: &HeaderMap) -> Option<(String, auth::Session)> {
+    let id = auth::cookie(headers, "cv_session")?;
+    let session = state.auth.session(&id)?;
+    Some((id, session))
+}
+
+fn signed_out() -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({
+            "ok": false,
+            "error": { "code": "signed_out", "message": "Your session ended. Sign in again." }
+        })),
+    )
+        .into_response()
+}
+
+fn set_cookie(response: &mut Response, value: String) {
+    if let Ok(value) = axum::http::HeaderValue::from_str(&value) {
+        response.headers_mut().append(header::SET_COOKIE, value);
+    }
+}
+
+async fn login_page(State(state): State<WebState>) -> Response {
+    if state.auth.needs_setup() {
+        return Redirect::to("/setup").into_response();
+    }
+    axum::response::Html(auth::login_page()).into_response()
+}
+
+async fn setup_page(State(state): State<WebState>, headers: HeaderMap) -> Response {
+    if state.auth.has_password() {
+        return Redirect::to("/login").into_response();
+    }
+    if state.auth.setup_closed() {
+        return (
+            StatusCode::FORBIDDEN,
+            "The setup window has closed. Run `cinevault-server passwd` on the server.",
+        )
+            .into_response();
+    }
+    let existing = auth::cookie(&headers, "cv_setup");
+    match state.auth.claim_setup(existing.as_deref()) {
+        Ok(claim) => {
+            let mut response = axum::response::Html(auth::setup_page()).into_response();
+            set_cookie(
+                &mut response,
+                auth::setup_cookie(&claim, is_secure(&headers)),
+            );
+            response
+        }
+        Err(auth::AuthError::SetupClaimed) => (
+            StatusCode::CONFLICT,
+            "Setup is in progress in another browser. Finish it there.",
+        )
+            .into_response(),
+        Err(_) => Redirect::to("/login").into_response(),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct PasswordBody {
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SetupBody {
+    password: String,
+    confirm: String,
+}
+
+async fn login(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<PasswordBody>,
+) -> Response {
+    match state.auth.login(&body.password, &peer.ip().to_string()) {
+        Ok((id, _)) => {
+            let mut response = Json(json!({ "ok": true })).into_response();
+            set_cookie(
+                &mut response,
+                auth::session_cookie(&id, is_secure(&headers)),
+            );
+            response
+        }
+        Err(error) => {
+            let status = match error {
+                auth::AuthError::TooManyAttempts => StatusCode::TOO_MANY_REQUESTS,
+                _ => StatusCode::UNAUTHORIZED,
+            };
+            (status, Json(json!({ "message": error.to_string() }))).into_response()
+        }
+    }
+}
+
+async fn setup(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+    Json(body): Json<SetupBody>,
+) -> Response {
+    let claim = auth::cookie(&headers, "cv_setup").unwrap_or_default();
+    match state
+        .auth
+        .set_password(&body.password, &body.confirm, &claim)
+    {
+        Ok((id, _)) => {
+            let mut response = Json(json!({ "ok": true })).into_response();
+            set_cookie(
+                &mut response,
+                auth::session_cookie(&id, is_secure(&headers)),
+            );
+            set_cookie(
+                &mut response,
+                auth::clear_cookie("cv_setup", is_secure(&headers)),
+            );
+            response
+        }
+        Err(error) => {
+            let status = match error {
+                auth::AuthError::TooShort | auth::AuthError::Mismatch => StatusCode::BAD_REQUEST,
+                auth::AuthError::SetupClaimed => StatusCode::CONFLICT,
+                _ => StatusCode::FORBIDDEN,
+            };
+            (status, Json(json!({ "message": error.to_string() }))).into_response()
+        }
+    }
+}
+
+async fn logout(State(state): State<WebState>, headers: HeaderMap) -> Response {
+    if let Some(id) = auth::cookie(&headers, "cv_session") {
+        state.auth.logout(&id);
+    }
+    let mut response = Json(json!({ "ok": true })).into_response();
+    set_cookie(
+        &mut response,
+        auth::clear_cookie("cv_session", is_secure(&headers)),
+    );
+    response
+}
+
 fn reader(state: &WebState) -> LibraryReader {
     LibraryReader::from_parts(
         Arc::clone(state.services.db()),
@@ -125,7 +286,27 @@ fn reader(state: &WebState) -> LibraryReader {
     )
 }
 
-async fn invoke(State(state): State<WebState>, Json(body): Json<InvokeBody>) -> Response {
+async fn invoke(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+    Json(body): Json<InvokeBody>,
+) -> Response {
+    let Some((_, session)) = session_of(&state, &headers) else {
+        return signed_out();
+    };
+    let csrf = headers
+        .get("x-cinevault-csrf")
+        .and_then(|value| value.to_str().ok());
+    if csrf != Some(session.csrf.as_str()) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "csrf", "message": "Reload the page and try again." }
+            })),
+        )
+            .into_response();
+    }
     match dispatch(&state, &body.cmd, &body.args).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),
         Err(error) => Json(json!({ "ok": false, "error": error })).into_response(),
@@ -321,7 +502,10 @@ async fn dispatch(state: &WebState, cmd: &str, args: &Value) -> DispatchResult {
     }
 }
 
-async fn stream(State(_state): State<WebState>) -> Response {
+async fn stream(State(state): State<WebState>, headers: HeaderMap) -> Response {
+    if session_of(&state, &headers).is_none() {
+        return signed_out();
+    }
     // The stream is a placeholder until task 3.5: an open SSE connection with keep-alives, so the
     // shim does not retry in a loop.
     Response::builder()
@@ -333,6 +517,9 @@ async fn stream(State(_state): State<WebState>) -> Response {
 }
 
 async fn image(State(state): State<WebState>, uri: Uri, headers: HeaderMap) -> Response {
+    if session_of(&state, &headers).is_none() {
+        return signed_out();
+    }
     let Some(service) = state.images.service().cloned() else {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     };
@@ -365,8 +552,30 @@ fn image_response(answer: ImageResponse) -> Response {
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
-async fn static_file(State(state): State<WebState>, uri: Uri) -> Response {
+async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap) -> Response {
     let requested = uri.path().trim_start_matches('/');
+    let is_asset = requested.starts_with("assets/")
+        || requested == "favicon.ico"
+        || requested == "favicon.svg"
+        || requested == "robots.txt"
+        || [
+            ".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".woff", ".woff2", ".map",
+        ]
+        .iter()
+        .any(|extension| requested.ends_with(extension));
+    let session = if is_asset {
+        None
+    } else {
+        session_of(&state, &headers)
+    };
+    if !is_asset && session.is_none() {
+        return Redirect::to(if state.auth.needs_setup() {
+            "/setup"
+        } else {
+            "/login"
+        })
+        .into_response();
+    }
     let mut file = state.ui_dir.join(if requested.is_empty() {
         "index.html"
     } else {
@@ -382,8 +591,14 @@ async fn static_file(State(state): State<WebState>, uri: Uri) -> Response {
         return StatusCode::NOT_FOUND.into_response();
     };
     if file.file_name().is_some_and(|name| name == "index.html") {
-        const MARKER: &str = "<script>window.__CINEVAULT_TRANSPORT__=\"server\";window.__CINEVAULT_CSRF__=\"\";</script>";
-        let text = String::from_utf8_lossy(&body).replace("</head>", &format!("{MARKER}</head>"));
+        let csrf = session
+            .as_ref()
+            .map(|(_, session)| session.csrf.as_str())
+            .unwrap_or("");
+        let marker = format!(
+            "<script>window.__CINEVAULT_TRANSPORT__=\"server\";window.__CINEVAULT_CSRF__=\"{csrf}\";</script>"
+        );
+        let text = String::from_utf8_lossy(&body).replace("</head>", &format!("{marker}</head>"));
         body = text.into_bytes();
     }
     let mime = match file

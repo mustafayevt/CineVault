@@ -48,6 +48,9 @@ icu_normalizer = "2.3"
 # External tool downloads (cv-media): HTTPS client, checksums, archive formats.
 ureq = "3"
 sha2 = "0.11"
+# Password hashing for the browser server sign-in (cv-web).
+argon2 = "0.5"
+rand_core = { version = "0.6", features = ["getrandom"] }
 fs4 = { version = "1.1", default-features = false, features = ["sync"] }
 zip = { version = "9", default-features = false, features = ["deflate"] }
 tar = "0.4"
