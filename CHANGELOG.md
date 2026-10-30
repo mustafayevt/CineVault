@@ -2,7 +2,7 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.2.1] - unreleased
+## [Unreleased]
 
 ### Added
 
