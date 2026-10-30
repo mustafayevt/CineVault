@@ -86,6 +86,7 @@ describe("the English catalogue", () => {
       "Backups",
       "External tools",
       "Keyboard shortcuts",
+      "Torrent sources",
     ];
     for (const [key, template] of Object.entries(allMessages())) {
       if (key.startsWith("providers.info.")) continue;
