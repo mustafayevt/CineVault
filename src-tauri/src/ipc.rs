@@ -276,6 +276,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             crate::torrent_stream_ipc::torrent_title_episodes,
             crate::torrent_stream_ipc::torrent_landing,
             crate::torrent_stream_ipc::torrent_release_search,
+            crate::torrent_stream_ipc::torrent_latest,
+            crate::torrent_stream_ipc::torrent_feed_lookup,
             crate::torrent_ipc::torrent_open_magnet,
             crate::torrent_ipc::torrent_open_page,
             crate::torrent_ipc::torrent_open_torrent_file,
