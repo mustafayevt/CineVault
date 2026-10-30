@@ -44,6 +44,7 @@ export const shell = {
   "shell.progress.paused": "{line} (paused)",
   "shell.progress.more": "+{count} more",
   "shell.progress.count": "{done} of {total} · {percent}%",
+  "shell.progress.otherSession": "Started from another session",
   "shell.progress.working": "Working…",
   "shell.progress.open": "{work}. Show the running work",
   "shell.progress.list": "Running work",

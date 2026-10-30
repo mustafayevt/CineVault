@@ -461,7 +461,8 @@ pub async fn apply_change_source(
     let service = ops.change(library)?;
     let ids = ids_of(&ids)?;
     let control = MoveControl::new();
-    *ops.control.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&control));
+    begin_move(ops, &control)?;
+    let finish = Arc::clone(&control);
     let result = blocking(move || {
         let applied =
             service.apply_with(&ids, i64::from(target), Some(control), &mut |progress| {
@@ -471,7 +472,7 @@ pub async fn apply_change_source(
         Ok(applied.into())
     })
     .await;
-    *ops.control.lock().unwrap_or_else(PoisonError::into_inner) = None;
+    end_move(ops, &finish);
     result
 }
 
@@ -486,6 +487,35 @@ pub enum MoveControlDto {
     /// Stop. Before the copy is verified the title is taken back to how it was; after that it is
     /// already whole in the new place and finishes.
     Cancel,
+}
+
+/// Marks a move as the running one. A second move is refused instead of replacing the first's
+/// pause and cancel controls.
+fn begin_move(
+    ops: &LibraryOpsState,
+    control: &Arc<MoveControl>,
+) -> Result<(), LibraryOpsCommandError> {
+    let mut slot = ops.control.lock().unwrap_or_else(PoisonError::into_inner);
+    if slot.is_some() {
+        return Err(LibraryOpsCommandError {
+            code: "busy".to_owned(),
+            message: "A move is already running. Wait for it to finish or cancel it first."
+                .to_owned(),
+        });
+    }
+    *slot = Some(Arc::clone(control));
+    Ok(())
+}
+
+/// Clears the slot only when it still belongs to this move.
+fn end_move(ops: &LibraryOpsState, control: &Arc<MoveControl>) {
+    let mut slot = ops.control.lock().unwrap_or_else(PoisonError::into_inner);
+    if slot
+        .as_ref()
+        .is_some_and(|current| Arc::ptr_eq(current, control))
+    {
+        *slot = None;
+    }
 }
 
 /// Pauses, resumes or cancels the move that is running. Does nothing when none is.
@@ -599,7 +629,8 @@ pub async fn resume_unfinished_batch(
 ) -> Result<ResumeOutcomeDto, LibraryOpsCommandError> {
     let service = ops.recovery(library)?;
     let control = MoveControl::new();
-    *ops.control.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&control));
+    begin_move(ops, &control)?;
+    let finish = Arc::clone(&control);
     let result = blocking(move || {
         let outcome = service
             .resume(&batch_id, Some(control), &mut |progress| {
@@ -614,7 +645,7 @@ pub async fn resume_unfinished_batch(
         })
     })
     .await;
-    *ops.control.lock().unwrap_or_else(PoisonError::into_inner) = None;
+    end_move(ops, &finish);
     result
 }
 

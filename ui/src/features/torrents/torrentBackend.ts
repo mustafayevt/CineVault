@@ -1,7 +1,7 @@
-import { isTauri } from "@tauri-apps/api/core";
 import type { Channel } from "@tauri-apps/api/core";
 
 import { commands } from "../../bindings";
+import { isServer, transport } from "../../lib/transport";
 import type {
   IndexerDto,
   IndexerManagerAccessDto,
@@ -192,6 +192,23 @@ const tauriTorrentBackend: TorrentBackend = {
   setIndexer: async (id, on) => unwrap(await commands.torrentSetIndexer(id, on)),
 };
 
+/** The browser server: the client's own browser opens magnets, pages and .torrent files. */
+const browserTorrentBackend: TorrentBackend = {
+  ...tauriTorrentBackend,
+  openMagnet: async (magnet) => {
+    window.open(magnet, "_blank", "noopener");
+  },
+  openTorrentFile: async (url) => {
+    window.open(url, "_blank", "noopener");
+  },
+  openPage: async (url) => {
+    window.open(url, "_blank", "noopener");
+  },
+  openIndexerManager: async () => {
+    throw new Error("The indexer manager runs on the server; open its address there.");
+  },
+};
+
 let override: TorrentBackend | null = null;
 let fallback: TorrentBackend | null = null;
 
@@ -202,7 +219,8 @@ export function setTorrentBackend(backend: TorrentBackend | null): void {
 
 export function currentTorrentBackend(): TorrentBackend {
   if (override !== null) return override;
-  if (isTauri()) return tauriTorrentBackend;
+  if (transport() === "desktop") return tauriTorrentBackend;
+  if (isServer()) return browserTorrentBackend;
   // A plain browser has no sources: it uses fixtures so the page can be developed.
   fallback ??= createSyntheticTorrentBackend();
   return fallback;

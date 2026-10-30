@@ -24,6 +24,7 @@ const SESSION_IDLE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 const SESSION_MAX: Duration = Duration::from_secs(90 * 24 * 60 * 60);
 const MAX_SESSIONS: usize = 32;
 const MAX_FAILURES: usize = 5;
+const MAX_GLOBAL_FAILURES: usize = 100;
 const FAILURE_WINDOW: Duration = Duration::from_secs(60);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -71,7 +72,44 @@ pub struct Auth {
     sessions: Mutex<HashMap<String, Session>>,
     setup_deadline: Mutex<Option<Instant>>,
     setup_claim: Mutex<Option<String>>,
-    failures: Mutex<HashMap<String, Vec<Instant>>>,
+    failures: Mutex<Failures>,
+}
+
+#[derive(Default)]
+struct Failures {
+    per_client: HashMap<String, Vec<Instant>>,
+    global: Vec<Instant>,
+}
+
+impl Failures {
+    fn prune(&mut self, now: Instant) {
+        self.per_client.retain(|_, attempts| {
+            attempts.retain(|at| now.duration_since(*at) <= FAILURE_WINDOW);
+            !attempts.is_empty()
+        });
+        self.global
+            .retain(|at| now.duration_since(*at) <= FAILURE_WINDOW);
+    }
+
+    fn blocked(&self, client: &str) -> bool {
+        self.global.len() >= MAX_GLOBAL_FAILURES
+            || self
+                .per_client
+                .get(client)
+                .is_some_and(|attempts| attempts.len() >= MAX_FAILURES)
+    }
+
+    fn record(&mut self, client: &str, now: Instant) {
+        self.per_client
+            .entry(client.to_owned())
+            .or_default()
+            .push(now);
+        self.global.push(now);
+    }
+
+    fn clear(&mut self, client: &str) {
+        self.per_client.remove(client);
+    }
 }
 
 impl Auth {
@@ -98,7 +136,7 @@ impl Auth {
             sessions: Mutex::new(HashMap::new()),
             setup_deadline: Mutex::new(setup_deadline),
             setup_claim: Mutex::new(None),
-            failures: Mutex::new(HashMap::new()),
+            failures: Mutex::new(Failures::default()),
         })
     }
 
@@ -262,9 +300,10 @@ impl Auth {
             .is_ok()
     }
 
-    /// Checks a password and starts a session, with the five-a-minute limit.
+    /// Checks a password and starts a session, with the five-a-minute limit and a global
+    /// ceiling. The check, the verification and the record happen under one lock, so concurrent
+    /// attempts cannot slip past the limit together.
     pub fn login(&self, password: &str, client: &str) -> Result<(String, Session), AuthError> {
-        self.check_failures(client)?;
         let file = {
             let guard = Self::lock(&self.password);
             (*guard).clone()
@@ -273,14 +312,21 @@ impl Auth {
             return Err(AuthError::SetupClosed);
         };
         let parsed = PasswordHash::new(&file.hash).map_err(|_| AuthError::Damaged)?;
+        let now = Instant::now();
+        let mut failures = Self::lock(&self.failures);
+        failures.prune(now);
+        if failures.blocked(client) {
+            return Err(AuthError::TooManyAttempts);
+        }
         if Argon2::default()
             .verify_password(password.as_bytes(), &parsed)
             .is_err()
         {
-            self.record_failure(client);
+            failures.record(client, now);
             return Err(AuthError::WrongPassword);
         }
-        Self::lock(&self.failures).remove(client);
+        failures.clear(client);
+        drop(failures);
         Ok(self.create_session())
     }
 
@@ -337,25 +383,6 @@ impl Auth {
         };
         sessions.insert(id.clone(), session.clone());
         (id, session)
-    }
-
-    fn check_failures(&self, client: &str) -> Result<(), AuthError> {
-        let now = Instant::now();
-        let mut failures = Self::lock(&self.failures);
-        let attempts = failures.entry(client.to_owned()).or_default();
-        attempts.retain(|at| now.duration_since(*at) <= FAILURE_WINDOW);
-        if attempts.len() >= MAX_FAILURES {
-            return Err(AuthError::TooManyAttempts);
-        }
-        Ok(())
-    }
-
-    fn record_failure(&self, client: &str) {
-        let mut failures = Self::lock(&self.failures);
-        failures
-            .entry(client.to_owned())
-            .or_default()
-            .push(Instant::now());
     }
 }
 

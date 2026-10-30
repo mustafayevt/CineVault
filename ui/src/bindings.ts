@@ -1961,6 +1961,8 @@ export type JobProgress = {
 	name: string,
 	/**  Lane the job runs on, such as `disk`, `cpu` or `provider:tmdb`. */
 	lane: string,
+	/**  The browser session that started it; absent on the desktop and for background work. */
+	started_by?: string | null,
 	state: JobStateDto,
 	priority: PriorityDto,
 	/**  Number of items. */

@@ -42,6 +42,10 @@ pub struct JobProgress {
     pub name: String,
     /// Lane the job runs on, such as `disk`, `cpu` or `provider:tmdb`.
     pub lane: String,
+    /// The browser session that started it; absent on the desktop and for background work.
+    #[serde(default)]
+    #[specta(optional)]
+    pub started_by: Option<String>,
     pub state: JobStateDto,
     pub priority: PriorityDto,
     /// Number of items.
@@ -106,6 +110,7 @@ impl From<&JobSnapshot> for JobProgress {
             id: small(s.id.0),
             name: s.name.clone(),
             lane: s.lane.to_string(),
+            started_by: (!s.started_by.is_empty()).then(|| s.started_by.clone()),
             state: match s.state {
                 JobState::Queued => JobStateDto::Queued,
                 JobState::Running => JobStateDto::Running,

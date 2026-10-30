@@ -204,6 +204,7 @@ fn snapshot(id: u64, state: JobState, done: usize, total: usize) -> JobSnapshot 
         id: cv_jobs::JobId(id),
         name: format!("job {id}"),
         lane: LaneId::Disk,
+        started_by: String::new(),
         state,
         priority: cv_jobs::Priority::Normal,
         total,

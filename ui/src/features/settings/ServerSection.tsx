@@ -189,7 +189,7 @@ export function ServerSection() {
         </Button>
       </FormRow>
       {error !== null ? (
-        <p role="alert" className="px-4 py-2 text-(length:--fs-12) text-status-problem">
+        <p role="alert" className="px-4 py-2 text-(length:--fs-12) text-danger">
           {error}
         </p>
       ) : null}

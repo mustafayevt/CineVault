@@ -61,7 +61,7 @@
 <li>One password for the server, created in the first-run welcome, with a 30-day session, &quot;sign out every session&quot; and a <code>cinevault-server passwd</code> recovery command.</li>
 <li>The server keeps provider keys in an encrypted <code>secrets.enc</code> and takes the master key from a Docker secret or a systemd credential. The desktop app keeps using the operating-system credential store.</li>
 <li>The server and the desktop app share one library safely: the server holds a <code>library-owner.json</code> lock, the desktop app refuses that folder, and the command line exits with code 2 instead of writing behind the server's back.</li>
-<li>Browser playback of the server's files with seeking, a stream link and an optional &quot;Open in Kodi&quot;; the desktop player choice stays in the desktop app.</li>
+<li>Browser playback of the server's files with seeking; the desktop player choice stays in the desktop app.</li>
 <li>A Server section in Settings with the address, version, session count, key state, password change and &quot;sign out every other session&quot;.</li>
 </ul>
       </div>

@@ -1,5 +1,6 @@
 import { commands } from "../../bindings";
-import { transport } from "../../lib/transport";
+import { isServer, transport } from "../../lib/transport";
+import { showToast } from "../toasts/toastStore";
 
 /** Where the Open folder actions go: in the desktop app that is the Rust service. */
 export interface OpenFolderBackend {
@@ -17,6 +18,14 @@ const tauriBackend: OpenFolderBackend = {
 /** In a plain browser (development and design review) nothing opens. */
 const syntheticBackend: OpenFolderBackend = { open: () => Promise.resolve() };
 
+/** On the server the folder is not on this machine; say where it is instead of doing nothing. */
+const serverBackend: OpenFolderBackend = {
+  open: () => {
+    showToast({ message: "The folder is on the server." });
+    return Promise.resolve();
+  },
+};
+
 let override: OpenFolderBackend | null = null;
 
 /** Replaces the backend; pass `null` to go back to the default. Used by tests. */
@@ -27,5 +36,6 @@ export function setOpenFolderBackend(backend: OpenFolderBackend | null): void {
 /** The backend in use: the override, the Rust service in the desktop app, else a no-op. */
 export function currentOpenFolderBackend(): OpenFolderBackend {
   if (override !== null) return override;
-  return transport() === "desktop" ? tauriBackend : syntheticBackend;
+  if (transport() === "desktop") return tauriBackend;
+  return isServer() ? serverBackend : syntheticBackend;
 }

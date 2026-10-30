@@ -90,6 +90,9 @@ pub struct JobSnapshot {
     pub name: String,
     /// Lane its items run on.
     pub lane: LaneId,
+    /// The browser session that started it, empty for the desktop and background work.
+    #[serde(default)]
+    pub started_by: String,
     /// Current state.
     pub state: JobState,
     /// Scheduling priority.

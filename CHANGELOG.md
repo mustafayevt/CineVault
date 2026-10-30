@@ -10,7 +10,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - One password for the server, created in the first-run welcome, with a 30-day session, "sign out every session" and a `cinevault-server passwd` recovery command.
 - The server keeps provider keys in an encrypted `secrets.enc` and takes the master key from a Docker secret or a systemd credential. The desktop app keeps using the operating-system credential store.
 - The server and the desktop app share one library safely: the server holds a `library-owner.json` lock, the desktop app refuses that folder, and the command line exits with code 2 instead of writing behind the server's back.
-- Browser playback of the server's files with seeking, a stream link and an optional "Open in Kodi"; the desktop player choice stays in the desktop app.
+- Browser playback of the server's files with seeking; the desktop player choice stays in the desktop app.
 - A Server section in Settings with the address, version, session count, key state, password change and "sign out every other session".
 
 ## [1.1.1] - 2026-10-29

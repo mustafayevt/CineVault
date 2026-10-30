@@ -47,6 +47,8 @@ const STREAM_HISTORY: usize = 512;
 struct ClientStream {
     sender: SseSender,
     history: VecDeque<(u64, String)>,
+    /// The session that opened it; signing out ends the streams of that session.
+    session: String,
 }
 
 /// One Server-Sent Events connection per page, by the client id the page minted.
@@ -65,6 +67,7 @@ impl Streams {
     pub(crate) fn connect(
         &self,
         client: &str,
+        session: &str,
         last_event_id: Option<u64>,
     ) -> (
         Vec<Event>,
@@ -74,11 +77,15 @@ impl Streams {
         let Ok(mut clients) = self.clients.lock() else {
             return (Vec::new(), receiver);
         };
-        let entry = clients.entry(client.to_owned()).or_insert_with(|| ClientStream {
-            sender: sender.clone(),
-            history: VecDeque::new(),
-        });
+        let entry = clients
+            .entry(client.to_owned())
+            .or_insert_with(|| ClientStream {
+                sender: sender.clone(),
+                history: VecDeque::new(),
+                session: session.to_owned(),
+            });
         entry.sender = sender;
+        entry.session = session.to_owned();
         let mut replay = Vec::new();
         let mut reset = false;
         if let Some(last) = last_event_id {
@@ -97,11 +104,31 @@ impl Streams {
         }
         if reset {
             replay.clear();
-            replay.push(
-                Event::default().data(json!({ "kind": "reset" }).to_string()),
-            );
+            replay.push(Event::default().data(json!({ "kind": "reset" }).to_string()));
         }
         (replay, receiver)
+    }
+
+    /// Ends every stream opened by the session (sign-out, password change, expiry).
+    pub(crate) fn close_session(&self, session: &str) {
+        if let Ok(mut clients) = self.clients.lock() {
+            clients.retain(|_, stream| stream.session != session);
+        }
+    }
+
+    /// Ends every stream except the one belonging to `session` (a password change keeps the
+    /// browser that made it signed in).
+    pub(crate) fn close_all_except(&self, session: &str) {
+        if let Ok(mut clients) = self.clients.lock() {
+            clients.retain(|_, stream| stream.session == session);
+        }
+    }
+
+    /// Ends every stream (shutdown).
+    pub(crate) fn close_all(&self) {
+        if let Ok(mut clients) = self.clients.lock() {
+            clients.clear();
+        }
     }
 
     fn send_data(&self, client: &str, data: String) -> bool {

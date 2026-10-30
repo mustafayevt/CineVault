@@ -179,3 +179,8 @@ function install(): void {
 }
 
 if (isServerMode()) install();
+
+/** The client id this page sends, or null outside the server. */
+export function serverClientId(): string | null {
+  return isServerMode() ? sessionStorage.getItem(CLIENT_KEY) : null;
+}

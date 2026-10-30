@@ -216,6 +216,13 @@ pub(crate) async fn dispatch(
     args: &Value,
     client: &str,
 ) -> DispatchResult {
+    if state.keys_locked && cmd == "set_provider_credential" {
+        return Err(json!({
+            "code": "keys_locked",
+            "message": "Provider keys are locked. Set CINEVAULT_SECRET_KEY_FILE and restart the server."
+        }));
+    }
+    let _client = cv_jobs::client::enter(client);
     let commands = &state.commands;
     let library = &commands.library;
     match cmd {
@@ -983,10 +990,26 @@ pub(crate) async fn dispatch(
             let item_id: String = arg(args, "itemId")?;
             let slot: String = arg(args, "slot")?;
             let source: String = arg(args, "source")?;
-            cv_ipc::artwork::place_artwork(&commands.artwork, item_id, slot, source)
+            // A browser may only place an image it uploaded to the server's staging folder. A
+            // pasted `file:` address or any other server path would copy a private file into the
+            // media folders.
+            let uploads = state.data_root.join("tmp");
+            let path = std::path::PathBuf::from(&source);
+            let staged = path.is_absolute() && path.starts_with(&uploads);
+            if !staged && (path.is_absolute() || source.starts_with("file:")) {
+                return Err(json!({
+                    "code": "not_allowed",
+                    "message": "Upload the image from this browser instead of naming a file on the server."
+                }));
+            }
+            let placed = cv_ipc::artwork::place_artwork(&commands.artwork, item_id, slot, source)
                 .await
                 .map_err(command_error)
-                .and_then(to_value)
+                .and_then(to_value);
+            if staged {
+                let _ = tokio::fs::remove_file(&path).await;
+            }
+            placed
         }
         "place_extra_artwork" => {
             let item_id: String = arg(args, "itemId")?;

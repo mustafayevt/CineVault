@@ -1,4 +1,4 @@
-import { isTauri } from "@tauri-apps/api/core";
+import { isServer, transport } from "../../lib/transport";
 
 import { commands } from "../../bindings";
 import { t } from "../../i18n/catalog";
@@ -23,7 +23,7 @@ const override: RatingPageOpener | null = null;
 
 function currentOpener(): RatingPageOpener {
   if (override !== null) return override;
-  return isTauri() ? tauriOpener : browserOpener;
+  return transport() === "desktop" && !isServer() ? tauriOpener : browserOpener;
 }
 
 /** Opens the title's page on a rating source's site; says so when it cannot. */

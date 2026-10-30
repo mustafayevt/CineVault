@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::body::Bytes;
-use axum::extract::{ConnectInfo, Path as UrlPath, Query, State};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, Path as UrlPath, Query, State};
 use axum::http::{HeaderMap, StatusCode, Uri, header};
 use axum::response::sse::{KeepAlive, Sse};
 use axum::response::{IntoResponse, Redirect, Response};
@@ -148,8 +148,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/server/sign-out-all", post(server_sign_out_all))
         .route("/api/delete/intent", post(delete_intent))
         .route("/api/delete/erase", post(delete_erase))
-        .route("/api/artwork/upload", post(artwork_upload))
-        .route("/api/invoke", post(invoke))
+        .route(
+            "/api/artwork/upload",
+            post(artwork_upload).layer(DefaultBodyLimit::max(33 * 1024 * 1024)),
+        )
+        .route(
+            "/api/invoke",
+            post(invoke).layer(DefaultBodyLimit::max(1024 * 1024)),
+        )
         .route("/api/stream", get(stream))
         .route("/img/{key}/{size}", get(image))
         .route("/api/media/{item}/{part}", get(media).post(media_download))
@@ -157,7 +163,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/fs/mkdir", post(fs_mkdir))
         .route("/api/fs/probe", post(fs_probe))
         .fallback(get(static_file))
-        .with_state(state);
+        .with_state(state.clone());
+
+    let shutdown_state = state;
 
     let addr: SocketAddr = format!("{bind}:{port}").parse()?;
     println!(
@@ -165,12 +173,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui_dir.display()
     );
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(
+    let server = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown())
-    .await?;
+    .with_graceful_shutdown(shutdown(shutdown_state));
+    // A client that refuses to close must not keep the process (and the library's owner file)
+    // alive forever.
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(15), server).await;
     Ok(())
 }
 
@@ -215,8 +225,28 @@ fn install_logging() {
     let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
 }
 
-async fn shutdown() {
-    let _ = tokio::signal::ctrl_c().await;
+async fn shutdown(state: WebState) {
+    wait_for_signal().await;
+    // Dropping every stream ends the SSE responses, so axum can finish its graceful shutdown.
+    state.streams.close_all();
+    state.services.shutdown();
+}
+
+async fn wait_for_signal() {
+    #[cfg(unix)]
+    {
+        let mut terminate =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("a SIGTERM handler");
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = terminate.recv() => {}
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
 }
 
 async fn health(State(state): State<WebState>) -> Response {
@@ -261,12 +291,24 @@ fn client_ip(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> IpAddr {
     if !from_trusted_proxy(peer, trust) {
         return peer;
     }
-    headers
+    let Some(chain) = headers
         .get("x-forwarded-for")
         .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(',').next())
-        .and_then(|value| value.trim().parse().ok())
-        .unwrap_or(peer)
+    else {
+        return peer;
+    };
+    let hops: Vec<IpAddr> = chain
+        .split(',')
+        .filter_map(|value| value.trim().parse().ok())
+        .collect();
+    // A proxy appends the address it saw to the right. The first address from the right that is
+    // not itself a trusted proxy is the client; the leftmost value may be client-supplied.
+    for ip in hops.iter().rev() {
+        if !from_trusted_proxy(*ip, trust) {
+            return *ip;
+        }
+    }
+    hops.first().copied().unwrap_or(peer)
 }
 
 fn effective_host(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> Option<String> {
@@ -277,8 +319,16 @@ fn effective_host(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> Option<
     };
     headers
         .get(name)
+        .or_else(|| headers.get("host"))
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned)
+}
+
+fn strip_default_port(value: &str) -> &str {
+    value
+        .strip_suffix(":80")
+        .or_else(|| value.strip_suffix(":443"))
+        .unwrap_or(value)
 }
 
 fn origin_matches(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> bool {
@@ -293,7 +343,7 @@ fn origin_matches(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> bool {
         return false;
     };
     let origin_host = origin.split("://").nth(1).unwrap_or(origin);
-    origin_host.eq_ignore_ascii_case(&host)
+    strip_default_port(origin_host).eq_ignore_ascii_case(strip_default_port(&host))
 }
 
 fn session_of(state: &WebState, headers: &HeaderMap) -> Option<(String, auth::Session)> {
@@ -491,6 +541,7 @@ async fn server_password(
     {
         Ok(()) => {
             state.auth.logout_all_except(Some(&session_id));
+            state.streams.close_all_except(&session_id);
             Json(json!({ "ok": true })).into_response()
         }
         Err(error) => {
@@ -519,6 +570,7 @@ async fn server_sign_out_all(State(state): State<WebState>, headers: HeaderMap) 
             .into_response();
     }
     state.auth.logout_all_except(Some(&session_id));
+    state.streams.close_all_except(&session_id);
     Json(json!({ "ok": true })).into_response()
 }
 
@@ -529,6 +581,7 @@ async fn logout(
 ) -> Response {
     if let Some(id) = auth::cookie(&headers, "cv_session") {
         state.auth.logout(&id);
+        state.streams.close_session(&id);
     }
     let mut response = Json(json!({ "ok": true })).into_response();
     set_cookie(
@@ -552,9 +605,7 @@ fn write_gate(
     let csrf = headers
         .get("x-cinevault-csrf")
         .and_then(|value| value.to_str().ok());
-    if csrf != Some(session.csrf.as_str())
-        || !origin_matches(headers, peer, &state.trust_proxy)
-    {
+    if csrf != Some(session.csrf.as_str()) || !origin_matches(headers, peer, &state.trust_proxy) {
         return Err(Box::new(
             (
                 StatusCode::FORBIDDEN,
@@ -663,7 +714,10 @@ async fn delete_erase(
         Ok(report) => Json(report).into_response(),
         Err(error) => (
             StatusCode::BAD_REQUEST,
-            Json(serde_json::to_value(error).unwrap_or_else(|_| json!({ "message": "The delete failed." }))),
+            Json(
+                serde_json::to_value(error)
+                    .unwrap_or_else(|_| json!({ "message": "The delete failed." })),
+            ),
         )
             .into_response(),
     }
@@ -780,9 +834,9 @@ async fn stream(
     Query(query): Query<ClientQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if session_of(&state, &headers).is_none() {
+    let Some((session_id, _)) = session_of(&state, &headers) else {
         return signed_out();
-    }
+    };
     let client = if query.client.is_empty() {
         "default".to_owned()
     } else {
@@ -792,8 +846,9 @@ async fn stream(
         .get("last-event-id")
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse::<u64>().ok());
-    let (replay, receiver) = state.streams.connect(&client, last_event_id);
-    let stream = tokio_stream::iter(replay.into_iter().map(Ok)).chain(ReceiverStream::new(receiver));
+    let (replay, receiver) = state.streams.connect(&client, &session_id, last_event_id);
+    let stream =
+        tokio_stream::iter(replay.into_iter().map(Ok)).chain(ReceiverStream::new(receiver));
     Sse::new(stream)
         .keep_alive(KeepAlive::default())
         .into_response()
@@ -1280,8 +1335,14 @@ async fn image(State(state): State<WebState>, uri: Uri, headers: HeaderMap) -> R
 fn image_response(answer: ImageResponse) -> Response {
     let mut builder = Response::builder().status(answer.status);
     for (name, value) in &answer.headers {
-        builder = builder.header(*name, value);
+        if name.eq_ignore_ascii_case("cache-control") {
+            // The desktop protocol may be cached publicly; the browser route is per-session.
+            builder = builder.header(*name, value.replace("public", "private"));
+        } else {
+            builder = builder.header(*name, value);
+        }
     }
+    builder = builder.header(header::VARY, "Cookie");
     builder
         .body(Body::from(answer.body))
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
@@ -1289,15 +1350,28 @@ fn image_response(answer: ImageResponse) -> Response {
 
 async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap) -> Response {
     let requested = uri.path().trim_start_matches('/');
-    let is_asset = requested.starts_with("assets/")
+    // Nothing but a plain relative path may reach the file system. `..`, an absolute path and a
+    // Windows prefix are refused before any join, so an encoded or literal traversal cannot
+    // escape the interface folder.
+    let relative = Path::new(requested);
+    if relative
+        .components()
+        .any(|component| !matches!(component, std::path::Component::Normal(_)))
+    {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let Ok(root) = tokio::fs::canonicalize(&state.ui_dir).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    // Only the hashed build files are public; they hold no library data. Everything else needs
+    // a session, including a page opened by a deep link.
+    let is_asset = relative
+        .components()
+        .next()
+        .is_some_and(|component| component.as_os_str() == "assets")
         || requested == "favicon.ico"
         || requested == "favicon.svg"
-        || requested == "robots.txt"
-        || [
-            ".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".woff", ".woff2", ".map",
-        ]
-        .iter()
-        .any(|extension| requested.ends_with(extension));
+        || requested == "robots.txt";
     let session = if is_asset {
         None
     } else {
@@ -1311,21 +1385,28 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         })
         .into_response();
     }
-    let mut file = state.ui_dir.join(if requested.is_empty() {
+    let mut file = root.join(if requested.is_empty() {
         "index.html"
     } else {
         requested
     });
-    if !file.starts_with(&state.ui_dir) {
-        return StatusCode::NOT_FOUND.into_response();
-    }
     if !file.is_file() {
-        file = state.ui_dir.join("index.html");
+        file = root.join("index.html");
     }
-    let Ok(mut body) = fs::read(&file).await else {
+    let Ok(canonical) = tokio::fs::canonicalize(&file).await else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    if file.file_name().is_some_and(|name| name == "index.html") {
+    // A symlink inside the interface folder must not point at the library either.
+    if !canonical.starts_with(&root) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let Ok(mut body) = fs::read(&canonical).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let is_index = canonical
+        .file_name()
+        .is_some_and(|name| name == "index.html");
+    if is_index {
         let csrf = session
             .as_ref()
             .map(|(_, session)| session.csrf.as_str())
@@ -1336,7 +1417,7 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         let text = String::from_utf8_lossy(&body).replace("</head>", &format!("{marker}</head>"));
         body = text.into_bytes();
     }
-    let mime = match file
+    let mime = match canonical
         .extension()
         .and_then(|extension| extension.to_str())
         .unwrap_or("")
@@ -1353,7 +1434,22 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         "woff" => "font/woff",
         _ => "application/octet-stream",
     };
-    ([(header::CONTENT_TYPE, mime)], body).into_response()
+    let cache = if is_index {
+        "no-store"
+    } else if is_asset {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-store"
+    };
+    (
+        [
+            (header::CONTENT_TYPE, mime),
+            (header::CACHE_CONTROL, cache),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+        ],
+        body,
+    )
+        .into_response()
 }
 
 #[cfg(test)]

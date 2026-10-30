@@ -12,6 +12,7 @@ interface FolderEntry {
 interface Listing {
   path: string;
   parent: string | null;
+  roots: string[];
   folders: FolderEntry[];
 }
 
@@ -41,12 +42,15 @@ export function FolderPickerHost() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [newName, setNewName] = useState<string | null>(null);
+  const [pathInput, setPathInput] = useState("");
   const nameInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (path: string) => {
     setError(null);
     try {
-      setListing(await readListing(path));
+      const value = await readListing(path);
+      setListing(value);
+      setPathInput(value.path);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -131,7 +135,7 @@ export function FolderPickerHost() {
           alignItems: "center",
           gap: 12,
           padding: "14px 20px",
-          borderBottom: "1px solid var(--divider)",
+          borderBottom: "1px solid var(--line-section)",
         }}
       >
         <strong style={{ fontSize: 15 }}>{request.title ?? "Choose a folder"}</strong>
@@ -163,20 +167,26 @@ export function FolderPickerHost() {
         >
           Up
         </button>
-        <code
+        <input
+          value={pathInput}
+          onChange={(event) => setPathInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void load(pathInput.trim());
+          }}
+          aria-label="Folder path on the server"
+          spellCheck={false}
           style={{
             flex: 1,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            background: "var(--surface-card)",
+            minWidth: 0,
+            background: "var(--surface-well)",
+            border: "1px solid var(--line-section)",
             borderRadius: 8,
             padding: "6px 10px",
+            color: "var(--text)",
             fontSize: 12,
+            fontFamily: "inherit",
           }}
-        >
-          {listing?.path ?? "…"}
-        </code>
+        />
         <button
           type="button"
           disabled={busy || listing === null}
@@ -186,6 +196,37 @@ export function FolderPickerHost() {
           New folder
         </button>
       </div>
+
+      {listing !== null && listing.roots.length > 0 ? (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            padding: "0 20px 10px",
+          }}
+        >
+          {listing.roots.map((root) => (
+            <button
+              key={root}
+              type="button"
+              onClick={() => void load(root)}
+              style={{
+                font: "inherit",
+                fontSize: 12,
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid var(--line-section)",
+                background: "var(--surface-card)",
+                color: "var(--text-2)",
+                cursor: "pointer",
+              }}
+            >
+              {root}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {newName !== null ? (
         <div style={{ display: "flex", gap: 8, padding: "0 20px 12px" }}>
@@ -201,7 +242,7 @@ export function FolderPickerHost() {
               flex: 1,
               padding: "8px 10px",
               borderRadius: 8,
-              border: "1px solid var(--divider)",
+              border: "1px solid var(--line-section)",
               background: "var(--surface-well)",
               color: "var(--text)",
               font: "inherit",
@@ -214,7 +255,7 @@ export function FolderPickerHost() {
       ) : null}
 
       {error !== null ? (
-        <p role="alert" style={{ color: "var(--status-problem)", padding: "0 20px" }}>
+        <p role="alert" style={{ color: "var(--danger)", padding: "0 20px" }}>
           {error}
         </p>
       ) : null}
@@ -261,7 +302,7 @@ export function FolderPickerHost() {
           justifyContent: "flex-end",
           gap: 10,
           padding: "14px 20px",
-          borderTop: "1px solid var(--divider)",
+          borderTop: "1px solid var(--line-section)",
         }}
       >
         <button type="button" onClick={() => close([])} style={{ font: "inherit" }}>
