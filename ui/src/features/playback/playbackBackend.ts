@@ -1,6 +1,5 @@
-import { isTauri } from "@tauri-apps/api/core";
-
 import { commands } from "../../bindings";
+import { isServer, transport } from "../../lib/transport";
 import type { PlayOutcomeDto } from "../../bindings";
 
 /** What pressing Play did: the player that started and how many parts it was given. */
@@ -36,9 +35,12 @@ const tauriPlaybackBackend: PlaybackBackend = {
   },
 };
 
-/** A plain browser has no player to start; the call succeeds so the page can be developed. */
+/** A browser plays the file itself through the server's media route. */
 const browserPlaybackBackend: PlaybackBackend = {
-  play: () => Promise.resolve({ player: "system", parts: 1, opened: 1 }),
+  play: (id) => {
+    window.open(`/api/media/${encodeURIComponent(id)}/0`, "_blank", "noopener");
+    return Promise.resolve({ player: "browser", parts: 1, opened: 1 });
+  },
 };
 
 let override: PlaybackBackend | null = null;
@@ -50,5 +52,8 @@ export function setPlaybackBackend(backend: PlaybackBackend | null): void {
 
 export function currentPlaybackBackend(): PlaybackBackend {
   if (override !== null) return override;
-  return isTauri() ? tauriPlaybackBackend : browserPlaybackBackend;
+  if (transport() === "desktop") return tauriPlaybackBackend;
+  return isServer()
+    ? browserPlaybackBackend
+    : { play: () => Promise.resolve({ player: "system", parts: 1, opened: 1 }) };
 }

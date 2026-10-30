@@ -146,6 +146,34 @@ pub fn write_temp(target: &Path, bytes: &[u8]) -> io::Result<PathBuf> {
     }
 }
 
+/// As [`write_temp`], but the temporary file is created with `mode` on Unix (the password hash
+/// and the owner file must not be readable by another user even for a moment). On other systems
+/// the file inherits the folder's access control.
+pub fn write_temp_with_mode(target: &Path, bytes: &[u8], mode: u32) -> io::Result<PathBuf> {
+    let temp = temp_path(target);
+    let written = (|| {
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(mode);
+        }
+        #[cfg(not(unix))]
+        let _ = mode;
+        let mut file = options.open(&temp)?;
+        file.write_all(bytes)?;
+        file.sync_all()
+    })();
+    match written {
+        Ok(()) => Ok(temp),
+        Err(error) => {
+            let _ = fs::remove_file(&temp);
+            Err(error)
+        }
+    }
+}
+
 /// Copies the file `source` to a new temporary file beside `target` and flushes it to the disk.
 /// Returns the temporary path; pass it to [`persist`]. `source` is only read. Nothing stays
 /// behind when this fails.
@@ -228,6 +256,18 @@ pub fn persist_new(temp: &Path, target: &Path) -> io::Result<()> {
 /// file stays behind.
 pub fn write_atomic(target: &Path, bytes: &[u8]) -> io::Result<()> {
     let temp = write_temp(target, bytes)?;
+    persist(&temp, target)
+}
+
+/// As [`write_atomic`], with the temporary file created as `mode` on Unix. Used for files that
+/// hold a password hash or a session secret, so another user cannot read them even during the
+/// write.
+///
+/// # Errors
+/// The new file cannot be written or put in place; `target` is then unchanged and no temporary
+/// file stays behind.
+pub fn write_atomic_with_mode(target: &Path, bytes: &[u8], mode: u32) -> io::Result<()> {
+    let temp = write_temp_with_mode(target, bytes, mode)?;
     persist(&temp, target)
 }
 

@@ -125,10 +125,10 @@ mod tests {
             PathStyle::current(),
             SystemFolders::new(PathStyle::current()),
         );
-        app.manage(LibraryState::with_guard(&boot, guard));
+        app.manage(LibraryState::with_guard(&services, guard));
         app.manage(NfoState::new());
         app.manage(EditState::new());
-        app.manage(SettingsState::from_boot(&boot));
+        app.manage(SettingsState::from_services(boot.services()));
         app.manage(boot);
         (app, services)
     }

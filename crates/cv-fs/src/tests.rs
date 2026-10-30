@@ -20,6 +20,18 @@ fn an_atomic_write_replaces_the_file_and_leaves_no_temporary_file() {
     assert_eq!(names(dir.path()), ["Heat.nfo"]);
 }
 
+#[cfg(unix)]
+#[test]
+fn a_restricted_atomic_write_is_owner_only_from_the_first_byte() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("server-auth.json");
+    write_atomic_with_mode(&target, b"hash", 0o600).unwrap();
+    let mode = fs::metadata(&target).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600);
+    assert_eq!(names(dir.path()), ["server-auth.json"]);
+}
+
 #[test]
 fn temporary_names_are_unique_and_never_a_media_extension() {
     let target = Path::new("/m/Heat (1995)/poster.jpg");

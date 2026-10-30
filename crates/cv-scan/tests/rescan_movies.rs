@@ -594,12 +594,20 @@ fn a_title_gets_its_added_date_and_its_video_the_files_modified_time_and_keeps_t
     // Never empty: the first scan stamps every new title with the time it saw it, and the sort
     // columns read the main video's modified time from the file system.
     let movies = lib.items(ItemKind::Movie);
-    assert!(
-        movies
-            .iter()
-            .all(|m| m.core.date_added_ms == 1_700_000_000_000)
-    );
+    // Changing a file's modification time also moves its creation time on APFS, so the file
+    // whose time the test changed reads the changed time as its date added there.
+    // Changing a file's modification time also moves its creation time on APFS. Heat therefore
+    // reads 2023 as its date added there; on the other systems its creation time is unknown and
+    // the scan clock wins. Alien was not touched, so its date added is the scan clock either way.
+    let expected_added = if cfg!(target_os = "macos") {
+        1_500_000_000_000
+    } else {
+        1_700_000_000_000
+    };
     let heat = movies.iter().find(|m| m.core.title == "Heat").unwrap();
+    assert_eq!(heat.core.date_added_ms, expected_added);
+    let alien = movies.iter().find(|m| m.core.title == "Alien").unwrap();
+    assert_eq!(alien.core.date_added_ms, 1_700_000_000_000);
     assert_eq!(video(heat).modified_ms, 1_500_000_000_000);
 
     // A later scan that sees a newer title does not move the first one's date.
@@ -618,7 +626,7 @@ fn a_title_gets_its_added_date_and_its_video_the_files_modified_time_and_keeps_t
             .core
             .date_added_ms
     };
-    assert_eq!(added("Heat"), 1_700_000_000_000);
+    assert_eq!(added("Heat"), expected_added);
     // Dune's date is when its file was created, no later than the scan's clock.
     assert!(added("Dune") > added("Heat") && added("Dune") <= 1_800_000_000_000);
 }

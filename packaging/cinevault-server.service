@@ -1,0 +1,38 @@
+[Unit]
+Description=CineVault movie and TV library server
+Documentation=https://github.com/mustafayevt/CineVault
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cinevault
+Group=cinevault
+Environment=CINEVAULT_DATA_DIR=/srv/cinevault
+Environment=CINEVAULT_WEB_BIND=0.0.0.0
+Environment=CINEVAULT_WEB_PORT=8787
+Environment=RUST_LOG=info
+ExecStart=/usr/local/bin/cinevault-server --ui /usr/share/cinevault/ui
+Restart=on-failure
+RestartSec=5
+# The server handles SIGINT for a clean stop (pause jobs, remove the owner file).
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# Provider-key master key as a systemd credential instead of an environment variable or a file
+# readable by everyone. Create /etc/cinevault/cinevault.key with `openssl rand -base64 32` (mode
+# 0600, owned by root; base64 of exactly 32 bytes), uncomment
+# both lines, and run `systemctl daemon-reload`.
+#LoadCredential=cinevault_key:/etc/cinevault/cinevault.key
+#Environment=CINEVAULT_SECRET_KEY_FILE=%d/cinevault_key
+
+# Modest hardening. ProtectHome hides /home, /root and /run/user: remove it if a library folder
+# lives there. ProtectSystem=full keeps /usr, /boot and /etc read-only while /srv and /media stay
+# writable.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

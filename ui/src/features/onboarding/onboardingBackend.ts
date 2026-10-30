@@ -1,6 +1,8 @@
 import { isTauri } from "@tauri-apps/api/core";
 
 import { commands } from "../../bindings";
+import { isServer, transport } from "../../lib/transport";
+import { requestFolderPick } from "../pickers/folderPickerRequest";
 import type {
   FileExampleDto,
   FolderAnalysisDto,
@@ -65,6 +67,14 @@ const tauriBackend: OnboardingBackend = {
     ),
 };
 
+/** In a browser the server folder browser replaces the native picker; the rest is the server. */
+const browserBackend: OnboardingBackend = {
+  available: true,
+  analyze: tauriBackend.analyze,
+  pickFolders: () => requestFolderPick(),
+  nameExample: tauriBackend.nameExample,
+};
+
 /** The backend of a plain browser (development): nothing can be looked into or picked. */
 const unavailableBackend: OnboardingBackend = {
   available: false,
@@ -109,11 +119,12 @@ export function previewStart(): { step: 1 | 2 | 3 | 4; folders: string[] } | nul
 
 export function currentOnboardingBackend(): OnboardingBackend {
   if (override !== null) return override;
-  if (isTauri()) return tauriBackend;
+  if (transport() === "desktop") return tauriBackend;
   if (firstRunPreview()) {
     synthetic ??= createSyntheticOnboardingBackend();
     return synthetic;
   }
+  if (isServer()) return browserBackend;
   return unavailableBackend;
 }
 

@@ -7,6 +7,7 @@ import { Dialog } from "../../components/Dialog";
 import { Field } from "../../components/Field";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
+import { isServer } from "../../lib/transport";
 import { useFormat } from "../../i18n/useFormat";
 import { useSetting } from "../settings/settingsStore";
 import { currentLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
@@ -58,6 +59,8 @@ function Confirmation({
   const format = useFormat();
   const bin = binName(detectPlatform());
   const [typed, setTyped] = useState("");
+  const [password, setPassword] = useState("");
+  const browser = isServer();
   const [busy, setBusy] = useState(false);
   // Under Delete permanently a delete erases too, so there is no bin to offer instead.
   const erasing = useSetting<string>("files.deleted-mode") === "erase";
@@ -73,14 +76,15 @@ function Confirmation({
   const skipped = plan.data?.skipped ?? [];
   const files = rows.reduce((sum, row) => sum + row.files, 0);
 
-  const ready = typed === CONFIRM_WORD && rows.length > 0 && !busy;
+  const ready =
+    typed === CONFIRM_WORD && rows.length > 0 && !busy && (!browser || password.length > 0);
 
   const confirm = async () => {
     if (!ready) return;
     setBusy(true);
     const listed = rows.map((row) => ({ id: row.id, title: nameOf(row) }));
     onClose();
-    await erasePermanently(listed, typed, { onDone });
+    await erasePermanently(listed, typed, { onDone, password: browser ? password : undefined });
   };
   const sendToBin = () => {
     onClose();
@@ -183,6 +187,21 @@ function Confirmation({
           </>
         )}
       </ul>
+      {browser ? (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="delete-password" className="text-text-2">
+            Current password
+          </label>
+          <input
+            id="delete-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="h-8 rounded-(--r-8) border border-solid border-line-edge bg-surface-well px-2.5 text-(length:--fs-13)"
+          />
+        </div>
+      ) : null}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="delete-confirm" className="text-text-2">
           {t("delete.dialog.typeBefore")}{" "}

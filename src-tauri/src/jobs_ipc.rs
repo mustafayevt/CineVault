@@ -4,167 +4,26 @@
 //! [`JobManager`] at most every 100 ms, so each job is reported at most 10 times a second, and
 //! every report is one [`JobProgressUpdate`] carrying only the jobs that changed. The same
 //! report moves the Windows taskbar button and the macOS dock tile through the window's
-//! progress bar.
+//! progress bar. The DTOs and the hub live in [`cv_ipc::jobs`].
 
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 use std::time::Duration;
 
+use cv_ipc::jobs::{JobProgressUpdate, ProgressHub};
 use cv_jobs::{
-    JobId, JobManager, JobSnapshot, JobState, LaneConfig, Lanes, ManagerConfig, Overall,
-    OverallKind, OverallTracker, PROGRESS_INTERVAL, Priority, ProgressTick,
+    JobId, JobManager, LaneConfig, Lanes, ManagerConfig, Overall, OverallKind, PROGRESS_INTERVAL,
 };
 // Only the sample job (a development aid) and its tests use these.
 #[cfg(any(debug_assertions, test))]
 use cv_jobs::{ItemControl, ItemError, ItemWork, JobSpec, LaneId};
-use serde::Serialize;
-use specta::Type;
 use tauri::ipc::Channel;
 use tauri::window::{ProgressBarState, ProgressBarStatus};
 use tauri::{AppHandle, Manager, State};
 
 use crate::boot::Boot;
 
-/// Job lifecycle state as the UI sees it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum JobStateDto {
-    Queued,
-    Running,
-    Paused,
-    Completed,
-    Failed,
-    Cancelled,
-}
-
-/// Scheduling priority as the UI sees it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum PriorityDto {
-    Low,
-    Normal,
-    High,
-}
-
-/// Progress of one job.
-#[derive(Debug, Clone, PartialEq, Serialize, Type)]
-pub struct JobProgress {
-    /// Session-local job id.
-    pub id: u32,
-    /// Display name.
-    pub name: String,
-    /// Lane the job runs on, such as `disk`, `cpu` or `provider:tmdb`.
-    pub lane: String,
-    pub state: JobStateDto,
-    pub priority: PriorityDto,
-    /// Number of items.
-    pub total: u32,
-    /// Items processed so far, successfully or not.
-    pub done: u32,
-    /// Items that failed (a subset of `done`).
-    pub failed: u32,
-    /// Items rolled back by a cancel.
-    pub rolled_back: u32,
-    /// Labels of the items being processed right now.
-    pub current: Vec<String>,
-    /// Items per second while the job ran.
-    pub throughput_per_sec: Option<f64>,
-    /// Estimated seconds remaining.
-    pub eta_secs: Option<f64>,
-    /// Seconds the job has run, pauses excluded.
-    pub elapsed_secs: f64,
-    /// Once the job is over, what it did beyond its counts (`6 titles wait in Needs review`).
-    pub outcome: Option<String>,
-    /// Once the job is over, what it produced, as its step in the run history (`212 new`,
-    /// `198 scraped`, `artwork for 190`); `None` shows the job's name.
-    pub result: Option<String>,
-}
-
-/// What the combined taskbar and dock progress shows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum OverallKindDto {
-    Idle,
-    Indeterminate,
-    Normal,
-    Paused,
-}
-
-/// Combined progress of all active jobs (the value mirrored to the taskbar and dock).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
-pub struct OverallProgress {
-    pub kind: OverallKindDto,
-    /// Whole percentage in 0..=100.
-    pub percent: u8,
-    /// Jobs that are queued, running or paused.
-    pub active_jobs: u32,
-}
-
-/// One message on the progress channel.
-#[derive(Debug, Clone, PartialEq, Serialize, Type)]
-pub struct JobProgressUpdate {
-    /// The jobs that changed since the previous message (every job in the first message).
-    pub jobs: Vec<JobProgress>,
-    /// The combined progress.
-    pub overall: OverallProgress,
-}
-
 fn small(n: impl TryInto<u32>) -> u32 {
     n.try_into().unwrap_or(u32::MAX)
-}
-
-impl From<&JobSnapshot> for JobProgress {
-    fn from(s: &JobSnapshot) -> Self {
-        Self {
-            id: small(s.id.0),
-            name: s.name.clone(),
-            lane: s.lane.to_string(),
-            state: match s.state {
-                JobState::Queued => JobStateDto::Queued,
-                JobState::Running => JobStateDto::Running,
-                JobState::Paused => JobStateDto::Paused,
-                JobState::Completed => JobStateDto::Completed,
-                JobState::Failed => JobStateDto::Failed,
-                JobState::Cancelled => JobStateDto::Cancelled,
-            },
-            priority: match s.priority {
-                Priority::Low => PriorityDto::Low,
-                Priority::Normal => PriorityDto::Normal,
-                Priority::High => PriorityDto::High,
-            },
-            total: small(s.total),
-            done: small(s.done),
-            failed: small(s.failed),
-            rolled_back: small(s.rolled_back),
-            current: s.current.clone(),
-            throughput_per_sec: s.throughput_per_sec,
-            eta_secs: s.eta_secs,
-            elapsed_secs: s.elapsed_secs,
-            outcome: s.outcome.clone(),
-            result: s.result.clone(),
-        }
-    }
-}
-
-impl From<&Overall> for OverallProgress {
-    fn from(o: &Overall) -> Self {
-        Self {
-            kind: match o.kind {
-                OverallKind::Idle => OverallKindDto::Idle,
-                OverallKind::Indeterminate => OverallKindDto::Indeterminate,
-                OverallKind::Normal => OverallKindDto::Normal,
-                OverallKind::Paused => OverallKindDto::Paused,
-            },
-            percent: o.percent(),
-            active_jobs: small(o.active_jobs),
-        }
-    }
-}
-
-fn update_of(jobs: &[JobSnapshot], overall: &Overall) -> JobProgressUpdate {
-    JobProgressUpdate {
-        jobs: jobs.iter().map(JobProgress::from).collect(),
-        overall: overall.into(),
-    }
 }
 
 /// How the combined progress looks on the taskbar button (Windows) and the dock tile (macOS).
@@ -194,68 +53,6 @@ impl Taskbar for AppHandle {
         if let Err(error) = window.set_progress_bar(state) {
             tracing::warn!(%error, "could not update the taskbar/dock progress");
         }
-    }
-}
-
-struct Subscriber {
-    channel: Channel<JobProgressUpdate>,
-    /// The next report is sent in full, so a report that was prepared before this subscriber
-    /// joined cannot leave it with stale jobs.
-    needs_full: bool,
-}
-
-/// The channels the UI opened. Dead channels (a closed window) are dropped on the next send.
-#[derive(Default)]
-pub struct ProgressHub {
-    subscribers: Mutex<Vec<Subscriber>>,
-}
-
-impl ProgressHub {
-    fn lock(&self) -> MutexGuard<'_, Vec<Subscriber>> {
-        self.subscribers
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
-    #[cfg(test)]
-    fn len(&self) -> usize {
-        self.lock().len()
-    }
-
-    /// Adds a channel and immediately sends it `initial`, the state of every job.
-    pub fn subscribe(&self, channel: Channel<JobProgressUpdate>, initial: JobProgressUpdate) {
-        if channel.send(initial).is_err() {
-            return;
-        }
-        self.lock().push(Subscriber {
-            channel,
-            needs_full: true,
-        });
-    }
-
-    /// Sends one report to every subscriber: the changed jobs, or for a new subscriber every job
-    /// (`all_jobs` is only called when someone needs it).
-    pub fn publish(&self, tick: &ProgressTick, all_jobs: impl FnOnce() -> Vec<JobSnapshot>) {
-        let mut subscribers = self.lock();
-        if subscribers.is_empty() {
-            return;
-        }
-        let delta = update_of(&tick.jobs, &tick.overall);
-        let mut full: Option<JobProgressUpdate> = None;
-        let mut all_jobs = Some(all_jobs);
-        subscribers.retain_mut(|subscriber| {
-            let update = if subscriber.needs_full {
-                subscriber.needs_full = false;
-                if full.is_none() {
-                    let jobs = all_jobs.take().map(|f| f()).unwrap_or_default();
-                    full = Some(update_of(&jobs, &tick.overall));
-                }
-                full.clone().unwrap_or_else(|| delta.clone())
-            } else {
-                delta.clone()
-            };
-            subscriber.channel.send(update).is_ok()
-        });
     }
 }
 
@@ -311,9 +108,9 @@ pub fn subscribe_job_progress(
     state: State<'_, JobsState>,
     on_progress: Channel<JobProgressUpdate>,
 ) {
-    let jobs = state.manager.list();
-    let overall = OverallTracker::default().update(&jobs);
-    state.hub.subscribe(on_progress, update_of(&jobs, &overall));
+    cv_ipc::jobs::subscribe_job_progress(&state.hub, &state.manager, move |update| {
+        on_progress.send(update).is_ok()
+    });
 }
 
 /// Cancels one job. Returns false when it is unknown or already over.
@@ -380,8 +177,7 @@ pub async fn start_sample_job(
 mod tests {
     use super::*;
     use cv_jobs::{LaneConfig, Lanes, ManagerConfig};
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use tauri::ipc::InvokeResponseBody;
+    use std::sync::Mutex;
     use tokio::time::{Instant, sleep};
 
     #[derive(Default)]
@@ -397,20 +193,17 @@ mod tests {
 
     type Received = Arc<Mutex<Vec<(Instant, serde_json::Value)>>>;
 
-    /// A channel that records every message as JSON, as the UI would receive it.
-    fn recording_channel() -> (Channel<JobProgressUpdate>, Received) {
+    /// A sink that records every message as JSON, as the UI would receive it.
+    fn recording_sink() -> (Box<dyn FnMut(JobProgressUpdate) -> bool + Send>, Received) {
         let received: Received = Arc::default();
         let sink = Arc::clone(&received);
-        let channel = Channel::new(move |body| {
-            let InvokeResponseBody::Json(json) = body else {
-                panic!("progress messages are JSON");
-            };
+        let sink: Box<dyn FnMut(JobProgressUpdate) -> bool + Send> = Box::new(move |update| {
             sink.lock()
                 .unwrap()
-                .push((Instant::now(), serde_json::from_str(&json).unwrap()));
-            Ok(())
+                .push((Instant::now(), serde_json::to_value(&update).unwrap()));
+            true
         });
-        (channel, received)
+        (sink, received)
     }
 
     fn state() -> JobsState {
@@ -469,29 +262,11 @@ mod tests {
         assert_eq!(state.progress, None);
     }
 
-    #[test]
-    fn progress_messages_use_snake_case_field_and_state_names() {
-        let (channel, received) = recording_channel();
-        let hub = ProgressHub::default();
-        let initial = JobProgressUpdate {
-            jobs: Vec::new(),
-            overall: (&Overall::IDLE).into(),
-        };
-        hub.subscribe(channel, initial);
-        let messages = received.lock().unwrap();
-        assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0].1["overall"]["kind"], "idle");
-        assert_eq!(messages[0].1["overall"]["active_jobs"], 0);
-    }
-
     #[tokio::test(start_paused = true)]
     async fn channel_receives_job_progress_at_most_ten_times_a_second() {
         let state = Arc::new(state());
-        let (channel, received) = recording_channel();
-        state.hub.subscribe(
-            channel,
-            update_of(&[], &OverallTracker::default().update(&[])),
-        );
+        let (sink, received) = recording_sink();
+        cv_ipc::jobs::subscribe_job_progress(&state.hub, &state.manager, sink);
         let taskbar = Arc::new(Fake::default());
         let feed = tokio::spawn({
             let state = Arc::clone(&state);
@@ -600,10 +375,8 @@ mod tests {
         });
         sleep(Duration::from_millis(1500)).await;
 
-        let (channel, received) = recording_channel();
-        let jobs = state.manager.list();
-        let overall = OverallTracker::default().update(&jobs);
-        state.hub.subscribe(channel, update_of(&jobs, &overall));
+        let (sink, received) = recording_sink();
+        cv_ipc::jobs::subscribe_job_progress(&state.hub, &state.manager, sink);
         assert_eq!(received.lock().unwrap().len(), 1);
         assert_eq!(received.lock().unwrap()[0].1["jobs"][0]["done"], 1);
 
@@ -614,38 +387,5 @@ mod tests {
         assert!(messages.len() >= 2);
         let last = &messages.last().unwrap().1["jobs"][0];
         assert_eq!(last["state"], "completed");
-    }
-
-    #[test]
-    fn a_closed_channel_is_dropped_and_does_not_stop_the_others() {
-        let hub = ProgressHub::default();
-        let dead_flag = Arc::new(AtomicBool::new(false));
-        let flag = Arc::clone(&dead_flag);
-        let dead: Channel<JobProgressUpdate> = Channel::new(move |_| {
-            if flag.load(Ordering::SeqCst) {
-                Err(tauri::Error::WebviewNotFound)
-            } else {
-                Ok(())
-            }
-        });
-        let (alive, received) = recording_channel();
-        let empty = || JobProgressUpdate {
-            jobs: Vec::new(),
-            overall: (&Overall::IDLE).into(),
-        };
-        hub.subscribe(dead, empty());
-        hub.subscribe(alive, empty());
-        assert_eq!(hub.len(), 2);
-
-        dead_flag.store(true, Ordering::SeqCst);
-        let tick = ProgressTick {
-            jobs: Vec::new(),
-            overall: Overall::IDLE,
-            overall_changed: true,
-        };
-        hub.publish(&tick, Vec::new);
-        assert_eq!(hub.len(), 1);
-        // The initial message plus this report.
-        assert_eq!(received.lock().unwrap().len(), 2);
     }
 }

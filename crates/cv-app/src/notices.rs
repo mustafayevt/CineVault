@@ -383,6 +383,7 @@ mod tests {
             id: cv_jobs::JobId(1),
             name: "Scraping 3 titles".to_owned(),
             lane,
+            started_by: String::new(),
             state,
             priority: cv_jobs::Priority::Normal,
             total: 10,

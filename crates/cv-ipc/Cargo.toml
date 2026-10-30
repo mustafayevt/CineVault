@@ -1,0 +1,33 @@
+[package]
+name = "cv-ipc"
+description = "Transport-neutral command layer shared by the desktop app and the browser server."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+cv-app.workspace = true
+cv-artwork.workspace = true
+cv-db.workspace = true
+cv-domain.workspace = true
+cv-jobs.workspace = true
+cv-media.workspace = true
+cv-nfo.workspace = true
+cv-providers.workspace = true
+cv-rename.workspace = true
+cv-scan.workspace = true
+cv-template.workspace = true
+cv-torrent.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+specta.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+image.workspace = true
+tempfile.workspace = true

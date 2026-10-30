@@ -20,6 +20,7 @@
 //! With a [`JobStore`], jobs are persistent: they and their items are saved in the library
 //! database, and [`JobManager::resume_persisted`] finishes the unfinished ones after a restart.
 
+pub mod client;
 mod feed;
 mod lane;
 mod manager;

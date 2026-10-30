@@ -7,11 +7,13 @@ import { PathText } from "../../components/PathText";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
+import { isServer } from "../../lib/transport";
 import { cx } from "../../lib/cx";
 import { currentSourcesBackend } from "../library-sources/sourcesBackend";
 import type { LibrarySource, SourceKind } from "../library-sources/sourcesBackend";
 import { refreshLibrary } from "../library-ops/manageShared";
 import { currentOnboardingBackend } from "../onboarding/onboardingBackend";
+import { probeFolder } from "../pickers/folderPickerRequest";
 import { useFolderDrop } from "../onboarding/useFolderDrop";
 import { runRescan } from "../scan/scanActions";
 import { currentScanBackend } from "../scan/scanBackend";
@@ -121,6 +123,16 @@ export function FoldersSection() {
       let added = 0;
       for (const path of paths) {
         try {
+          if (isServer()) {
+            const probe = await probeFolder(path);
+            if (!probe.writable) {
+              showToast({
+                tone: "error",
+                message: probe.message ?? "This folder is not writable by the server.",
+              });
+              continue;
+            }
+          }
           const found = await currentOnboardingBackend().analyze(path);
           // A folder with both kinds starts as movies; the switch on its row changes it.
           const kind: SourceKind = found.suggested === "tv" ? "tv" : "movie";

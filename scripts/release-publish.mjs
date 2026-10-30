@@ -157,6 +157,8 @@ export function classifyAsset(name) {
   }
   // The .deb and .rpm packages are for package managers: uploaded, not in the manifest.
   if (/\.(deb|rpm)$/i.test(name)) return { kind: "upload", os: "Linux" };
+  // The server tarball is also only uploaded.
+  if (/^cinevault-server-.+\.tar\.gz$/i.test(name)) return { kind: "upload", os: "Linux" };
   if (/\.msi$/i.test(name) || /-portable\.zip$/i.test(name)) return { kind: "upload", os: "Windows" };
   return null;
 }
@@ -167,8 +169,10 @@ export function classifyAsset(name) {
  */
 export function stableName(name) {
   if (/^CineVault_.+\.AppImage$/i.test(name)) return `CineVault-${linuxArch(name)}.AppImage`;
-  if (/\.deb$/i.test(name)) return `CineVault-${/arm64|aarch64/i.test(name) ? "arm64" : "amd64"}.deb`;
-  if (/\.rpm$/i.test(name)) return `CineVault-${linuxArch(name)}.rpm`;
+  // Only the desktop package gets a version-less link. The server's cinevault-server packages
+  // must not overwrite CineVault-amd64.deb / CineVault-x86_64.rpm.
+  if (/^CineVault_.+\.deb$/i.test(name)) return `CineVault-${/arm64|aarch64/i.test(name) ? "arm64" : "amd64"}.deb`;
+  if (/^CineVault-(?!server).+\.rpm$/i.test(name)) return `CineVault-${linuxArch(name)}.rpm`;
   const arch = /arm64|aarch64/i.test(name) ? "arm64" : "x64";
   if (/-setup\.exe$/i.test(name)) return `CineVault-setup-${arch}.exe`;
   if (/\.msi$/i.test(name)) return `CineVault-${arch}.msi`;
@@ -753,6 +757,10 @@ async function selfTest() {
   assert(stableName("CineVault_1.2.0_aarch64.AppImage") === "CineVault-aarch64.AppImage", "stable arm64 AppImage name");
   assert(stableName("CineVault_1.2.0_amd64.deb") === "CineVault-amd64.deb", "stable deb name");
   assert(stableName("CineVault-1.2.0-1.x86_64.rpm") === "CineVault-x86_64.rpm", "stable rpm name");
+  assert(stableName("cinevault-server_1.2.0_amd64.deb") === null, "no stable copy for the server package");
+  assert(stableName("cinevault-server-1.2.0-1.x86_64.rpm") === null, "no stable copy for the server rpm");
+  assert(classifyAsset("cinevault-server-1.2.0-linux-amd64.tar.gz")?.kind === "upload", "the server tarball is uploaded");
+  assert(namesVersion("cinevault-server-1.2.0-linux-amd64.tar.gz", "1.2.0"), "the server tarball carries its version");
   for (const name of [...files, ...linuxFiles].map((f) => f.name)) {
     const stable = stableName(name);
     assert(

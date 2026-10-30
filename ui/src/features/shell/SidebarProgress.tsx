@@ -9,6 +9,7 @@ import { ProgressBar } from "../../components/ProgressBar";
 import { ProgressCard } from "../../components/ProgressCard";
 import { t } from "../../i18n/catalog";
 import { cx } from "../../lib/cx";
+import { serverClientId } from "../../lib/ipc";
 import { useJobProgressStore } from "../jobs/jobProgressStore";
 import { currentLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import { useMoveToStore } from "../move-to/moveToStore";
@@ -27,6 +28,7 @@ interface Entry {
   count: string | null;
   current: string | undefined;
   paused: boolean;
+  otherSession: boolean;
   setPaused: (paused: boolean) => void;
   cancel: () => void;
 }
@@ -48,6 +50,8 @@ function jobEntry(job: JobProgress): Entry {
         : null,
     current: job.current[0],
     paused: job.state === "paused",
+    otherSession:
+      job.started_by != null && job.started_by !== "" && job.started_by !== serverClientId(),
     setPaused: (paused) => void currentJobControls().setPaused(job.id, paused),
     cancel: () => void currentJobControls().cancel(job.id),
   };
@@ -67,6 +71,7 @@ function moveEntry(move: RunningMove): Entry {
         : `${Math.round(move.percent)}% · ${move.speed}`,
     current: move.current,
     paused: move.paused,
+    otherSession: false,
     setPaused: (paused) => {
       const store = useMoveToStore.getState();
       if (store.running !== null) store.setRunning({ ...store.running, paused });
@@ -88,6 +93,11 @@ function EntryRow({ entry }: { entry: Entry }) {
             {entry.count ?? t("shell.progress.working")}
             {entry.current === undefined || entry.current === "" ? "" : ` · ${entry.current}`}
           </span>
+          {entry.otherSession ? (
+            <span className="text-(length:--fs-11) text-text-muted">
+              {t("shell.progress.otherSession")}
+            </span>
+          ) : null}
         </div>
         <IconButton
           size="sm"

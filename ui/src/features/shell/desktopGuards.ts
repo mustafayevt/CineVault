@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import { isServer } from "../../lib/transport";
 import { stepAppZoom, zoomActionForKey } from "../settings/zoom";
 import type { ZoomAction } from "../settings/zoom";
 import { handleEscape } from "./escStack";
@@ -97,10 +98,22 @@ function classifyKey(
  */
 export function installDesktopGuards(options: DesktopGuardOptions = {}): () => void {
   const mac = options.mac ?? detectPlatform() === "macos";
+  const browser = isServer();
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
       if (handleEscape(event)) {
         event.preventDefault();
+      }
+      return;
+    }
+    // A browser keeps its reload, zoom, find and developer tools. CineVault only takes Ctrl/Cmd+F
+    // for the library search.
+    if (browser) {
+      const modifier = mac ? event.metaKey : event.ctrlKey;
+      if (modifier && !event.altKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        if (options.focusSearch !== undefined) options.focusSearch();
+        else focusLibrarySearch();
       }
       return;
     }
@@ -120,7 +133,9 @@ export function installDesktopGuards(options: DesktopGuardOptions = {}): () => v
   };
 
   const onContextMenu = (event: MouseEvent) => {
-    // Our own menus open in their handlers, which ran before this one.
+    // Our own menus open in their handlers, which ran before this one. A browser keeps its menu
+    // where the app has none.
+    if (browser) return;
     event.preventDefault();
   };
 
@@ -134,10 +149,13 @@ export function installDesktopGuards(options: DesktopGuardOptions = {}): () => v
   };
 
   const onWheel = (event: WheelEvent) => {
+    if (browser) return;
     if (event.ctrlKey || event.metaKey) event.preventDefault();
   };
 
-  const onGesture = (event: Event) => event.preventDefault();
+  const onGesture = (event: Event) => {
+    if (!browser) event.preventDefault();
+  };
 
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("contextmenu", onContextMenu);

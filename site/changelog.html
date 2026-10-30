@@ -55,6 +55,15 @@
     <article class="log-entry">
       <div class="log-meta"><h2>[Unreleased]</h2></div>
       <div class="log-body">
+<h3>Added</h3>
+<ul>
+<li>CineVault can run on a home server next to the media files and be used from any browser: sign in, browse the library and the title pages, scan, scrape and fix a match, choose artwork, rename with the preview and undo, and read the History. The server is a Linux program with no desktop stack, shipped as a container image, a <code>.deb</code>/<code>.rpm</code> and a tarball; the <code>cinevault</code> command line is included.</li>
+<li>One password for the server, created in the first-run welcome, with a 30-day session, &quot;sign out every session&quot; and a <code>cinevault-server passwd</code> recovery command.</li>
+<li>The server keeps provider keys in an encrypted <code>secrets.enc</code> and takes the master key from a Docker secret or a systemd credential. The desktop app keeps using the operating-system credential store.</li>
+<li>The server and the desktop app share one library safely: the server holds a <code>library-owner.json</code> lock, the desktop app refuses that folder, and the command line exits with code 2 instead of writing behind the server's back.</li>
+<li>Browser playback of the server's files with seeking; the desktop player choice stays in the desktop app.</li>
+<li>A Server section in Settings with the address, version, session count, key state, password change and &quot;sign out every other session&quot;.</li>
+</ul>
 <h3>Changed</h3>
 <ul>
 <li>Deleting a title that shares its folder with other titles, or sits directly in a library folder, now also removes the subtitles, posters, NFO files, trailers and other files named after it, even ones added since the last Scan. Deleting an episode does the same for its files. Files of the other titles stay, the confirmation counts the extra files, and Undo brings them back.</li>

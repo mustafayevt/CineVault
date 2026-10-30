@@ -111,7 +111,8 @@ const NFC: &str = "Am\u{e9}lie (2001)";
 const NFD: &str = "Ame\u{301}lie (2001)";
 
 /// A title folder spelled in NFD (as a Mac writes it) renamed to the NFC spelling the
-/// templates give.
+/// templates give. Only the non-macOS test below uses it.
+#[cfg(not(target_os = "macos"))]
 fn nfd_to_nfc(tree: &Tree) -> BatchItem {
     tree.write(&format!("{NFD}/{NFD}.mkv"), "video bytes");
     tree.write(&format!("{NFD}/poster.jpg"), "poster bytes");

@@ -24,6 +24,7 @@ cv-artwork = { path = "crates/cv-artwork" }
 cv-rename = { path = "crates/cv-rename" }
 cv-jobs = { path = "crates/cv-jobs" }
 cv-app = { path = "crates/cv-app" }
+cv-ipc = { path = "crates/cv-ipc" }
 cv-torrent = { path = "crates/cv-torrent" }
 
 # Third-party
@@ -33,6 +34,8 @@ async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tokio-stream = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
@@ -47,6 +50,14 @@ icu_normalizer = "2.3"
 # External tool downloads (cv-media): HTTPS client, checksums, archive formats.
 ureq = "3"
 sha2 = "0.11"
+# Password hashing for the browser server sign-in (cv-web).
+argon2 = "0.5"
+# Encrypted provider keys for the browser server (cv-app).
+chacha20poly1305 = "0.10"
+# Trusted reverse proxies for the browser server (cv-web).
+ipnet = "2"
+percent-encoding = "2"
+rand_core = { version = "0.6", features = ["getrandom"] }
 fs4 = { version = "1.1", default-features = false, features = ["sync"] }
 zip = { version = "9", default-features = false, features = ["deflate"] }
 tar = "0.4"
@@ -79,7 +90,7 @@ rustix = { version = "1", default-features = false, features = ["std", "fs", "pr
 liblzma = { version = "0.4", default-features = false, features = ["static"] }
 
 # Local mock servers in the torrent search tests (cv-torrent).
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json", "query"] }
 
 # Torrent search (cv-torrent): base32 info-hashes, accent-free title spellings, property tests.
 data-encoding = "2"

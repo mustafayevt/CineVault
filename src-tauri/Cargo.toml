@@ -19,6 +19,7 @@ cv-app.workspace = true
 cv-artwork.workspace = true
 cv-db.workspace = true
 cv-domain.workspace = true
+cv-ipc.workspace = true
 cv-jobs.workspace = true
 cv-media.workspace = true
 cv-nfo.workspace = true

@@ -38,9 +38,11 @@ crates/cv-artwork    artwork selection, download, naming and the thumbnail cache
 crates/cv-rename     the rename planner, executor and journal (undoable)
 crates/cv-jobs       background job lanes, progress, cancel and persistence
 crates/cv-torrent    torrent search sources and release ranking
-crates/cv-app        the application services the desktop app and CLI share
+crates/cv-app        the application services the desktop app, the server and the CLI share
+crates/cv-ipc        the transport-neutral command layer (DTOs, readers, commands, streams)
+crates/cv-web        the browser server: sign-in, HTTP, SSE, folder browser, media
 crates/cv-compat     the test runner over tests/compat/ (not shipped)
-src-tauri/           Tauri 2 desktop app (commands, channels, cv:// image protocol, window chrome)
+src-tauri/           Tauri 2 desktop app (thin command wrappers, cv:// image protocol, window chrome)
 cli/                 the `cinevault` command-line binary
 ui/                  React 19 + TypeScript + Vite + Tailwind v4 frontend
 tests/compat/        golden fixtures and expected outputs (byte-exact NFO, renamer, parser checks)
@@ -73,6 +75,7 @@ openspec/            specs and change proposals
 **Repository root:**
 
 - `bun install`, then `bun run tauri dev` (the desktop app) or `bun run tauri build` (MSI and NSIS installers on Windows, DMG and `.app` on macOS, under `target/release/bundle/`)
+- `bun run server:dev` builds the UI and starts `cinevault-server` on the loopback address; `bun run server:build` builds the release binary; `bun run server:image` builds the container image; `bun run server:package` makes the server `.deb` and `.rpm` on Linux; `bun run server:tarball` makes the tarball; `bun run check:scripts` checks that the `bun run` commands named in this file and the README exist
 - `bun run tools:fetch`: downloads the pinned MediaInfo, FFmpeg and helper tools into the git-ignored `.dev-tools/` (`-- ffmpeg` fetches one, `-- --help` lists them)
 - `bun run bundle:check` (add `-- --artifacts` after a build to require the installers), `bun run package:portable` (portable Windows zip)
 - `bun run notices`: regenerates `THIRD_PARTY_NOTICES.md` (needs `cargo install cargo-about --locked --features cli`)

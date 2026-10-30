@@ -1,6 +1,7 @@
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { Select } from "../../components/Select";
 import { t } from "../../i18n/catalog";
+import { isServer } from "../../lib/transport";
 import type { MessageKey } from "../../i18n/catalog";
 import { detectPlatform } from "../shell/platform";
 import type { Platform } from "../shell/platform";
@@ -27,6 +28,7 @@ export function AppearanceSection() {
   const zoom = snapZoom(useSetting<number>("appearance.zoom"));
   const platform = detectPlatform();
   const mac = platform === "macos";
+  const browser = isServer();
   return (
     <SettingsSection id="appearance" title={t("settingsPage.appearance.title")}>
       <FormRow label={t("settingsPage.appearance.theme")}>
@@ -46,23 +48,27 @@ export function AppearanceSection() {
           }}
         />
       </FormRow>
-      <FormRow
-        label={t("settingsPage.appearance.size")}
-        hint={t(mac ? "settingsPage.appearance.size.hintMac" : "settingsPage.appearance.size.hint")}
-      >
-        <Select
-          className="w-[120px]"
-          aria-label={t("settingsPage.appearance.size")}
-          options={ZOOM_STEPS.map((step) => ({
-            value: String(step),
-            label: t("settingsPage.appearance.sizeOption", { percent: step }),
-          }))}
-          value={String(zoom)}
-          onValueChange={(value) => {
-            useSettingsStore.getState().set("appearance.zoom", Number(value));
-          }}
-        />
-      </FormRow>
+      {browser ? null : (
+        <FormRow
+          label={t("settingsPage.appearance.size")}
+          hint={t(
+            mac ? "settingsPage.appearance.size.hintMac" : "settingsPage.appearance.size.hint",
+          )}
+        >
+          <Select
+            className="w-[120px]"
+            aria-label={t("settingsPage.appearance.size")}
+            options={ZOOM_STEPS.map((step) => ({
+              value: String(step),
+              label: t("settingsPage.appearance.sizeOption", { percent: step }),
+            }))}
+            value={String(zoom)}
+            onValueChange={(value) => {
+              useSettingsStore.getState().set("appearance.zoom", Number(value));
+            }}
+          />
+        </FormRow>
+      )}
     </SettingsSection>
   );
 }

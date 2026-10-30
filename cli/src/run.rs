@@ -132,7 +132,21 @@ pub async fn run_batch(request: &BatchRequest, quiet: bool, env: &Env) -> BatchR
     };
     match forward(env.location(), request, on_progress).await {
         Ok(report) => return report,
-        Err(ForwardError::NoRunningApp) => {}
+        Err(ForwardError::NoRunningApp) => {
+            if let Some(owner) = cv_app::owner::read_owner(env.location().root())
+                && cv_app::owner::is_fresh(&owner)
+                && owner.role != "cli"
+            {
+                return BatchReport::failed_to_start(
+                    request,
+                    format!(
+                        "{} The batch was not run here, because the library has one writer. \
+                         Stop it, or send the batch through it.",
+                        owner.sentence()
+                    ),
+                );
+            }
+        }
         Err(error) => {
             return BatchReport::failed_to_start(
                 request,
@@ -145,6 +159,33 @@ pub async fn run_batch(request: &BatchRequest, quiet: bool, env: &Env) -> BatchR
 
 /// Opens the library in this process and runs the batch.
 async fn run_here(request: &BatchRequest, quiet: bool, env: &Env) -> BatchReport {
+    // Refuse a library of an earlier version before taking the owner file, so a refused run
+    // leaves the data folder exactly as it found it. A data folder that is not a folder is left
+    // to the boot below, which has the sentence for it.
+    if env.location().root().is_dir()
+        && let Err(error) = cv_app::fresh_start::refuse_pending(env.location())
+    {
+        return BatchReport::failed_to_start(request, error.to_string());
+    }
+    let _owner = match cv_app::owner::acquire(env.location().root(), "cli") {
+        Ok(Some(guard)) => Some(guard),
+        Ok(None) => {
+            let current = cv_app::owner::read_owner(env.location().root());
+            let why = current.map_or_else(
+                || "Another CineVault process is using this library.".to_owned(),
+                |owner| owner.sentence(),
+            );
+            return BatchReport::failed_to_start(
+                request,
+                format!("{why} The batch was not run here, because the library has one writer."),
+            );
+        }
+        Err(error) => {
+            // The boot below reports an unusable data folder in its own words.
+            tracing::warn!(%error, "the owner file could not be taken; trying to open the library");
+            None
+        }
+    };
     let options = (env.make_options)(env.location.clone());
     let services = match AppServices::boot(options) {
         Ok(services) => services,

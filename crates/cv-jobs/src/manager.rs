@@ -96,6 +96,8 @@ pub struct JobSpec {
     /// Items of this job processed at the same time (at least 1; the lane still bounds it).
     /// Items start in order; use 1 for strictly sequential work such as a rename batch.
     pub concurrency: usize,
+    /// The browser session that started it, or empty for the desktop and background work.
+    pub started_by: String,
 }
 
 impl JobSpec {
@@ -106,6 +108,7 @@ impl JobSpec {
             lane,
             priority: Priority::Normal,
             concurrency: 1,
+            started_by: crate::client::current(),
         }
     }
 
@@ -276,6 +279,7 @@ struct Core {
     id: JobId,
     name: String,
     lane: LaneId,
+    started_by: String,
     seq: u64,
     control: watch::Sender<Control>,
     start: Notify,
@@ -296,6 +300,7 @@ impl Core {
             id: self.id,
             name: self.name.clone(),
             lane: self.lane.clone(),
+            started_by: self.started_by.clone(),
             state: state.job_state(),
             priority: state.priority,
             total: t.total,
@@ -707,6 +712,7 @@ impl JobManager {
             id,
             name: spec.name.clone(),
             lane: spec.lane.clone(),
+            started_by: spec.started_by.clone(),
             state: state.job_state(),
             priority: spec.priority,
             total: launch.total,
@@ -739,6 +745,7 @@ impl JobManager {
             id,
             name: spec.name.clone(),
             lane: spec.lane.clone(),
+            started_by: spec.started_by.clone(),
             seq: id.0,
             control,
             start: Notify::new(),

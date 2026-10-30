@@ -8,16 +8,21 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::boot::Boot;
 use async_trait::async_trait;
 use cv_app::data_location::{DataLocation, LocationInputs};
 use cv_app::secrets::SecretStore;
 use cv_app::services::{AppServices, BootOptions};
+use cv_app::torrents::{MovieCopy, TitleHit, TorrentServiceError};
+use cv_ipc::matching::PosterKeys;
+use cv_ipc::provider_stream::ProviderEvent;
 use cv_jobs::{LaneConfig, Lanes};
+use cv_torrent::TorrentError;
 use cv_torrent::model::{
-    MediaKind, RawRelease, Scope, SkipReason, SourceError, SourceId, SourceKind, Support, TitleIds,
-    TorrentQuery,
+    Hdr, MediaKind, RawRelease, Resolution, Scope, SkipReason, SourceError, SourceId, SourceKind,
+    Support, TitleIds, TorrentQuery,
 };
-use cv_torrent::search::SearchSession;
+use cv_torrent::search::{ResultRow, SearchSession};
 use cv_torrent::source::{SearchContext, TorrentSource};
 use tauri::Manager;
 use tauri::ipc::Channel;
@@ -625,8 +630,8 @@ fn app(root: &Path) -> (tauri::App<MockRuntime>, Arc<AppServices>) {
     let app = mock_builder()
         .build(mock_context(noop_assets()))
         .expect("mock app builds");
-    app.manage(TorrentState::from_boot(&boot));
-    app.manage(SearchState::from_boot(&boot));
+    app.manage(TorrentState::from_services(boot.services()));
+    app.manage(SearchState::from_services(boot.services()));
     app.manage(crate::img_ipc::ImageState::from_boot(&boot));
     app.manage(boot);
     (app, services)

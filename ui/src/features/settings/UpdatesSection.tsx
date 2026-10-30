@@ -1,5 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 
+import { isServer } from "../../lib/transport";
+
 import { Button } from "../../components/Button";
 import { Switch } from "../../components/Switch";
 import { t } from "../../i18n/catalog";
@@ -111,30 +113,37 @@ export function UpdatesSection() {
   const offer = useUpdateStore((state) => state.offer);
   // Without a router (a section drawn on its own) the link has nowhere to go and is left out.
   const router = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
+  const browser = isServer();
   return (
     <SettingsSection id="updates" title={t("settingsPage.updates.title")}>
       <FormRow
         label={version === "" ? "CineVault" : t("settingsPage.updates.version", { version })}
         hint={
-          <span role="status" aria-live="polite">
-            {status}
-          </span>
+          browser ? (
+            "The server is updated by pulling a new image or installing a new package."
+          ) : (
+            <span role="status" aria-live="polite">
+              {status}
+            </span>
+          )
         }
       >
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
-          <UpdateButtons />
-          <span className="flex-1" />
-          <span id="install-on-close" className="text-text-2">
-            {t("settingsPage.updates.installOnClose")}
-          </span>
-          <Switch
-            checked={installOnClose}
-            aria-labelledby="install-on-close"
-            onCheckedChange={(on) => {
-              useSettingsStore.getState().set(INSTALL_ON_CLOSE_KEY, on);
-            }}
-          />
-        </div>
+        {browser ? null : (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+            <UpdateButtons />
+            <span className="flex-1" />
+            <span id="install-on-close" className="text-text-2">
+              {t("settingsPage.updates.installOnClose")}
+            </span>
+            <Switch
+              checked={installOnClose}
+              aria-labelledby="install-on-close"
+              onCheckedChange={(on) => {
+                useSettingsStore.getState().set(INSTALL_ON_CLOSE_KEY, on);
+              }}
+            />
+          </div>
+        )}
       </FormRow>
       {offer === null ? null : <ReleaseNotes offer={offer} />}
       {router === undefined ? null : (

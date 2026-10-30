@@ -4,6 +4,15 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ## [Unreleased]
 
+### Added
+
+- CineVault can run on a home server next to the media files and be used from any browser: sign in, browse the library and the title pages, scan, scrape and fix a match, choose artwork, rename with the preview and undo, and read the History. The server is a Linux program with no desktop stack, shipped as a container image, a `.deb`/`.rpm` and a tarball; the `cinevault` command line is included.
+- One password for the server, created in the first-run welcome, with a 30-day session, "sign out every session" and a `cinevault-server passwd` recovery command.
+- The server keeps provider keys in an encrypted `secrets.enc` and takes the master key from a Docker secret or a systemd credential. The desktop app keeps using the operating-system credential store.
+- The server and the desktop app share one library safely: the server holds a `library-owner.json` lock, the desktop app refuses that folder, and the command line exits with code 2 instead of writing behind the server's back.
+- Browser playback of the server's files with seeking; the desktop player choice stays in the desktop app.
+- A Server section in Settings with the address, version, session count, key state, password change and "sign out every other session".
+
 ### Changed
 
 - Deleting a title that shares its folder with other titles, or sits directly in a library folder, now also removes the subtitles, posters, NFO files, trailers and other files named after it, even ones added since the last Scan. Deleting an episode does the same for its files. Files of the other titles stay, the confirmation counts the extra files, and Undo brings them back.

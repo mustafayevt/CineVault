@@ -1,5 +1,6 @@
-import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+
+import { transport } from "../../lib/transport";
 
 import { readBootLook } from "./bootLook";
 import { useSettingsStore } from "./settingsStore";
@@ -71,7 +72,7 @@ export function stepAppZoom(action: ZoomAction): void {
  * (the synthetic backend) there is no webview to ask and nothing happens.
  */
 export async function applyNativeZoom(percent: number): Promise<void> {
-  if (!isTauri()) return;
+  if (transport() !== "desktop") return;
   try {
     await getCurrentWebview().setZoom(snapZoom(percent) / 100);
   } catch {

@@ -14,6 +14,7 @@
 //! folders. A pointer file that cannot be used falls back to the per-user folder and the result
 //! carries a warning, so a bad pointer never blocks startup and is never overwritten silently.
 
+use std::ffi::OsStr;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -38,6 +39,8 @@ pub enum LocationMode {
     Custom,
     /// The per-user application-data folder.
     UserDefault,
+    /// `CINEVAULT_DATA_DIR`, for a container or service.
+    Environment,
 }
 
 /// Errors from saving the custom folder choice.
@@ -100,6 +103,43 @@ impl DataLocation {
     /// Resolve the data folder: portable marker, then custom pointer, then per-user default.
     #[must_use]
     pub fn resolve(inputs: &LocationInputs) -> Self {
+        Self::resolve_with_env(inputs, None)
+    }
+
+    /// Resolve the data folder with an optional `CINEVAULT_DATA_DIR` value.
+    ///
+    /// An absolute environment value wins over every other rule. A relative or empty one is
+    /// refused with a warning and the next rule decides, so a bad variable never stops the app.
+    #[must_use]
+    pub fn resolve_with_env(inputs: &LocationInputs, data_dir: Option<&OsStr>) -> Self {
+        if let Some(value) = data_dir {
+            let path = PathBuf::from(value);
+            if path.is_absolute() {
+                return Self {
+                    root: path,
+                    mode: LocationMode::Environment,
+                    warning: None,
+                };
+            }
+            let warning = if value.is_empty() {
+                "CINEVAULT_DATA_DIR is empty; using the default data folder".to_owned()
+            } else {
+                format!(
+                    "CINEVAULT_DATA_DIR={} is not an absolute path; using the default data folder",
+                    path.display()
+                )
+            };
+            let mut location = Self::resolve_fallback(inputs);
+            location.warning = Some(match location.warning.take() {
+                Some(other) => format!("{warning}; {other}"),
+                None => warning,
+            });
+            return location;
+        }
+        Self::resolve_fallback(inputs)
+    }
+
+    fn resolve_fallback(inputs: &LocationInputs) -> Self {
         if inputs.exe_dir.join(PORTABLE_MARKER).is_file() {
             return Self {
                 root: inputs.exe_dir.join(PORTABLE_DATA_DIR),
@@ -155,9 +195,22 @@ impl DataLocation {
     }
 
     /// Resolve for the running process, or `None` if the OS folders are unknown.
+    ///
+    /// `CINEVAULT_DATA_DIR` is read first, so a container with no `HOME` still finds its data.
     #[must_use]
     pub fn resolve_for_process() -> Option<Self> {
-        LocationInputs::from_environment().map(|i| Self::resolve(&i))
+        let data_dir = std::env::var_os("CINEVAULT_DATA_DIR");
+        if let Some(value) = data_dir.as_deref() {
+            let path = PathBuf::from(value);
+            if path.is_absolute() {
+                return Some(Self {
+                    root: path,
+                    mode: LocationMode::Environment,
+                    warning: None,
+                });
+            }
+        }
+        LocationInputs::from_environment().map(|i| Self::resolve_with_env(&i, data_dir.as_deref()))
     }
 
     /// Remember a user-chosen data folder. Takes effect on the next [`Self::resolve`] (the app

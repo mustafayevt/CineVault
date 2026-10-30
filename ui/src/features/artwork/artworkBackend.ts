@@ -1,5 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 
+import { isServer } from "../../lib/transport";
+
 import type { Channel } from "@tauri-apps/api/core";
 
 import { commands } from "../../bindings";
@@ -233,6 +235,46 @@ function artworkStreamTransport(
   });
 }
 
+/** The largest image the server takes (its `/api/artwork/upload` limit). */
+const UPLOAD_LIMIT = 32 * 1024 * 1024;
+
+/** The browser server: the streamed search is shared, a dropped file is uploaded first. */
+const browserArtworkBackend: ArtworkBackend = {
+  ...tauriArtworkBackend,
+  placeLocal: async (itemId, slot, image) => {
+    if (image.kind === "path") {
+      return unwrap(await commands.placeArtwork(itemId, slot, image.path));
+    }
+    // The server refuses a larger body by closing the request, which a browser reports as a
+    // network failure; say the real reason before sending.
+    if (image.file.size > UPLOAD_LIMIT) {
+      throw new ArtworkRequestError("too_large", t("artwork.upload.tooLarge"));
+    }
+    const csrf = (window as unknown as Record<string, unknown>).__CINEVAULT_CSRF__;
+    const response = await fetch("/api/artwork/upload", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": image.file.type || "application/octet-stream",
+        "x-cinevault-csrf": typeof csrf === "string" ? csrf : "",
+      },
+      body: await image.file.arrayBuffer(),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      path?: string;
+      code?: string;
+      message?: string;
+    };
+    if (!response.ok || body.path === undefined) {
+      throw new ArtworkRequestError(
+        body.code ?? "upload",
+        body.message ?? t("artwork.upload.failed"),
+      );
+    }
+    return unwrap(await commands.placeArtwork(itemId, slot, body.path));
+  },
+};
+
 let override: ArtworkBackend | null = null;
 let fallback: ArtworkBackend | null = null;
 /** Replaces the backend; pass `null` to go back to the default. Used by tests. */
@@ -242,6 +284,9 @@ export function setArtworkBackend(backend: ArtworkBackend | null): void {
 
 export function currentArtworkBackend(): ArtworkBackend {
   if (override !== null) return override;
+  // The server's shim makes `isTauri()` true as well, so the server is asked first; otherwise a
+  // file chosen in the browser would reach the desktop backend, which cannot upload it.
+  if (isServer()) return browserArtworkBackend;
   if (isTauri()) return tauriArtworkBackend;
   // A plain browser has no providers: it uses fixtures so the picker can be developed.
   fallback ??= createSyntheticArtworkBackend();

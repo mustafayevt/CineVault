@@ -9,6 +9,8 @@ export const artwork = {
   // Artwork picker
   "artwork.title": "Change artwork",
   "artwork.unavailable": "Choosing artwork is available in the desktop app.",
+  "artwork.upload.tooLarge": "That image is larger than 32 MiB.",
+  "artwork.upload.failed": "The image could not be uploaded to the server.",
   "artwork.type": "Artwork type",
   "artwork.slot.poster": "Poster",
   "artwork.slot.fanart": "Fanart",
