@@ -181,7 +181,7 @@ impl From<UnmanagedReport> for MissingInSourceDto {
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, ScanCommandError> + Send + 'static,
 ) -> Result<T, ScanCommandError> {
-    tokio::task::spawn_blocking(work)
+    cv_jobs::client::spawn_blocking(work)
         .await
         .map_err(|error| ScanCommandError {
             code: "storage".to_owned(),

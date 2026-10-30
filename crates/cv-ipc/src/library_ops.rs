@@ -144,7 +144,7 @@ impl From<cv_app::library_ops::LibraryOpsError> for LibraryOpsCommandError {
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, LibraryOpsCommandError> + Send + 'static,
 ) -> Result<T, LibraryOpsCommandError> {
-    tokio::task::spawn_blocking(work)
+    cv_jobs::client::spawn_blocking(work)
         .await
         .map_err(|error| LibraryOpsCommandError {
             code: "storage".to_owned(),

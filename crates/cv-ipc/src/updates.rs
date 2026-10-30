@@ -328,7 +328,7 @@ pub async fn check_for_update(
     manual: bool,
 ) -> Result<UpdateCheckDto, UpdateCommandError> {
     let service = Arc::clone(&state.service);
-    let outcome = tokio::task::spawn_blocking(move || {
+    let outcome = cv_jobs::client::spawn_blocking(move || {
         if manual {
             service.check_now(now())
         } else {
@@ -399,7 +399,7 @@ async fn download_and_start(
     state.cancel.store(false, Ordering::SeqCst);
     let service = Arc::clone(&state.service);
     let cancel = Arc::clone(&state.cancel);
-    let installer = tokio::task::spawn_blocking(move || {
+    let installer = cv_jobs::client::spawn_blocking(move || {
         let mut last = Instant::now().checked_sub(PROGRESS_INTERVAL);
         let total = service.offer().map_or(0, |offer| small(offer.size_bytes));
         service.download(&version, &cancel, &mut |downloaded| {
@@ -431,7 +431,7 @@ async fn download_and_start(
         );
     match method {
         InstallMethod::SilentSetup { install_dir } => {
-            tokio::task::spawn_blocking(move || start_silent_setup(&installer, &install_dir))
+            cv_jobs::client::spawn_blocking(move || start_silent_setup(&installer, &install_dir))
                 .await
                 .map_err(unexpected)??;
             tracing::info!("the update setup started; CineVault quits for it");
@@ -489,7 +489,7 @@ async fn download_and_start(
             );
             // A failure here leaves the old AppImage as it was and the app running; the page
             // shows the message and the update stays on offer.
-            tokio::task::spawn_blocking(move || replace_and_relaunch(&installer, &target))
+            cv_jobs::client::spawn_blocking(move || replace_and_relaunch(&installer, &target))
                 .await
                 .map_err(unexpected)??;
             tracing::info!("the AppImage was replaced; CineVault quits and the new one starts");

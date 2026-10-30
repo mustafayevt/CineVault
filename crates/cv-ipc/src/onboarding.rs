@@ -157,7 +157,7 @@ pub async fn analyze_library_folder(
     path: String,
 ) -> Result<FolderAnalysisDto, OnboardingCommandError> {
     let check = state.folder_check();
-    tokio::task::spawn_blocking(move || check_and_analyze(&path, check))
+    cv_jobs::client::spawn_blocking(move || check_and_analyze(&path, check))
         .await
         .map_err(|error| OnboardingCommandError {
             code: "storage".to_owned(),

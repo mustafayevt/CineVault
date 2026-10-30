@@ -123,7 +123,7 @@ fn settings_error(error: impl std::fmt::Display) -> OrganizeCommandError {
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, OrganizeCommandError> + Send + 'static,
 ) -> Result<T, OrganizeCommandError> {
-    tokio::task::spawn_blocking(work)
+    cv_jobs::client::spawn_blocking(work)
         .await
         .map_err(|error| OrganizeCommandError {
             code: "storage".to_owned(),

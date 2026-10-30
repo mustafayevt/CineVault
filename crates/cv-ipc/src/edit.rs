@@ -405,7 +405,7 @@ impl From<EditError> for EditCommandError {
 pub async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, EditCommandError> + Send + 'static,
 ) -> Result<T, EditCommandError> {
-    tokio::task::spawn_blocking(work)
+    cv_jobs::client::spawn_blocking(work)
         .await
         .map_err(|error| EditCommandError {
             code: "storage".to_owned(),

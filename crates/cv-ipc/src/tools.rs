@@ -196,7 +196,7 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
 async fn statuses(service: Arc<ToolsService>) -> Result<Vec<ToolStatusDto>, ToolCommandError> {
     // Reading a version starts the program, so keep it off the UI thread.
-    tokio::task::spawn_blocking(move || service.status().into_iter().map(Into::into).collect())
+    cv_jobs::client::spawn_blocking(move || service.status().into_iter().map(Into::into).collect())
         .await
         .map_err(|error| ToolCommandError {
             code: "storage".to_owned(),
@@ -236,7 +236,7 @@ pub async fn install_tool(
     let id = ToolsService::parse_tool(&tool)?;
     let service = Arc::clone(&state.service);
     let worker = Arc::clone(&service);
-    let joined = tokio::task::spawn_blocking(move || {
+    let joined = cv_jobs::client::spawn_blocking(move || {
         let mut last = Instant::now().checked_sub(PROGRESS_INTERVAL);
         let mut last_phase = None;
         worker.install(id, &mut |progress| {

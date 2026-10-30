@@ -168,7 +168,7 @@ pub async fn get_show_orderings(
 ) -> CommandResult<ShowOrderingsDto> {
     let id = parse_show(&show_id)?;
     let service = state.service()?;
-    let (active, options) = tokio::task::spawn_blocking(move || service.options(id))
+    let (active, options) = cv_jobs::client::spawn_blocking(move || service.options(id))
         .await
         .map_err(|error| EpisodeOrderCommandError {
             code: "storage".to_owned(),

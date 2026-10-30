@@ -64,7 +64,7 @@ impl From<LibraryOpsError> for HistoryCommandError {
 pub async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, HistoryCommandError> + Send + 'static,
 ) -> Result<T, HistoryCommandError> {
-    tokio::task::spawn_blocking(work)
+    cv_jobs::client::spawn_blocking(work)
         .await
         .map_err(|error| HistoryCommandError {
             code: "storage".to_owned(),

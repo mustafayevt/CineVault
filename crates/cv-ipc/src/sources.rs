@@ -92,7 +92,7 @@ impl From<SourceHealth> for SourceHealthDto {
 
 /// Every library folder with whether it is reachable and what it holds, for the sidebar.
 pub async fn source_health(service: Arc<ScanService>) -> Result<Vec<SourceHealthDto>, String> {
-    tokio::task::spawn_blocking(move || service.source_health())
+    cv_jobs::client::spawn_blocking(move || service.source_health())
         .await
         .map_err(|error| error.to_string())?
         .map(|rows| rows.into_iter().map(Into::into).collect())
@@ -405,7 +405,7 @@ impl From<DataSourceError> for SourceCommandError {
 
 /// Runs the watcher restart off the async workers; a failure only means it stays as it was.
 async fn watch_again(work: impl FnOnce() + Send + 'static) {
-    let _ = tokio::task::spawn_blocking(work).await;
+    let _ = cv_jobs::client::spawn_blocking(work).await;
 }
 
 /// Lists every library folder: movies first, then TV, each in the user's order.

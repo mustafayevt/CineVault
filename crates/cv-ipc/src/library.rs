@@ -1169,7 +1169,7 @@ fn hdr_label(video: &VideoFacts) -> Option<String> {
 pub async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, LibraryCommandError> + Send + 'static,
 ) -> Result<T, LibraryCommandError> {
-    tokio::task::spawn_blocking(work)
+    cv_jobs::client::spawn_blocking(work)
         .await
         .map_err(|error| storage(error.to_string()))?
 }

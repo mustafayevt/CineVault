@@ -109,7 +109,7 @@ pub async fn get_collection(
     cache: Option<Arc<ThumbCache>>,
     id: ItemId,
 ) -> Result<CollectionPageDto, CommandError> {
-    tokio::task::spawn_blocking(move || {
+    cv_jobs::client::spawn_blocking(move || {
         let page = service.page(id).map_err(error_of)?;
         page_dto(page, &db, &sources, cache.as_deref())
     })

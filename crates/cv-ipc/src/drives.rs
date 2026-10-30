@@ -200,7 +200,7 @@ pub async fn drives_overview(
     let Some(service) = service else {
         return Ok(DrivesOverview::default().into());
     };
-    tokio::task::spawn_blocking(move || service.overview())
+    cv_jobs::client::spawn_blocking(move || service.overview())
         .await
         .map_err(|error| DrivesCommandError {
             code: "storage".to_owned(),
@@ -233,10 +233,11 @@ pub async fn drives_trash_contents(
             bytes: 0.0,
         });
     };
-    let contents = tokio::task::spawn_blocking(move || service.trash_contents(drive_id.as_deref()))
-        .await
-        .map_err(|error| storage(error.to_string()))?
-        .map_err(|error| storage(format!("The library could not be read: {error}")))?;
+    let contents =
+        cv_jobs::client::spawn_blocking(move || service.trash_contents(drive_id.as_deref()))
+            .await
+            .map_err(|error| storage(error.to_string()))?
+            .map_err(|error| storage(format!("The library could not be read: {error}")))?;
     let bytes = exact(contents.bytes());
     let mut entries: Vec<TrashEntryDto> = contents
         .batches
@@ -281,7 +282,7 @@ pub async fn empty_drives_trash(
         return Err(storage("The library is not open.".to_owned()));
     };
     let report =
-        tokio::task::spawn_blocking(move || service.empty_trash(drive_id.as_deref(), &confirm))
+        cv_jobs::client::spawn_blocking(move || service.empty_trash(drive_id.as_deref(), &confirm))
             .await
             .map_err(|error| storage(error.to_string()))?
             .map_err(|error| DrivesCommandError {

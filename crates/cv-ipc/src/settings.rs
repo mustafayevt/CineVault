@@ -141,7 +141,7 @@ pub async fn set_setting(
         state.scan.clone(),
         state.caches.clone(),
     );
-    tokio::task::spawn_blocking(move || {
+    cv_jobs::client::spawn_blocking(move || {
         SettingsState {
             settings,
             scan,
@@ -165,7 +165,7 @@ pub async fn reset_settings(state: &SettingsState, keys: Vec<String>) -> Result<
         state.scan.clone(),
         state.caches.clone(),
     );
-    tokio::task::spawn_blocking(move || {
+    cv_jobs::client::spawn_blocking(move || {
         let names: Vec<&str> = keys.iter().map(String::as_str).collect();
         SettingsState {
             settings,

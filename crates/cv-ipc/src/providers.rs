@@ -114,7 +114,7 @@ impl ProvidersState {
         if was_paused && let Some(matching) = self.matching.clone() {
             let handle = tokio::runtime::Handle::current();
             // Planning reads the database and the job manager spawns on the current runtime.
-            let started = tokio::task::spawn_blocking(move || {
+            let started = cv_jobs::client::spawn_blocking(move || {
                 let _entered = handle.enter();
                 matching.key_saved(was_paused)
             })

@@ -133,7 +133,7 @@ fn small(id: i64) -> u32 {
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, MatchServiceError> + Send + 'static,
 ) -> CommandResult<T> {
-    tokio::task::spawn_blocking(work)
+    cv_jobs::client::spawn_blocking(work)
         .await
         .map_err(|error| MatchCommandError {
             code: "storage".to_owned(),

@@ -599,7 +599,7 @@ pub async fn torrent_landing(
     cache: Option<Arc<ThumbCache>>,
 ) -> CommandResult<TorrentLandingDto> {
     let service = state.get()?;
-    tokio::task::spawn_blocking(move || {
+    cv_jobs::client::spawn_blocking(move || {
         let landing = service.landing()?;
         let ids: Vec<cv_domain::ItemId> = landing
             .upgrades

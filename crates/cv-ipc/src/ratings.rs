@@ -247,7 +247,7 @@ pub async fn count_rating_sweep(
 ) -> Result<u32, RatingsCommandError> {
     let services = Arc::clone(services.ok_or_else(starting)?);
     let only = only_source(provider.as_deref());
-    tokio::task::spawn_blocking(move || {
+    cv_jobs::client::spawn_blocking(move || {
         services
             .rating_status()
             .sweep_titles(scope.into(), only)
@@ -269,7 +269,7 @@ pub async fn start_rating_sweep(
 ) -> Result<RatingSweepStartedDto, RatingsCommandError> {
     let services = Arc::clone(services.ok_or_else(starting)?);
     let only = only_source(provider.as_deref());
-    let queued = tokio::task::spawn_blocking(move || {
+    let queued = cv_jobs::client::spawn_blocking(move || {
         submit_sweep(
             services.jobs(),
             services.actions(),

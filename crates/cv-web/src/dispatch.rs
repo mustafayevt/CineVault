@@ -131,7 +131,8 @@ where
     T: Send + 'static,
     F: FnOnce() -> T + Send + 'static,
 {
-    tokio::task::spawn_blocking(work)
+    // A blocking thread has no task-local; this keeps the command's client there.
+    cv_jobs::client::spawn_blocking(work)
         .await
         .map_err(|error| storage(error.to_string()))
 }
@@ -254,19 +255,24 @@ fn artwork_source(uploads: &Path, source: &str) -> Result<Option<std::path::Path
     Ok(Some(path.to_path_buf()))
 }
 
+/// Runs one command with the page's client id as the client of every job it starts, so the other
+/// sessions' progress cards can say "Started from another session".
 pub(crate) async fn dispatch(
     state: &WebState,
     cmd: &str,
     args: &Value,
     client: &str,
 ) -> DispatchResult {
+    cv_jobs::client::scope(client.to_owned(), run_command(state, cmd, args, client)).await
+}
+
+async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) -> DispatchResult {
     if state.keys_locked && cmd == "set_provider_credential" {
         return Err(json!({
             "code": "keys_locked",
             "message": "Provider keys are locked. Set CINEVAULT_SECRET_KEY_FILE and restart the server."
         }));
     }
-    let _client = cv_jobs::client::enter(client);
     let commands = &state.commands;
     let library = &commands.library;
     match cmd {
