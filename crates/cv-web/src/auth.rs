@@ -736,7 +736,7 @@ fn recovery(host: &HostMode) -> String {
         ),
         HostMode::Server => r#"<details id="forgot"><summary>Forgot the password?</summary>
 <p>CineVault can write a one-time PIN to a file on the server. This works from your home network.</p>
-<button type="button" id="pin-start">Make a reset PIN</button>
+<button type="button" class="secondary" id="pin-start">Make a reset PIN</button>
 <p id="pin-where" role="status"></p>
 <form id="pin-form" hidden>
 <label for="pin">PIN</label>
@@ -935,6 +935,9 @@ input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
 .field button { position: absolute; right: 6px; top: 6px; height: 32px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font: inherit; }
 button.primary { width: 100%; margin-top: 20px; padding: 12px; border: 0; border-radius: 10px; background: var(--gold); color: var(--on-gold); font: inherit; font-weight: 600; cursor: pointer; }
 button.primary:hover { filter: brightness(1.08); }
+button.secondary { margin-top: 4px; padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+button.secondary:hover { background: var(--bg); }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 p.hint, details, p.warn { color: var(--muted); font-size: 13px; }
 p.warn { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 16px; }
 #error { color: var(--error); min-height: 1.5em; margin: 10px 0 0; }
