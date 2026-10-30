@@ -9,7 +9,7 @@
 #   docker run --rm -p 8787:8787 -v "$PWD/data:/data" -v /path/to/media:/media cinevault-server
 #
 # The version is read by scripts/check-version.mjs, so keep it in step with Cargo.toml.
-ARG CINEVAULT_VERSION=1.1.1
+ARG CINEVAULT_VERSION=1.2.0
 
 # ------------------------------------------------------------------------------------------------
 # Builder 1: the server and CLI in the release profile.
