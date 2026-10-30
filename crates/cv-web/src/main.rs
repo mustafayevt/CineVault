@@ -155,6 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/media/{item}/{part}", get(media).post(media_download))
         .route("/api/fs/list", get(fs_list))
         .route("/api/fs/mkdir", post(fs_mkdir))
+        .route("/api/fs/probe", post(fs_probe))
         .fallback(get(static_file))
         .with_state(state);
 
@@ -845,6 +846,56 @@ pub(crate) fn path_inside_roots(path: &Path, roots: &[PathBuf]) -> bool {
         let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.clone());
         path.starts_with(root)
     })
+}
+
+#[derive(Debug, Deserialize)]
+struct ProbeBody {
+    path: String,
+}
+
+async fn fs_probe(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<ProbeBody>,
+) -> Response {
+    if let Err(response) = write_gate(&state, &headers, peer.ip()) {
+        return *response;
+    }
+    let path = PathBuf::from(body.path.trim());
+    let Ok(folder) = tokio::fs::canonicalize(&path).await else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "writable": false, "message": "That folder does not exist." })),
+        )
+            .into_response();
+    };
+    let roots = allowed_roots(&state);
+    if !path_inside_roots(&folder, &roots) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "writable": false,
+                "message": "That folder is outside the folders this server may browse."
+            })),
+        )
+            .into_response();
+    }
+    let probe = folder.join(format!(".cinevault-probe-{}", random_token()));
+    match tokio::fs::write(&probe, b"probe").await {
+        Ok(()) => {
+            let _ = tokio::fs::remove_file(&probe).await;
+            Json(json!({ "writable": true })).into_response()
+        }
+        Err(_) => (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "writable": false,
+                "message": "This folder is not writable by the server."
+            })),
+        )
+            .into_response(),
+    }
 }
 
 async fn fs_list(

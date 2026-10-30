@@ -6,6 +6,7 @@ import { Button } from "../../components/Button";
 import { t } from "../../i18n/catalog";
 import { cx } from "../../lib/cx";
 import { isServer } from "../../lib/transport";
+import { probeFolder } from "../pickers/folderPickerRequest";
 import { currentSourcesBackend } from "../library-sources/sourcesBackend";
 import type { SourceKind } from "../library-sources/sourcesBackend";
 import { useProviderKeys } from "../providers/useProviderKeys";
@@ -139,14 +140,23 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
   /** Looks inside a folder and fills in its row. */
   const analyse = useCallback(
     (path: string) => {
-      void currentOnboardingBackend()
-        .analyze(path)
-        .then((found) => {
+      void (async () => {
+        if (isServer()) {
+          const probe = await probeFolder(path);
+          if (!probe.writable) {
+            patchEntry(path, () =>
+              failedEntry(path, probe.message ?? "This folder is not writable by the server."),
+            );
+            return;
+          }
+        }
+        try {
+          const found = await currentOnboardingBackend().analyze(path);
           patchEntry(path, () => readyEntry({ ...found, path }));
-        })
-        .catch((error: unknown) => {
+        } catch (error: unknown) {
           patchEntry(path, () => failedEntry(path, analysisError(path, error)));
-        });
+        }
+      })();
     },
     [patchEntry],
   );
