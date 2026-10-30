@@ -1199,9 +1199,9 @@ async fn serve_media(
     headers: &HeaderMap,
     download: bool,
 ) -> Response {
-    if session_of(state, headers).is_none() {
+    let Some((session_id, _)) = session_of(state, headers) else {
         return signed_out();
-    }
+    };
     let Ok(id) = parse_id(item) else {
         return StatusCode::NOT_FOUND.into_response();
     };
@@ -1249,6 +1249,12 @@ async fn serve_media(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     let length = end - start + 1;
+    // The stream belongs to the session that asked for it: signing out, a password change or
+    // "sign out every session" ends a playback or download that is still running. The check runs
+    // once per 64 KiB chunk.
+    let auth = Arc::clone(&state.auth);
+    let chunks = ReaderStream::with_capacity(file.take(length), 64 * 1024)
+        .take_while(move |_| auth.session(&session_id).is_some());
     let mut builder = Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, media_type(&canonical))
@@ -1270,7 +1276,7 @@ async fn serve_media(
         );
     }
     builder
-        .body(Body::from_stream(ReaderStream::new(file.take(length))))
+        .body(Body::from_stream(chunks))
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
