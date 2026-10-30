@@ -112,7 +112,7 @@ export function ServerSection() {
         }
       >
         <span className="text-(length:--fs-13)">
-          {info?.keys === "locked" ? "Locked" : "Configured"}
+          {info === null ? "…" : info.keys === "locked" ? "Locked" : info.keys === "configured" ? "Configured" : "Not checked yet"}
         </span>
       </FormRow>
       <FormRow label="Password" align="start">

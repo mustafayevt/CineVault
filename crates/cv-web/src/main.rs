@@ -23,7 +23,6 @@ use cv_app::data_location::DataLocation;
 use cv_app::drives::DrivesService;
 use cv_app::history::HistoryService;
 use cv_app::scanning::SourceState;
-use cv_app::secrets::SecretStore;
 use cv_app::services::{AppServices, BootOptions};
 use cv_artwork::img::{ImageRequest, ImageResponse};
 use cv_db::repo::data_sources::list_sources;
@@ -91,10 +90,14 @@ impl Streams {
         self.send(client, Event::default().data(data.to_string()))
     }
 
-    #[expect(dead_code)] // Used by the items-changed relay next.
-    fn event<T: serde::Serialize>(&self, client: &str, name: &str, payload: &T) -> bool {
-        let data = json!({ "kind": "event", "event": name, "payload": payload });
-        self.send(client, Event::default().data(data.to_string()))
+    fn broadcast_event<T: serde::Serialize>(&self, name: &str, payload: &T) {
+        let Ok(clients) = self.clients.lock() else {
+            return;
+        };
+        let data = json!({ "kind": "event", "event": name, "payload": payload }).to_string();
+        for sender in clients.values() {
+            let _ = sender.try_send(Ok(Event::default().data(data.clone())));
+        }
     }
 }
 
@@ -109,6 +112,7 @@ struct WebState {
     data_root: PathBuf,
     bind: String,
     port: u16,
+    keys_locked: bool,
     ui_dir: PathBuf,
 }
 
@@ -125,10 +129,18 @@ struct InvokeBody {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     install_logging();
 
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    if arguments.first().is_some_and(|arg| arg == "passwd") {
+        return passwd(&arguments[1..]);
+    }
+
     let mut ui_dir = PathBuf::from("ui/dist");
-    let mut bind = "127.0.0.1".to_owned();
-    let mut port = 8787_u16;
-    let mut args = std::env::args().skip(1);
+    let mut bind = std::env::var("CINEVAULT_WEB_BIND").unwrap_or_else(|_| "127.0.0.1".to_owned());
+    let mut port = std::env::var("CINEVAULT_WEB_PORT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(8787_u16);
+    let mut args = arguments.into_iter();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--ui" => ui_dir = PathBuf::from(args.next().ok_or("--ui needs a folder")?),
@@ -154,8 +166,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let data_root = location.root().to_path_buf();
     let auth = Arc::new(auth::Auth::open(location.root())?);
+    let (secrets, keys_locked) =
+        cv_app::server_secrets::server_store(&data_root).map_err(std::io::Error::other)?;
     let services = AppServices::boot(
-        BootOptions::new(location, Arc::new(SecretStore::in_memory()))
+        BootOptions::new(location, Arc::new(secrets))
             .without_providers()
             .without_background_nfo(),
     )?;
@@ -163,6 +177,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let images = Arc::new(ImageContext::from_services(&services));
     let progress = Arc::new(cv_ipc::jobs::ProgressHub::default());
     let notices = cv_ipc::notices::NoticeHub::from_app(Arc::clone(services.notices()));
+    let streams = Arc::new(Streams::default());
+    let changes = Arc::clone(services.changes());
+    let change_streams = Arc::clone(&streams);
+    changes.subscribe(Arc::new(move |change| {
+        let payload = json!({
+            "items": change.items.iter().map(|id| id.0.to_string()).collect::<Vec<_>>(),
+            "parts": change.parts.iter().map(|part| part.as_str()).collect::<Vec<_>>(),
+        });
+        change_streams.broadcast_event("items-changed", &payload);
+    }));
     let feed_hub = Arc::clone(&progress);
     let feed_manager = services.jobs().clone();
     let list_manager = feed_manager.clone();
@@ -181,10 +205,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth,
         progress,
         notices,
-        streams: Arc::new(Streams::default()),
+        streams,
         data_root: data_root.clone(),
         bind: bind.clone(),
         port,
+        keys_locked,
         ui_dir: ui_dir.clone(),
     };
     let app = Router::new()
@@ -221,6 +246,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// `cinevault-server passwd` and `cinevault-server passwd --reset` on the machine that holds the
+/// data folder. This is the recovery path when the browser password is lost.
+fn passwd(arguments: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    let location = DataLocation::resolve_for_process()
+        .ok_or("CineVault could not find a folder for its data.")?;
+    let path = location.root().join(auth::AUTH_FILE);
+    if arguments.iter().any(|arg| arg == "--reset") {
+        match std::fs::remove_file(&path) {
+            Ok(()) => println!(
+                "The password was cleared. Start the server and set a new one in a browser."
+            ),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                println!("There is no password to clear.");
+            }
+            Err(error) => return Err(error.into()),
+        }
+        return Ok(());
+    }
+    let auth = auth::Auth::open(location.root())?;
+    if auth.has_password() {
+        let current = rpassword::prompt_password("Current password: ")?;
+        if !auth.check_password(&current) {
+            return Err("That password is not right.".into());
+        }
+    }
+    let password = rpassword::prompt_password("New password (at least 12 characters): ")?;
+    let confirm = rpassword::prompt_password("Confirm the new password: ")?;
+    if password != confirm {
+        return Err("The passwords do not match.".into());
+    }
+    auth.set_password_unattended(&password)?;
+    println!("Password set. Open the server in a browser and sign in.");
+    Ok(())
+}
+
 fn install_logging() {
     use tracing_subscriber::EnvFilter;
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
@@ -233,7 +293,11 @@ async fn shutdown() {
 
 async fn health(State(state): State<WebState>) -> Response {
     let _ = &state.services;
-    Json(json!({ "status": "ok" })).into_response()
+    Json(json!({
+        "status": "ok",
+        "keys": if state.keys_locked { "locked" } else { "configured" }
+    }))
+    .into_response()
 }
 
 fn is_secure(headers: &HeaderMap) -> bool {
@@ -381,7 +445,7 @@ async fn server_info(State(state): State<WebState>, headers: HeaderMap) -> Respo
         "bind": state.bind,
         "port": state.port,
         "sessions": state.auth.live_sessions(),
-        "keys": "unknown",
+        "keys": if state.keys_locked { "locked" } else { "configured" },
     }))
     .into_response()
 }

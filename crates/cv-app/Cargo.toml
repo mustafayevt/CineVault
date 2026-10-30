@@ -39,6 +39,8 @@ tokio.workspace = true
 trash.workspace = true
 ed25519-dalek = { version = "2", default-features = false, features = ["std", "fast"] }
 base64 = "0.23.1"
+chacha20poly1305.workspace = true
+rand_core.workspace = true
 semver = "1.0.28"
 ureq.workspace = true
 sha2.workspace = true

@@ -47,6 +47,7 @@ pub mod scanning;
 pub mod scrape_follow_up;
 pub mod scrape_settings;
 pub mod secrets;
+pub mod server_secrets;
 pub mod services;
 pub mod settings;
 pub mod step_outcomes;

@@ -177,6 +177,30 @@ impl Auth {
         Ok(self.create_session())
     }
 
+    /// Sets the password without the setup claim or a session, for `cinevault-server passwd` on
+    /// the machine that holds the data folder. Shell access is the trust boundary.
+    pub fn set_password_unattended(&self, password: &str) -> Result<(), AuthError> {
+        if password.chars().count() < 12 {
+            return Err(AuthError::TooShort);
+        }
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .map_err(|error| AuthError::Hash(error.to_string()))?
+            .to_string();
+        let next = AuthFile {
+            version: VERSION,
+            hash,
+        };
+        let bytes =
+            serde_json::to_vec(&next).map_err(|error| AuthError::Hash(error.to_string()))?;
+        cv_fs::write_atomic_with_mode(&self.path, &bytes, 0o600)?;
+        *Self::lock(&self.password) = Some(next);
+        *Self::lock(&self.setup_deadline) = None;
+        *Self::lock(&self.setup_claim) = None;
+        Ok(())
+    }
+
     /// Changes the password from a signed-in session. The current password is required; the
     /// caller ends every other session.
     pub fn change_password(
@@ -222,7 +246,6 @@ impl Auth {
     }
 
     /// Checks a password without starting a session (for a sensitive confirmation).
-    #[expect(dead_code)] // Used by permanent delete from a browser.
     pub fn check_password(&self, password: &str) -> bool {
         let file = {
             let guard = Self::lock(&self.password);
