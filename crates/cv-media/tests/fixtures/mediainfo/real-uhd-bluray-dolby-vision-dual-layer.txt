@@ -1,0 +1,147 @@
+# Recorded from MediaInfo 26.10 on the main clip of an Ultra HD Blu-ray (BDMV/STREAM/00000.m2ts, read
+# through the buffer interface as the disc analysis does). The disc has Dolby Vision profile 7: the
+# enhancement layer is the second HEVC stream (packet id 0x1015, 1080p), whose clip information
+# marks it as Dolby Vision. The stream file has no Dolby Vision descriptor, so MediaInfo reports
+# both layers as plain HDR10 HEVC. The title's duration is the playlist's.
+[General]
+ID: 1
+Format: BDAV
+Format/Extensions: m2ts mts ssif
+Format_Commercial: BDAV
+FileSize: 44898797568
+Duration: 5113232
+Duration/String3: 01:25:13.232
+OverallBitRate_Mode: VBR
+OverallBitRate: 81273557
+OverallBitRate_Maximum: 35500000
+FrameRate: 23.976
+[Video]
+StreamOrder: 0-0
+ID: 4113
+Format: HEVC
+Format_Commercial: HEVC
+Format_Profile: Main 10@L5.1@High
+HDR_Format: SMPTE ST 2086
+HDR_Format/String: SMPTE ST 2086, HDR10 compatible
+HDR_Format_Commercial: HDR10
+HDR_Format_Compatibility: HDR10
+CodecID: 36
+Duration: 6631
+Duration/String3: 00:00:06.631
+BitRate_Mode: VBR
+BitRate_Maximum: 80999424
+Width: 3840
+Height: 2160
+Sampled_Width: 3840
+Sampled_Height: 2160
+PixelAspectRatio: 1.000
+DisplayAspectRatio: 1.778
+FrameRate: 23.976
+FrameRate_Num: 24000
+FrameRate_Den: 1001
+BitDepth: 10
+ScanType: Progressive
+Delay: 4198333.333333
+colour_primaries: BT.2020
+transfer_characteristics: PQ
+matrix_coefficients: BT.2020 non-constant
+MasteringDisplay_ColorPrimaries: Display P3
+MasteringDisplay_Luminance: min: 0.0001 cd/m2, max: 1000 cd/m2
+[Video]
+StreamOrder: 0-1
+ID: 4117
+Format: HEVC
+Format_Commercial: HEVC
+Format_Profile: Main 10@L5.1@High
+HDR_Format: SMPTE ST 2086
+HDR_Format/String: SMPTE ST 2086, HDR10 compatible
+HDR_Format_Commercial: HDR10
+HDR_Format_Compatibility: HDR10
+CodecID: 36
+Duration: 6589
+Duration/String3: 00:00:06.589
+BitRate_Mode: VBR
+BitRate_Maximum: 8999936
+Width: 1920
+Height: 1080
+Sampled_Width: 1920
+Sampled_Height: 1080
+PixelAspectRatio: 1.000
+DisplayAspectRatio: 1.778
+FrameRate: 23.976
+FrameRate_Num: 24000
+FrameRate_Den: 1001
+BitDepth: 10
+ScanType: Progressive
+Delay: 4198333.333333
+colour_primaries: BT.2020
+transfer_characteristics: PQ
+matrix_coefficients: BT.2020 non-constant
+MasteringDisplay_ColorPrimaries: Display P3
+MasteringDisplay_Luminance: min: 0.0001 cd/m2, max: 1000 cd/m2
+[Audio]
+StreamOrder: 0-2
+ID: 4352
+Format: AC-3
+Format_Commercial: Dolby Digital
+Format_Commercial_IfAny: Dolby Digital
+CodecID: 129
+Duration: 6496
+Duration/String3: 00:00:06.496
+BitRate_Mode: CBR
+BitRate: 448000
+Channel(s): 6
+ChannelPositions: Front: L C R, Side: L R, LFE
+ChannelLayout: L R C LFE Ls Rs
+SamplingRate: 48000
+FrameRate: 31.250
+Delay: 4198333.333333
+StreamSize: 363776
+ServiceKind: CM
+ServiceKind/String: Complete Main
+[Audio]
+StreamOrder: 0-3
+ID: 4353
+Format: MLP FBA
+Format_Commercial: Dolby TrueHD with Dolby Atmos
+Format_Commercial_IfAny: Dolby TrueHD with Dolby Atmos
+Format_AdditionalFeatures: AC-3 16-ch
+CodecID: 131
+Duration: 6464
+Duration/String3: 00:00:06.464
+BitRate_Mode: VBR
+BitRate: 640000
+BitRate_Maximum: 5043000
+Channel(s): 8
+ChannelPositions: Front: L C R, Side: L R, Back: L R, LFE
+ChannelLayout: L R C LFE Ls Rs Lb Rb
+SamplingRate: 48000
+FrameRate: 31.250
+Delay: 4198333.333333
+StreamSize: 517120
+ServiceKind: CM
+ServiceKind/String: Complete Main
+[Text]
+StreamOrder: 0-4
+ID: 4768
+Format: PGS
+Format_Commercial: PGS
+CodecID: 144
+[Text]
+StreamOrder: 0-5
+ID: 4769
+Format: PGS
+Format_Commercial: PGS
+CodecID: 144
+[Text]
+StreamOrder: 0-6
+ID: 4770
+Format: PGS
+Format_Commercial: PGS
+CodecID: 144
+[Text]
+StreamOrder: 0-7
+ID: 4771
+Format: PGS
+Format_Commercial: PGS
+CodecID: 144

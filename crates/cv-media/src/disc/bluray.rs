@@ -4,7 +4,7 @@
 //! on a 45 kHz clock. The main title is the playlist with the longest total playing time.
 //! All numbers are big-endian.
 
-use super::files::{DiscFs, join, read_file};
+use super::files::{DiscFs, find, join, read_file};
 use super::{DiscError, DiscKind, MainTitle};
 
 /// The playlist clock.
@@ -178,4 +178,126 @@ fn find_dir(fs: &dyn DiscFs, parent: &str, name: &str) -> Result<String, DiscErr
         .find(|entry| entry.is_dir && entry.name.eq_ignore_ascii_case(name))
         .map(|entry| join(parent, &entry.name))
         .ok_or_else(|| DiscError::structure(format!("the BDMV folder has no {name} folder")))
+}
+
+/// The dynamic range a clip information file states for a video stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DynamicRange {
+    Sdr,
+    Hdr10,
+    DolbyVision,
+    /// A value the format reserves.
+    Other(u8),
+}
+
+/// What a clip information file (`CLIPINF/nnnnn.clpi`) says about one elementary stream of its
+/// clip.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClipStream {
+    /// The packet id, which MediaInfo reports as the stream's `ID`.
+    pub pid: u16,
+    /// The stream coding type (`0x24` HEVC, `0x1b` AVC, `0x83` TrueHD, `0x90` PGS ...).
+    pub coding_type: u8,
+    /// The ISO 639-2 language code of an audio or subtitle stream, as stored (`eng`).
+    pub language: Option<String>,
+    /// The dynamic range of an HEVC video stream (Ultra HD Blu-ray).
+    pub dynamic_range: Option<DynamicRange>,
+    /// The HDR10+ flag of an HEVC video stream (Ultra HD Blu-ray).
+    pub hdr10_plus: bool,
+}
+
+const CLPI_LIMIT: u64 = 16 * 1024 * 1024;
+
+/// Parses the program information of a clip information file: every stream's packet id, coding
+/// type, language and, for HEVC video, dynamic range and HDR10+ flag.
+///
+/// # Errors
+/// [`DiscError::Structure`] when the bytes are not a clip information file or are cut short.
+pub fn parse_clip_info(bytes: &[u8]) -> Result<Vec<ClipStream>, DiscError> {
+    let cut = || DiscError::structure("a clip information file is cut short");
+    if !bytes.starts_with(b"HDMV") {
+        return Err(DiscError::structure("a .clpi file has no HDMV header"));
+    }
+    let info_at = usize::try_from(be32(bytes, 12).ok_or_else(cut)?).map_err(|_| cut())?;
+    // ProgramInfo(): length u32, reserved u8, program count u8; each program: SPN start u32,
+    // program map pid u16, stream count u8, group count u8, then per stream its pid u16 and a
+    // StreamCodingInfo() of `length u8` bytes that starts with the coding type.
+    let programs = *bytes.get(info_at + 5).ok_or_else(cut)?;
+    let mut at = info_at + 6;
+    let mut streams = Vec::new();
+    for _ in 0..programs {
+        let count = *bytes.get(at + 6).ok_or_else(cut)?;
+        at += 8;
+        for _ in 0..count {
+            let pid = be16(bytes, at).ok_or_else(cut)?;
+            let length = usize::from(*bytes.get(at + 2).ok_or_else(cut)?);
+            let info = bytes.get(at + 3..at + 3 + length).ok_or_else(cut)?;
+            at += 3 + length;
+            let Some(&coding_type) = info.first() else {
+                continue;
+            };
+            streams.push(clip_stream(pid, coding_type, &info[1..]));
+        }
+    }
+    Ok(streams)
+}
+
+fn clip_stream(pid: u16, coding_type: u8, attributes: &[u8]) -> ClipStream {
+    let language = |at: usize| {
+        let code = attributes.get(at..at + 3)?;
+        code.iter()
+            .all(u8::is_ascii_alphabetic)
+            .then(|| String::from_utf8_lossy(code).to_ascii_lowercase())
+    };
+    let mut stream = ClipStream {
+        pid,
+        coding_type,
+        language: None,
+        dynamic_range: None,
+        hdr10_plus: false,
+    };
+    match coding_type {
+        // HEVC: format and rate, aspect and flags, then dynamic range and colour space, then the
+        // HDR10+ flag in the top bit.
+        0x24 => {
+            if let Some(&range) = attributes.get(2) {
+                stream.dynamic_range = Some(match range >> 4 {
+                    0 => DynamicRange::Sdr,
+                    1 => DynamicRange::Hdr10,
+                    2 => DynamicRange::DolbyVision,
+                    other => DynamicRange::Other(other),
+                });
+            }
+            stream.hdr10_plus = attributes.get(3).is_some_and(|flags| flags & 0x80 != 0);
+        }
+        // Audio: format and sampling rate, then the language.
+        0x03 | 0x04 | 0x80..=0x86 | 0xa1 | 0xa2 => stream.language = language(1),
+        // Presentation and interactive graphics: the language first.
+        0x90 | 0x91 => stream.language = language(0),
+        // Text subtitles: the character code, then the language.
+        0x92 => stream.language = language(1),
+        _ => {}
+    }
+    stream
+}
+
+/// The streams of the clip whose stream file is `stream_file` (`BDMV/STREAM/00800.m2ts`), from
+/// its clip information file (`BDMV/CLIPINF/00800.clpi`, or the copy in `BDMV/BACKUP/CLIPINF`).
+/// `None` when neither can be read.
+#[must_use]
+pub fn clip_streams(fs: &dyn DiscFs, stream_file: &str) -> Option<Vec<ClipStream>> {
+    let (stream_dir, file) = stream_file.rsplit_once('/')?;
+    let (bdmv, _) = stream_dir.rsplit_once('/')?;
+    let (clip, _) = file.rsplit_once('.')?;
+    let name = format!("{clip}.clpi");
+    let backup = find_dir(fs, bdmv, "BACKUP").ok();
+    [Some(bdmv.to_owned()), backup]
+        .into_iter()
+        .flatten()
+        .filter_map(|parent| find_dir(fs, &parent, "CLIPINF").ok())
+        .find_map(|dir| {
+            let entry = find(fs, &dir, &name).ok()??;
+            let bytes = read_file(fs, &join(&dir, &entry.name), CLPI_LIMIT).ok()?;
+            parse_clip_info(&bytes).ok()
+        })
 }

@@ -729,3 +729,356 @@ fn the_mastering_display_and_light_levels_are_read() {
     assert_eq!(d.max_fall_nits, Some(400));
     assert!(details(&[("Format", "HEVC")]).is_empty());
 }
+
+fn snapshot_of(general: &[(&str, &str)], videos: &[&[(&str, &str)]]) -> MediaSnapshot {
+    let mut snapshot = MediaSnapshot::new();
+    snapshot.push(StreamKind::General, stream(general));
+    for video in videos {
+        snapshot.push(StreamKind::Video, stream(video));
+    }
+    snapshot
+}
+
+fn applied(snapshot: &MediaSnapshot) -> MediaFile {
+    let mut file = MediaFile::new(MediaFileType::Video, "d", "00000.m2ts");
+    apply_snapshot(&mut file, snapshot);
+    file
+}
+
+/// The two HEVC streams of an Ultra HD Blu-ray clip as MediaInfo 26.10 reports them when the
+/// stream file has no Dolby Vision descriptor (recorded from a real disc).
+const UHD_BASE_LAYER: &[(&str, &str)] = &[
+    ("ID", "4113"),
+    ("Format", "HEVC"),
+    ("HDR_Format", "SMPTE ST 2086"),
+    ("HDR_Format_Commercial", "HDR10"),
+    ("HDR_Format_Compatibility", "HDR10"),
+    ("Width", "3840"),
+    ("Height", "2160"),
+    ("BitDepth", "10"),
+    ("transfer_characteristics", "PQ"),
+    ("MasteringDisplay_ColorPrimaries", "Display P3"),
+    (
+        "MasteringDisplay_Luminance",
+        "min: 0.0001 cd/m2, max: 1000 cd/m2",
+    ),
+];
+const UHD_ENHANCEMENT_LAYER: &[(&str, &str)] = &[
+    ("ID", "4117"),
+    ("Format", "HEVC"),
+    ("HDR_Format", "SMPTE ST 2086"),
+    ("HDR_Format_Commercial", "HDR10"),
+    ("HDR_Format_Compatibility", "HDR10"),
+    ("Width", "1920"),
+    ("Height", "1080"),
+];
+
+#[test]
+fn a_blu_ray_enhancement_layer_stream_means_dolby_vision_profile_7() {
+    let file = applied(&snapshot_of(
+        &[("Format", "BDAV")],
+        &[UHD_BASE_LAYER, UHD_ENHANCEMENT_LAYER],
+    ));
+    assert_eq!((file.width, file.height), (3840, 2160));
+    assert_eq!(file.hdr_formats, ["Dolby Vision", "HDR10"]);
+    assert_eq!(file.hdr_details.dolby_vision_profile, "7");
+    assert_eq!(file.hdr_details.dolby_vision_compatibility, "Blu-ray");
+    // The base layer keeps its own mastering display.
+    assert_eq!(file.hdr_details.mastering_primaries, "Display P3");
+    assert_eq!(file.hdr_details.mastering_max_nits, Some(1000.0));
+
+    // Listed first, the enhancement layer is still not the main picture.
+    let file = applied(&snapshot_of(
+        &[("Format", "BDAV")],
+        &[UHD_ENHANCEMENT_LAYER, UHD_BASE_LAYER],
+    ));
+    assert_eq!((file.width, file.height), (3840, 2160));
+    assert_eq!(file.hdr_formats, ["Dolby Vision", "HDR10"]);
+
+    // Only in a Blu-ray or MPEG transport stream does the packet id mean anything.
+    let file = applied(&snapshot_of(
+        &[("Format", "Matroska")],
+        &[UHD_BASE_LAYER, UHD_ENHANCEMENT_LAYER],
+    ));
+    assert_eq!(file.hdr_formats, ["HDR10"]);
+    assert_eq!(file.hdr_details.dolby_vision_profile, "");
+
+    // A Blu-ray clip with one video stream is what MediaInfo says.
+    let file = applied(&snapshot_of(&[("Format", "BDAV")], &[UHD_BASE_LAYER]));
+    assert_eq!(file.hdr_formats, ["HDR10"]);
+}
+
+#[test]
+fn dolby_vision_found_in_a_second_video_stream_is_merged_with_the_base_layer() {
+    // MediaInfo found the Dolby Vision layer in the enhancement layer's stream.
+    let enhancement: &[(&str, &str)] = &[
+        ("ID", "4117"),
+        ("Format", "HEVC"),
+        ("HDR_Format", "Dolby Vision / SMPTE ST 2086"),
+        ("HDR_Format_Version", "1.0 / "),
+        ("HDR_Format_Profile", "dvhe.07 / "),
+        ("HDR_Format_Level", "06 / "),
+        ("HDR_Format_Settings", "BL+EL+RPU / "),
+        ("HDR_Format_Compatibility", "Blu-ray / HDR10"),
+        ("Width", "1920"),
+        ("Height", "1080"),
+    ];
+    let base_hdr10_plus: &[(&str, &str)] = &[
+        ("ID", "4113"),
+        ("Format", "HEVC"),
+        ("HDR_Format", "SMPTE ST 2094 App 4"),
+        ("HDR_Format_Compatibility", "HDR10+ Profile B"),
+        ("Width", "3840"),
+        ("Height", "2160"),
+    ];
+    let file = applied(&snapshot_of(
+        &[("Format", "BDAV")],
+        &[base_hdr10_plus, enhancement],
+    ));
+    assert_eq!(file.hdr_formats, ["Dolby Vision", "HDR10+"]);
+    assert_eq!(file.hdr_details.dolby_vision_profile, "7");
+
+    // A main stream that names Dolby Vision itself is left as it is.
+    let main_dv: &[(&str, &str)] = &[
+        ("Format", "HEVC"),
+        ("HDR_Format", "Dolby Vision / SMPTE ST 2086"),
+        ("HDR_Format_Profile", "dvhe.08 / "),
+        ("HDR_Format_Compatibility", "HDR10 / HDR10"),
+        ("Width", "3840"),
+        ("Height", "2160"),
+    ];
+    let file = applied(&snapshot_of(&[("Format", "BDAV")], &[main_dv, enhancement]));
+    assert_eq!(file.hdr_details.dolby_vision_profile, "8.1");
+}
+
+#[test]
+fn an_sdr_base_layer_under_an_enhancement_layer_is_dolby_vision_only() {
+    let base: &[(&str, &str)] = &[
+        ("ID", "4113"),
+        ("Format", "HEVC"),
+        ("Width", "3840"),
+        ("Height", "2160"),
+        ("transfer_characteristics", "BT.709"),
+    ];
+    let enhancement: &[(&str, &str)] = &[("ID", "4117"), ("Format", "HEVC")];
+    let file = applied(&snapshot_of(&[("Format", "BDAV")], &[base, enhancement]));
+    assert_eq!(file.hdr_formats, ["Dolby Vision"]);
+    assert_eq!(file.hdr_details.dolby_vision_profile, "7");
+}
+
+#[test]
+fn a_dolby_vision_layer_goes_in_front_of_the_existing_layers() {
+    let base = stream(&[
+        ("HDR_Format", "SMPTE ST 2086"),
+        ("HDR_Format_Compatibility", "HDR10"),
+        ("MaxCLL", "1000 cd/m2"),
+    ]);
+    let merged = with_dolby_vision_layer(&base, &bluray_dolby_vision_layer());
+    assert_eq!(
+        merged.get("HDR_Format"),
+        Some("Dolby Vision / SMPTE ST 2086")
+    );
+    assert_eq!(merged.get("HDR_Format_Profile"), Some("dvhe.07 / "));
+    assert_eq!(
+        merged.get("HDR_Format_Compatibility"),
+        Some("Blu-ray / HDR10")
+    );
+    assert_eq!(merged.get("HDR_Format_Level"), None);
+    assert_eq!(merged.get("MaxCLL"), Some("1000 cd/m2"));
+    // With no HDR layer of its own the Dolby Vision layer stands alone.
+    let merged = with_dolby_vision_layer(&stream(&[]), &bluray_dolby_vision_layer());
+    assert_eq!(merged.get("HDR_Format"), Some("Dolby Vision"));
+    assert_eq!(merged.get("HDR_Format_Profile"), Some("dvhe.07"));
+}
+
+#[test]
+fn dolby_vision_profiles_of_every_codec_string() {
+    let profile = |codec: &str| {
+        dolby_vision_profile(&stream(&[
+            ("HDR_Format", "Dolby Vision"),
+            ("HDR_Format_Profile", codec),
+        ]))
+    };
+    assert_eq!(profile("dvhe.04"), Some(4));
+    assert_eq!(profile("dvhe.05"), Some(5));
+    assert_eq!(profile("dvhe.07"), Some(7));
+    assert_eq!(profile("dvh1.08"), Some(8));
+    assert_eq!(profile("dvav.09"), Some(9));
+    assert_eq!(profile("dva1.09"), Some(9));
+    assert_eq!(profile("dav1.10"), Some(10));
+    assert_eq!(profile("dvhe.08.06"), Some(8));
+    assert_eq!(profile("Profile 8"), Some(8));
+
+    let named = |codec: &str, compat: &str| {
+        details(&[
+            ("HDR_Format", "Dolby Vision"),
+            ("HDR_Format_Profile", codec),
+            ("HDR_Format_Compatibility", compat),
+        ])
+        .dolby_vision_profile
+    };
+    assert_eq!(named("dav1.10", "HDR10"), "10.1");
+    assert_eq!(named("dav1.10", "SDR"), "10.2");
+    assert_eq!(named("dav1.10", "HLG"), "10.4");
+    assert_eq!(named("dvhe.04", "SDR"), "4");
+    assert_eq!(named("dvav.09", "SDR"), "9");
+}
+
+#[test]
+fn the_combined_string_of_older_libraries_gives_the_profile_and_base_layer() {
+    let d = details(&[(
+        "HDR_Format/String",
+        "Dolby Vision, Version 1.0, dvhe.08.06, BL+RPU, HDR10 compatible / SMPTE ST 2086, HDR10 compatible",
+    )]);
+    assert_eq!(d.dolby_vision_profile, "8.1");
+    assert_eq!(d.dolby_vision_compatibility, "HDR10");
+    let d = details(&[(
+        "HDR_Format/String",
+        "Dolby Vision, Version 1.0, dvhe.05.06, BL+RPU",
+    )]);
+    assert_eq!(d.dolby_vision_profile, "5");
+    assert_eq!(d.dolby_vision_compatibility, "");
+    // The split fields win when the library has them.
+    let d = details(&[
+        ("HDR_Format", "SMPTE ST 2086"),
+        ("HDR_Format/String", "Dolby Vision, dvhe.08.06"),
+    ]);
+    assert_eq!(d.dolby_vision_profile, "");
+}
+
+#[test]
+fn e_ac_3_in_a_blu_ray_stream_file_is_not_plain_ac3() {
+    // Recorded from MediaInfo 26.10 on a Blu-ray transport stream (stream coding type 0x84).
+    let codec = audio_codec(&stream(&[
+        ("Format", "AC-3"),
+        ("Format_Commercial", "Dolby Digital Plus with Dolby Atmos"),
+        (
+            "Format_Commercial_IfAny",
+            "Dolby Digital Plus with Dolby Atmos",
+        ),
+        ("Format_Profile", "Blu-ray Disc"),
+        ("Format_Settings_Mode", "Dolby Surround EX"),
+        ("Format_AdditionalFeatures", "Dep JOC"),
+        ("CodecID", "132"),
+    ]));
+    assert_eq!(codec, "E-AC-3 Atmos");
+    let codec = audio_codec(&stream(&[
+        ("Format", "AC-3"),
+        ("Format_Commercial_IfAny", "Dolby Digital Plus"),
+        ("Format_AdditionalFeatures", "Dep"),
+    ]));
+    assert_eq!(codec, "E-AC-3");
+    // E-AC-3 7.1 in Matroska reports the dependent substream too.
+    let codec = audio_codec(&stream(&[
+        ("Format", "E-AC-3"),
+        ("Format_Commercial_IfAny", "Dolby Digital Plus"),
+        ("Format_AdditionalFeatures", "Dep"),
+    ]));
+    assert_eq!(codec, "E-AC-3");
+    // Plain Dolby Digital stays AC3.
+    let codec = audio_codec(&stream(&[
+        ("Format", "AC-3"),
+        ("Format_Commercial_IfAny", "Dolby Digital"),
+    ]));
+    assert_eq!(codec, "AC3");
+}
+
+#[test]
+fn height_speakers_are_not_counted_as_channels() {
+    // Recorded from MediaInfo 26.10: a DTS:X 7.1.4 track in Matroska.
+    let dts_x = stream(&[
+        ("Format", "DTS"),
+        ("Format_Commercial_IfAny", "DTS-HD MA + DTS:X"),
+        ("Format_AdditionalFeatures", "XLL X"),
+        ("Channel(s)", "12"),
+        (
+            "ChannelPositions",
+            "Front: L C R, Side: L R, Back: L R, TopFront: L R, TopRear: L R, LFE",
+        ),
+        ("ChannelLayout", "C L R LFE Lb Rb Lss Rss Tfl Tfr Tbl Tbr"),
+    ]);
+    assert_eq!(audio_codec(&dts_x), "DTS-X");
+    assert_eq!(audio_channels(&dts_x), 8);
+    // Without height speakers the count stays.
+    let seven_one = stream(&[
+        ("Channel(s)", "8"),
+        ("ChannelLayout", "L R C LFE Ls Rs Lb Rb"),
+    ]);
+    assert_eq!(audio_channels(&seven_one), 8);
+    // A layout that disagrees with the count is not trusted.
+    let odd = stream(&[("Channel(s)", "12"), ("ChannelLayout", "L R Tfl Tfr")]);
+    assert_eq!(audio_channels(&odd), 12);
+}
+
+#[test]
+fn interlaced_video_stored_as_fields_reports_the_frame_rate() {
+    // Recorded from MediaInfo 26.10: 1080i in Matroska, one field per container frame.
+    let file = file_from(
+        &[("Format", "Matroska")],
+        &[
+            ("Format", "AVC"),
+            ("Width", "1920"),
+            ("Height", "1080"),
+            ("FrameRate_Mode", "VFR"),
+            ("FrameRate", "59.940"),
+            ("FrameRate_Original", "29.970"),
+            ("ScanType", "Interlaced"),
+            ("ScanType_StoreMethod", "SeparatedFields"),
+        ],
+        "a.mkv",
+    );
+    assert_eq!(file.exact_video_format, "1080i");
+    assert!((file.frame_rate - 29.97).abs() < 1e-9);
+}
+
+#[test]
+fn a_dual_track_mp4_takes_dolby_vision_from_its_enhancement_layer_track() {
+    // Recorded from MediaInfo 26.10: an MP4 with the base layer in track 1 and the Dolby Vision
+    // enhancement layer (EL+RPU) in track 2.
+    let base: &[(&str, &str)] = &[
+        ("ID", "1"),
+        ("Format", "HEVC"),
+        ("HDR_Format", "SMPTE ST 2086"),
+        ("HDR_Format_Commercial", "HDR10"),
+        ("HDR_Format_Compatibility", "HDR10"),
+        ("CodecID", "hev1"),
+        ("Width", "3840"),
+        ("Height", "2160"),
+    ];
+    let enhancement: &[(&str, &str)] = &[
+        ("ID", "2"),
+        ("Format", "HEVC"),
+        ("HDR_Format", "Dolby Vision / SMPTE ST 2086"),
+        ("HDR_Format_Commercial", "Blu-ray / HDR10"),
+        ("HDR_Format_Version", "1.0 / "),
+        ("HDR_Format_Profile", "dvhe.07 / "),
+        ("HDR_Format_Level", "06 / "),
+        ("HDR_Format_Settings", "EL+RPU / "),
+        ("HDR_Format_Compression", "None / "),
+        ("HDR_Format_Compatibility", "Blu-ray / HDR10"),
+        ("CodecID", "dvhe"),
+        ("Width", "1920"),
+        ("Height", "1080"),
+    ];
+    let file = applied(&snapshot_of(&[("Format", "MPEG-4")], &[base, enhancement]));
+    assert_eq!((file.width, file.height), (3840, 2160));
+    assert_eq!(file.hdr_formats, ["Dolby Vision", "HDR10"]);
+    assert_eq!(file.hdr_details.dolby_vision_profile, "7");
+    assert_eq!(file.hdr_details.dolby_vision_compatibility, "Blu-ray");
+}
+
+#[test]
+fn e_ac_3_that_matroska_names_ac_3_is_e_ac_3() {
+    // Recorded from MediaInfo 26.10: an E-AC-3 track in Matroska reported as AC-3.
+    let codec = audio_codec(&stream(&[
+        ("Format", "AC-3"),
+        ("Format_Commercial", "Dolby Digital Plus"),
+        ("Format_Commercial_IfAny", "Dolby Digital Plus"),
+        ("Format_Profile", "Blu-ray Disc"),
+        ("Format_Settings_Mode", "Dolby Surround EX"),
+        ("Format_AdditionalFeatures", "Dep"),
+        ("CodecID", "A_EAC3"),
+        ("Channel(s)", "8"),
+    ]));
+    assert_eq!(codec, "E-AC-3");
+}
