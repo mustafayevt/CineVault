@@ -49,6 +49,10 @@ export interface LatestFeed {
   refresh: () => void;
 }
 
+/** How often, and how far apart, a request refused for the notice is asked again. */
+const NOTICE_WAITS = 5;
+const NOTICE_WAIT_MS = 400;
+
 /** How long a kind's rows are kept on the page after the person leaves it, like the backend. */
 const KEEP_MS = 5 * 60_000;
 
@@ -189,6 +193,8 @@ export function useLatestFeed(kind: FeedKind, enabled: boolean): LatestFeed {
 
   // Set below; a request that finds the feed refreshed elsewhere starts it over.
   const startOver = useRef<(kind: FeedKind) => void>(() => undefined);
+  const askAgain = useRef<(kind: FeedKind, more: boolean) => void>(() => undefined);
+  const noticeWaits = useRef(0);
   const request = useCallback(
     (forKind: FeedKind, more: boolean, refresh: boolean) => {
       const backend = currentTorrentBackend();
@@ -243,9 +249,14 @@ export function useLatestFeed(kind: FeedKind, enabled: boolean): LatestFeed {
         })
         .catch((error: unknown) => {
           finish();
-          if (error instanceof TorrentRequestError && error.code === "feed_expired") {
+          if (!(error instanceof TorrentRequestError)) return;
+          if (error.code === "feed_expired") {
             // Another window refreshed the feed: start over so the pages line up again.
             startOver.current(forKind);
+          } else if (error.code === "notice_not_accepted" && noticeWaits.current < NOTICE_WAITS) {
+            // "Got it" was just pressed and the setting is still being saved: ask again shortly.
+            noticeWaits.current += 1;
+            window.setTimeout(() => askAgain.current(forKind, more), NOTICE_WAIT_MS);
           }
         });
       return searchId;
@@ -255,6 +266,7 @@ export function useLatestFeed(kind: FeedKind, enabled: boolean): LatestFeed {
 
   useEffect(() => {
     startOver.current = (forKind) => request(forKind, false, true);
+    askAgain.current = (forKind, more) => request(forKind, more, false);
   }, [request]);
 
   // The first page: when the feed is shown, and again for each kind.

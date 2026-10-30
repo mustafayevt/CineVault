@@ -8,7 +8,7 @@ import { useToastStore } from "../toasts/toastStore";
 import { titleLinks } from "./feedView";
 import { ACTIONS_COLUMN_WIDTH, SEND_COLUMN_WIDTH } from "./ReleaseTable";
 import { qualityRank } from "./releaseSort";
-import { setTorrentBackend } from "./torrentBackend";
+import { TorrentRequestError, setTorrentBackend } from "./torrentBackend";
 import type { FeedStart } from "./torrentBackend";
 import { backendWith, release, renderTorrents, spiedBackend } from "./torrentHarness";
 import { applyFeedEvent, applyFeedStart, forgetLatestFeed } from "./useLatestFeed";
@@ -66,6 +66,22 @@ describe("the Latest releases feed", () => {
     const status = await screen.findByTestId("feed-status");
     await waitFor(() => expect(status).toHaveTextContent("1337x can't list new releases"));
     expect(status).not.toHaveTextContent("Torrentio");
+  });
+
+  it("asks again when the notice was accepted a moment before the setting was saved", async () => {
+    const backend = spiedBackend();
+    let refused = false;
+    const latest = backend.latest;
+    backend.latest = (request, onEvent) => {
+      if (!refused) {
+        refused = true;
+        return Promise.reject(new TorrentRequestError("notice_not_accepted", "Accept first"));
+      }
+      return latest(request, onEvent);
+    };
+    await renderTorrents("/torrents", backend);
+    await rowNamed("Oppenheimer");
+    expect(refused).toBe(true);
   });
 
   it("marks titles the library holds, and a better copy, without asking TMDB", async () => {
