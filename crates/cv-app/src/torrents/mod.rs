@@ -10,6 +10,7 @@
 //! Sources use their own HTTP client (`cv_torrent::source::client_builder`: 20 second timeout, no
 //! retry, the CineVault User-Agent, an 8 MiB answer limit) that shares the app's redaction.
 
+mod feed;
 pub mod indexer;
 pub mod indexer_update;
 mod landing;
@@ -35,6 +36,7 @@ use cv_torrent::sources::torznab::{
 use cv_torrent::sources::yts::YtsSource;
 use cv_torrent::{TorrentError, model::TorrentQuery};
 
+pub use feed::{LibraryIndex, LibraryMatch};
 pub use landing::{Landing, LandingTitle, STRIP_LENGTH, landing_of};
 pub use library::{
     LibraryHolding, LibraryLink, MovieCopy, copy_of, hdr_of, movie_copy_of, resolution_of,
@@ -324,6 +326,14 @@ impl TorrentService {
         &self,
         _query: &TorrentQuery,
     ) -> Result<Vec<Arc<dyn TorrentSource>>, TorrentError> {
+        self.enabled_sources()
+    }
+
+    /// Every source that is switched on, whatever the query (see [`Self::sources`]).
+    ///
+    /// # Errors
+    /// `NoticeNotAccepted` before the notice is accepted.
+    pub fn enabled_sources(&self) -> Result<Vec<Arc<dyn TorrentSource>>, TorrentError> {
         self.ensure_accepted()?;
         let settings = self.settings_now();
         let Some(client) = self.http() else {

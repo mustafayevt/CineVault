@@ -1,5 +1,6 @@
 //! The library rows behind the Torrent search landing: the movies whose copy could be better and
-//! the newest additions, each with its TMDB ID.
+//! the newest additions, each with its TMDB ID; and every movie and show for the "Latest
+//! releases" feed, which matches releases by title and year.
 //!
 //! Both reads are one query each over `item`, `ext_id` and `media_file`, so the landing costs the
 //! same for a library of fifty titles and one of five thousand.
@@ -101,6 +102,69 @@ pub fn recently_added(conn: &Connection, limit: usize) -> DbResult<Vec<LandingRo
     collect(rows)
 }
 
+/// A library movie or show as the "Latest releases" feed matches releases against it: by title
+/// and year, with no provider ID needed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryTitleRow {
+    pub id: ItemId,
+    /// `Movie` or `Show`.
+    pub kind: ItemKind,
+    pub title: String,
+    pub original_title: String,
+    /// `0` when unknown.
+    pub year: u16,
+    /// The movie's source (`BluRay`, `WEB-DL`, ...), empty when unknown or for a show.
+    pub media_source: String,
+    /// The frame size of the movie's largest video, `(0, 0)` when unknown or for a show.
+    pub width: u32,
+    pub height: u32,
+    /// The HDR formats of that video.
+    pub hdr_formats: Vec<String>,
+}
+
+/// One row of the library-titles query, as read.
+type TitleRaw = (i64, String, String, String, i64, String, i64, i64, String);
+
+/// Every movie and show in the library (not in the bin), each with the frame size and HDR formats
+/// of a movie's largest video, in one query.
+pub fn library_titles(conn: &Connection) -> DbResult<Vec<LibraryTitleRow>> {
+    const LARGEST: &str = "FROM media_file m WHERE m.item_id = i.id AND m.kind = 'video'                            ORDER BY m.size_bytes DESC, m.id LIMIT 1";
+    let sql = format!(
+        "SELECT i.id, i.kind, i.title, i.original_title, i.year, i.media_source,            COALESCE((SELECT m.width {LARGEST}), 0),            COALESCE((SELECT m.height {LARGEST}), 0),            COALESCE((SELECT m.hdr_formats {LARGEST}), '[]')          FROM item i WHERE i.kind IN ('movie', 'show') AND i.trashed_entry IS NULL          ORDER BY i.id"
+    );
+    let mut stmt = conn.prepare_cached(&sql)?;
+    let rows = stmt.query_map([], |r| -> rusqlite::Result<TitleRaw> {
+        Ok((
+            r.get(0)?,
+            r.get(1)?,
+            r.get(2)?,
+            r.get(3)?,
+            r.get(4)?,
+            r.get(5)?,
+            r.get(6)?,
+            r.get(7)?,
+            r.get(8)?,
+        ))
+    })?;
+    let mut found = Vec::new();
+    for entry in rows {
+        let (id, kind, title, original_title, year, media_source, width, height, hdr) = entry?;
+        found.push(LibraryTitleRow {
+            id: ItemId(id),
+            kind: parse_enum(&kind, "item kind")?,
+            title,
+            original_title,
+            year: u16::try_from(year).unwrap_or(0),
+            media_source,
+            width: u32::try_from(width).unwrap_or(0),
+            height: u32::try_from(height).unwrap_or(0),
+            // A damaged list only loses the HDR mark.
+            hdr_formats: serde_json::from_str(&hdr).unwrap_or_default(),
+        });
+    }
+    Ok(found)
+}
+
 #[cfg(test)]
 mod tests {
     use cv_domain::{Item, MediaFile, MediaFileType};
@@ -176,5 +240,31 @@ mod tests {
         assert_eq!(titles, ["New", "Severance"]);
         assert_eq!(rows[0].height, 2160);
         assert_eq!(rows[1].kind, ItemKind::Show);
+    }
+
+    #[test]
+    fn library_titles_list_movies_and_shows_with_the_largest_video() {
+        let conn = memory_db();
+        let mut hdr = video(3840, 2160, 9);
+        hdr.hdr_formats = vec!["HDR10".to_owned()];
+        movie(
+            &conn,
+            "Paper Lanterns",
+            "",
+            1,
+            vec![video(1280, 720, 1), hdr],
+        );
+        let mut show = Item::show("Night Bakers");
+        show.core.year = 2024;
+        insert_item(&conn, &show).unwrap();
+        let rows = library_titles(&conn).unwrap();
+        assert_eq!(rows.len(), 2);
+        let film = rows.iter().find(|r| r.kind == ItemKind::Movie).unwrap();
+        assert_eq!(film.title, "Paper Lanterns");
+        assert_eq!((film.width, film.height), (3840, 2160));
+        assert_eq!(film.hdr_formats, ["HDR10"]);
+        let series = rows.iter().find(|r| r.kind == ItemKind::Show).unwrap();
+        assert_eq!(series.year, 2024);
+        assert_eq!((series.width, series.height), (0, 0));
     }
 }
