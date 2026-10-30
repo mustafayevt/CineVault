@@ -44,6 +44,47 @@
 2. **Add your folders and a free TMDB key.** The first-run screen asks where your movies and shows are, then for a [TMDB API key](https://www.themoviedb.org/settings/api) (free; the only key needed to Scrape).
 3. **Scan, Scrape, Rename.** Scanning starts on its own. Scrape your titles, check the Rename preview, apply. Everything can be undone from History.
 
+## Run on a home server
+
+CineVault can run headless next to the media files and be used from a browser on another machine.
+The server links no Tauri, no WebKit and no display stack, so it fits a NAS, a mini-PC or a small
+container.
+
+```yaml
+services:
+  cinevault:
+    image: ghcr.io/mustafayevt/cinevault:latest
+    ports: ["8787:8787"]
+    environment:
+      CINEVAULT_DATA_DIR: /data
+      CINEVAULT_WEB_BIND: 0.0.0.0
+    volumes:
+      - ./cinevault-data:/data
+      - /mnt/media:/media
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d
+```
+
+Open `http://<server>:8787`. The first visit creates the password; then the normal setup adds the
+library folder, the TMDB key and the naming profile. The library folders must be readable and
+writable by the server, because Scan, Scrape and Rename write NFO and artwork next to the media.
+
+A `.deb`, an `.rpm` and a tarball are published with each release for hosts without Docker; see
+[`packaging/README.md`](packaging/README.md) for the packages, the systemd unit and the tarball.
+The provider keys are kept in an encrypted `secrets.enc`; supply the master key as a Docker secret
+or a systemd credential (`CINEVAULT_SECRET_KEY_FILE`) and back it up with the data folder.
+
+The desktop app and the server can share a data folder, but only one may open it at a time. The
+server holds a `library-owner.json` lock; the desktop app refuses that folder and the `cinevault`
+command line exits with code 2 instead of writing behind the server's back.
+
+Keep the server on the LAN or behind a VPN. For HTTPS, put it behind a reverse proxy and set
+`CINEVAULT_WEB_TRUST_PROXY` to the proxy addresses so the session cookie is marked `Secure` and the
+sign-in limit uses the real client address. Never port-forward it to the internet.
+
 ## Screenshots
 
 <table>

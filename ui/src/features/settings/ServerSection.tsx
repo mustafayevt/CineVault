@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "../../components/Button";
+import { t } from "../../i18n/catalog";
 import { FormRow, SettingsSection } from "./FormParts";
 
 interface ServerInfo {
@@ -18,7 +19,7 @@ function csrf(): string {
 
 async function readInfo(): Promise<ServerInfo> {
   const response = await fetch("/api/server/info", { credentials: "same-origin" });
-  if (!response.ok) throw new Error("The server did not answer.");
+  if (!response.ok) throw new Error(t("settingsPage.server.error"));
   return (await response.json()) as ServerInfo;
 }
 
@@ -69,14 +70,14 @@ export function ServerSection() {
     });
     const body = (await response.json()) as { message?: string };
     if (!response.ok) {
-      setError(body.message ?? "The password could not be changed.");
+      setError(body.message ?? t("settingsPage.server.error"));
       return;
     }
     setChanging(false);
     setCurrent("");
     setPassword("");
     setConfirm("");
-    setMessage("The password was changed. Every other session was signed out.");
+    setMessage(t("settingsPage.server.password.changed"));
     void reload();
   };
 
@@ -86,44 +87,55 @@ export function ServerSection() {
       credentials: "same-origin",
       headers: { "x-cinevault-csrf": csrf() },
     });
-    setMessage("Every other session was signed out.");
+    setMessage(t("settingsPage.server.sessions.signedOut"));
     void reload();
   };
 
   return (
-    <SettingsSection id="server" title="Server">
-      <FormRow label="Address" hint="From CINEVAULT_WEB_BIND and CINEVAULT_WEB_PORT.">
+    <SettingsSection id="server" title={t("settingsPage.server.title")}>
+      <FormRow
+        label={t("settingsPage.server.address")}
+        hint={t("settingsPage.server.address.hint")}
+      >
         <code className="text-(length:--fs-13)">
           {info === null ? "…" : `http://${info.bind}:${info.port}`}
         </code>
       </FormRow>
-      <FormRow label="Version">
+      <FormRow label={t("settingsPage.server.version")}>
         <span className="text-(length:--fs-13)">{info?.version ?? "…"}</span>
       </FormRow>
-      <FormRow label="Signed-in sessions">
+      <FormRow label={t("settingsPage.server.sessions")}>
         <span className="text-(length:--fs-13)">{info?.sessions ?? "…"}</span>
       </FormRow>
       <FormRow
-        label="Provider keys"
+        label={t("settingsPage.server.keys")}
         hint={
           info?.keys === "locked"
-            ? "The master key is missing. Set CINEVAULT_SECRET_KEY_FILE and restart."
-            : "Kept in the server's encrypted secrets file."
+            ? t("settingsPage.server.keys.locked.hint")
+            : t("settingsPage.server.keys.hint")
         }
       >
         <span className="text-(length:--fs-13)">
-          {info === null ? "…" : info.keys === "locked" ? "Locked" : info.keys === "configured" ? "Configured" : "Not checked yet"}
+          {info === null
+            ? "…"
+            : info.keys === "locked"
+              ? t("settingsPage.server.keys.locked")
+              : info.keys === "configured"
+                ? t("settingsPage.server.keys.configured")
+                : t("settingsPage.server.keys.unknown")}
         </span>
       </FormRow>
-      <FormRow label="Password" align="start">
+      <FormRow label={t("settingsPage.server.password")} align="start">
         {!changing ? (
-          <Button onClick={() => setChanging(true)}>Change password</Button>
+          <Button onClick={() => setChanging(true)}>
+            {t("settingsPage.server.password.change")}
+          </Button>
         ) : (
           <div className="flex max-w-[360px] flex-col gap-2">
             <input
               type="password"
               autoComplete="current-password"
-              placeholder="Current password"
+              placeholder={t("settingsPage.server.password.current")}
               value={current}
               onChange={(event) => setCurrent(event.target.value)}
               className="w-full rounded-(--r-8) border border-solid border-line-section bg-surface-well px-2.5 py-1.5 text-(length:--fs-13)"
@@ -131,7 +143,7 @@ export function ServerSection() {
             <input
               type="password"
               autoComplete="new-password"
-              placeholder="New password (at least 12 characters)"
+              placeholder={t("settingsPage.server.password.new")}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded-(--r-8) border border-solid border-line-section bg-surface-well px-2.5 py-1.5 text-(length:--fs-13)"
@@ -139,14 +151,14 @@ export function ServerSection() {
             <input
               type="password"
               autoComplete="new-password"
-              placeholder="Confirm the new password"
+              placeholder={t("settingsPage.server.password.confirm")}
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
               className="w-full rounded-(--r-8) border border-solid border-line-section bg-surface-well px-2.5 py-1.5 text-(length:--fs-13)"
             />
             <div className="flex gap-2">
               <Button variant="primary" onClick={() => void change()}>
-                Change password
+                {t("settingsPage.server.password.change")}
               </Button>
               <Button onClick={() => setChanging(false)}>Cancel</Button>
             </div>
@@ -154,10 +166,12 @@ export function ServerSection() {
         )}
       </FormRow>
       <FormRow
-        label="Sessions"
-        hint="Signing out every session keeps this browser signed in."
+        label={t("settingsPage.server.sessions")}
+        hint={t("settingsPage.server.sessions.hint")}
       >
-        <Button onClick={() => void signOutAll()}>Sign out every other session</Button>
+        <Button onClick={() => void signOutAll()}>
+          {t("settingsPage.server.sessions.signOutAll")}
+        </Button>
       </FormRow>
       {error !== null ? (
         <p role="alert" className="px-4 py-2 text-(length:--fs-12) text-status-problem">
