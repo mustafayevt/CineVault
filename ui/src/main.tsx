@@ -1,3 +1,6 @@
+// Installs the browser transport before any module reads `isTauri()` (server mode only).
+import "./lib/ipc";
+
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
