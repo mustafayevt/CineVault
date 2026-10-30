@@ -2,11 +2,11 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.2.0] - 2026-10-30
 
 ### Added
 
-- CineVault can run on a home server next to the media files and be used from any browser: sign in, browse the library and the title pages, scan, scrape and fix a match, choose artwork, rename with the preview and undo, and read the History. The server is a Linux program with no desktop stack, shipped as a container image, a `.deb`/`.rpm` and a tarball; the `cinevault` command line is included.
+- Browser mode (beta): CineVault can run on a home server next to the media files and be used from any browser: sign in, browse the library and the title pages, scan, scrape and fix a match, choose artwork, rename with the preview and undo, and read the History. The server is a Linux program with no desktop stack, shipped as a container image, a `.deb`/`.rpm` and a tarball; the `cinevault` command line is included.
 - One password for the server, created in the first-run welcome, with a 30-day session, "sign out every session" and a `cinevault-server passwd` recovery command.
 - The server keeps provider keys in an encrypted `secrets.enc` and takes the master key from a Docker secret or a systemd credential. The desktop app keeps using the operating-system credential store.
 - The server and the desktop app share one library safely: the server holds a `library-owner.json` lock, the desktop app refuses that folder, and the command line exits with code 2 instead of writing behind the server's back.
@@ -15,7 +15,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ### Changed
 
-- Deleting a title that shares its folder with other titles, or sits directly in a library folder, now also removes the subtitles, posters, NFO files, trailers and other files named after it, even ones added since the last Scan. Deleting an episode does the same for its files. Files of the other titles stay, the confirmation counts the extra files, and Undo brings them back.
+- Deleting a title that shares its folder with other titles, or sits directly in a library folder, now also removes the subtitles, posters, NFO files, trailers and other files named after it, even ones added since the last Scan. Deleting an episode does the same for its files. Files of the other titles stay, and Undo brings them back.
 
 ### Fixed
 
@@ -25,11 +25,6 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - DTS:X tracks with height speakers now show their real layout, such as 7.1, instead of 11.1.
 - Interlaced videos stored as separate fields now show their frame rate (29.97 instead of 59.94).
 - After the update, CineVault reads the media info of Blu-ray discs, disc images, Blu-ray files and the videos above once more, so they show the corrected details.
-
-## [1.1.1] - 2026-10-29
-
-### Fixed
-
 - Linux: the AppImage, .deb and .rpm now start on Ubuntu 22.04, Debian 12, Linux Mint 21 and other systems of that age. 1.1.0 was built on a newer system and needed a newer C library (glibc 2.38) than they have, so it closed right away.
 
 ## [1.1.0] - 2026-10-28

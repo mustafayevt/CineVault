@@ -62,19 +62,27 @@ With "Custom trash folder…" and a folder chosen with "Choose folder…" (`file
 - **THEN** the section says "Choose a folder; until then files go to each drive's trash folder." and files go there
 
 ### Requirement: Delete permanently as the choice
-Choosing "Delete permanently" SHALL first ask for the typed DELETE confirmation ("Erase deleted files at once?") and SHALL show the red warning "Deleted and replaced files are erased at once. Undo can't bring them back." With it on, a Delete SHALL be a permanent delete without Undo, and renames and moves SHALL stay undoable (a rename without its erased leftovers, a move by copying back).
+Choosing "Delete permanently" SHALL first ask for the typed DELETE confirmation ("Erase deleted files at once?") and SHALL show the red warning "Deleted and replaced files are erased at once. Undo can't bring them back." With it on, a Delete SHALL be a permanent delete without Undo, and renames and moves SHALL stay undoable (a rename without its erased leftovers, a move by copying back). In a browser, permanent delete SHALL be off unless it is enabled in Settings › Server, and a bin/trash delete SHALL show no dialog in either surface.
 
 #### Scenario: Cancelled confirmation
 - **WHEN** the user picks "Delete permanently" and cancels the confirmation
 - **THEN** the choice stays as it was
 
 #### Scenario: Delete with the choice on
-- **WHEN** the choice is "Delete permanently" and the user deletes a title
+- **WHEN** the choice is "Delete permanently" and the user deletes a title in the desktop app
 - **THEN** its files are erased, the toast says "Erased <title>: Deleted files are set to Delete permanently", and a match or artwork entry whose replaced files were erased has no Undo
 
 #### Scenario: Move with the choice on
 - **WHEN** the choice is "Delete permanently" and a title moves to another drive
 - **THEN** each original is erased only after its copy is verified
+
+#### Scenario: Browser permanent delete off
+- **WHEN** permanent delete has not been enabled in Settings › Server and a browser asks to erase a title
+- **THEN** the request is refused and the UI offers the configured deleted-files destination
+
+#### Scenario: Bin delete
+- **WHEN** the user deletes a title to the configured bin or trash folder
+- **THEN** no confirmation dialog is shown and the delete is undoable
 
 ### Requirement: Empty trash folders automatically
 Settings › Deleted files SHALL offer "Empty trash folders automatically" (`files.auto-empty-days`) with "Off" (the default), "After 7 days", "After 30 days" and "After 90 days". When on, at start-up and then once a day, CineVault SHALL erase each batch of its own trash folders (the custom folder's included) whose newest file is older than the chosen days, and SHALL never touch the system Recycle Bin or Trash.
@@ -95,7 +103,7 @@ Each Delete SHALL be one History entry. Undo (from the toast or Restore in Histo
 - **THEN** Restore leaves both the new folder and the bin untouched and reports that something is at that path
 
 ### Requirement: Shift+Delete asks for a typed confirmation
-Shift+Delete and "Delete permanently…" SHALL open the one confirmation dialog: "Delete N titles permanently?", a line saying the folders and files are erased and that "This skips the Recycle Bin and cannot be undone", the list "What will be erased" with each title's path and size, a field for DELETE, and "Cancel", "Send to Recycle Bin instead" and "Delete permanently". The last SHALL stay disabled until the field holds exactly DELETE.
+Shift+Delete and "Delete permanently…" SHALL open the one confirmation dialog: "Delete N titles permanently?", a line saying the folders and files are erased and that "This skips the Recycle Bin and cannot be undone", the list "What will be erased" with each title's path and size, a field for DELETE, and "Cancel", "Send to Recycle Bin instead" and "Delete permanently". The last SHALL stay disabled until the field holds exactly DELETE. In a browser the dialog SHALL also ask for the current password, and the server SHALL mint a one-time intent bound to the listed item IDs before the request is sent; a missing, reused, expired or mismatched intent, or a wrong password, SHALL be refused before any file is touched.
 
 #### Scenario: Confirm button stays off
 - **WHEN** the dialog is open and the user has typed "delet"
@@ -109,8 +117,16 @@ Shift+Delete and "Delete permanently…" SHALL open the one confirmation dialog:
 - **WHEN** the user clicks "Send to Recycle Bin instead"
 - **THEN** the titles are deleted as with Delete, and the dialog closes
 
+#### Scenario: Browser confirmation
+- **WHEN** a browser confirms a permanent delete of two titles
+- **THEN** it sends DELETE, the current password and the server's one-time intent, and the two titles are erased
+
+#### Scenario: Replayed intent
+- **WHEN** the same intent is sent again
+- **THEN** the server refuses it and no file is touched
+
 ### Requirement: Permanent delete erases only what it listed
-Confirming a permanent delete SHALL write its History entry first with every path it is about to erase, then erase the titles one by one, file by file, with short retries for files another program holds. It SHALL refuse a path outside its library folder and a path that is or holds a library folder's root. Only titles erased whole SHALL leave the library, and the entry SHALL list what was erased and what was left.
+Confirming a permanent delete SHALL write its History entry first with every path it is about to erase, then erase the titles one by one, file by file, with short retries for files another program holds. It SHALL refuse a path outside its library folder and a path that is or holds a library folder's root. In a browser it SHALL also check the one-time intent and the password before the History entry is written. Only titles erased whole SHALL leave the library, and the entry SHALL list what was erased and what was left.
 
 #### Scenario: A file in use
 - **WHEN** the second of two titles has a file open in a player
@@ -120,12 +136,28 @@ Confirming a permanent delete SHALL write its History entry first with every pat
 - **WHEN** a title's files sit directly in `D:\Movies`
 - **THEN** only that title's own files are erased and `D:\Movies` itself is never removed
 
+#### Scenario: Intent checked first
+- **WHEN** a browser sends an erase request with a wrong password
+- **THEN** no History entry is written and no file is erased
+
 ### Requirement: Deleting never touches other titles
-Delete and permanent delete SHALL act only on the selected title's own files in a folder that other titles also use, and SHALL do nothing to a title whose drive is offline.
+Delete and permanent delete SHALL act only on the selected title's own files in a folder that other titles also use, and SHALL do nothing to a title whose drive is offline. A file the library records for another title SHALL never be taken. A file whose name continues the base names of several videos SHALL belong to the longest of them; when the longest is shared with a video of another title, or another video not of this title, the file SHALL stay where it is and the delete SHALL go on. A video SHALL never be taken by its name alone.
 
 #### Scenario: Offline drive
 - **WHEN** the user deletes a title whose drive is offline
 - **THEN** nothing happens to it and the message says "The drive of <library folder> is offline, so nothing was deleted."
+
+#### Scenario: Longer name of another title
+- **WHEN** a shared folder holds `Example Movie (2020).mkv` and `Example Movie (2020) Director's Cut.mkv`, each with an `.en.srt` subtitle, and the user deletes Example Movie (2020)
+- **THEN** `Example Movie (2020).en.srt` goes with it, and `Example Movie (2020) Director's Cut.mkv` and its subtitle stay
+
+#### Scenario: Name that continues after a space or a dot
+- **WHEN** a shared folder holds `Heat.mkv`, `Heat 2.mkv`, `Movie.mkv` and `Movie.1080p.mkv`, each with a subtitle named after it, and the user deletes Heat and Movie
+- **THEN** `Heat 2.mkv`, `Movie.1080p.mkv` and their subtitles stay
+
+#### Scenario: Same name as another title's video
+- **WHEN** another title's video in the same folder has the same base name as the deleted title's video
+- **THEN** a file named after that base name stays, and the deleted title's own files go
 
 ### Requirement: Linux Trash folder on the same file system
 On Linux the Trash SHALL take a path only when a Trash folder on the same file system can be used, in this order: the home Trash (`~/.local/share/Trash` by default) when it is on the same device; else the volume's shared `.Trash/<uid>` folder when `.Trash` at the mount point is a real folder with the sticky bit; else the volume's `.Trash-<uid>` folder, created when the mount point is writable. Otherwise the path SHALL go to the library folder's trash folder, with a note naming the reason.
@@ -151,3 +183,33 @@ On Linux, finding a sent item in the Trash, restoring it, and erasing it with th
 #### Scenario: Two names that differ by case
 - **WHEN** `/home/alex/Movies/Example/movie.mkv` and `/home/alex/Movies/Example/Movie.mkv` were both sent to the Trash and the user undoes only the delete of `Movie.mkv`
 - **THEN** only `Movie.mkv` is restored and `movie.mkv` stays in the Trash
+
+### Requirement: Delete takes the files named after the title
+When a title shares its folder or sits in a library folder's root, and when an episode is deleted, Delete and permanent delete SHALL also take every file directly in the folder of each of its videos whose name is the video's base name or continues it after `.`, `-`, `_` or a space (subtitles, NFO, artwork, trailers and other sidecar files), as found on disk at the time of the delete. A title with its own folder SHALL go as that folder, as before.
+
+#### Scenario: Subtitle and poster added after the last Scan
+- **WHEN** `D:\Movies\Mixed` holds `Example Movie (2020).mkv`, `Example Movie (2020).en.srt` and `Example Movie (2020)-poster.jpg`, the library knows only the video, and the user deletes Example Movie (2020)
+- **THEN** all three files are in the Recycle Bin, and Undo puts all three back
+
+#### Scenario: Library folder root
+- **WHEN** `D:\Movies\Example Movie (2020).mkv` sits in the library folder's root with `Example Movie (2020).nfo` and `Example Movie (2020)-fanart.jpg` next to it
+- **THEN** a delete of Example Movie (2020) takes the three files and leaves `D:\Movies` and everything else in it
+
+#### Scenario: Episode subtitles
+- **WHEN** an episode `Example Show S01E01.mkv` is deleted and `Example Show S01E01.en.forced.srt` and `Example Show S01E02.en.srt` are next to it
+- **THEN** only `Example Show S01E01.en.forced.srt` goes with it
+
+#### Scenario: Sub-folders stay
+- **WHEN** a shared folder holds a `Subs` folder with `Example Movie (2020).en.srt` in it
+- **THEN** a delete of Example Movie (2020) leaves the `Subs` folder and its files
+
+### Requirement: Files named after the title are counted and undoable
+The files a delete takes by name SHALL count in the preview's files and size of their title, be part of the same History entry as the title's other files, and come back with Undo. Only a permanent delete SHALL erase them.
+
+#### Scenario: Preview counts them
+- **WHEN** the permanent-delete dialog lists a title in a shared folder with one known video and two subtitles named after it
+- **THEN** its row counts three files and their size
+
+#### Scenario: Undo
+- **WHEN** the user undoes the delete of a title whose subtitle went with it by name
+- **THEN** the subtitle is back at its old path with the video
