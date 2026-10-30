@@ -9,6 +9,8 @@ export interface MoveOption {
   source: LibrarySource;
   /** "E: Archive" when the drive is known, else the folder's label. */
   name: string;
+  /** The folder's own label ("Movies 4K") when it says more than the drive's name, else null. */
+  folder: string | null;
   path: string;
   /** The titles of the request this destination would take. */
   readyIds: string[];
@@ -52,6 +54,27 @@ export function driveOfDestination(
 }
 
 /**
+ * Why none of the titles can go to a destination, in the menu's words: the space shortfall as
+ * "Not enough space: needs 71.4 GB, 1.02 GB free." (the row already names the drive), an
+ * unreachable folder without its path (the row shows it), else the backend's reason.
+ */
+function blockedReason(
+  blocked: MovePlan["rows"][number] | undefined,
+  name: string,
+  size: SizeText,
+): string {
+  if (blocked === undefined) return t("move.blocker.other");
+  if (blocked.status === "insufficient_space") {
+    return t("moveTo.noRoom", {
+      needed: size(blocked.needed_bytes ?? blocked.bytes ?? 0),
+      free: size(blocked.free_bytes ?? 0),
+    });
+  }
+  if (blocked.status === "unavailable") return t("move.blocker.unavailable");
+  return moveBlocker(blocked, name, size) ?? t("move.blocker.other");
+}
+
+/**
  * What choosing a destination would do, from the plan the backend made for it: the titles it takes,
  * the space before and after, and the reason it is disabled (offline, none of the titles can go
  * there, or not enough room for the ones that can). Spec `drives` "Move to with space before and
@@ -74,9 +97,8 @@ export function buildOption(
   const blocked = plan.rows.find((row) => row.status !== "ready");
 
   let reason: string | null = null;
-  if (offline) reason = t("moveTo.offline");
-  else if (ready.length === 0)
-    reason = blocked === undefined ? t("move.blocker.other") : moveBlocker(blocked, name, size);
+  if (offline) reason = t("moveTo.offlineReason");
+  else if (ready.length === 0) reason = blockedReason(blocked, name, size);
   else if (freeNow !== null && needed > freeNow) {
     reason = t("moveTo.noRoom", { needed: size(needed), free: size(freeNow) });
   }
@@ -86,9 +108,11 @@ export function buildOption(
     drive !== undefined && drive.totalBytes > 0 && freeAfter !== null
       ? 1 - freeAfter / drive.totalBytes
       : null;
+  const label = sourceName(source);
   return {
     source,
     name,
+    folder: label !== name && label !== source.path ? label : null,
     path: source.path,
     readyIds: ready.map((row) => row.id),
     movedBytes,
