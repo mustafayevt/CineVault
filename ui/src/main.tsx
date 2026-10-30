@@ -3,7 +3,10 @@ import "./lib/ipc";
 
 // A command that finds the session gone sends the user back to sign in.
 window.addEventListener("cinevault:signed-out", () => {
-  if (window.location.pathname !== "/login") window.location.assign("/login");
+  if (window.location.pathname !== "/login") {
+    const next = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.assign(`/login?next=${next}`);
+  }
 });
 
 // The stream tells the page when it could not replay what was missed; a reload rebuilds the

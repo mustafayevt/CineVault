@@ -1458,6 +1458,7 @@ dependencies = [
  "cv-ipc",
  "cv-jobs",
  "ipnet",
+ "percent-encoding",
  "rand_core 0.6.4",
  "rpassword",
  "serde",

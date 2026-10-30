@@ -455,7 +455,7 @@ form.onsubmit = async (event) => {{
   event.preventDefault();
   error.textContent = '';
   const answer = await fetch('/api/login', {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: JSON.stringify({{ password: password.value }}) }});
-  if (answer.ok) {{ location.href = '/'; return; }}
+  if (answer.ok) {{ const next = new URLSearchParams(location.search).get('next'); location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/'; return; }}
   const body = await answer.json().catch(() => ({{ message: 'Could not sign in.' }}));
   error.textContent = body.message;
   password.select();
@@ -504,7 +504,7 @@ form.onsubmit = async (event) => {{
   error.textContent = '';
   if (password.value !== confirm.value) {{ error.textContent = 'The passwords do not match.'; confirm.select(); return; }}
   const answer = await fetch('/api/setup', {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: JSON.stringify({{ password: password.value, confirm: confirm.value }}) }});
-  if (answer.ok) {{ location.href = '/'; return; }}
+  if (answer.ok) {{ const next = new URLSearchParams(location.search).get('next'); location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/'; return; }}
   const body = await answer.json().catch(() => ({{ message: 'Could not set the password.' }}));
   error.textContent = body.message;
 }};

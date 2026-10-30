@@ -1396,12 +1396,12 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         session_of(&state, &headers)
     };
     if !is_asset && session.is_none() {
-        return Redirect::to(if state.auth.needs_setup() {
-            "/setup"
-        } else {
-            "/login"
-        })
-        .into_response();
+        if state.auth.needs_setup() {
+            return Redirect::to("/setup").into_response();
+        }
+        let next =
+            percent_encoding::utf8_percent_encode(uri.path(), percent_encoding::NON_ALPHANUMERIC);
+        return Redirect::to(&format!("/login?next={next}")).into_response();
     }
     let mut file = root.join(if requested.is_empty() {
         "index.html"

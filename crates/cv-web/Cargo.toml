@@ -24,6 +24,7 @@ argon2.workspace = true
 rand_core.workspace = true
 rpassword = "7"
 ipnet.workspace = true
+percent-encoding = "2"
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
