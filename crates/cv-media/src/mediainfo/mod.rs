@@ -34,8 +34,9 @@ use std::sync::Arc;
 use crate::tools::{ToolError, ToolId, ToolsManager};
 
 pub use mapping::{
-    Halve, apply_snapshot, audio_codec, detect_3d, dolby_vision_profile, hdr_details, hdr_formats,
-    language, map_audio_stream, map_subtitle_stream, video_3d_from_name, video_codec,
+    Halve, apply_snapshot, audio_codec, bluray_dolby_vision_layer, detect_3d, dolby_vision_profile,
+    hdr_details, hdr_formats, language, map_audio_stream, map_subtitle_stream, video_3d_from_name,
+    video_codec, with_dolby_vision_layer,
 };
 pub use pool::{
     Analyzer, DEFAULT_PER_GB, DEFAULT_TIMEOUT, MAX_TIMEOUT, MediaInfoPool, PoolOptions, volume_key,

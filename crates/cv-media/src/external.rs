@@ -32,6 +32,12 @@ use std::path::Path;
 
 use cv_domain::{MediaFile, StreamFlag, SubtitleStream};
 
+/// The canonical code of a language code or name (`eng`, `ger`, `English` give `en`; a language
+/// without a two-letter code keeps its three-letter one). `None` when it is not a known language.
+pub(crate) fn canonical_language(token: &str) -> Option<&'static str> {
+    languages::canonical_code(token)
+}
+
 /// What a file name says about an external audio or subtitle stream.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ExternalStreamInfo {

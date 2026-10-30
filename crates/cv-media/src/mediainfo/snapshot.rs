@@ -161,6 +161,11 @@ impl MediaSnapshot {
         &self.streams[kind.index()]
     }
 
+    /// The streams of one kind, for changing them.
+    pub fn streams_mut(&mut self, kind: StreamKind) -> &mut [StreamInfo] {
+        &mut self.streams[kind.index()]
+    }
+
     /// The container-level section.
     #[must_use]
     pub fn general(&self) -> Option<&StreamInfo> {
