@@ -17,12 +17,17 @@ use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use cv_app::data_location::DataLocation;
+use cv_app::drives::DrivesService;
+use cv_app::history::HistoryService;
 use cv_app::scanning::SourceState;
 use cv_app::secrets::SecretStore;
 use cv_app::services::{AppServices, BootOptions};
 use cv_artwork::img::{ImageRequest, ImageResponse};
 use cv_db::repo::data_sources::list_sources;
 use cv_domain::ItemKind;
+use cv_ipc::detail::{DetailReader, get_movie_detail, parse_id};
+use cv_ipc::drives::drives_overview as drives_read;
+use cv_ipc::history::{HistoryFilterDto, history_for_title, history_list};
 use cv_ipc::image::ImageContext;
 use cv_ipc::library::{
     LibraryKindDto, LibraryQueryDto, LibraryReader, library_counts, library_facet_values,
@@ -30,6 +35,7 @@ use cv_ipc::library::{
     list_library_window, search_library_people,
 };
 use cv_ipc::lifecycle::{LifecycleCountsDto, service as lifecycle_service};
+use cv_ipc::tv::{TvReader, get_episode_detail, get_show_detail};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::fs;
@@ -286,6 +292,43 @@ fn reader(state: &WebState) -> LibraryReader {
     )
 }
 
+fn detail_reader(state: &WebState) -> DetailReader {
+    DetailReader::new(
+        Arc::clone(state.services.db()),
+        Arc::clone(state.images.sources()),
+        state
+            .images
+            .service()
+            .map(|service| Arc::clone(service.cache())),
+    )
+    .with_lifecycle(Some(Arc::clone(state.services.lifecycle())))
+    .with_rating_status(Some(Arc::clone(state.services.rating_status())))
+}
+
+fn tv_reader(state: &WebState) -> TvReader {
+    TvReader::new(
+        Arc::clone(state.services.db()),
+        Arc::clone(state.images.sources()),
+        state
+            .images
+            .service()
+            .map(|service| Arc::clone(service.cache())),
+    )
+    .with_lifecycle(Some(Arc::clone(state.services.lifecycle())))
+    .with_rating_status(Some(Arc::clone(state.services.rating_status())))
+}
+
+fn history(state: &WebState) -> Arc<HistoryService> {
+    Arc::new(HistoryService::new(Arc::clone(state.services.db())))
+}
+
+fn drives(state: &WebState) -> Option<Arc<DrivesService>> {
+    Some(DrivesService::new(
+        Arc::clone(state.services.db()),
+        Arc::clone(state.services.scan()),
+    ))
+}
+
 async fn invoke(
     State(state): State<WebState>,
     headers: HeaderMap,
@@ -480,7 +523,50 @@ async fn dispatch(state: &WebState, cmd: &str, args: &Value) -> DispatchResult {
             .map_err(|error| json!({ "code": "storage", "message": error.to_string() }))
             .map(Value::from)
         }
-        "drives_overview" => Ok(json!({ "drives": [], "updated_ms": 0 })),
+        "get_movie_detail" => {
+            let id: String = arg(args, "id")?;
+            let id = parse_id(&id).map_err(command_error)?;
+            get_movie_detail(detail_reader(state), id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "get_show_detail" => {
+            let id: String = arg(args, "id")?;
+            let id = parse_id(&id).map_err(command_error)?;
+            get_show_detail(tv_reader(state), id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "get_episode_detail" => {
+            let id: String = arg(args, "id")?;
+            let id = parse_id(&id).map_err(command_error)?;
+            get_episode_detail(tv_reader(state), id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "history_for_title" => {
+            let id: String = arg(args, "id")?;
+            history_for_title(history(state), id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "history_list" => {
+            let filter: HistoryFilterDto = arg(args, "filter")?;
+            let offset: u32 = arg(args, "offset")?;
+            let limit: u32 = arg(args, "limit")?;
+            history_list(history(state), filter, offset, limit)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "drives_overview" => drives_read(drives(state))
+            .await
+            .map_err(command_error)
+            .and_then(to_value),
         "get_update_status" => Ok(json!({
             "current_version": env!("CARGO_PKG_VERSION"),
             "channel_set": false,
