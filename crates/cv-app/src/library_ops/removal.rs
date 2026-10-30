@@ -248,9 +248,9 @@ impl RemovalService {
     /// `title-deletion`). A title with its own folder goes as that folder; a title
     /// that shares its folder with other titles, or sits in the root of its library folder (and
     /// an episode), sends only its own files: those the library records and those on disk named
-    /// after its videos (see `companions`). A path the bin cannot take (a network or removable drive, a
-    /// drive whose bin is off, an item larger than the bin) or refuses goes to
-    /// the library folder's trash folder instead. Nothing is erased.
+    /// after its videos (see `companions`). A path the bin cannot take (a network or removable
+    /// drive, a drive whose bin is off, an item larger than the bin) or refuses goes to the
+    /// library folder's trash folder instead. Nothing is erased.
     ///
     /// The titles are hidden, not removed: their rows keep every detail, artwork row and stage,
     /// so the delete's History entry (one for the whole call) brings them back with their files.
@@ -425,7 +425,7 @@ impl RemovalService {
         ids: &[ItemId],
     ) -> Result<(Vec<Loaded>, Vec<Problem>), LibraryOpsError> {
         let ids = unique(ids);
-        let (mut loaded, skipped) = self.db.read(move |conn| {
+        let (loaded, skipped) = self.db.read(move |conn| {
             let mut skipped = Vec::new();
             let mut loaded: Vec<(Loaded, Vec<companions::FolderFacts>)> = Vec::new();
             for id in ids {
@@ -491,7 +491,7 @@ impl RemovalService {
         })?;
         // The folders are listed outside the library read.
         let loaded = loaded
-            .drain(..)
+            .into_iter()
             .map(|(mut entry, facts)| {
                 entry.companions = companions::find(&facts);
                 entry
