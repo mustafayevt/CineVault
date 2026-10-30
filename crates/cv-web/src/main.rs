@@ -2,121 +2,38 @@
 //!
 //! Boots the same `AppServices` the desktop app and the command line use, serves the built
 //! interface and answers the typed command surface over HTTP through the shared `cv-ipc` layer.
-//! This is the read-path skeleton: sign-in, the write commands and the SSE stream land next.
+//! The command state objects are built once, in [`state`], and every command is one arm of
+//! [`dispatch`].
 
 mod auth;
+mod dispatch;
+mod state;
 
-use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{ConnectInfo, Path as UrlPath, Query, State};
 use axum::http::{HeaderMap, StatusCode, Uri, header};
-use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::response::sse::{KeepAlive, Sse};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use cv_app::data_location::DataLocation;
-use cv_app::drives::DrivesService;
-use cv_app::history::HistoryService;
-use cv_app::scanning::SourceState;
 use cv_app::services::{AppServices, BootOptions};
 use cv_artwork::img::{ImageRequest, ImageResponse};
 use cv_db::repo::data_sources::list_sources;
-use cv_domain::ItemKind;
-use cv_ipc::detail::{DetailReader, get_movie_detail, parse_id};
-use cv_ipc::drives::{drives_overview as drives_read, drives_trash_contents};
-use cv_ipc::history::{HistoryFilterDto, history_for_title, history_list};
+use cv_ipc::detail::parse_id;
 use cv_ipc::image::ImageContext;
-use cv_ipc::library::{
-    LibraryKindDto, LibraryQueryDto, LibraryReader, library_counts, library_facet_values,
-    library_filter_catalogue, library_size_total, library_source_groups, list_library_rows,
-    list_library_window, search_library_people,
-};
-use cv_ipc::lifecycle::{LifecycleCountsDto, service as lifecycle_service};
-use cv_ipc::scan::{ScanState, find_missing_files, read_pending_media_info, rescan_library};
-use cv_ipc::tv::{TvReader, get_episode_detail, get_show_detail};
 use ipnet::IpNet;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use state::{Commands, WebState};
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
-use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::io::ReaderStream;
-
-type SseSender = mpsc::Sender<Result<Event, std::convert::Infallible>>;
-
-#[derive(Default)]
-struct Streams {
-    clients: StdMutex<HashMap<String, SseSender>>,
-}
-
-impl Streams {
-    fn connect(&self, client: &str) -> mpsc::Receiver<Result<Event, std::convert::Infallible>> {
-        let (sender, receiver) = mpsc::channel(256);
-        if let Ok(mut clients) = self.clients.lock() {
-            clients.insert(client.to_owned(), sender);
-        }
-        receiver
-    }
-
-    fn send(&self, client: &str, event: Event) -> bool {
-        let Ok(clients) = self.clients.lock() else {
-            return false;
-        };
-        let Some(sender) = clients.get(client) else {
-            return false;
-        };
-        sender.try_send(Ok(event)).is_ok()
-    }
-
-    fn channel<T: serde::Serialize>(
-        &self,
-        client: &str,
-        stream: u64,
-        index: &AtomicU64,
-        message: &T,
-    ) -> bool {
-        let index = index.fetch_add(1, AtomicOrdering::Relaxed);
-        let data = json!({
-            "kind": "channel",
-            "stream": stream,
-            "index": index,
-            "message": message,
-        });
-        self.send(client, Event::default().data(data.to_string()))
-    }
-
-    fn broadcast_event<T: serde::Serialize>(&self, name: &str, payload: &T) {
-        let Ok(clients) = self.clients.lock() else {
-            return;
-        };
-        let data = json!({ "kind": "event", "event": name, "payload": payload }).to_string();
-        for sender in clients.values() {
-            let _ = sender.try_send(Ok(Event::default().data(data.clone())));
-        }
-    }
-}
-
-#[derive(Clone)]
-struct WebState {
-    services: Arc<AppServices>,
-    images: Arc<ImageContext>,
-    auth: Arc<auth::Auth>,
-    progress: Arc<cv_ipc::jobs::ProgressHub>,
-    notices: Arc<cv_ipc::notices::NoticeHub>,
-    streams: Arc<Streams>,
-    data_root: PathBuf,
-    bind: String,
-    port: u16,
-    keys_locked: bool,
-    trust_proxy: Vec<IpNet>,
-    ui_dir: PathBuf,
-}
 
 #[derive(Debug, Deserialize)]
 struct InvokeBody {
@@ -170,16 +87,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth = Arc::new(auth::Auth::open(location.root())?);
     let (secrets, keys_locked) =
         cv_app::server_secrets::server_store(&data_root).map_err(std::io::Error::other)?;
-    let services = AppServices::boot(
-        BootOptions::new(location, Arc::new(secrets))
-            .without_providers()
-            .without_background_nfo(),
-    )?;
+    let services = AppServices::boot(BootOptions::new(location, Arc::new(secrets)))?;
     services.start();
     let images = Arc::new(ImageContext::from_services(&services));
     let progress = Arc::new(cv_ipc::jobs::ProgressHub::default());
     let notices = cv_ipc::notices::NoticeHub::from_app(Arc::clone(services.notices()));
-    let streams = Arc::new(Streams::default());
+    let streams = Arc::new(state::Streams::default());
+    // Every command's state object, built once from the one set of services. The desktop builds
+    // the same objects lazily; the server has no window and one lifetime.
+    let commands = Arc::new(Commands::build(&services, &images));
     let changes = Arc::clone(services.changes());
     let change_streams = Arc::clone(&streams);
     changes.subscribe(Arc::new(move |change| {
@@ -208,6 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         progress,
         notices,
         streams,
+        commands,
         data_root: data_root.clone(),
         bind: bind.clone(),
         port,
@@ -228,7 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/invoke", post(invoke))
         .route("/api/stream", get(stream))
         .route("/img/{key}/{size}", get(image))
-        .route("/api/media/{item}/{part}", get(media))
+        .route("/api/media/{item}/{part}", get(media).post(media_download))
         .route("/api/fs/list", get(fs_list))
         .route("/api/fs/mkdir", post(fs_mkdir))
         .fallback(get(static_file))
@@ -295,7 +212,6 @@ async fn shutdown() {
 }
 
 async fn health(State(state): State<WebState>) -> Response {
-    let _ = &state.services;
     Json(json!({
         "status": "ok",
         "keys": if state.keys_locked { "locked" } else { "configured" }
@@ -617,55 +533,6 @@ async fn logout(
     response
 }
 
-fn reader(state: &WebState) -> LibraryReader {
-    LibraryReader::from_parts(
-        Arc::clone(state.services.db()),
-        Arc::clone(state.images.sources()),
-        state
-            .images
-            .service()
-            .map(|service| Arc::clone(service.cache())),
-        Some(Arc::clone(state.services.lifecycle())),
-    )
-}
-
-fn detail_reader(state: &WebState) -> DetailReader {
-    DetailReader::new(
-        Arc::clone(state.services.db()),
-        Arc::clone(state.images.sources()),
-        state
-            .images
-            .service()
-            .map(|service| Arc::clone(service.cache())),
-    )
-    .with_lifecycle(Some(Arc::clone(state.services.lifecycle())))
-    .with_rating_status(Some(Arc::clone(state.services.rating_status())))
-}
-
-fn tv_reader(state: &WebState) -> TvReader {
-    TvReader::new(
-        Arc::clone(state.services.db()),
-        Arc::clone(state.images.sources()),
-        state
-            .images
-            .service()
-            .map(|service| Arc::clone(service.cache())),
-    )
-    .with_lifecycle(Some(Arc::clone(state.services.lifecycle())))
-    .with_rating_status(Some(Arc::clone(state.services.rating_status())))
-}
-
-fn history(state: &WebState) -> Arc<HistoryService> {
-    Arc::new(HistoryService::new(Arc::clone(state.services.db())))
-}
-
-fn drives(state: &WebState) -> Option<Arc<DrivesService>> {
-    Some(DrivesService::new(
-        Arc::clone(state.services.db()),
-        Arc::clone(state.services.scan()),
-    ))
-}
-
 async fn invoke(
     State(state): State<WebState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
@@ -690,297 +557,9 @@ async fn invoke(
         )
             .into_response();
     }
-    match dispatch(&state, &body.cmd, &body.args, &body.client).await {
+    match dispatch::dispatch(&state, &body.cmd, &body.args, &body.client).await {
         Ok(data) => Json(json!({ "ok": true, "data": data })).into_response(),
         Err(error) => Json(json!({ "ok": false, "error": error })).into_response(),
-    }
-}
-
-type DispatchResult = Result<Value, Value>;
-
-fn bad_request(error: impl std::fmt::Display) -> Value {
-    json!({ "code": "bad_request", "message": format!("bad argument: {error}") })
-}
-
-fn arg<T: serde::de::DeserializeOwned>(args: &Value, key: &str) -> Result<T, Value> {
-    serde_json::from_value(args.get(key).cloned().unwrap_or(Value::Null))
-        .map_err(|error| bad_request(format!("{key}: {error}")))
-}
-
-fn to_value<T: serde::Serialize>(value: T) -> DispatchResult {
-    serde_json::to_value(value).map_err(bad_request)
-}
-
-fn command_error(error: impl serde::Serialize) -> Value {
-    serde_json::to_value(error).unwrap_or_else(
-        |_| json!({ "code": "storage", "message": "the library could not be read" }),
-    )
-}
-
-async fn dispatch(state: &WebState, cmd: &str, args: &Value, client: &str) -> DispatchResult {
-    match cmd {
-        "list_library_window" => {
-            let query: LibraryQueryDto = arg(args, "query")?;
-            let offset: u32 = arg(args, "offset")?;
-            let limit: u32 = arg(args, "limit")?;
-            list_library_window(reader(state), query, offset, limit)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "list_library_rows" => {
-            let query: LibraryQueryDto = arg(args, "query")?;
-            let offset: u32 = arg(args, "offset")?;
-            let limit: u32 = arg(args, "limit")?;
-            list_library_rows(reader(state), query, offset, limit)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "library_counts" => library_counts(reader(state))
-            .await
-            .map_err(command_error)
-            .and_then(to_value),
-        "library_size_total" => {
-            let kind: LibraryKindDto = arg(args, "kind")?;
-            library_size_total(reader(state), kind)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "library_source_groups" => {
-            let query: LibraryQueryDto = arg(args, "query")?;
-            library_source_groups(reader(state), query)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "library_facet_values" => {
-            let query: LibraryQueryDto = arg(args, "query")?;
-            let facet: String = arg(args, "facet")?;
-            library_facet_values(reader(state), query, facet)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "search_library_people" => {
-            let term: String = arg(args, "term")?;
-            let limit: u32 = arg(args, "limit")?;
-            search_library_people(reader(state), term, limit)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "library_filter_catalogue" => {
-            let kind: LibraryKindDto = arg(args, "kind")?;
-            to_value(library_filter_catalogue(kind))
-        }
-        "list_data_sources" => {
-            let db = Arc::clone(state.services.db());
-            let sources =
-                tokio::task::spawn_blocking(move || db.read(|conn| list_sources(conn, None)))
-                    .await
-                    .map_err(|error| json!({ "code": "storage", "message": error.to_string() }))?
-                    .map_err(|error| json!({ "code": "storage", "message": error.to_string() }))?;
-            to_value(
-                sources
-                    .into_iter()
-                    .map(|source| {
-                        json!({
-                            "id": u32::try_from(source.id).unwrap_or(u32::MAX),
-                            "kind": match source.kind {
-                                cv_domain::SourceKind::Movie => "movie",
-                                cv_domain::SourceKind::Tv => "tv",
-                            },
-                            "path": source.path,
-                            "label": source.label,
-                            "position": u32::try_from(source.position).unwrap_or(u32::MAX),
-                        })
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        }
-        "get_settings" => {
-            let snapshot = state.services.settings().snapshot();
-            to_value(json!({
-                "values": snapshot
-                    .values
-                    .into_iter()
-                    .map(|(key, value)| (key, value.to_string()))
-                    .collect::<std::collections::BTreeMap<_, _>>(),
-                "notice": snapshot.notice,
-            }))
-        }
-        "lifecycle_counts" => {
-            let kind: LibraryKindDto = arg(args, "kind")?;
-            let item_kind = ItemKind::from(kind);
-            let service =
-                lifecycle_service(Some(state.services.lifecycle())).map_err(command_error)?;
-            tokio::task::spawn_blocking(move || service.counts(item_kind))
-                .await
-                .map_err(|error| json!({ "code": "storage", "message": error.to_string() }))?
-                .map(LifecycleCountsDto::from)
-                .map_err(|error| command_error(cv_ipc::library::LibraryCommandError::from(error)))
-                .and_then(to_value)
-        }
-        "list_source_health" => {
-            let scan = Arc::clone(state.services.scan());
-            let health = tokio::task::spawn_blocking(move || scan.source_health())
-                .await
-                .map_err(|error| json!({ "code": "storage", "message": error.to_string() }))?
-                .map_err(|error| json!({ "code": "storage", "message": error.to_string() }))?;
-            to_value(
-                health
-                    .into_iter()
-                    .map(|health| {
-                        json!({
-                            "id": u32::try_from(health.source.id).unwrap_or(u32::MAX),
-                            "kind": match health.source.kind {
-                                cv_domain::SourceKind::Movie => "movie",
-                                cv_domain::SourceKind::Tv => "tv",
-                            },
-                            "path": health.source.path,
-                            "online": health.state == SourceState::Online,
-                            "titles": u32::try_from(health.counts.titles).unwrap_or(u32::MAX),
-                            "missing": u32::try_from(health.counts.missing).unwrap_or(u32::MAX),
-                            "pending_media_info": u32::try_from(health.counts.pending_media_info).unwrap_or(u32::MAX),
-                        })
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        }
-        "count_review_items" => {
-            let service =
-                lifecycle_service(Some(state.services.lifecycle())).map_err(command_error)?;
-            tokio::task::spawn_blocking(move || {
-                let of = |kind| service.counts(kind).map(|counts| counts.needs_review);
-                let movies = of(ItemKind::Movie)?;
-                let shows = of(ItemKind::Show)?;
-                Ok::<_, cv_db::DbError>(movies.saturating_add(shows))
-            })
-            .await
-            .map_err(|error| json!({ "code": "storage", "message": error.to_string() }))?
-            .map_err(|error| json!({ "code": "storage", "message": error.to_string() }))
-            .map(Value::from)
-        }
-        "get_movie_detail" => {
-            let id: String = arg(args, "id")?;
-            let id = parse_id(&id).map_err(command_error)?;
-            get_movie_detail(detail_reader(state), id)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "get_show_detail" => {
-            let id: String = arg(args, "id")?;
-            let id = parse_id(&id).map_err(command_error)?;
-            get_show_detail(tv_reader(state), id)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "get_episode_detail" => {
-            let id: String = arg(args, "id")?;
-            let id = parse_id(&id).map_err(command_error)?;
-            get_episode_detail(tv_reader(state), id)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "history_for_title" => {
-            let id: String = arg(args, "id")?;
-            history_for_title(history(state), id)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "history_list" => {
-            let filter: HistoryFilterDto = arg(args, "filter")?;
-            let offset: u32 = arg(args, "offset")?;
-            let limit: u32 = arg(args, "limit")?;
-            history_list(history(state), filter, offset, limit)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "drives_overview" => drives_read(drives(state))
-            .await
-            .map_err(command_error)
-            .and_then(to_value),
-        "rescan_library" => {
-            let scan = ScanState::from_services(Some(&state.services));
-            rescan_library(&scan)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "find_missing_files" => {
-            let scan = ScanState::from_services(Some(&state.services));
-            find_missing_files(&scan)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "read_pending_media_info" => {
-            let scan = ScanState::from_services(Some(&state.services));
-            read_pending_media_info(&scan)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "drives_trash_contents" => {
-            let drive_id: Option<String> = args
-                .get("driveId")
-                .and_then(|value| value.as_str())
-                .map(str::to_owned);
-            drives_trash_contents(drives(state), drive_id)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
-        "get_update_status" => Ok(json!({
-            "current_version": env!("CARGO_PKG_VERSION"),
-            "channel_set": false,
-            "enabled": false,
-            "offer": null
-        })),
-        "subscribe_job_progress" => {
-            let Some(stream) = args.get("onProgress").and_then(channel_id) else {
-                return Err(bad_request("onProgress is not a channel"));
-            };
-            let index = Arc::new(AtomicU64::new(0));
-            let streams = Arc::clone(&state.streams);
-            let client = client.to_owned();
-            cv_ipc::jobs::subscribe_job_progress(
-                &state.progress,
-                state.services.jobs(),
-                move |update| streams.channel(&client, stream, &index, &update),
-            );
-            Ok(Value::Null)
-        }
-        "subscribe_notices" => {
-            let Some(stream) = args.get("onNotice").and_then(channel_id) else {
-                return Err(bad_request("onNotice is not a channel"));
-            };
-            let index = Arc::new(AtomicU64::new(0));
-            let streams = Arc::clone(&state.streams);
-            let client = client.to_owned();
-            state
-                .notices
-                .subscribe(move |notice| streams.channel(&client, stream, &index, &notice));
-            Ok(Value::Null)
-        }
-        "set_setting" | "clear_new_on_open" => Ok(Value::Null),
-        "plugin:event|listen" | "plugin:event|unlisten" => Ok(Value::Null),
-        "plugin:window|is_maximized" => Ok(Value::Bool(false)),
-        "plugin:webview|set_webview_zoom" | "plugin:window|set_title" => Ok(Value::Null),
-        other => {
-            eprintln!("cinevault-server: unhandled command {other}");
-            Err(json!({
-                "code": "not_implemented",
-                "message": format!("{other} is not served yet")
-            }))
-        }
     }
 }
 
@@ -988,10 +567,6 @@ async fn dispatch(state: &WebState, cmd: &str, args: &Value, client: &str) -> Di
 struct ClientQuery {
     #[serde(default)]
     client: String,
-}
-
-fn channel_id(value: &Value) -> Option<u64> {
-    value.as_str()?.strip_prefix("__CHANNEL__:")?.parse().ok()
 }
 
 async fn stream(
@@ -1024,7 +599,10 @@ struct MkdirBody {
     path: String,
 }
 
-fn allowed_roots(state: &WebState) -> Vec<PathBuf> {
+/// The folders the folder browser and the library-folder commands may reach: `CINEVAULT_WEB_ROOTS`
+/// when set, otherwise the data folder, the existing library folders and the usual mount points
+/// on Linux. `/` is never a root unless the operator asks for it.
+pub(crate) fn allowed_roots(state: &WebState) -> Vec<PathBuf> {
     if let Some(value) = std::env::var_os("CINEVAULT_WEB_ROOTS") {
         let separator = if cfg!(windows) { ';' } else { ':' };
         let roots: Vec<PathBuf> = value
@@ -1038,6 +616,10 @@ fn allowed_roots(state: &WebState) -> Vec<PathBuf> {
         }
     }
     let mut roots = vec![state.data_root.clone()];
+    // An existing library folder is where the person already keeps media.
+    let db = Arc::clone(state.services.db());
+    let sources = db.read(|conn| list_sources(conn, None)).unwrap_or_default();
+    roots.extend(sources.into_iter().map(|source| PathBuf::from(source.path)));
     let extra: &[&str] = if cfg!(target_os = "linux") {
         &["/media", "/mnt", "/srv"]
     } else {
@@ -1047,7 +629,8 @@ fn allowed_roots(state: &WebState) -> Vec<PathBuf> {
     roots
 }
 
-fn inside_roots(path: &Path, roots: &[PathBuf]) -> bool {
+/// Whether `path` is inside one of `roots`, compared a path component at a time.
+pub(crate) fn path_inside_roots(path: &Path, roots: &[PathBuf]) -> bool {
     roots.iter().any(|root| {
         let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.clone());
         path.starts_with(root)
@@ -1085,7 +668,7 @@ async fn fs_list(
         )
             .into_response();
     };
-    if !inside_roots(&folder, &roots) {
+    if !path_inside_roots(&folder, &roots) {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({
@@ -1123,7 +706,7 @@ async fn fs_list(
     });
     let parent = folder
         .parent()
-        .filter(|parent| inside_roots(parent, &roots))
+        .filter(|parent| path_inside_roots(parent, &roots))
         .map(|parent| parent.to_string_lossy().into_owned());
     Json(json!({
         "path": folder.to_string_lossy(),
@@ -1191,7 +774,7 @@ async fn fs_mkdir(
         )
             .into_response();
     };
-    if !inside_roots(&parent, &roots) {
+    if !path_inside_roots(&parent, &roots) {
         return (
             StatusCode::FORBIDDEN,
             Json(
@@ -1218,18 +801,39 @@ async fn fs_mkdir(
     }
 }
 
+/// Plays a title in the browser: the file streams inline, so a `<video>` element can seek.
 async fn media(
     State(state): State<WebState>,
     UrlPath((item, part)): UrlPath<(String, u32)>,
     headers: HeaderMap,
 ) -> Response {
-    if session_of(&state, &headers).is_none() {
+    serve_media(&state, &item, part, &headers, false).await
+}
+
+/// Downloads a title's file: the same bytes, always as an attachment, so a browser saves it
+/// instead of opening the player. Ranges are answered like the inline route's.
+async fn media_download(
+    State(state): State<WebState>,
+    UrlPath((item, part)): UrlPath<(String, u32)>,
+    headers: HeaderMap,
+) -> Response {
+    serve_media(&state, &item, part, &headers, true).await
+}
+
+async fn serve_media(
+    state: &WebState,
+    item: &str,
+    part: u32,
+    headers: &HeaderMap,
+    download: bool,
+) -> Response {
+    if session_of(state, headers).is_none() {
         return signed_out();
     }
-    let Ok(id) = parse_id(&item) else {
+    let Ok(id) = parse_id(item) else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    let files = match video_files(&state, id).await {
+    let files = match video_files(state, id).await {
         Ok(files) => files,
         Err(_) => return StatusCode::NOT_FOUND.into_response(),
     };
@@ -1240,7 +844,7 @@ async fn media(
     let Ok(canonical) = tokio::fs::canonicalize(&path).await else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    if !inside_library(&state, &canonical).await {
+    if !inside_library(state, &canonical).await {
         return StatusCode::NOT_FOUND.into_response();
     }
     let Ok(mut file) = tokio::fs::File::open(&canonical).await else {
@@ -1273,6 +877,9 @@ async fn media(
         .header(header::CACHE_CONTROL, "private, no-store")
         .header("x-content-type-options", "nosniff")
         .header("content-security-policy", "sandbox");
+    if download {
+        builder = builder.header(header::CONTENT_DISPOSITION, attachment_name(&canonical));
+    }
     if status == StatusCode::PARTIAL_CONTENT {
         builder = builder.header(
             header::CONTENT_RANGE,
@@ -1282,6 +889,32 @@ async fn media(
     builder
         .body(Body::from_stream(ReaderStream::new(file.take(length))))
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+}
+
+/// `attachment; filename="…"; filename*=UTF-8''…`, with a quoted and an RFC 5987 name so a
+/// release name with spaces, quotes or accents saves under its own name.
+fn attachment_name(path: &Path) -> String {
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy())
+        .unwrap_or_default();
+    let quoted: String = name
+        .chars()
+        .map(|character| match character {
+            '"' | '\\' | '\r' | '\n' => '_',
+            other => other,
+        })
+        .collect();
+    let mut encoded = String::new();
+    for byte in name.as_bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                encoded.push(char::from(*byte));
+            }
+            other => encoded.push_str(&format!("%{other:02X}")),
+        }
+    }
+    format!("attachment; filename=\"{quoted}\"; filename*=UTF-8''{encoded}")
 }
 
 fn parse_range(value: &str, total: u64) -> Option<(u64, u64)> {
@@ -1492,10 +1125,15 @@ mod tests {
     }
 
     #[test]
-    fn a_channel_argument_is_parsed() {
-        assert_eq!(channel_id(&json!("__CHANNEL__:7")), Some(7));
-        assert_eq!(channel_id(&json!("7")), None);
-        assert_eq!(channel_id(&json!(null)), None);
+    fn a_download_saves_under_the_file_name() {
+        let name = attachment_name(Path::new("/media/Film (2019)/Film.mkv"));
+        assert_eq!(
+            name,
+            "attachment; filename=\"Film.mkv\"; filename*=UTF-8''Film.mkv"
+        );
+        let awkward = attachment_name(Path::new("/media/Blade Runner \"Final\".mkv"));
+        assert!(awkward.contains("filename=\"Blade Runner _Final_.mkv\""));
+        assert!(awkward.contains("Blade%20Runner%20%22Final%22.mkv"));
     }
 
     #[test]
