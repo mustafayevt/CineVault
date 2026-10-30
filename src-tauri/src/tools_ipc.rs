@@ -246,6 +246,7 @@ pub async fn install_tool(
     on_progress: Channel<ToolInstallEvent>,
 ) -> Result<Vec<ToolStatusDto>, ToolCommandError> {
     let id = ToolsService::parse_tool(&tool)?;
+    let on_progress = crate::ipc_sink::sink(on_progress);
     let service = Arc::clone(&state.service);
     let worker = Arc::clone(&service);
     let joined = tauri::async_runtime::spawn_blocking(move || {
@@ -258,7 +259,7 @@ pub async fn install_tool(
                 last = Some(Instant::now());
                 last_phase = Some(progress.phase);
                 // A closed channel (the page was left) must not stop the download.
-                let _ = on_progress.send(ToolInstallEvent::from(&progress));
+                on_progress(ToolInstallEvent::from(&progress));
             }
         })
     })

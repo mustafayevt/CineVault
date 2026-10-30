@@ -1067,7 +1067,7 @@ mod tests {
         );
         app.manage(LibraryState::with_guard(&boot, guard));
         app.manage(ImageState::from_boot(&boot));
-        app.manage(ScanState::from_boot(&boot));
+        app.manage(ScanState::from_services(boot.services()));
         app.manage(MatchState::from_boot(&boot));
         app.manage(boot);
         (app, services)

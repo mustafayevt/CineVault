@@ -244,17 +244,17 @@ pub async fn stream_scrape_candidates(
             })
             .collect(),
     };
-    search
-        .start_on_channel_finishing(
-            &search_id,
-            searches(&stream, state.artwork.as_ref()),
-            on_event,
-            Some(nothing_found(&stream)),
-        )
-        .map_err(|error| MatchCommandError {
-            code: "storage".to_owned(),
-            message: error.message,
-        })?;
+    crate::provider_stream::start_on_channel_finishing(
+        &search,
+        &search_id,
+        searches(&stream, state.artwork.as_ref()),
+        on_event,
+        Some(nothing_found(&stream)),
+    )
+    .map_err(|error| MatchCommandError {
+        code: "storage".to_owned(),
+        message: error.message,
+    })?;
     Ok(start)
 }
 

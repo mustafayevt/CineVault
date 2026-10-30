@@ -626,7 +626,7 @@ fn app(root: &Path) -> (tauri::App<MockRuntime>, Arc<AppServices>) {
         .build(mock_context(noop_assets()))
         .expect("mock app builds");
     app.manage(TorrentState::from_boot(&boot));
-    app.manage(SearchState::from_boot(&boot));
+    app.manage(SearchState::from_services(boot.services()));
     app.manage(crate::img_ipc::ImageState::from_boot(&boot));
     app.manage(boot);
     (app, services)

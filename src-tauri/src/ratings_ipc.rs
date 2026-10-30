@@ -278,6 +278,7 @@ pub async fn start_rating_sweep(
 ) -> Result<RatingSweepStartedDto, RatingsCommandError> {
     let services = Arc::clone(boot.services().ok_or_else(starting)?);
     let only = only_source(provider.as_deref());
+    let on_done = crate::ipc_sink::sink(on_done);
     let queued = tauri::async_runtime::spawn_blocking(move || {
         submit_sweep(
             services.jobs(),
@@ -301,7 +302,7 @@ pub async fn start_rating_sweep(
     let job_id = u32::try_from(job.id().0).unwrap_or(u32::MAX);
     tauri::async_runtime::spawn(async move {
         job.wait().await;
-        let _ = on_done.send(RatingSweepSummaryDto::new(job_id, &work.summary()));
+        on_done(RatingSweepSummaryDto::new(job_id, &work.summary()));
     });
     Ok(RatingSweepStartedDto {
         job_id,

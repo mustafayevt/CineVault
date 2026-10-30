@@ -468,13 +468,14 @@ pub async fn apply_change_source(
 ) -> Result<MoveAppliedDto, LibraryOpsCommandError> {
     let service = ops.change(&library)?;
     let ids = ids_of(&ids)?;
+    let on_progress = crate::ipc_sink::sink(on_progress);
     let control = MoveControl::new();
     *ops.control.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&control));
     let result = blocking(move || {
         let applied =
             service.apply_with(&ids, i64::from(target), Some(control), &mut |progress| {
                 // A closed channel (the page was left) must not stop the move.
-                let _ = on_progress.send(MoveProgressDto::from(progress));
+                on_progress(MoveProgressDto::from(progress));
             })?;
         Ok(applied.into())
     })
@@ -612,12 +613,13 @@ pub async fn resume_unfinished_batch(
     on_progress: Channel<MoveProgressDto>,
 ) -> Result<ResumeOutcomeDto, LibraryOpsCommandError> {
     let service = ops.recovery(&library)?;
+    let on_progress = crate::ipc_sink::sink(on_progress);
     let control = MoveControl::new();
     *ops.control.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&control));
     let result = blocking(move || {
         let outcome = service
             .resume(&batch_id, Some(control), &mut |progress| {
-                let _ = on_progress.send(MoveProgressDto::from(progress));
+                on_progress(MoveProgressDto::from(progress));
             })
             .map_err(recovery_error)?;
         Ok(ResumeOutcomeDto {

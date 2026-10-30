@@ -423,7 +423,14 @@ pub async fn install_update(
             message: "An update is already being downloaded.".to_owned(),
         });
     }
-    let result = download_and_start(&app, &state, version, stop_jobs, on_progress).await;
+    let result = download_and_start(
+        &app,
+        &state,
+        version,
+        stop_jobs,
+        crate::ipc_sink::sink(on_progress),
+    )
+    .await;
     // Once the setup runs, the app is quitting: a second "Update now" must not start another.
     if !matches!(
         result,
@@ -445,7 +452,7 @@ async fn download_and_start(
     state: &UpdatesState,
     version: String,
     stop_jobs: bool,
-    on_progress: Channel<UpdateProgressEvent>,
+    on_progress: cv_ipc::sink::Sink<UpdateProgressEvent>,
 ) -> Result<UpdateInstallDto, UpdateCommandError> {
     state.cancel.store(false, Ordering::SeqCst);
     let service = Arc::clone(&state.service);
@@ -457,7 +464,7 @@ async fn download_and_start(
             if last.is_none_or(|at| at.elapsed() >= PROGRESS_INTERVAL) {
                 last = Some(Instant::now());
                 // A closed channel (the page was left) must not stop the download.
-                let _ = on_progress.send(UpdateProgressEvent {
+                on_progress(UpdateProgressEvent {
                     downloaded: small(downloaded),
                     total,
                 });

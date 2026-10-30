@@ -33,6 +33,7 @@ mod img_ipc;
 mod instance;
 mod instance_lock;
 mod ipc;
+mod ipc_sink;
 mod jobs_ipc;
 mod library_facets;
 mod library_ipc;
@@ -166,7 +167,7 @@ fn main() {
             }
             let settings = settings_ipc::SettingsState::from_boot(&boot);
             app.manage(tools_ipc::ToolsState::from_boot(&boot, &settings));
-            app.manage(scan_ipc::ScanState::from_boot(&boot));
+            app.manage(scan_ipc::ScanState::from_services(boot.services()));
             app.manage(drives_ipc::DrivesState::from_boot(&boot, app.handle()));
             app.manage(match_ipc::MatchState::from_boot(&boot));
             app.manage(episode_order_ipc::EpisodeOrderState::from_boot(&boot));
@@ -193,7 +194,7 @@ fn main() {
             app.manage(jobs_ipc::JobsState::from_boot(&boot));
             app.manage(notices_ipc::NoticesState::from_boot(&boot));
             app.manage(updates_ipc::UpdatesState::new(&settings));
-            app.manage(provider_stream::SearchState::from_boot(&boot));
+            app.manage(provider_stream::SearchState::from_services(boot.services()));
             app.manage(torrent_stream_ipc::TorrentState::from_boot(&boot));
             app.manage(settings);
             app.manage(boot);

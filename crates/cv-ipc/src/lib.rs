@@ -17,10 +17,15 @@ pub mod events;
 pub mod history;
 pub mod hub;
 pub mod image;
+pub mod jobs;
 pub mod library;
 pub mod library_facets;
 pub mod lifecycle;
+pub mod notices;
 pub mod people;
+pub mod provider_stream;
+pub mod scan;
+pub mod sink;
 pub mod sources;
 pub mod tv;
 

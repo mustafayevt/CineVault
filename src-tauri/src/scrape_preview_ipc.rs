@@ -265,12 +265,12 @@ pub async fn stream_scrape_preview(
             artwork: state.artwork.clone(),
         }),
     ];
-    search
-        .start_on_channel(&search_id, phases, on_event)
-        .map_err(|error| MatchCommandError {
+    crate::provider_stream::start_on_channel(&search, &search_id, phases, on_event).map_err(
+        |error| MatchCommandError {
             code: "storage".to_owned(),
             message: error.message,
-        })?;
+        },
+    )?;
     Ok(start)
 }
 

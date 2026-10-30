@@ -473,8 +473,7 @@ pub async fn torrent_title_search(
     let service = state.get()?;
     service.ensure_accepted()?;
     let providers = title_providers(&service, state.artwork.as_ref(), &request.query);
-    search
-        .start_on_channel(&request.search_id, providers, on_event)
+    crate::provider_stream::start_on_channel(&search, &request.search_id, providers, on_event)
         .map_err(|error| TorrentCommandError::new("unavailable", error.message))?;
     Ok(TorrentTitleStartDto {
         providers: vec![
@@ -1154,8 +1153,7 @@ pub async fn torrent_release_search(
     let sources = service.sources(&query)?;
     let session = SearchSession::new(query);
     let (listed, providers) = plan_sources(&session, sources, Some(&service));
-    search
-        .start_on_channel(&request.search_id, providers, on_event)
+    crate::provider_stream::start_on_channel(&search, &request.search_id, providers, on_event)
         .map_err(|error| TorrentCommandError::new("unavailable", error.message))?;
     Ok(TorrentSearchStartDto { sources: listed })
 }

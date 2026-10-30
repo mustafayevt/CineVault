@@ -5,9 +5,9 @@
 - [x] 1.1 Create `crates/cv-ipc` with `AppContext` (every service and state object built once), the `EventSink` trait, sink-based `ProgressHub` and `NoticeHub` (with a bounded replay ring) and the shared error envelope. Verified by `cargo test -p cv-ipc` and the desktop app opening the fixture library.
 - [x] 1.2 Move the library read commands and DTOs into `cv-ipc`, leaving one-line Tauri wrappers. Verified by the moved library tests and a desktop run through the Library page.
 - [x] 1.3 Move the page read commands (movie, show, season, episode, people, collections, history, drives, source health, activity) and their DTOs. Verified by the moved tests and each page opening in the desktop app.
-- [ ] 1.4 Move the jobs, notices, move-progress, rating-sweep, tool-install and update channel commands onto `ProgressHub`/`NoticeHub`. Verified by the channel tests and a desktop scan whose progress card updates.
-- [ ] 1.5 Move the provider stream engine and its state onto the sink, deleting the Tauri channel adapters from the engine. Verified by a desktop scrape that still streams candidates and by the stream tests.
-- [ ] 1.6 Move the scan command module. Verified by the scan tests and a desktop scan, rescan and media info read.
+- [x] 1.4 Move the jobs, notices, move-progress, rating-sweep, tool-install and update channel commands onto `ProgressHub`/`NoticeHub`. Verified by the channel tests and a desktop scan whose progress card updates.
+- [x] 1.5 Move the provider stream engine and its state onto the sink, deleting the Tauri channel adapters from the engine. Verified by a desktop scrape that still streams candidates and by the stream tests.
+- [x] 1.6 Move the scan command module. Verified by the scan tests and a desktop scan, rescan and media info read.
 - [ ] 1.7 Move the match, scrape, preview and artwork command modules. Verified by the match tests and a desktop scrape and artwork change.
 - [ ] 1.8 Move the rename, organize, edit, NFO, collections and lifecycle command modules. Verified by the rename and edit tests and a desktop rename with Undo.
 - [ ] 1.9 Move the library-ops (delete and moves), torrents, tools, updates and onboarding command modules. Verified by their tests and a desktop delete, move and tool install.

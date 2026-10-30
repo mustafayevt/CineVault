@@ -159,13 +159,13 @@ pub async fn stream_artwork_candidates(
     let kind = parse_slot(&slot)?;
     let stream = service.candidate_stream(item, kind).await?;
     let start = start_dto(&stream, artwork.thumbs.as_deref());
-    search
-        .start_on_channel(
-            &search_id,
-            searches(&stream.sources, artwork.thumbs.as_ref()),
-            on_event,
-        )
-        .map_err(|error| ArtworkCommandError::new("storage", error.message))?;
+    crate::provider_stream::start_on_channel(
+        &search,
+        &search_id,
+        searches(&stream.sources, artwork.thumbs.as_ref()),
+        on_event,
+    )
+    .map_err(|error| ArtworkCommandError::new("storage", error.message))?;
     Ok(start)
 }
 
