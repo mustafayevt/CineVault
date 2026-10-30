@@ -3,11 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 
 import { t } from "../../i18n/catalog";
+import { transport } from "../../lib/transport";
 import { AppearanceSection } from "./AppearanceSection";
 import { DeletedFilesSection } from "./DeletedFilesSection";
 import { FoldersSection } from "./FoldersSection";
 import { NamingSection } from "./NamingSection";
 import { ProvidersSection } from "./ProvidersSection";
+import { ServerSection } from "./ServerSection";
 import { SettingsNav } from "./SettingsNav";
 import { TorrentSourcesSection } from "./TorrentSourcesSection";
 import { UpdatesSection } from "./UpdatesSection";
@@ -19,7 +21,7 @@ interface SectionDef {
 }
 
 /** The sections in page order; the index follows this list. */
-const SECTIONS: readonly SectionDef[] = [
+const BASE_SECTIONS: readonly SectionDef[] = [
   { id: "providers", label: () => t("settingsPage.providers.title"), Body: ProvidersSection },
   { id: "naming", label: () => t("settingsPage.naming.title"), Body: NamingSection },
   { id: "folders", label: () => t("settingsPage.folders.title"), Body: FoldersSection },
@@ -32,6 +34,12 @@ const SECTIONS: readonly SectionDef[] = [
   { id: "appearance", label: () => t("settingsPage.appearance.title"), Body: AppearanceSection },
   { id: "updates", label: () => t("settingsPage.updates.title"), Body: UpdatesSection },
 ];
+
+/** The Server section exists only when the page is served by the browser server. */
+const SECTIONS: readonly SectionDef[] =
+  transport() === "browser"
+    ? [...BASE_SECTIONS, { id: "server", label: () => "Server", Body: ServerSection }]
+    : BASE_SECTIONS;
 
 /** Older addresses (`?section=library`) and the ids of the old groups, by their new section. */
 const ALIASES: Readonly<Record<string, string>> = {

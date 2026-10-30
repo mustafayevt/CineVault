@@ -1,6 +1,5 @@
-import { isTauri } from "@tauri-apps/api/core";
-
 import { commands } from "../../bindings";
+import { transport } from "../../lib/transport";
 
 /** Where the Open folder actions go: in the desktop app that is the Rust service. */
 export interface OpenFolderBackend {
@@ -28,5 +27,5 @@ export function setOpenFolderBackend(backend: OpenFolderBackend | null): void {
 /** The backend in use: the override, the Rust service in the desktop app, else a no-op. */
 export function currentOpenFolderBackend(): OpenFolderBackend {
   if (override !== null) return override;
-  return isTauri() ? tauriBackend : syntheticBackend;
+  return transport() === "desktop" ? tauriBackend : syntheticBackend;
 }

@@ -1,6 +1,7 @@
-import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
+
+import { transport } from "../../lib/transport";
 
 /** The window operations the title bar needs. Injectable so the chrome can be tested. */
 export interface WindowApi {
@@ -12,9 +13,9 @@ export interface WindowApi {
   onResized: (handler: () => void) => Promise<() => void>;
 }
 
-/** The current Tauri window, or `null` when the UI runs in a plain browser. */
+/** The current Tauri window, or `null` when the UI runs in a browser. */
 export function tauriWindowApi(): WindowApi | null {
-  if (!isTauri()) {
+  if (transport() !== "desktop") {
     return null;
   }
   const current = getCurrentWindow();

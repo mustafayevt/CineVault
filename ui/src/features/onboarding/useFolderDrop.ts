@@ -1,5 +1,6 @@
-import { isTauri } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
+
+import { transport } from "../../lib/transport";
 
 /**
  * Folders dropped on the desktop window arrive as the window's drag-and-drop event with their
@@ -14,7 +15,7 @@ export function useFolderDrop(onPaths: (paths: string[]) => void): boolean {
   }, [onPaths]);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    if (transport() !== "desktop") return;
     let stopped = false;
     let unlisten: (() => void) | null = null;
     void import("@tauri-apps/api/webview")

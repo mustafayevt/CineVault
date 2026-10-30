@@ -33,6 +33,7 @@ pub mod nfo;
 pub mod notices;
 pub mod onboarding;
 pub mod organize;
+pub mod owner;
 pub mod playback;
 pub mod provider_choice;
 pub mod provider_credentials;

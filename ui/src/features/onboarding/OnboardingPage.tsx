@@ -5,6 +5,7 @@ import { BrandMark } from "../../components/BrandMark";
 import { Button } from "../../components/Button";
 import { t } from "../../i18n/catalog";
 import { cx } from "../../lib/cx";
+import { transport } from "../../lib/transport";
 import { currentSourcesBackend } from "../library-sources/sourcesBackend";
 import type { SourceKind } from "../library-sources/sourcesBackend";
 import { useProviderKeys } from "../providers/useProviderKeys";
@@ -294,7 +295,7 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
           <span className="sr-only">CineVault</span>
         </div>
         <div data-tauri-drag-region className="h-full min-w-0 flex-1" />
-        {platform === "windows" || platform === "linux" ? (
+        {transport() === "desktop" && (platform === "windows" || platform === "linux") ? (
           <CaptionButtons windowApi={api} maximized={maximized} />
         ) : null}
       </header>

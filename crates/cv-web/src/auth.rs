@@ -177,6 +177,68 @@ impl Auth {
         Ok(self.create_session())
     }
 
+    /// Changes the password from a signed-in session. The current password is required; the
+    /// caller ends every other session.
+    pub fn change_password(
+        &self,
+        current: &str,
+        password: &str,
+        confirm: &str,
+    ) -> Result<(), AuthError> {
+        if password.chars().count() < 12 {
+            return Err(AuthError::TooShort);
+        }
+        if password != confirm {
+            return Err(AuthError::Mismatch);
+        }
+        let file = {
+            let guard = Self::lock(&self.password);
+            (*guard).clone()
+        };
+        let Some(file) = file else {
+            return Err(AuthError::SetupClosed);
+        };
+        let parsed = PasswordHash::new(&file.hash).map_err(|_| AuthError::Damaged)?;
+        if Argon2::default()
+            .verify_password(current.as_bytes(), &parsed)
+            .is_err()
+        {
+            return Err(AuthError::WrongPassword);
+        }
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .map_err(|error| AuthError::Hash(error.to_string()))?
+            .to_string();
+        let next = AuthFile {
+            version: VERSION,
+            hash,
+        };
+        let bytes =
+            serde_json::to_vec(&next).map_err(|error| AuthError::Hash(error.to_string()))?;
+        cv_fs::write_atomic_with_mode(&self.path, &bytes, 0o600)?;
+        *Self::lock(&self.password) = Some(next);
+        Ok(())
+    }
+
+    /// Checks a password without starting a session (for a sensitive confirmation).
+    #[expect(dead_code)] // Used by permanent delete from a browser.
+    pub fn check_password(&self, password: &str) -> bool {
+        let file = {
+            let guard = Self::lock(&self.password);
+            (*guard).clone()
+        };
+        let Some(file) = file else {
+            return false;
+        };
+        let Ok(parsed) = PasswordHash::new(&file.hash) else {
+            return false;
+        };
+        Argon2::default()
+            .verify_password(password.as_bytes(), &parsed)
+            .is_ok()
+    }
+
     /// Checks a password and starts a session, with the five-a-minute limit.
     pub fn login(&self, password: &str, client: &str) -> Result<(String, Session), AuthError> {
         self.check_failures(client)?;

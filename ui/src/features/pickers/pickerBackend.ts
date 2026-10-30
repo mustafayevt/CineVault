@@ -1,6 +1,6 @@
-import { isTauri } from "@tauri-apps/api/core";
-
 import { commands } from "../../bindings";
+import { transport } from "../../lib/transport";
+import { requestFolderPick } from "./folderPickerRequest";
 import type { PickFileKind } from "../../bindings";
 
 export type { PickFileKind };
@@ -40,6 +40,13 @@ const unavailableBackend: PickerBackend = {
   pick: () => Promise.resolve([]),
 };
 
+/** In a browser the server folder browser replaces the native picker. */
+const browserBackend: PickerBackend = {
+  available: true,
+  pick: (kind, options) =>
+    kind === "folder" ? requestFolderPick(options?.title) : Promise.resolve([]),
+};
+
 /** A stand-in for a browser preview (`?first-run`): each pick answers with a sample path. */
 function createSyntheticPickerBackend(): PickerBackend {
   return {
@@ -55,7 +62,8 @@ let synthetic: PickerBackend | null = null;
 
 export function currentPickerBackend(): PickerBackend {
   if (override !== null) return override;
-  if (isTauri()) return tauriBackend;
+  if (transport() === "desktop") return tauriBackend;
+  if (transport() === "browser") return browserBackend;
   if (new URLSearchParams(window.location.search).has("first-run")) {
     synthetic ??= createSyntheticPickerBackend();
     return synthetic;
