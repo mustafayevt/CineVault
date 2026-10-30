@@ -403,6 +403,55 @@ async fn home_network_only_refuses_public_peers() {
     services.shutdown();
 }
 
+/// The desktop's resolver answers every unknown path with `index.html`, as Tauri's does.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_deep_link_through_a_falling_back_resolver_gets_the_transport_marker() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let host = HostMode::Desktop {
+        computer: "STUDY-PC".to_owned(),
+    };
+    let mut state = web_state(&services, host, true, Vec::new());
+    state.ui = UiAssets::Embedded(Arc::new(|path: &str| {
+        Some(if path.ends_with(".js") {
+            UiFile {
+                bytes: b"console.log(1)".to_vec(),
+                mime: "text/javascript".to_owned(),
+            }
+        } else {
+            UiFile {
+                bytes: INDEX.as_bytes().to_vec(),
+                mime: "text/html".to_owned(),
+            }
+        })
+    }));
+    set_password(&state);
+    let signed_in = call(
+        &state,
+        "POST",
+        "/api/login",
+        "192.168.1.30",
+        &[],
+        Some(serde_json::json!({ "password": PASSWORD })),
+    )
+    .await;
+    let cookie = format!("cv_session={}", signed_in.session().unwrap());
+    let page = call(
+        &state,
+        "GET",
+        "/library",
+        "192.168.1.30",
+        &[("cookie", &cookie)],
+        None,
+    )
+    .await;
+    assert_eq!(page.status, StatusCode::OK);
+    assert!(page.body.contains("__CINEVAULT_TRANSPORT__=\"server\""));
+    let script = call(&state, "GET", "/assets/app.js", "192.168.1.30", &[], None).await;
+    assert_eq!(script.body, "console.log(1)");
+    services.shutdown();
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_embedded_interface_is_served_with_the_session_token() {
     let dir = tempfile::tempdir().unwrap();

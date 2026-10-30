@@ -815,7 +815,10 @@ form.onsubmit = async (event) => {{
 </script>
 </body></html>"#,
         style = PAGE_STYLE,
-        warning = plain_http_warning(plain_http),
+        warning = match host {
+            HostMode::Desktop { .. } if plain_http => DESKTOP_PLAIN_HTTP,
+            _ => plain_http_warning(plain_http),
+        },
         safe_next = SAFE_NEXT,
         recovery = recovery(host),
         reset_script = if *host == HostMode::Server {
@@ -825,6 +828,9 @@ form.onsubmit = async (event) => {{
         },
     )
 }
+
+/// The desktop app has no reverse proxy in front of it; the advice is where to use it.
+const DESKTOP_PLAIN_HTTP: &str = r#"<p class="warn">This connection is not encrypted. Use Browser access on your home network, not on public Wi-Fi.</p>"#;
 
 /// The page a browser from outside the home network gets while no password exists.
 #[must_use]

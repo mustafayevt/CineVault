@@ -1486,12 +1486,15 @@ async fn read_ui_file(ui: &UiAssets, requested: &str) -> Option<(Vec<u8>, String
             let wanted = wanted.to_owned();
             tokio::task::spawn_blocking(move || {
                 if let Some(file) = resolve(&wanted) {
-                    let is_index = wanted == "index.html";
                     let mime = if file.mime.is_empty() {
                         ui_mime(&wanted).to_owned()
                     } else {
                         file.mime
                     };
+                    // The app's resolver answers an unknown path (a deep link such as
+                    // `/library`) with `index.html` itself. The build has no other HTML file,
+                    // so an HTML answer is the page that needs the transport marker.
+                    let is_index = wanted == "index.html" || mime.starts_with("text/html");
                     return Some((file.bytes, mime, is_index));
                 }
                 let index = resolve("index.html")?;
