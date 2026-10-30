@@ -7,12 +7,9 @@
 
 use std::sync::{Arc, OnceLock};
 
-use cv_app::history::{
-    HistoryEntry, HistoryError, HistoryFilter, HistoryKind, HistoryPage, HistoryService,
-    HistoryTitle, TitleState, UndoReport, UndoState,
-};
+use cv_app::history::{HistoryKind, HistoryService, UndoReport};
 use cv_app::library_ops::{
-    DeleteMethod, DeleteReport, EraseReport, ErasedTitle, LibraryOpsError, Problem, RemovalService,
+    DeleteMethod, DeleteReport, EraseReport, ErasedTitle, Problem, RemovalService,
 };
 use cv_app::organize::OrganizeService;
 use cv_artwork::library_source::LibrarySources;
@@ -26,6 +23,8 @@ use tauri_specta::Event;
 use crate::artwork_ipc::ArtworkState;
 use crate::match_ipc::MatchState;
 use crate::sources_ipc::LibraryState;
+
+pub use cv_ipc::history::*;
 
 /// Held in Tauri state. The services are built by the first command that needs them.
 pub struct HistoryState {
@@ -80,40 +79,6 @@ impl HistoryState {
     }
 }
 
-/// Why a command did not run.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
-pub struct HistoryCommandError {
-    /// `storage`, `bad_id`, `unknown_entry`, `refused`, `confirmation`, or another refused rule.
-    pub code: String,
-    /// Plain sentence for the user.
-    pub message: String,
-}
-
-fn storage(message: &str) -> HistoryCommandError {
-    HistoryCommandError {
-        code: "storage".to_owned(),
-        message: message.to_owned(),
-    }
-}
-
-impl From<HistoryError> for HistoryCommandError {
-    fn from(error: HistoryError) -> Self {
-        Self {
-            code: error.code().to_owned(),
-            message: error.to_string(),
-        }
-    }
-}
-
-impl From<LibraryOpsError> for HistoryCommandError {
-    fn from(error: LibraryOpsError) -> Self {
-        Self {
-            code: error.code().to_owned(),
-            message: error.to_string(),
-        }
-    }
-}
-
 /// History changed: an entry was written or undone. `entry_id` names it when one did.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type, Event)]
 pub struct HistoryChanged {
@@ -149,170 +114,7 @@ fn titles_changed(library: &LibraryState, ids: &[ItemId]) {
     }
 }
 
-async fn blocking<T: Send + 'static>(
-    work: impl FnOnce() -> Result<T, HistoryCommandError> + Send + 'static,
-) -> Result<T, HistoryCommandError> {
-    tauri::async_runtime::spawn_blocking(work)
-        .await
-        .map_err(|error| HistoryCommandError {
-            code: "storage".to_owned(),
-            message: format!("The operation stopped unexpectedly: {error}"),
-        })?
-}
-
-fn id_of(text: &str) -> Result<i64, HistoryCommandError> {
-    text.trim().parse::<i64>().map_err(|_| HistoryCommandError {
-        code: "bad_id".to_owned(),
-        message: format!("\"{text}\" is not a known id."),
-    })
-}
-
-fn ids_of(ids: &[String]) -> Result<Vec<ItemId>, HistoryCommandError> {
-    ids.iter().map(|id| id_of(id).map(ItemId)).collect()
-}
-
-#[allow(clippy::cast_precision_loss)]
-fn number(value: i64) -> f64 {
-    value as f64
-}
-
-#[allow(clippy::cast_precision_loss)]
-fn bytes_of(bytes: u64) -> f64 {
-    bytes as f64
-}
-
 // ---- History ---------------------------------------------------------------------------------
-
-/// One title of an entry.
-#[derive(Debug, Clone, PartialEq, Serialize, Type)]
-pub struct HistoryTitleDto {
-    pub id: String,
-    pub title: String,
-    /// The old name or path.
-    pub before: String,
-    /// The new name or path.
-    pub after: String,
-    /// `done`, `undone`, or `left` (a permanent delete stopped before it).
-    pub state: String,
-}
-
-impl From<HistoryTitle> for HistoryTitleDto {
-    fn from(title: HistoryTitle) -> Self {
-        Self {
-            id: title.item_id.0.to_string(),
-            title: title.title,
-            before: title.before,
-            after: title.after,
-            state: match title.state {
-                TitleState::Done => "done",
-                TitleState::Undone => "undone",
-                TitleState::Left => "left",
-            }
-            .to_owned(),
-        }
-    }
-}
-
-/// One History entry.
-#[derive(Debug, Clone, PartialEq, Serialize, Type)]
-pub struct HistoryEntryDto {
-    pub id: String,
-    /// `rename`, `move`, `delete`, `delete_permanent`, `artwork` or `match`.
-    pub kind: String,
-    /// Epoch milliseconds.
-    pub at: f64,
-    /// "Renamed 12 titles".
-    pub summary: String,
-    /// The muted line under it; sizes are in `bytes`.
-    pub detail: String,
-    pub bytes: Option<f64>,
-    /// The journal batch of a rename or move.
-    pub batch_id: Option<String>,
-    /// When the entry was wholly undone (epoch milliseconds).
-    pub undone_at: Option<f64>,
-    /// `available`, `partial`, `undone` or `none` (no Undo: a permanent delete).
-    pub undo_state: String,
-    /// Why Undo is off for an entry that had one (its files were erased, or emptied from the
-    /// trash); `null` otherwise.
-    pub undo_note: Option<String>,
-    pub titles_total: u32,
-    pub titles_undone: u32,
-    /// The first titles; `history_titles` lists all.
-    pub preview: Vec<HistoryTitleDto>,
-}
-
-fn kind_text(kind: HistoryKind) -> &'static str {
-    kind.as_str()
-}
-
-fn state_text(state: UndoState) -> &'static str {
-    match state {
-        UndoState::Available => "available",
-        UndoState::Partial => "partial",
-        UndoState::Undone => "undone",
-        UndoState::None => "none",
-    }
-}
-
-impl From<HistoryEntry> for HistoryEntryDto {
-    fn from(entry: HistoryEntry) -> Self {
-        Self {
-            id: entry.id.to_string(),
-            kind: kind_text(entry.kind).to_owned(),
-            at: number(entry.at),
-            summary: entry.summary,
-            detail: entry.detail,
-            bytes: entry.bytes.map(bytes_of),
-            batch_id: entry.batch_ref,
-            undone_at: entry.undone_at.map(number),
-            undo_state: state_text(entry.undo_state).to_owned(),
-            undo_note: entry.undo_note,
-            titles_total: entry.titles_total,
-            titles_undone: entry.titles_undone,
-            preview: entry.preview.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-/// A page of History, newest first.
-#[derive(Debug, Clone, PartialEq, Serialize, Type)]
-pub struct HistoryPageDto {
-    pub entries: Vec<HistoryEntryDto>,
-    /// Entries of the filter in all.
-    pub total: f64,
-}
-
-impl From<HistoryPage> for HistoryPageDto {
-    fn from(page: HistoryPage) -> Self {
-        Self {
-            entries: page.entries.into_iter().map(Into::into).collect(),
-            total: bytes_of(page.total),
-        }
-    }
-}
-
-/// The filter tabs of the History page.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum HistoryFilterDto {
-    All,
-    Renames,
-    Moves,
-    Deletes,
-    ArtworkAndMatches,
-}
-
-impl From<HistoryFilterDto> for HistoryFilter {
-    fn from(filter: HistoryFilterDto) -> Self {
-        match filter {
-            HistoryFilterDto::All => Self::All,
-            HistoryFilterDto::Renames => Self::Renames,
-            HistoryFilterDto::Moves => Self::Moves,
-            HistoryFilterDto::Deletes => Self::Deletes,
-            HistoryFilterDto::ArtworkAndMatches => Self::ArtworkAndMatches,
-        }
-    }
-}
 
 /// One page of History entries of a tab, newest first (`limit` at most 200).
 #[tauri::command]
@@ -325,8 +127,7 @@ pub async fn history_list(
     limit: u32,
 ) -> Result<HistoryPageDto, HistoryCommandError> {
     let service = history.history(&library)?;
-    let (offset, limit) = (offset as usize, limit.clamp(1, 200) as usize);
-    blocking(move || Ok(service.list(filter.into(), offset, limit)?.into())).await
+    cv_ipc::history::history_list(service, filter, offset, limit).await
 }
 
 /// Every title of an entry ("Show N more").
@@ -338,8 +139,7 @@ pub async fn history_titles(
     entry_id: String,
 ) -> Result<Vec<HistoryTitleDto>, HistoryCommandError> {
     let service = history.history(&library)?;
-    let entry = id_of(&entry_id)?;
-    blocking(move || Ok(service.titles(entry)?.into_iter().map(Into::into).collect())).await
+    cv_ipc::history::history_titles(service, entry_id).await
 }
 
 /// The newest entries that touched a title, with that title's line only (the "Renamed from …"
@@ -352,15 +152,7 @@ pub async fn history_for_title(
     id: String,
 ) -> Result<Vec<HistoryEntryDto>, HistoryCommandError> {
     let service = history.history(&library)?;
-    let item = ItemId(id_of(&id)?);
-    blocking(move || {
-        Ok(service
-            .for_title(item, 20)?
-            .into_iter()
-            .map(Into::into)
-            .collect())
-    })
-    .await
+    cv_ipc::history::history_for_title(service, id).await
 }
 
 /// The History entry of a rename or move batch, so its toast's Undo points at the same record.
@@ -372,7 +164,7 @@ pub async fn history_entry_for_batch(
     batch_id: String,
 ) -> Result<Option<String>, HistoryCommandError> {
     let service = history.history(&library)?;
-    blocking(move || Ok(service.entry_for_batch(&batch_id)?.map(|id| id.to_string()))).await
+    cv_ipc::history::history_entry_for_batch(service, batch_id).await
 }
 
 /// How much of what CineVault sent to the Recycle Bin / Trash is still there, in bytes.
@@ -383,7 +175,7 @@ pub async fn history_bin_total(
     history: State<'_, HistoryState>,
 ) -> Result<f64, HistoryCommandError> {
     let service = history.history(&library)?;
-    blocking(move || Ok(bytes_of(service.bin_total()?))).await
+    cv_ipc::history::history_bin_total(service).await
 }
 
 /// A title an Undo left as it is.
@@ -669,13 +461,9 @@ pub async fn erase_titles(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use cv_app::history::UndoState;
 
-    #[test]
-    fn ids_must_be_numbers() {
-        assert_eq!(id_of(" 12 ").unwrap(), 12);
-        assert_eq!(id_of("x").unwrap_err().code, "bad_id");
-    }
+    use super::*;
 
     #[test]
     fn an_undo_report_carries_the_reason_of_each_title_left() {

@@ -8,14 +8,21 @@
 //! both surfaces use, [`EventSink`] carries the typed events, and [`Hub`] is the replaying fan-out
 //! behind job progress and notices.
 
+pub mod collections;
 pub mod context;
+pub mod detail;
+pub mod drives;
 pub mod error;
 pub mod events;
+pub mod history;
 pub mod hub;
 pub mod image;
 pub mod library;
 pub mod library_facets;
 pub mod lifecycle;
+pub mod people;
+pub mod sources;
+pub mod tv;
 
 pub use context::AppContext;
 pub use error::{CommandError, CommandResult};

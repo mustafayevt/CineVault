@@ -64,15 +64,6 @@ impl MatchState {
         poster_keys_of(self.artwork.as_ref(), urls, POSTER_WAIT).await
     }
 
-    /// Like [`Self::poster_keys`], waiting for `wait` (the cast portraits of an opened title).
-    pub(crate) async fn portrait_keys<'a>(
-        &self,
-        urls: impl Iterator<Item = &'a str>,
-        wait: Duration,
-    ) -> PosterKeys {
-        poster_keys_of(self.artwork.as_ref(), urls, wait).await
-    }
-
     pub(crate) fn get(&self) -> Result<Arc<MatchService>, MatchCommandError> {
         self.service.clone().ok_or_else(|| MatchCommandError {
             code: "storage".to_owned(),

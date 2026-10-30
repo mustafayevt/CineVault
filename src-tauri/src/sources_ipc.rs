@@ -15,9 +15,9 @@ use cv_app::organize::OrganizeStateService;
 use cv_app::rating_status::RatingStatusService;
 use cv_app::scanning::ScanService;
 use cv_db::Database;
-use cv_domain::{DataSource, SourceKind};
+use cv_domain::DataSource;
 use cv_scan::sources::SourceGuard;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use specta::Type;
 use tauri::State;
 
@@ -272,45 +272,11 @@ impl LibraryState {
 
 /// The label of the library folder `root` (a title's `data_source`) of a library type, empty when
 /// the folder is no longer in the list.
-pub(crate) fn source_label_of(db: &Database, kind: SourceKind, root: &str) -> String {
-    if root.is_empty() {
-        return String::new();
-    }
-    db.read(|conn| cv_db::repo::data_sources::label_of_root(conn, kind, root))
-        .ok()
-        .flatten()
-        .unwrap_or_default()
-}
-
 fn small(n: u64) -> u32 {
     u32::try_from(n).unwrap_or(u32::MAX)
 }
 
-/// Which library a folder feeds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum SourceKindDto {
-    Movie,
-    Tv,
-}
-
-impl From<SourceKindDto> for SourceKind {
-    fn from(kind: SourceKindDto) -> Self {
-        match kind {
-            SourceKindDto::Movie => Self::Movie,
-            SourceKindDto::Tv => Self::Tv,
-        }
-    }
-}
-
-impl From<SourceKind> for SourceKindDto {
-    fn from(kind: SourceKind) -> Self {
-        match kind {
-            SourceKind::Movie => Self::Movie,
-            SourceKind::Tv => Self::Tv,
-        }
-    }
-}
+pub use cv_ipc::sources::SourceKindDto;
 
 /// One library folder.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]

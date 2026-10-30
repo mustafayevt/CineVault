@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use cv_app::scanning::{MediaInfoStatus, ScanError, ScanService, SourceHealth, SourceState};
+use cv_app::scanning::{MediaInfoStatus, ScanError, ScanService};
 use cv_scan::unmanaged::{UnmanagedReason, UnmanagedReport};
 use serde::Serialize;
 use specta::Type;
@@ -164,34 +164,7 @@ impl From<UnmanagedReport> for MissingInSourceDto {
 }
 
 /// One library folder with its live state.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
-pub struct SourceHealthDto {
-    pub id: u32,
-    pub kind: SourceKindDto,
-    pub path: String,
-    /// False while the drive is disconnected or the share is down; its titles stay in the library.
-    pub online: bool,
-    /// Movies, or shows for a TV folder.
-    pub titles: u32,
-    /// Titles whose folder or video is gone while the library folder itself is reachable.
-    pub missing: u32,
-    /// Titles still waiting for their media info.
-    pub pending_media_info: u32,
-}
-
-impl From<SourceHealth> for SourceHealthDto {
-    fn from(health: SourceHealth) -> Self {
-        Self {
-            id: u32::try_from(health.source.id).unwrap_or(u32::MAX),
-            kind: health.source.kind.into(),
-            path: health.source.path,
-            online: health.state == SourceState::Online,
-            titles: small(health.counts.titles),
-            missing: small(health.counts.missing),
-            pending_media_info: small(health.counts.pending_media_info),
-        }
-    }
-}
+pub use cv_ipc::sources::SourceHealthDto;
 
 impl ScanState {
     /// Queues a rescan of every library folder. Must run inside the async runtime.
@@ -257,14 +230,12 @@ pub async fn list_source_health(
     state: State<'_, ScanState>,
 ) -> Result<Vec<SourceHealthDto>, ScanCommandError> {
     let service = state.get()?;
-    blocking(move || {
-        Ok(service
-            .source_health()?
-            .into_iter()
-            .map(Into::into)
-            .collect())
-    })
-    .await
+    cv_ipc::sources::source_health(service)
+        .await
+        .map_err(|message| ScanCommandError {
+            code: "storage".to_owned(),
+            message,
+        })
 }
 
 /// Reads the media info of the titles that are still waiting for it, for example after MediaInfo
