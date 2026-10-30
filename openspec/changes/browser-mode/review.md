@@ -47,27 +47,105 @@ done about it.
 - **Logs and warnings.** The server uses the shared redacting logging initialiser, and the sign-in
   and welcome pages warn on plain HTTP when the host is not loopback.
 
+## QA pass before 1.2.0
+
+A second pass ran the server for real: natively on Windows (debug build, `CINEVAULT_WEB_ROOTS`
+set, a disposable Kodi-style library of generated MP4/MKV files) and in Docker Desktop
+(`docker compose up` with the image built from this branch, `PUID`/`PGID` 1000, a Docker-secret
+master key), driven from a throwaway headless Chrome over CDP and with curl. No TMDB key was
+available to the server, so live scraping was not exercised.
+
+### Bugs found and fixed
+
+- **The server stopped itself after 15 seconds.** The shutdown cap wrapped the whole serve future,
+  so every start exited cleanly 15 seconds later (and `restart: unless-stopped` looped). The cap
+  now starts at SIGINT/SIGTERM.
+- **Add folder… crashed to a blank page.** The picker reads `roots` from `/api/fs/list`, which the
+  route never sent. The listing now returns the existing roots, opens on a media root rather than
+  the data folder, and shows plain paths (not `\\?\C:\…` on Windows).
+- **Play showed an empty player.** The media route's bare `CSP: sandbox` gave the browser's player
+  document an opaque origin, so its own video request was refused by CORS. It is now
+  `sandbox allow-same-origin`. A range past the end answers 416 instead of the whole file.
+- **Artwork upload never ran in a browser.** The server shim makes `isTauri()` true and the
+  artwork backend asked that first, so a chosen or dropped file failed with "available in the
+  desktop app". A file over 32 MiB is now refused with that sentence before sending (the server
+  closes an oversized body, which the browser only reports as a network error).
+- **Artwork source guard bypasses.** `place_artwork` compared lexically, so a quoted path, an
+  upper-case `FILE:` address or `<data>/tmp/../file` passed it, and the last was deleted after the
+  placement; `place_extra_artwork` had no guard. Both now accept a web address or a canonical
+  `artwork-*` file in the staging folder only.
+- **Job attribution never worked.** The client id was a thread-local set around an async command,
+  lost (or mixed with another session's) after the first `.await`. It is a task-local now, carried
+  to blocking threads by `cv_jobs::client::spawn_blocking`.
+- **Media kept streaming after sign-out.** A playing or downloading file now ends when its
+  session ends; other sessions keep streaming.
+- **`cinevault-server passwd` needed a restart** to take effect while the server ran; the server
+  now reads the password file on each check.
+- **Open redirect on sign-in.** `?next=/\evil.example` passed the prefix check; the pages now resolve
+  `next` and require the same origin. A deep link also keeps its query string through sign-in.
+- **Documented master key crash-looped the container.** The guide said "a long random value";
+  the server needs base64 of 32 bytes. The guide, compose file and unit now say
+  `openssl rand -base64 32`, and the error names it.
+- **UI format check** failed on the pull request; the files are formatted.
+
+### Verified working
+
+First-run welcome (setup window closes after, second browser refused, `/setup` redirects to sign-in
+afterwards); sign-in, wrong password, the five-a-minute limit (a rotated `X-Forwarded-For` from an
+untrusted peer does not bypass it); sign-out; deep link after sign-in; server restart with the page
+open (the page returns to sign-in with its address); folder browser with typed paths and the root
+jail (also in the container: `/etc` and `/media/../etc` refused); onboarding to a scanned library;
+grid, table and detail pages; job progress over the event stream; Rename preview, apply and
+History Undo on disk; artwork upload and Undo; delete to the trash folder and Restore (in the
+container, with no system bin, delete falls back to `.deletedByCineVault`); Play in Chrome with
+range requests; two sessions streaming while one signs out; every API, image, media and stream
+route without a session (401 or redirect); CSRF token, foreign `Origin`, spoofed
+`X-Forwarded-Host`, `text/plain` bodies, 1 MiB command cap and 33 MiB upload cap; static and media
+traversal; cookie flags (`HttpOnly; SameSite=Strict`, no `Secure` from a spoofed
+`X-Forwarded-Proto`); no password, token or key in the logs or `settings.json`; provider key stored
+only in `secrets.enc` and still there after a container restart; MediaInfo download in the
+container; non-root server process (UID 1000), Docker health `healthy`, clean stop in under a
+second with the owner file removed; the CLI refuses with exit 2 natively and in the container
+while the server runs.
+
+### Not verified here
+
+- Live scraping and fixing a match in a browser (no TMDB key could be given to the server without
+  copying secrets).
+- Real Linux file permissions with a mismatched `PUID` (Docker Desktop bind mounts on Windows are
+  world-writable), arm64, the `.deb`/`.rpm` and the tarball.
+- The desktop app as a window: its unit tests pass and it builds, but the installed CineVault was
+  running on the test machine and the single-instance guard hands a second copy to it.
+- The "Started from another session" label on screen (the job's `started_by` is now right on the
+  wire; scans of the fixture finish too fast to see the card).
+
 ## Known gaps (follow-ups, not hidden)
+
+- **The CLI does not forward to the server.** It refuses with exit 2 ("send the batch through
+  it"), but the server does not republish the automation endpoint, so a scheduled CLI batch
+  cannot run while the server is up.
+- **Phone width.** Sign-in and welcome fit a phone; the library keeps the full sidebar at 390 px
+  (the proposal designs the library for a tablet or larger).
+- **Wording.** Some texts still speak of "this computer" (the TMDB key step) or call a Docker
+  bind mount a network drive in the delete note.
 
 - **Playback actions.** Play opens the browser's player with seeking and the media route answers
   ranges; "Copy stream link" and "Open in Kodi" are not in the UI yet, and Kodi is not configured
-  in the server settings.
+  in the server settings. A stream link needs a token in the address first: the media route takes
+  only the session cookie, so a copied link would not play in Kodi or VLC.
 - **`/healthz` always answers 200.** The listener is bound after the library opens, so a slow open
   is connection-refused rather than 503.
 - **`server.json`, key rotation, session lifetime and trusted-proxy state in Settings.** The
   address and port come from the environment; the settings page shows the running values but does
   not edit them.
-- **SSE reset.** The server replays by `Last-Event-ID` and sends a `reset` when its buffer is too
-  small, but the page does not yet reload on that event, and `end` is not sent.
-- **Deep links and CSRF after a cached page.** `index.html` is `no-store`; a deep link is still
-  lost after signing in.
+- **SSE `end`.** The page reloads on `reset` (d03990f8); the server still does not send `end`.
 - **`AppContext` parity.** The server builds its state in `cv-web/src/state.rs`; the desktop still
   builds its own in `src-tauri/src/main.rs`, so the "one constructor" goal is not met yet.
 - **Packaging.** The release builds amd64 only; arm64 needs the `linux-aarch64` tool manifest and
   a native runner. The container smoke test covers `/healthz`; the scan/rename/artwork smoke test
   is still to add.
-- **Not tested here.** A real NAS, a real Kodi HTPC and a Docker daemon (unavailable on this
-  machine). Those are the final human checks.
+- **Not tested here.** A real NAS and a real Kodi HTPC. Those are the final human checks; the
+  container itself was run under Docker Desktop in the QA pass above.
 
 ## Verification
 
