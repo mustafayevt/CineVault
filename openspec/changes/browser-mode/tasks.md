@@ -46,7 +46,7 @@
 - [ ] 4.2 Serve Scrape: candidate streams, preview, accept, confident accept and undo. Verified by contract tests and a browser scrape whose NFO and library rows match a desktop run.
 - [ ] 4.3 Serve the artwork picker, candidate streams, apply and undo, and the upload route (32 MiB, content sniffing, preview before apply, cross-volume atomic write, leftover cleanup). Verified by upload tests and a browser artwork change whose old file lands in the trash.
 - [ ] 4.4 Serve Rename: preview, conflicts, apply and undo through the journal. Verified by contract tests and a browser rename and undo compared with a desktop run.
-- [ ] 4.5 Add setup's folder write probe and the "This folder is not writable by the server." message. Verified by a test with a read-only fixture folder and a browser setup that refuses it.
+- [x] 4.5 Add setup's folder write probe and the "This folder is not writable by the server." message. Verified by a test with a read-only fixture folder and a browser setup that refuses it.
 
 ## 5. Remaining writes
 
