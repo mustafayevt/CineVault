@@ -208,10 +208,27 @@ pub(crate) struct Commands {
     pub(crate) history_reads: Arc<HistoryService>,
 }
 
+/// The state objects a host already has and the server must share rather than copy: the
+/// desktop app's batch runner, drives service and move slot. The headless server passes the
+/// default (it owns everything).
+#[derive(Default)]
+pub struct Borrowed {
+    /// The batch runner of the selection actions.
+    pub actions: Option<Arc<cv_app::automation::CommandBackend>>,
+    /// The drives service, whose change callback refreshes the host's own Drives page.
+    pub drives: Option<Arc<DrivesService>>,
+    /// The library-ops state built with `LibraryOpsState::sharing_moves_with`.
+    pub library_ops: Option<LibraryOpsState>,
+}
+
 impl Commands {
     /// Every state object the commands need, over `services`. Must run inside the tokio runtime:
     /// the batch runner the selection actions use is a task.
-    pub(crate) fn build(services: &Arc<AppServices>, images: &ImageContext) -> Self {
+    pub(crate) fn build(
+        services: &Arc<AppServices>,
+        images: &ImageContext,
+        borrowed: Borrowed,
+    ) -> Self {
         let settings = SettingsState::from_services(Some(services));
         let tools = ToolsState::from_services(Some(services), &settings);
         let updates = UpdatesState::new(&settings);
@@ -221,23 +238,31 @@ impl Commands {
             .service(&library)
             .ok()
             .map(|nfo| Arc::new(CollectionService::new(Arc::clone(services.db()), nfo)));
-        let observer: Arc<dyn cv_db::repo::rename_journal::PathObserver> =
-            Arc::clone(images.sources()) as _;
-        let engine = cv_app::automation::BatchEngine::new(
-            Arc::clone(services),
-            cv_app::automation::EngineOptions {
-                path_observer: Some(observer),
-                ..cv_app::automation::EngineOptions::default()
-            },
-        );
-        let actions = cv_app::automation::CommandBackend::start(engine);
-        let drives = DrivesService::new(Arc::clone(services.db()), Arc::clone(services.scan()));
-        let choice: Arc<dyn cv_app::deleted_files::DeletedFilesSource> =
-            Arc::clone(services.settings()) as _;
-        drives.set_trash(
-            cv_app::library_ops::PolicyBin::os(Arc::clone(&choice)),
-            choice,
-        );
+        let actions = borrowed.actions.unwrap_or_else(|| {
+            let observer: Arc<dyn cv_db::repo::rename_journal::PathObserver> =
+                Arc::clone(images.sources()) as _;
+            let engine = cv_app::automation::BatchEngine::new(
+                Arc::clone(services),
+                cv_app::automation::EngineOptions {
+                    path_observer: Some(observer),
+                    ..cv_app::automation::EngineOptions::default()
+                },
+            );
+            cv_app::automation::CommandBackend::start(engine)
+        });
+        let drives = borrowed.drives.unwrap_or_else(|| {
+            let drives = DrivesService::new(Arc::clone(services.db()), Arc::clone(services.scan()));
+            let choice: Arc<dyn cv_app::deleted_files::DeletedFilesSource> =
+                Arc::clone(services.settings()) as _;
+            drives.set_trash(
+                cv_app::library_ops::PolicyBin::os(Arc::clone(&choice)),
+                choice,
+            );
+            drives
+        });
+        let library_ops = borrowed
+            .library_ops
+            .unwrap_or_else(|| LibraryOpsState::new(Arc::clone(images.sources())));
         Self {
             settings,
             tools,
@@ -250,7 +275,7 @@ impl Commands {
             providers: ProvidersState::from_services(Some(services)),
             curation: CurationState::default(),
             organize: OrganizeState::new(Arc::clone(images.sources())),
-            library_ops: LibraryOpsState::new(Arc::clone(images.sources())),
+            library_ops,
             history: HistoryState::new(Arc::clone(images.sources())),
             history_reads: Arc::new(HistoryService::new(Arc::clone(services.db()))),
             search: SearchState::from_services(Some(services)),
@@ -334,6 +359,24 @@ pub(crate) fn random_token() -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
+/// One file of the interface: its bytes and its content type.
+pub struct UiFile {
+    pub bytes: Vec<u8>,
+    pub mime: String,
+}
+
+/// Looks up a file of the interface by its path inside the build (`index.html`,
+/// `assets/index-1a2b.js`).
+pub type UiResolver = Arc<dyn Fn(&str) -> Option<UiFile> + Send + Sync>;
+
+/// Where the interface's files come from: a folder (the headless server's `--ui`) or the files
+/// built into the desktop app.
+#[derive(Clone)]
+pub enum UiAssets {
+    Folder(std::path::PathBuf),
+    Embedded(UiResolver),
+}
+
 /// Everything a handler needs. Cheap to clone: every field is shared.
 #[derive(Clone)]
 pub(crate) struct WebState {
@@ -350,5 +393,7 @@ pub(crate) struct WebState {
     pub(crate) port: u16,
     pub(crate) keys_locked: bool,
     pub(crate) trust_proxy: Vec<IpNet>,
-    pub(crate) ui_dir: std::path::PathBuf,
+    pub(crate) ui: UiAssets,
+    /// Refuse every peer outside the home network (the desktop's default).
+    pub(crate) lan_only: bool,
 }

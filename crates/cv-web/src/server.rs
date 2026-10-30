@@ -1,18 +1,15 @@
-//! CineVault's browser server.
+//! The routes and handlers of the browser server, shared by the headless `cinevault-server` and
+//! the desktop app's Browser access.
 //!
-//! Boots the same `AppServices` the desktop app and the command line use, serves the built
-//! interface and answers the typed command surface over HTTP through the shared `cv-ipc` layer.
-//! The command state objects are built once, in [`state`], and every command is one arm of
-//! [`dispatch`].
-
-mod auth;
-mod dispatch;
-mod state;
+//! [`router`] builds every route over one [`WebState`]; the command bodies are the ones in
+//! `cv-ipc`, reached through [`crate::dispatch`].
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::state::{DeleteGuard, UiAssets, WebState, random_token};
+use crate::{auth, dispatch, network};
 use axum::body::Body;
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, DefaultBodyLimit, Path as UrlPath, Query, State};
@@ -21,16 +18,12 @@ use axum::response::sse::{KeepAlive, Sse};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use cv_app::data_location::DataLocation;
-use cv_app::services::{AppServices, BootOptions};
 use cv_artwork::img::{ImageRequest, ImageResponse};
 use cv_db::repo::data_sources::list_sources;
 use cv_ipc::detail::parse_id;
-use cv_ipc::image::ImageContext;
 use ipnet::IpNet;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use state::{Commands, DeleteGuard, WebState, random_token};
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
 use tokio_stream::StreamExt as _;
@@ -46,103 +39,16 @@ struct InvokeBody {
     client: String,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    install_logging();
-
-    let arguments: Vec<String> = std::env::args().skip(1).collect();
-    if arguments.first().is_some_and(|arg| arg == "passwd") {
-        return passwd(&arguments[1..]);
-    }
-
-    let mut ui_dir = PathBuf::from("ui/dist");
-    let mut bind = std::env::var("CINEVAULT_WEB_BIND").unwrap_or_else(|_| "127.0.0.1".to_owned());
-    let mut port = std::env::var("CINEVAULT_WEB_PORT")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(8787_u16);
-    let mut args = arguments.into_iter();
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--ui" => ui_dir = PathBuf::from(args.next().ok_or("--ui needs a folder")?),
-            "--bind" => bind = args.next().ok_or("--bind needs an address")?,
-            "--port" => port = args.next().ok_or("--port needs a number")?.parse()?,
-            other => return Err(format!("unknown argument {other}").into()),
-        }
-    }
-
-    let location = DataLocation::resolve_for_process()
-        .ok_or("CineVault could not find a folder for its data.")?;
-    let _owner = match cv_app::owner::acquire(location.root(), "server") {
-        Ok(Some(guard)) => guard,
-        Ok(None) => {
-            let current = cv_app::owner::read_owner(location.root());
-            let why = current.map_or_else(
-                || "Another CineVault process is using this library.".to_owned(),
-                |owner| owner.sentence(),
-            );
-            return Err(format!("{why} Stop it, or choose another data folder.").into());
-        }
-        Err(error) => return Err(error.into()),
-    };
-    let data_root = location.root().to_path_buf();
-    clean_uploads(&data_root);
-    let auth = Arc::new(auth::Auth::open(location.root())?);
-    let (secrets, keys_locked) =
-        cv_app::server_secrets::server_store(&data_root).map_err(std::io::Error::other)?;
-    let services = AppServices::boot(BootOptions::new(location, Arc::new(secrets)))?;
-    services.start();
-    let images = Arc::new(ImageContext::from_services(&services));
-    let progress = Arc::new(cv_ipc::jobs::ProgressHub::default());
-    let notices = cv_ipc::notices::NoticeHub::from_app(Arc::clone(services.notices()));
-    let streams = Arc::new(state::Streams::default());
-    // Every command's state object, built once from the one set of services. The desktop builds
-    // the same objects lazily; the server has no window and one lifetime.
-    let commands = Arc::new(Commands::build(&services, &images));
-    let changes = Arc::clone(services.changes());
-    let change_streams = Arc::clone(&streams);
-    changes.subscribe(Arc::new(move |change| {
-        let payload = json!({
-            "items": change.items.iter().map(|id| id.0.to_string()).collect::<Vec<_>>(),
-            "parts": change.parts.iter().map(|part| part.as_str()).collect::<Vec<_>>(),
-        });
-        change_streams.broadcast_event("items-changed", &payload);
-    }));
-    let feed_hub = Arc::clone(&progress);
-    let feed_manager = services.jobs().clone();
-    let list_manager = feed_manager.clone();
-    tokio::spawn(async move {
-        feed_manager
-            .progress_feed(cv_jobs::PROGRESS_INTERVAL)
-            .run(move |tick| {
-                feed_hub.publish(&tick, || list_manager.list());
-            })
-            .await;
-    });
-
-    let state = WebState {
-        services,
-        images,
-        auth,
-        progress,
-        notices,
-        streams,
-        commands,
-        delete_guard: Arc::new(DeleteGuard::default()),
-        data_root: data_root.clone(),
-        bind: bind.clone(),
-        port,
-        keys_locked,
-        trust_proxy: parse_trust_proxy(),
-        ui_dir: ui_dir.clone(),
-    };
-    let app = Router::new()
+pub(crate) fn router(state: WebState) -> Router {
+    Router::new()
         .route("/healthz", get(health))
         .route("/login", get(login_page))
         .route("/setup", get(setup_page))
         .route("/api/login", post(login))
         .route("/api/setup", post(setup))
         .route("/api/logout", post(logout))
+        .route("/api/reset/start", post(reset_start))
+        .route("/api/reset/finish", post(reset_finish))
         .route("/api/server/info", get(server_info))
         .route("/api/server/password", post(server_password))
         .route("/api/server/sign-out-all", post(server_sign_out_all))
@@ -163,103 +69,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/fs/mkdir", post(fs_mkdir))
         .route("/api/fs/probe", post(fs_probe))
         .fallback(get(static_file))
-        .with_state(state.clone());
-
-    let shutdown_state = state;
-
-    let addr: SocketAddr = format!("{bind}:{port}").parse()?;
-    println!(
-        "cinevault-server on http://{addr}/ (ui from {})",
-        ui_dir.display()
-    );
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    let stopping = Arc::new(tokio::sync::Notify::new());
-    let server = axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(shutdown(shutdown_state, Arc::clone(&stopping)));
-    // A client that refuses to close must not keep the process (and the library's owner file)
-    // alive forever: once the stop signal arrived, the graceful shutdown gets 15 seconds. The cap
-    // starts at the signal, not at start-up, or the server would stop itself after 15 seconds.
-    tokio::select! {
-        result = server => result?,
-        () = async {
-            stopping.notified().await;
-            tokio::time::sleep(SHUTDOWN_GRACE).await;
-        } => {}
-    }
-    Ok(())
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            home_network_guard,
+        ))
+        .with_state(state)
 }
 
-/// `cinevault-server passwd` and `cinevault-server passwd --reset` on the machine that holds the
-/// data folder. This is the recovery path when the browser password is lost.
-fn passwd(arguments: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-    let location = DataLocation::resolve_for_process()
-        .ok_or("CineVault could not find a folder for its data.")?;
-    let path = location.root().join(auth::AUTH_FILE);
-    if arguments.iter().any(|arg| arg == "--reset") {
-        match std::fs::remove_file(&path) {
-            Ok(()) => println!(
-                "The password was cleared. Start the server and set a new one in a browser."
-            ),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                println!("There is no password to clear.");
-            }
-            Err(error) => return Err(error.into()),
-        }
-        return Ok(());
+/// The sentence a request from outside the home network gets while the desktop's "Only devices
+/// on my home network" is on.
+pub(crate) const HOME_ONLY: &str = "Browser access is limited to your home network.";
+
+/// Refuses every peer outside the home network when the state asks for it. The socket peer
+/// decides; the desktop trusts no proxy.
+async fn home_network_guard(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    if state.lan_only && !network::is_home_address(peer.ip()) {
+        return (StatusCode::FORBIDDEN, HOME_ONLY).into_response();
     }
-    let auth = auth::Auth::open(location.root())?;
-    if auth.has_password() {
-        let current = rpassword::prompt_password("Current password: ")?;
-        if !auth.check_password(&current) {
-            return Err("That password is not right.".into());
-        }
-    }
-    let password = rpassword::prompt_password("New password (at least 12 characters): ")?;
-    let confirm = rpassword::prompt_password("Confirm the new password: ")?;
-    if password != confirm {
-        return Err("The passwords do not match.".into());
-    }
-    auth.set_password_unattended(&password)?;
-    println!("Password set. Open the server in a browser and sign in.");
-    Ok(())
+    next.run(request).await
 }
 
-fn install_logging() {
-    // The shared initialiser reads CINEVAULT_LOG/RUST_LOG and writes through the redacting
-    // writer, so a provider key or a session token can never reach a log line.
-    cv_app::logging::init_with_default("info");
-}
-
-/// How long a graceful stop may take after the signal before the process exits anyway.
-const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
-
-async fn shutdown(state: WebState, stopping: Arc<tokio::sync::Notify>) {
-    wait_for_signal().await;
-    // `notify_one` stores a permit, so the grace timer starts even if it is polled later.
-    stopping.notify_one();
-    // Dropping every stream ends the SSE responses, so axum can finish its graceful shutdown.
-    state.streams.close_all();
-    state.services.shutdown();
-}
-
-async fn wait_for_signal() {
-    #[cfg(unix)]
-    {
-        let mut terminate =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .expect("a SIGTERM handler");
-        tokio::select! {
-            _ = tokio::signal::ctrl_c() => {}
-            _ = terminate.recv() => {}
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = tokio::signal::ctrl_c().await;
-    }
+/// Starts the work that feeds the open pages: the item-change relay and the job progress feed.
+/// The relay holds the streams weakly, so a stopped server's relay does nothing; the returned
+/// task is the progress feed, which the caller aborts on stop.
+pub(crate) fn wire(state: &WebState) -> tokio::task::JoinHandle<()> {
+    let weak = Arc::downgrade(&state.streams);
+    state.services.changes().subscribe(Arc::new(move |change| {
+        let Some(streams) = weak.upgrade() else {
+            return;
+        };
+        let payload = json!({
+            "items": change.items.iter().map(|id| id.0.to_string()).collect::<Vec<_>>(),
+            "parts": change.parts.iter().map(|part| part.as_str()).collect::<Vec<_>>(),
+        });
+        streams.broadcast_event("items-changed", &payload);
+    }));
+    let feed_hub = Arc::clone(&state.progress);
+    let feed_manager = state.services.jobs().clone();
+    let list_manager = feed_manager.clone();
+    tokio::spawn(async move {
+        feed_manager
+            .progress_feed(cv_jobs::PROGRESS_INTERVAL)
+            .run(move |tick| {
+                feed_hub.publish(&tick, || list_manager.list());
+            })
+            .await;
+    })
 }
 
 async fn health(State(state): State<WebState>) -> Response {
@@ -270,7 +130,7 @@ async fn health(State(state): State<WebState>) -> Response {
     .into_response()
 }
 
-fn parse_trust_proxy() -> Vec<IpNet> {
+pub(crate) fn parse_trust_proxy() -> Vec<IpNet> {
     let Ok(value) = std::env::var("CINEVAULT_WEB_TRUST_PROXY") else {
         return Vec::new();
     };
@@ -392,7 +252,7 @@ async fn login_page(
     }
     let plain_http =
         !effective_secure(&headers, peer.ip(), &state.trust_proxy) && !loopback_host(&headers);
-    axum::response::Html(auth::login_page(plain_http)).into_response()
+    axum::response::Html(auth::login_page(plain_http, state.auth.host())).into_response()
 }
 
 fn loopback_host(headers: &HeaderMap) -> bool {
@@ -405,18 +265,33 @@ fn loopback_host(headers: &HeaderMap) -> bool {
         })
 }
 
+/// The browser's own words for itself, kept for the session list.
+fn user_agent(headers: &HeaderMap) -> String {
+    headers
+        .get(header::USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_owned()
+}
+
+/// Whether the request comes from the home network: the socket peer, or the forwarded client
+/// address only when the peer is a trusted proxy.
+fn from_home_network(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> bool {
+    network::is_home_address(client_ip(headers, peer, trust))
+}
+
 async fn setup_page(
     State(state): State<WebState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
 ) -> Response {
-    if state.auth.has_password() {
+    if !state.auth.needs_setup() {
         return Redirect::to("/login").into_response();
     }
-    if state.auth.setup_closed() {
+    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
         return (
             StatusCode::FORBIDDEN,
-            "The setup window has closed. Run `cinevault-server passwd` on the server.",
+            axum::response::Html(auth::away_page()),
         )
             .into_response();
     }
@@ -462,7 +337,10 @@ async fn login(
     Json(body): Json<PasswordBody>,
 ) -> Response {
     let client = client_ip(&headers, peer.ip(), &state.trust_proxy).to_string();
-    match state.auth.login(&body.password, &client) {
+    match state
+        .auth
+        .login(&body.password, &client, &user_agent(&headers))
+    {
         Ok((id, _)) => {
             let mut response = Json(json!({ "ok": true })).into_response();
             set_cookie(
@@ -490,11 +368,22 @@ async fn setup(
     headers: HeaderMap,
     Json(body): Json<SetupBody>,
 ) -> Response {
+    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "message": auth::AuthError::NotHomeNetwork.to_string() })),
+        )
+            .into_response();
+    }
     let claim = auth::cookie(&headers, "cv_setup").unwrap_or_default();
-    match state
-        .auth
-        .set_password(&body.password, &body.confirm, &claim)
-    {
+    let client = client_ip(&headers, peer.ip(), &state.trust_proxy).to_string();
+    match state.auth.set_password(
+        &body.password,
+        &body.confirm,
+        &claim,
+        &client,
+        &user_agent(&headers),
+    ) {
         Ok((id, _)) => {
             let mut response = Json(json!({ "ok": true })).into_response();
             set_cookie(
@@ -524,9 +413,124 @@ async fn setup(
     }
 }
 
+/// The sentence a browser outside the home network gets when it asks for a reset.
+const RESET_AWAY: &str =
+    "Reset the password from your home network, or run `cinevault-server passwd` on the server.";
+
+/// "Forgot password?": writes a one-time PIN to a file in the data folder. Only on the headless
+/// server and only from the home network.
+async fn reset_start(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Response {
+    if let auth::HostMode::Desktop { computer } = state.auth.host() {
+        let message = auth::AuthError::DesktopReset(computer.clone()).to_string();
+        return (StatusCode::FORBIDDEN, Json(json!({ "message": message }))).into_response();
+    }
+    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "message": RESET_AWAY })),
+        )
+            .into_response();
+    }
+    if !state.auth.has_password() {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "message": "No password is set yet. Open the server to create one." })),
+        )
+            .into_response();
+    }
+    let auth = Arc::clone(&state.auth);
+    let started = tokio::task::spawn_blocking(move || auth.start_reset()).await;
+    match started {
+        Ok(Ok(started)) => Json(json!({
+            "ok": true,
+            "created": started.created,
+            "path": started.path.to_string_lossy(),
+            "minutes": auth::PIN_LIFETIME.as_secs() / 60,
+        }))
+        .into_response(),
+        Ok(Err(error)) => {
+            let status = match error {
+                auth::AuthError::ResetTooSoon => StatusCode::TOO_MANY_REQUESTS,
+                auth::AuthError::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                _ => StatusCode::FORBIDDEN,
+            };
+            (status, Json(json!({ "message": error.to_string() }))).into_response()
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ResetBody {
+    pin: String,
+    password: String,
+    confirm: String,
+}
+
+/// Sets a new password with the PIN, ends every other session and signs this browser in.
+async fn reset_finish(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<ResetBody>,
+) -> Response {
+    if let auth::HostMode::Desktop { computer } = state.auth.host() {
+        let message = auth::AuthError::DesktopReset(computer.clone()).to_string();
+        return (StatusCode::FORBIDDEN, Json(json!({ "message": message }))).into_response();
+    }
+    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "message": RESET_AWAY })),
+        )
+            .into_response();
+    }
+    let client = client_ip(&headers, peer.ip(), &state.trust_proxy).to_string();
+    let agent = user_agent(&headers);
+    let auth = Arc::clone(&state.auth);
+    let finished = tokio::task::spawn_blocking(move || {
+        auth.finish_reset(&body.pin, &body.password, &body.confirm, &client, &agent)
+    })
+    .await;
+    match finished {
+        Ok(Ok((id, _))) => {
+            // Every other browser's streams end with their sessions.
+            state.streams.close_all_except(&id);
+            let mut response = Json(json!({ "ok": true })).into_response();
+            set_cookie(
+                &mut response,
+                auth::session_cookie(
+                    &id,
+                    effective_secure(&headers, peer.ip(), &state.trust_proxy),
+                ),
+            );
+            response
+        }
+        Ok(Err(error)) => {
+            let status = match error {
+                auth::AuthError::TooShort | auth::AuthError::Mismatch => StatusCode::BAD_REQUEST,
+                auth::AuthError::Io(_) | auth::AuthError::Hash(_) => {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+                _ => StatusCode::UNAUTHORIZED,
+            };
+            (status, Json(json!({ "message": error.to_string() }))).into_response()
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
 async fn server_info(State(state): State<WebState>, headers: HeaderMap) -> Response {
     let Some((_, _)) = session_of(&state, &headers) else {
         return signed_out();
+    };
+    let (host, computer) = match state.auth.host() {
+        auth::HostMode::Server => ("server", None),
+        auth::HostMode::Desktop { computer } => ("desktop", Some(computer.clone())),
     };
     Json(json!({
         "version": env!("CARGO_PKG_VERSION"),
@@ -534,6 +538,8 @@ async fn server_info(State(state): State<WebState>, headers: HeaderMap) -> Respo
         "port": state.port,
         "sessions": state.auth.live_sessions(),
         "keys": if state.keys_locked { "locked" } else { "configured" },
+        "host": host,
+        "computer": computer,
     }))
     .into_response()
 }
@@ -754,7 +760,7 @@ async fn delete_erase(
     }
 }
 
-fn clean_uploads(data_root: &Path) {
+pub(crate) fn clean_uploads(data_root: &Path) {
     let Ok(entries) = std::fs::read_dir(data_root.join("tmp")) else {
         return;
     };
@@ -1254,7 +1260,7 @@ async fn serve_media(
     // once per 64 KiB chunk.
     let auth = Arc::clone(&state.auth);
     let chunks = ReaderStream::with_capacity(file.take(length), 64 * 1024)
-        .take_while(move |_| auth.session(&session_id).is_some());
+        .take_while(move |_| auth.is_live(&session_id));
     let mut builder = Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, media_type(&canonical))
@@ -1425,6 +1431,79 @@ fn image_response(answer: ImageResponse) -> Response {
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
+/// The content type of an interface file, by its extension.
+fn ui_mime(path: &str) -> &'static str {
+    match Path::new(path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+    {
+        "html" => "text/html; charset=utf-8",
+        "js" => "text/javascript; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "json" => "application/json",
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "woff2" => "font/woff2",
+        "woff" => "font/woff",
+        "ico" => "image/x-icon",
+        "txt" => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    }
+}
+
+/// Reads one interface file: `(bytes, content type, is index.html)`. An unknown path answers
+/// with `index.html`, so a deep link opens the page and the router takes it from there.
+async fn read_ui_file(ui: &UiAssets, requested: &str) -> Option<(Vec<u8>, String, bool)> {
+    let wanted = if requested.is_empty() {
+        "index.html"
+    } else {
+        requested
+    };
+    match ui {
+        UiAssets::Folder(folder) => {
+            let root = tokio::fs::canonicalize(folder).await.ok()?;
+            let mut file = root.join(wanted);
+            if !file.is_file() {
+                file = root.join("index.html");
+            }
+            let canonical = tokio::fs::canonicalize(&file).await.ok()?;
+            // A symlink inside the interface folder must not point at the library either.
+            if !canonical.starts_with(&root) {
+                return None;
+            }
+            let body = fs::read(&canonical).await.ok()?;
+            let name = canonical.to_string_lossy().into_owned();
+            let is_index = canonical
+                .file_name()
+                .is_some_and(|name| name == "index.html");
+            Some((body, ui_mime(&name).to_owned(), is_index))
+        }
+        UiAssets::Embedded(resolve) => {
+            let resolve = Arc::clone(resolve);
+            let wanted = wanted.to_owned();
+            tokio::task::spawn_blocking(move || {
+                if let Some(file) = resolve(&wanted) {
+                    let is_index = wanted == "index.html";
+                    let mime = if file.mime.is_empty() {
+                        ui_mime(&wanted).to_owned()
+                    } else {
+                        file.mime
+                    };
+                    return Some((file.bytes, mime, is_index));
+                }
+                let index = resolve("index.html")?;
+                Some((index.bytes, ui_mime("index.html").to_owned(), true))
+            })
+            .await
+            .ok()
+            .flatten()
+        }
+    }
+}
+
 async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap) -> Response {
     let requested = uri.path().trim_start_matches('/');
     // Nothing but a plain relative path may reach the file system. `..`, an absolute path and a
@@ -1434,12 +1513,10 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
     if relative
         .components()
         .any(|component| !matches!(component, std::path::Component::Normal(_)))
+        || requested.contains('\\')
     {
         return StatusCode::NOT_FOUND.into_response();
     }
-    let Ok(root) = tokio::fs::canonicalize(&state.ui_dir).await else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
     // Only the hashed build files are public; they hold no library data. Everything else needs
     // a session, including a page opened by a deep link.
     let is_asset = relative
@@ -1466,27 +1543,9 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
             percent_encoding::utf8_percent_encode(target, percent_encoding::NON_ALPHANUMERIC);
         return Redirect::to(&format!("/login?next={next}")).into_response();
     }
-    let mut file = root.join(if requested.is_empty() {
-        "index.html"
-    } else {
-        requested
-    });
-    if !file.is_file() {
-        file = root.join("index.html");
-    }
-    let Ok(canonical) = tokio::fs::canonicalize(&file).await else {
+    let Some((mut body, mime, is_index)) = read_ui_file(&state.ui, requested).await else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    // A symlink inside the interface folder must not point at the library either.
-    if !canonical.starts_with(&root) {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-    let Ok(mut body) = fs::read(&canonical).await else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-    let is_index = canonical
-        .file_name()
-        .is_some_and(|name| name == "index.html");
     if is_index {
         let csrf = session
             .as_ref()
@@ -1498,23 +1557,6 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         let text = String::from_utf8_lossy(&body).replace("</head>", &format!("{marker}</head>"));
         body = text.into_bytes();
     }
-    let mime = match canonical
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .unwrap_or("")
-    {
-        "html" => "text/html; charset=utf-8",
-        "js" => "text/javascript; charset=utf-8",
-        "css" => "text/css; charset=utf-8",
-        "json" => "application/json",
-        "svg" => "image/svg+xml",
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "webp" => "image/webp",
-        "woff2" => "font/woff2",
-        "woff" => "font/woff",
-        _ => "application/octet-stream",
-    };
     let cache = if is_index {
         "no-store"
     } else if is_asset {
@@ -1522,15 +1564,18 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
     } else {
         "no-store"
     };
-    (
+    let mut response = (
         [
-            (header::CONTENT_TYPE, mime),
             (header::CACHE_CONTROL, cache),
             (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
         ],
         body,
     )
-        .into_response()
+        .into_response();
+    if let Ok(value) = axum::http::HeaderValue::from_str(&mime) {
+        response.headers_mut().insert(header::CONTENT_TYPE, value);
+    }
+    response
 }
 
 #[cfg(test)]

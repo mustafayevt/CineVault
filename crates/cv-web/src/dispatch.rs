@@ -199,9 +199,9 @@ fn inside_roots(state: &WebState, path: &str) -> Result<(), Value> {
             "message": "The folder must be an absolute path."
         }));
     }
-    let roots = crate::allowed_roots(state);
+    let roots = crate::server::allowed_roots(state);
     let resolved = std::fs::canonicalize(&folder).unwrap_or(folder);
-    if crate::path_inside_roots(&resolved, &roots) {
+    if crate::server::path_inside_roots(&resolved, &roots) {
         Ok(())
     } else {
         Err(json!({
