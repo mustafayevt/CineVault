@@ -6,6 +6,12 @@ window.addEventListener("cinevault:signed-out", () => {
   if (window.location.pathname !== "/login") window.location.assign("/login");
 });
 
+// The stream tells the page when it could not replay what was missed; a reload rebuilds the
+// job and stream state from the server instead of leaving a gap in the channel indices.
+window.addEventListener("cinevault:stream-reset", () => {
+  window.location.reload();
+});
+
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
