@@ -220,9 +220,9 @@ fn passwd(arguments: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn install_logging() {
-    use tracing_subscriber::EnvFilter;
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
-    let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
+    // The shared initialiser reads CINEVAULT_LOG/RUST_LOG and writes through the redacting
+    // writer, so a provider key or a session token can never reach a log line.
+    cv_app::logging::init_with_default("info");
 }
 
 async fn shutdown(state: WebState) {
@@ -369,11 +369,27 @@ fn set_cookie(response: &mut Response, value: String) {
     }
 }
 
-async fn login_page(State(state): State<WebState>) -> Response {
+async fn login_page(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Response {
     if state.auth.needs_setup() {
         return Redirect::to("/setup").into_response();
     }
-    axum::response::Html(auth::login_page()).into_response()
+    let plain_http =
+        !effective_secure(&headers, peer.ip(), &state.trust_proxy) && !loopback_host(&headers);
+    axum::response::Html(auth::login_page(plain_http)).into_response()
+}
+
+fn loopback_host(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|host| {
+            let host = host.to_ascii_lowercase();
+            host.starts_with("127.") || host.starts_with("localhost") || host.starts_with("[::1]")
+        })
 }
 
 async fn setup_page(
@@ -392,9 +408,11 @@ async fn setup_page(
             .into_response();
     }
     let existing = auth::cookie(&headers, "cv_setup");
+    let plain_http =
+        !effective_secure(&headers, peer.ip(), &state.trust_proxy) && !loopback_host(&headers);
     match state.auth.claim_setup(existing.as_deref()) {
         Ok(claim) => {
-            let mut response = axum::response::Html(auth::setup_page()).into_response();
+            let mut response = axum::response::Html(auth::setup_page(plain_http)).into_response();
             set_cookie(
                 &mut response,
                 auth::setup_cookie(

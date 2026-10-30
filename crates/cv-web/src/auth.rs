@@ -426,7 +426,7 @@ pub fn clear_cookie(name: &str, secure: bool) -> String {
 /// The sign-in page. One password field, a show/hide control, Enter submits, and a link that
 /// explains the recovery command.
 #[must_use]
-pub fn login_page() -> String {
+pub fn login_page(plain_http: bool) -> String {
     format!(
         r#"<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -435,6 +435,7 @@ pub fn login_page() -> String {
 <body><main>
 <div class="mark">CineVault</div>
 <h1>Sign in</h1>
+{warning}
 <form id="form">
 <label for="password">Password</label>
 <div class="field"><input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
@@ -461,13 +462,14 @@ form.onsubmit = async (event) => {{
 }};
 </script>
 </body></html>"#,
-        style = PAGE_STYLE
+        style = PAGE_STYLE,
+        warning = plain_http_warning(plain_http)
     )
 }
 
 /// The welcome page shown once, before a password exists.
 #[must_use]
-pub fn setup_page() -> String {
+pub fn setup_page(plain_http: bool) -> String {
     format!(
         r#"<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -485,6 +487,7 @@ pub fn setup_page() -> String {
 <input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="12" required>
 <p class="hint">At least 12 characters. A password manager is a good idea.</p>
 <p id="error" role="alert"></p>
+{warning}
 <button class="primary" type="submit">Create password</button>
 </form>
 <p class="warn">Finish setup before making this server reachable from the internet.</p>
@@ -507,8 +510,17 @@ form.onsubmit = async (event) => {{
 }};
 </script>
 </body></html>"#,
-        style = PAGE_STYLE
+        style = PAGE_STYLE,
+        warning = plain_http_warning(plain_http)
     )
+}
+
+fn plain_http_warning(plain_http: bool) -> &'static str {
+    if plain_http {
+        r#"<p class="warn">This connection is not encrypted. On a network you do not fully trust, put CineVault behind a reverse proxy with HTTPS before signing in.</p>"#
+    } else {
+        ""
+    }
 }
 
 const PAGE_STYLE: &str = r#"
