@@ -210,6 +210,50 @@ fn inside_roots(state: &WebState, path: &str) -> Result<(), Value> {
     }
 }
 
+/// Where a browser may take an artwork image from: a web address, or a file it uploaded to the
+/// server's staging folder (`<data>/tmp/artwork-*`). Anything else, a `file:` address, another
+/// server path, a quoted or `..` path that only looks staged, is refused, so a command cannot
+/// copy a private server file into the media folders or delete one afterwards. Returns the staged
+/// file to remove once it was placed.
+fn artwork_source(uploads: &Path, source: &str) -> Result<Option<std::path::PathBuf>, Value> {
+    let refused = || {
+        json!({
+            "code": "not_allowed",
+            "message": "Upload the image from this browser instead of naming a file on the server."
+        })
+    };
+    // The same trimming the artwork service applies before it reads the source.
+    let text = source.trim().trim_matches(['"', '\'']).trim();
+    let lower = text.to_ascii_lowercase();
+    if lower.starts_with("https://") || lower.starts_with("http://") {
+        return Ok(None);
+    }
+    let path = Path::new(text);
+    let plain = path.components().all(|component| {
+        matches!(
+            component,
+            std::path::Component::Normal(_)
+                | std::path::Component::RootDir
+                | std::path::Component::Prefix(_)
+        )
+    });
+    if !path.is_absolute() || !plain {
+        return Err(refused());
+    }
+    let named = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("artwork-"));
+    let parent = path
+        .parent()
+        .and_then(|parent| std::fs::canonicalize(parent).ok());
+    let staging = std::fs::canonicalize(uploads).ok();
+    if !named || parent.is_none() || parent != staging {
+        return Err(refused());
+    }
+    Ok(Some(path.to_path_buf()))
+}
+
 pub(crate) async fn dispatch(
     state: &WebState,
     cmd: &str,
@@ -993,20 +1037,12 @@ pub(crate) async fn dispatch(
             // A browser may only place an image it uploaded to the server's staging folder. A
             // pasted `file:` address or any other server path would copy a private file into the
             // media folders.
-            let uploads = state.data_root.join("tmp");
-            let path = std::path::PathBuf::from(&source);
-            let staged = path.is_absolute() && path.starts_with(&uploads);
-            if !staged && (path.is_absolute() || source.starts_with("file:")) {
-                return Err(json!({
-                    "code": "not_allowed",
-                    "message": "Upload the image from this browser instead of naming a file on the server."
-                }));
-            }
+            let staged = artwork_source(&state.data_root.join("tmp"), &source)?;
             let placed = cv_ipc::artwork::place_artwork(&commands.artwork, item_id, slot, source)
                 .await
                 .map_err(command_error)
                 .and_then(to_value);
-            if staged {
+            if let Some(path) = staged {
                 let _ = tokio::fs::remove_file(&path).await;
             }
             placed
@@ -1015,10 +1051,20 @@ pub(crate) async fn dispatch(
             let item_id: String = arg(args, "itemId")?;
             let slot: String = arg(args, "slot")?;
             let sources: Vec<String> = arg(args, "sources")?;
-            cv_ipc::artwork::place_extra_artwork(&commands.artwork, item_id, slot, sources)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
+            let uploads = state.data_root.join("tmp");
+            let staged = sources
+                .iter()
+                .map(|source| artwork_source(&uploads, source))
+                .collect::<Result<Vec<_>, _>>()?;
+            let placed =
+                cv_ipc::artwork::place_extra_artwork(&commands.artwork, item_id, slot, sources)
+                    .await
+                    .map_err(command_error)
+                    .and_then(to_value);
+            for path in staged.into_iter().flatten() {
+                let _ = tokio::fs::remove_file(&path).await;
+            }
+            placed
         }
         "download_missing_artwork" => {
             let item_ids: Vec<String> = arg(args, "itemIds")?;
@@ -1959,6 +2005,46 @@ mod tests {
     fn the_development_aids_answer_not_applicable() {
         for name in ["register_image_source", "start_sample_job"] {
             assert!(arm(name).contains("not_applicable("), "{name}");
+        }
+    }
+
+    /// Only a web address or a file in the staging folder may become artwork. A quoted path, a
+    /// `file:` address, a `..` walk out of the staging folder and another server file are refused.
+    #[test]
+    fn artwork_comes_only_from_the_web_or_the_staging_folder() {
+        let data = tempfile::tempdir().unwrap();
+        let uploads = data.path().join("tmp");
+        std::fs::create_dir_all(&uploads).unwrap();
+        let staged = uploads.join("artwork-abc.png");
+        std::fs::write(&staged, b"x").unwrap();
+        let secret = data.path().join("library.db");
+        std::fs::write(&secret, b"x").unwrap();
+
+        assert_eq!(
+            artwork_source(&uploads, "https://image.tmdb.org/a.jpg"),
+            Ok(None)
+        );
+        assert_eq!(
+            artwork_source(&uploads, staged.to_str().unwrap()),
+            Ok(Some(staged.clone()))
+        );
+        let walk = format!("{}/../library.db", uploads.display());
+        let quoted = format!("\"{}\"", secret.display());
+        let file_url = format!("FILE:///{}", secret.display());
+        let walk_named = format!("{}/../artwork-abc.png", uploads.join("x").display());
+        for source in [
+            secret.to_str().unwrap(),
+            walk.as_str(),
+            quoted.as_str(),
+            file_url.as_str(),
+            walk_named.as_str(),
+            "relative/artwork-a.png",
+            "",
+        ] {
+            assert!(
+                artwork_source(&uploads, source).is_err(),
+                "{source} must be refused"
+            );
         }
     }
 
