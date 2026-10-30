@@ -1,0 +1,179 @@
+name: Server
+
+# The browser server's own checks: the Rust workspace, the interface, the container image and the
+# Linux packages. The desktop installers stay in CI and Release; this job is what proves the server
+# packaging still starts and answers its health endpoint.
+#
+# By hand: Actions → Server → Run workflow, or `gh workflow run server.yml --ref <branch>`.
+on:
+  pull_request:
+    paths:
+      - "crates/**"
+      - "cli/**"
+      - "ui/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "package.json"
+      - "bun.lock"
+      - "CHANGELOG.md"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.yml"
+      - "packaging/**"
+      - "scripts/package-server.sh"
+      - "scripts/server-tarball.sh"
+      - "scripts/check-version.mjs"
+      - ".github/workflows/server.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "cli/**"
+      - "ui/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "package.json"
+      - "bun.lock"
+      - "CHANGELOG.md"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.yml"
+      - "packaging/**"
+      - "scripts/package-server.sh"
+      - "scripts/server-tarball.sh"
+      - "scripts/check-version.mjs"
+      - ".github/workflows/server.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: server-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  server:
+    name: Server, image and packages
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-build
+        with:
+          rust-components: rustfmt, clippy
+
+      # The Tauri crate in the workspace embeds ui/dist when it compiles, so the UI is built before
+      # the Rust checks even though the server itself serves the folder at run time.
+      - name: UI install
+        working-directory: ui
+        run: bun install --frozen-lockfile
+
+      - name: UI build
+        working-directory: ui
+        run: bun run build
+
+      - name: Rust format
+        run: cargo fmt --all -- --check
+
+      - name: Rust clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust test
+        run: cargo test --workspace
+
+      - name: Build the container image
+        run: docker build -t cinevault-server:ci .
+
+      - name: Start the container on a fixture data folder
+        run: |
+          set -euo pipefail
+          mkdir -p target/server-ci/data target/server-ci/media
+          chmod 0777 target/server-ci/media
+          docker run -d --name cinevault-server-ci \
+            -p 127.0.0.1:8787:8787 \
+            -v "$PWD/target/server-ci/data:/data" \
+            -v "$PWD/target/server-ci/media:/media" \
+            cinevault-server:ci
+          trap 'docker rm -f cinevault-server-ci >/dev/null 2>&1 || true' EXIT
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8787/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' cinevault-server-ci 2>/dev/null || echo false)" != "true" ]; then
+              echo "The container stopped before /healthz answered." >&2
+              docker logs cinevault-server-ci
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "/healthz did not answer within 60 seconds." >&2
+            docker logs cinevault-server-ci
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:8787/healthz
+          docker rm -f cinevault-server-ci
+          trap - EXIT
+
+      - name: Install package tools
+        run: sudo apt-get update && sudo apt-get install -y rpm libssl3 libdbus-1-3 ca-certificates
+
+      - name: Build the server packages
+        run: bun run server:package
+
+      - name: Server package names carry the version
+        run: node scripts/check-version.mjs --server-artifacts target/server-package
+
+      - name: Install the .deb and start the installed server
+        run: |
+          set -euo pipefail
+          deb="$(ls target/server-package/cinevault-server_*_amd64.deb | head -n 1)"
+          rpm="$(ls target/server-package/cinevault-server-*.rpm | head -n 1)"
+          sudo dpkg -i "$deb"
+          test -x /usr/local/bin/cinevault-server
+          test -x /usr/local/bin/cinevault
+          test -f /usr/share/cinevault/ui/index.html
+          test -f /usr/lib/systemd/system/cinevault-server.service
+          rpm -qip "$rpm" >/dev/null
+          rpm -qlp "$rpm" | grep -qx /usr/local/bin/cinevault-server
+
+          data="$RUNNER_TEMP/cinevault-package-data"
+          log="$RUNNER_TEMP/cinevault-package.log"
+          mkdir -p "$data"
+          CINEVAULT_DATA_DIR="$data" /usr/local/bin/cinevault-server \
+            --ui /usr/share/cinevault/ui --bind 127.0.0.1 --port 8788 >"$log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" >/dev/null 2>&1 || true; wait "$pid" >/dev/null 2>&1 || true' EXIT
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8788/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$pid" >/dev/null 2>&1; then
+              echo "The installed server stopped before /healthz answered." >&2
+              cat "$log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "The installed server's /healthz did not answer within 60 seconds." >&2
+            cat "$log"
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:8788/healthz
+          kill "$pid"
+          wait "$pid" || true
+          trap - EXIT

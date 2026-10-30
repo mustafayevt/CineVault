@@ -1,0 +1,34 @@
+# Build output (the image builds its own release binaries and interface).
+target/
+**/target/
+ui/dist/
+ui/node_modules/
+node_modules/
+
+# Git history and the workflows/screenshots are not part of a build.
+.git/
+.gitignore
+.github/
+
+# Screenshots and site assets.
+.github/assets/
+site/img/
+ui/.shots/
+
+# Local data, secrets and development tools.
+*.local
+*.local.toml
+*.pem
+*.key
+.env
+.env.*
+.cinevault-keys/
+secrets/
+.dev-tools/
+anime-offline-database*.json*
+
+# Editor and OS noise.
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

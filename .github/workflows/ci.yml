@@ -90,6 +90,9 @@ jobs:
       - name: Bundling configuration
         run: node scripts/check-bundle.mjs
 
+      - name: Documented commands exist
+        run: bun run check:scripts
+
       - name: Version files agree
         run: |
           node scripts/check-version.mjs --self-test

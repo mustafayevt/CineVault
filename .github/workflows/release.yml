@@ -6,8 +6,9 @@ name: Release
 #   git switch main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z
 #
 # The Windows (NSIS, MSI, portable zip) and Linux (AppImage, deb, rpm) installers are built in
-# parallel, the tag is checked against the version in src-tauri/tauri.conf.json, and then the
-# release of this repository is published with the installers, their checksums, the notes from
+# parallel, the server image is pushed to GHCR and its .deb, .rpm and tarball are built, the tag is
+# checked against the version files (including the Dockerfile's image version), and then the release
+# of this repository is published with the installers, server packages, checksums, the notes from
 # CHANGELOG.md and the signed update manifest.
 #
 # The signing key is the repository secret CINEVAULT_UPDATE_KEY (the contents of the private key
@@ -119,9 +120,78 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+  server:
+    name: Server image, packages and tarball
+    needs: verify
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      IMAGE: ghcr.io/${{ github.repository_owner }}/cinevault
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-build
+        with:
+          cache-key: server-release
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd ui && bun install --frozen-lockfile
+
+      - name: Install package tools
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # arm64 joins the image once the linux-aarch64 tool manifest entry and a native runner land
+      # (task 7.6). The amd64 image and every package are built from this tag.
+      - name: Build and push the server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            CINEVAULT_VERSION=${{ env.VERSION }}
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Build the server packages and tarball
+        run: |
+          set -euo pipefail
+          bun run server:package
+          bun run server:tarball
+          node scripts/check-version.mjs "$VERSION" \
+            --server-artifacts target/server-package \
+            --server-artifacts target/server-tarball
+          mkdir -p out
+          cp target/server-package/*.deb target/server-package/*.rpm target/server-tarball/*.tar.gz out/
+          test -f "out/cinevault-server_${VERSION}_amd64.deb"
+          test -n "$(find out -maxdepth 1 -name 'cinevault-server-*.rpm' -print -quit)"
+          test -f "out/cinevault-server-${VERSION}-linux-amd64.tar.gz"
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-packages-${{ github.sha }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 3
+
   publish:
     name: Publish the release
-    needs: [verify, build]
+    needs: [verify, build, server]
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     # The build and the tag check are done; only this job can write to the repository.
@@ -154,6 +224,11 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           pattern: installers-*
+          path: dist
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: server-packages-*
           path: dist
 
       - name: Publish

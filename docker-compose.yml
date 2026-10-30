@@ -1,0 +1,36 @@
+# CineVault server on a home server.
+#
+#   docker compose up -d
+#
+# The data folder holds library.db, settings.json, the server session files and downloaded tools.
+# Library folders are mounted read-write: Scan, Rename, artwork and NFO writes all change files
+# beside the media, and the server must be able to write there.
+services:
+  cinevault:
+    image: ghcr.io/mustafayevt/cinevault:latest
+    # Build the image from this checkout instead of pulling it:
+    # build: .
+    container_name: cinevault
+    ports:
+      - "8787:8787"
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      CINEVAULT_DATA_DIR: /data
+      CINEVAULT_WEB_BIND: 0.0.0.0
+      CINEVAULT_WEB_PORT: "8787"
+      # Provider-key master key as a Docker secret. Create ./secrets/cinevault_key first and
+      # uncomment this and the secrets blocks below.
+      # CINEVAULT_SECRET_KEY_FILE: /run/secrets/cinevault_key
+    volumes:
+      - ./data:/data
+      # Library folders MUST be read-write. Add one line per folder (movies, TV, ...).
+      - /path/to/media:/media
+    restart: unless-stopped
+    stop_grace_period: 30s
+    # secrets:
+    #   - cinevault_key
+
+# secrets:
+#   cinevault_key:
+#     file: ./secrets/cinevault_key
