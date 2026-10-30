@@ -294,6 +294,24 @@
         "usage": "Text on the scrim (light in both themes)."
       },
       {
+        "name": "qr-ink",
+        "group": "Artwork",
+        "value": {
+          "dark": "#121211",
+          "light": "#121211"
+        },
+        "usage": "The dark modules of a QR code: dark on light in both themes, so every phone reads it."
+      },
+      {
+        "name": "qr-paper",
+        "group": "Artwork",
+        "value": {
+          "dark": "#ffffff",
+          "light": "#ffffff"
+        },
+        "usage": "The light ground and quiet zone of a QR code, in both themes."
+      },
+      {
         "name": "badge-scrim",
         "group": "Artwork",
         "value": {

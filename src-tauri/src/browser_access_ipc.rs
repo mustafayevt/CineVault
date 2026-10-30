@@ -315,7 +315,7 @@ pub async fn start_on_launch(app: &AppHandle) {
                 )
                 .detail(message.clone())
                 .source("Browser access")
-                .settings_link("/settings?section=browser-access"),
+                .settings_link("/settings/browser-access"),
             );
         }
     } else {
