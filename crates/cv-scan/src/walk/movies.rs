@@ -10,6 +10,7 @@ use regex::Regex;
 use super::tree::{Dir, Entry};
 use super::{ProblemKind, ScanProblem, ScannedFile, ScannedMovie, WalkOptions};
 use crate::classify::classify;
+pub(super) use crate::companion::{is_sibling, normalized_base, stem};
 use crate::parse::{
     CleanTitle, ParsedIds, detect_clean_title_and_year, detect_clean_title_and_year_of_folder,
     detect_edition, detect_ids, detect_media_source,
@@ -381,14 +382,6 @@ fn keep_disc_file(file: &Entry) -> bool {
         || ["video_ts.ifo", "index.bdmv", "hv000i01.ifo"].contains(&lower.as_str())
 }
 
-/// The name without its last extension. A leading dot is not an extension.
-pub(super) fn stem(name: &str) -> &str {
-    match name.rfind('.') {
-        Some(i) if i > 0 => &name[..i],
-        _ => name,
-    }
-}
-
 pub(super) fn extension(name: &str) -> String {
     match name.rfind('.') {
         Some(i) if i > 0 => name[i + 1..].to_lowercase(),
@@ -402,32 +395,6 @@ pub(super) fn join(parent: &str, name: &str) -> String {
     } else {
         format!("{parent}/{name}")
     }
-}
-
-/// The video's base name without extension and without a trailing part marker, so all parts of
-/// a stack give the same text. An empty base name becomes `empty`.
-pub(super) fn normalized_base(file_name: &str) -> String {
-    let without_marker = parse_file_name(file_name).cleaned;
-    let folder_form = parse_folder_name(stem(&without_marker)).cleaned;
-    let trimmed = folder_form
-        .trim_end_matches([' ', '.', '_', '-'])
-        .trim_start()
-        .to_owned();
-    if trimmed.is_empty() {
-        "empty".to_owned()
-    } else {
-        trimmed
-    }
-}
-
-/// `stem` equals the movie's base name or continues it after a space, dot, comma, underscore or
-/// hyphen (`Movie-poster`, `Movie.en`, `Movie.cd1`). Both are lower case.
-pub(super) fn is_sibling(stem: &str, base: &str) -> bool {
-    stem == base
-        || stem
-            .strip_prefix(base)
-            .and_then(|rest| rest.chars().next())
-            .is_some_and(|c| c.is_whitespace() || matches!(c, '.' | ',' | '_' | '-'))
 }
 
 /// Lower-case stems of the videos, raw and without a part marker.
