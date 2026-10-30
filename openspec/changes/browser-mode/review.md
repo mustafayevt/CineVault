@@ -96,7 +96,10 @@ untrusted peer does not bypass it); sign-out; deep link after sign-in; server re
 open (the page returns to sign-in with its address); folder browser with typed paths and the root
 jail (also in the container: `/etc` and `/media/../etc` refused); onboarding to a scanned library;
 grid, table and detail pages; job progress over the event stream; Rename preview, apply and
-History Undo on disk; artwork upload and Undo; delete to the trash folder and Restore (in the
+History Undo on disk; artwork upload and Undo; delete to the trash folder and Restore, including,
+after merging the named-companions delete from `main`, a title in a library folder's root whose
+`.en.srt` and poster were added after the Scan (both went with it, another title's subtitle
+stayed, Restore brought all three back) (in the
 container, with no system bin, delete falls back to `.deletedByCineVault`); Play in Chrome with
 range requests; two sessions streaming while one signs out; every API, image, media and stream
 route without a session (401 or redirect); CSRF token, foreign `Origin`, spoofed
