@@ -201,6 +201,73 @@ fn a_failing_migration_rolls_back_and_keeps_the_version() {
     assert!(object_names(&conn, "table").contains("item"));
 }
 
+#[test]
+fn migration_103_reads_disc_and_mis_mapped_videos_again() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    let before_103: Vec<Migration> = MIGRATIONS
+        .iter()
+        .copied()
+        .filter(|m| m.version < 103)
+        .collect();
+    schema::migrate_with(&mut conn, &before_103).unwrap();
+    let item = insert_item(&conn, "movie", "Example");
+    let video = |name: &str, container: &str, format: &str| -> i64 {
+        conn.execute(
+            "INSERT INTO media_file (item_id, kind, directory, filename, container_format, \
+                                     exact_video_format, width) \
+             VALUES (?1, 'video', 'D:/Movies', ?2, ?3, ?4, 3840)",
+            params![item, name, container, format],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    };
+    let disc = video("BDMV", "m2ts", "2160p");
+    let marker = video("index.bdmv", "m2ts", "2160p");
+    let clip = video("Clip.m2ts", "m2ts", "1080p");
+    let image = video("Film.iso", "mpeg-ps", "480p");
+    let interlaced = video("Concert.mkv", "mkv", "1080i");
+    let dts_x = video("Loud.mkv", "mkv", "2160p");
+    let eac3 = video("Dubbed.mkv", "mkv", "2160p");
+    let plain = video("Film.mkv", "mkv", "2160p");
+    let never_read = video("New.mkv", "", "");
+    for (file, codec, channels) in [
+        (dts_x, "DTS-X", 12),
+        (eac3, "AC3", 8),
+        (plain, "DTS-X", 8),
+        (plain, "AC3", 6),
+    ] {
+        conn.execute(
+            "INSERT INTO stream (media_file_id, kind, codec, channels) VALUES (?1, 'audio', ?2, ?3)",
+            params![file, codec, channels],
+        )
+        .unwrap();
+    }
+
+    schema::migrate(&mut conn).unwrap();
+
+    let container = |id: i64| -> String {
+        conn.query_row(
+            "SELECT container_format FROM media_file WHERE id = ?1",
+            [id],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    for id in [
+        disc, marker, clip, image, interlaced, dts_x, eac3, never_read,
+    ] {
+        assert_eq!(container(id), "", "media file {id} is read again");
+    }
+    assert_eq!(container(plain), "mkv");
+    // The stored details stay until the new read replaces them.
+    let width: i64 = conn
+        .query_row("SELECT width FROM media_file WHERE id = ?1", [disc], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(width, 3840);
+}
+
 // ---- opening: WAL, pragmas, files ------------------------------------------------------------
 
 #[test]
