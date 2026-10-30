@@ -2,6 +2,18 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.1] - unreleased
+
+### Added
+
+- Browser mode installs with one command: on Linux it installs the server package and starts it as a service, on Windows and macOS it sets CineVault up in Docker Desktop. Running the same command again updates CineVault, changes its folders or removes it. There is also an Unraid template and a simpler Docker Compose file.
+
+### Fixed
+
+- A password set with `cinevault-server passwd` as root (with sudo, or `docker exec` without `-u`) now works right away instead of only after a restart.
+- The server packages and tarball are attached to every release again; 1.2.0 was missing them at first.
+- Removing the server `.deb` no longer takes an empty `/usr/local/bin` folder with it.
+
 ## [1.2.0] - 2026-10-30
 
 ### Added
