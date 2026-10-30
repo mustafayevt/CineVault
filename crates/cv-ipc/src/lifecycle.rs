@@ -12,11 +12,13 @@ use cv_app::lifecycle::{
     FlagKind, Lifecycle, LifecycleCounts, LifecycleService, Line, LineLink, LinePart, LineStatus,
     LineStep, Stage,
 };
-use cv_domain::ItemId;
+use cv_domain::{ItemId, ItemKind};
 use serde::Serialize;
 use specta::Type;
 
-use crate::library::{LibraryCommandError, storage};
+use crate::detail::parse_id;
+use crate::library::{LibraryCommandError, LibraryKindDto, blocking, storage};
+use crate::sources::LibraryState;
 
 /// The stage of a title.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
@@ -308,6 +310,56 @@ pub fn service(
     lifecycle
         .cloned()
         .ok_or_else(|| storage("CineVault could not open the library.".to_owned()))
+}
+
+/// The pipeline counts of the movies or the shows: titles per stage, and Needs review, Not
+/// matched, Working, Rename pending, Locked and Missing. Every screen that shows these numbers
+/// reads this command.
+pub async fn lifecycle_counts(
+    library: &LibraryState,
+    kind: LibraryKindDto,
+) -> Result<LifecycleCountsDto, LibraryCommandError> {
+    let item_kind = ItemKind::from(kind);
+    if !matches!(item_kind, ItemKind::Movie | ItemKind::Show) {
+        return Err(LibraryCommandError {
+            code: "bad_filter".to_owned(),
+            message: "Collections have no pipeline.".to_owned(),
+        });
+    }
+    let service = service(library.lifecycle())?;
+    blocking(move || {
+        service
+            .counts(item_kind)
+            .map(LifecycleCountsDto::from)
+            .map_err(LibraryCommandError::from)
+    })
+    .await
+}
+
+/// The stage, flags and explanation lines of the titles `ids` (movies, shows, seasons and
+/// episodes). A title without a lifecycle, such as a collection, is left out.
+pub async fn get_lifecycles(
+    library: &LibraryState,
+    ids: Vec<String>,
+) -> Result<Vec<ItemLifecycleDto>, LibraryCommandError> {
+    let ids = ids
+        .iter()
+        .map(|id| parse_id(id))
+        .collect::<Result<Vec<_>, _>>()?;
+    let service = service(library.lifecycle())?;
+    blocking(move || {
+        let read = service.read(&ids).map_err(LibraryCommandError::from)?;
+        Ok(ids
+            .iter()
+            .filter_map(|id| {
+                read.get(id).map(|lifecycle| ItemLifecycleDto {
+                    id: id.0.to_string(),
+                    lifecycle: lifecycle.into(),
+                })
+            })
+            .collect())
+    })
+    .await
 }
 
 #[cfg(test)]

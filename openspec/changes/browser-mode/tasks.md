@@ -8,9 +8,9 @@
 - [x] 1.4 Move the jobs, notices, move-progress, rating-sweep, tool-install and update channel commands onto `ProgressHub`/`NoticeHub`. Verified by the channel tests and a desktop scan whose progress card updates.
 - [x] 1.5 Move the provider stream engine and its state onto the sink, deleting the Tauri channel adapters from the engine. Verified by a desktop scrape that still streams candidates and by the stream tests.
 - [x] 1.6 Move the scan command module. Verified by the scan tests and a desktop scan, rescan and media info read.
-- [ ] 1.7 Move the match, scrape, preview and artwork command modules. Verified by the match tests and a desktop scrape and artwork change.
-- [ ] 1.8 Move the rename, organize, edit, NFO, collections and lifecycle command modules. Verified by the rename and edit tests and a desktop rename with Undo.
-- [ ] 1.9 Move the library-ops (delete and moves), torrents, tools, updates and onboarding command modules. Verified by their tests and a desktop delete, move and tool install.
+- [x] 1.7 Move the match, scrape, preview and artwork command modules. Verified by the match tests and a desktop scrape and artwork change.
+- [x] 1.8 Move the rename, organize, edit, NFO, collections and lifecycle command modules. Verified by the rename and edit tests and a desktop rename with Undo.
+- [x] 1.9 Move the library-ops (delete and moves), torrents, tools, updates and onboarding command modules. Verified by their tests and a desktop delete, move and tool install.
 - [ ] 1.10 Add the `Platform` trait for desktop-only actions and mark the desktop-only commands in one list. Verified by `cargo test -p cv-ipc` and the desktop app still opening folders and starting a player.
 - [ ] 1.11 Add `CommandRegistry` with generated argument structs (`camelCase`, `deny_unknown_fields`), the channel argument, sync/async and the desktop-only flag; add the parity test against a separate server table. Verified by deleting one dispatcher arm and one argument and seeing the test fail.
 - [ ] 1.12 Rewrite the tests that build Tauri state (`app.state::<X>()` and the mock builders) against `AppContext`, and move the event tests to `EventSink` fakes. Verified by `cargo test --workspace`.

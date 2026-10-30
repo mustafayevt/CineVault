@@ -101,7 +101,7 @@ mod tests {
             PathStyle::current(),
             SystemFolders::new(PathStyle::current()),
         );
-        app.manage(LibraryState::with_guard(&boot, guard));
+        app.manage(LibraryState::with_guard(&services, guard));
         app.manage(ImageState::from_boot(&boot));
         app.manage(ScanState::from_services(boot.services()));
         app.manage(boot);

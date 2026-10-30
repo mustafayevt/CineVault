@@ -165,19 +165,29 @@ fn main() {
             if let Some(services) = boot.services() {
                 changes_ipc::relay(app.handle().clone(), services.changes());
             }
-            let settings = settings_ipc::SettingsState::from_boot(&boot);
-            app.manage(tools_ipc::ToolsState::from_boot(&boot, &settings));
+            let settings = settings_ipc::SettingsState::from_services(boot.services());
+            app.manage(tools_ipc::ToolsState::from_services(
+                boot.services(),
+                &settings,
+            ));
             app.manage(scan_ipc::ScanState::from_services(boot.services()));
             app.manage(drives_ipc::DrivesState::from_boot(&boot, app.handle()));
-            app.manage(match_ipc::MatchState::from_boot(&boot));
+            app.manage(match_ipc::MatchState::from_services(boot.services()));
             app.manage(episode_order_ipc::EpisodeOrderState::from_boot(&boot));
-            app.manage(episode_scrape_ipc::EpisodeScrapeState::from_boot(&boot));
-            app.manage(artwork_ipc::ArtworkState::from_boot(&boot));
+            app.manage(episode_scrape_ipc::EpisodeScrapeState::from_services(
+                boot.services(),
+            ));
+            app.manage(artwork_ipc::ArtworkState::from_services(boot.services()));
             app.manage(providers_ipc::ProvidersState::from_boot(&boot));
             app.manage(curation_ipc::CurationState::default());
             app.manage(collections_ipc::CollectionsState::from_boot(&boot));
             app.manage(activity_ipc::ActivityState::from_boot(&boot));
-            let library = sources_ipc::LibraryState::from_boot(&boot);
+            let library = match boot.services() {
+                Some(services) => sources_ipc::LibraryState::from_services(services),
+                None => sources_ipc::LibraryState::unavailable(
+                    "CineVault could not open the library, so library folders cannot be saved.",
+                ),
+            };
             app.manage(library);
             let images = img_ipc::ImageState::from_boot(&boot);
             app.manage(organize_ipc::OrganizeState::new(Arc::clone(
@@ -195,7 +205,9 @@ fn main() {
             app.manage(notices_ipc::NoticesState::from_boot(&boot));
             app.manage(updates_ipc::UpdatesState::new(&settings));
             app.manage(provider_stream::SearchState::from_services(boot.services()));
-            app.manage(torrent_stream_ipc::TorrentState::from_boot(&boot));
+            app.manage(torrent_stream_ipc::TorrentState::from_services(
+                boot.services(),
+            ));
             app.manage(settings);
             app.manage(boot);
             // Stream job progress to the UI and mirror it to the taskbar and dock.

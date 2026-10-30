@@ -1,15 +1,10 @@
-//! The title lifecycle over IPC: the commands that read the stage, flags and explanation lines of
-//! the titles on a page, and the pipeline counts.
+//! The Tauri surface of the lifecycle commands.
 //!
-//! The rules live in `cv_app::lifecycle`, and the DTOs and read helpers live in
-//! [`cv_ipc::lifecycle`]; this module keeps the two Tauri commands and re-exports the types the
-//! rest of the desktop app imports.
+//! The rules, the DTOs and the command bodies live in [`cv_ipc::lifecycle`].
 
-use cv_domain::ItemKind;
 use tauri::State;
 
-use crate::detail_ipc::parse_id;
-use crate::library_ipc::{LibraryCommandError, LibraryKindDto, blocking};
+use crate::library_ipc::{LibraryCommandError, LibraryKindDto};
 use crate::sources_ipc::LibraryState;
 
 pub use cv_ipc::lifecycle::*;
@@ -23,21 +18,7 @@ pub async fn lifecycle_counts(
     library: State<'_, LibraryState>,
     kind: LibraryKindDto,
 ) -> Result<LifecycleCountsDto, LibraryCommandError> {
-    let item_kind = ItemKind::from(kind);
-    if !matches!(item_kind, ItemKind::Movie | ItemKind::Show) {
-        return Err(LibraryCommandError {
-            code: "bad_filter".to_owned(),
-            message: "Collections have no pipeline.".to_owned(),
-        });
-    }
-    let service = service(library.lifecycle())?;
-    blocking(move || {
-        service
-            .counts(item_kind)
-            .map(LifecycleCountsDto::from)
-            .map_err(LibraryCommandError::from)
-    })
-    .await
+    cv_ipc::lifecycle::lifecycle_counts(&library, kind).await
 }
 
 /// The stage, flags and explanation lines of the titles `ids` (movies, shows, seasons and
@@ -48,24 +29,7 @@ pub async fn get_lifecycles(
     library: State<'_, LibraryState>,
     ids: Vec<String>,
 ) -> Result<Vec<ItemLifecycleDto>, LibraryCommandError> {
-    let ids = ids
-        .iter()
-        .map(|id| parse_id(id))
-        .collect::<Result<Vec<_>, _>>()?;
-    let service = service(library.lifecycle())?;
-    blocking(move || {
-        let read = service.read(&ids).map_err(LibraryCommandError::from)?;
-        Ok(ids
-            .iter()
-            .filter_map(|id| {
-                read.get(id).map(|lifecycle| ItemLifecycleDto {
-                    id: id.0.to_string(),
-                    lifecycle: lifecycle.into(),
-                })
-            })
-            .collect())
-    })
-    .await
+    cv_ipc::lifecycle::get_lifecycles(&library, ids).await
 }
 
 #[cfg(test)]
