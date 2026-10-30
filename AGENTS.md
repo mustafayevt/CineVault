@@ -40,7 +40,8 @@ crates/cv-jobs       background job lanes, progress, cancel and persistence
 crates/cv-torrent    torrent search sources and release ranking
 crates/cv-app        the application services the desktop app, the server and the CLI share
 crates/cv-ipc        the transport-neutral command layer (DTOs, readers, commands, streams)
-crates/cv-web        the browser server: sign-in, HTTP, SSE, folder browser, media
+crates/cv-web        the browser server: sign-in, HTTP, SSE, folder browser, media; a library that
+                     the desktop app embeds for Browser access, plus the `cinevault-server` binary
 crates/cv-compat     the test runner over tests/compat/ (not shipped)
 src-tauri/           Tauri 2 desktop app (thin command wrappers, cv:// image protocol, window chrome)
 cli/                 the `cinevault` command-line binary
