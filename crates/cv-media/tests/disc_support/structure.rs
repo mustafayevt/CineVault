@@ -133,3 +133,33 @@ pub fn mpls(items: &[Item<'_>], marks: &[u8]) -> Vec<u8> {
     file.extend(marks_section);
     file
 }
+
+/// A clip information file (`CLIPINF/nnnnn.clpi`) with one program whose streams are
+/// `(packet id, StreamCodingInfo body)`: the coding type and its attribute bytes, as a disc
+/// stores them.
+pub fn clpi(streams: &[(u16, &[u8])]) -> Vec<u8> {
+    let mut program = Vec::new();
+    program.extend_from_slice(&0_u32.to_be_bytes()); // length, set below
+    program.push(0); // reserved
+    program.push(1); // one program
+    program.extend_from_slice(&0_u32.to_be_bytes()); // SPN of the program sequence
+    program.extend_from_slice(&0x0100_u16.to_be_bytes()); // program map pid
+    program.push(u8::try_from(streams.len()).unwrap());
+    program.push(0); // groups
+    for (pid, coding) in streams {
+        program.extend_from_slice(&pid.to_be_bytes());
+        program.push(u8::try_from(coding.len()).unwrap());
+        program.extend_from_slice(coding);
+    }
+    let length = u32::try_from(program.len() - 4).unwrap();
+    program[0..4].copy_from_slice(&length.to_be_bytes());
+
+    let program_at = 40_u32;
+    let mut file = Vec::new();
+    file.extend_from_slice(b"HDMV0300");
+    file.extend_from_slice(&0_u32.to_be_bytes()); // sequence info
+    file.extend_from_slice(&program_at.to_be_bytes());
+    file.resize(40, 0);
+    file.extend(program);
+    file
+}

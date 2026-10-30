@@ -27,6 +27,7 @@ pub use iso::IsoImage;
 
 use crate::mediainfo::{
     DEFAULT_BUFFER_LIMIT, MediaInfoError, MediaInfoLibrary, MediaSnapshot, StreamKind,
+    bluray_dolby_vision_layer, language, with_dolby_vision_layer,
 };
 
 /// Which kind of disc a title belongs to.
@@ -178,7 +179,49 @@ pub fn analyze_disc(
     if let Some(duration) = title.duration_ms {
         set_duration(&mut snapshot, duration);
     }
+    if title.kind == DiscKind::BluRay
+        && let Some(streams) = bluray::clip_streams(fs, &title.stream_file)
+    {
+        apply_clip_info(&mut snapshot, &streams);
+    }
     Ok(DiscAnalysis { title, snapshot })
+}
+
+/// Adds what the Blu-ray clip information knows and the stream file does not say:
+///
+/// * the **language** of each audio and subtitle stream, which a Blu-ray keeps in its clip
+///   information rather than in the stream file (MediaInfo reads none from most stream files);
+/// * the **Dolby Vision** layer of an Ultra HD Blu-ray, whose enhancement layer the clip
+///   information marks while the stream file often carries no Dolby Vision descriptor for
+///   MediaInfo to find (it then reports a second, plain HEVC stream).
+///
+/// Streams are matched by packet id (MediaInfo's `ID`). What MediaInfo itself reported wins.
+pub fn apply_clip_info(snapshot: &mut MediaSnapshot, clip: &[bluray::ClipStream]) {
+    for kind in [StreamKind::Video, StreamKind::Audio, StreamKind::Text] {
+        for stream in snapshot.streams_mut(kind) {
+            let Some(info) = stream
+                .get_u64("ID")
+                .and_then(|id| clip.iter().find(|c| u64::from(c.pid) == id))
+            else {
+                continue;
+            };
+            if let Some(code) = &info.language
+                && code != "und"
+                && language(stream).is_empty()
+            {
+                let code = crate::external::canonical_language(code).unwrap_or(code);
+                stream.set("Language", code.to_owned());
+            }
+            if kind == StreamKind::Video
+                && info.dynamic_range == Some(bluray::DynamicRange::DolbyVision)
+                && !stream
+                    .get("HDR_Format")
+                    .is_some_and(|f| f.to_ascii_lowercase().contains("dolby vision"))
+            {
+                *stream = with_dolby_vision_layer(stream, &bluray_dolby_vision_layer());
+            }
+        }
+    }
 }
 
 /// Analyses a disc folder (the disc folder itself, such as `.../BDMV`, or the folder that holds
