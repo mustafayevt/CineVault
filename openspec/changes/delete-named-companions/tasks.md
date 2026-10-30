@@ -12,4 +12,4 @@
 
 ## 4. Integration
 
-- [ ] 4.1 `CHANGELOG.md` under Unreleased and `bun run site:changelog`; `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, the delete and changelog UI tests, `openspec validate delete-named-companions --strict` and `openspec validate --specs`. Verified by those commands and CI.
+- [x] 4.1 `CHANGELOG.md` under `## [Unreleased]` and `bun run site:changelog`; `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, the delete and changelog UI tests, `openspec validate delete-named-companions --strict` and `openspec validate --specs`. Verified by those commands and CI.
