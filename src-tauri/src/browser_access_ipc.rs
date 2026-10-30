@@ -45,6 +45,8 @@ pub struct BrowserAccessState {
 struct Inner {
     config: BrowserAccessConfig,
     running: Option<RunningServer>,
+    /// The port and home-network rule the running server was started with.
+    listening: Option<(u16, bool)>,
     problem: Option<Problem>,
 }
 
@@ -126,6 +128,7 @@ impl BrowserAccessState {
             inner: tokio::sync::Mutex::new(Inner {
                 config,
                 running: None,
+                listening: None,
                 problem: None,
             }),
         }
@@ -221,21 +224,31 @@ fn start_server(
 
 /// Brings the server in line with the settings: started, stopped or restarted.
 async fn reconcile(app: &AppHandle, state: &BrowserAccessState, inner: &mut Inner) {
-    if let Some(running) = inner.running.take() {
-        running.stop().await;
-    }
-    inner.problem = None;
     let has_password = state.data_root.as_deref().is_some_and(embed::has_password);
-    if inner.config.enabled && has_password {
-        match start_server(app, &inner.config) {
-            Ok(running) => inner.running = Some(running),
-            Err(error @ StartError::PortInUse { .. }) => {
-                tracing::warn!(%error, "browser access did not start");
-                inner.problem = Some(Problem::PortInUse(error.to_string()));
-            }
-            Err(error) => {
-                tracing::warn!(%error, "browser access did not start");
-                inner.problem = Some(Problem::Error(error.to_string()));
+    let wanted = inner.config.enabled && has_password;
+    let listening = (inner.config.port, inner.config.lan_only);
+    // Only a change of what the server listens for restarts it (and signs browsers out); the
+    // tray option leaves a running server alone.
+    if needs_restart(wanted, inner.listening, listening) {
+        if let Some(running) = inner.running.take() {
+            running.stop().await;
+        }
+        inner.listening = None;
+        inner.problem = None;
+        if wanted {
+            match start_server(app, &inner.config) {
+                Ok(running) => {
+                    inner.running = Some(running);
+                    inner.listening = Some(listening);
+                }
+                Err(error @ StartError::PortInUse { .. }) => {
+                    tracing::warn!(%error, "browser access did not start");
+                    inner.problem = Some(Problem::PortInUse(error.to_string()));
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "browser access did not start");
+                    inner.problem = Some(Problem::Error(error.to_string()));
+                }
             }
         }
     }
@@ -244,6 +257,16 @@ async fn reconcile(app: &AppHandle, state: &BrowserAccessState, inner: &mut Inne
         Ordering::Relaxed,
     );
     sync_tray(app, inner.config.enabled && inner.config.keep_in_tray);
+}
+
+/// Whether the server has to stop or start: it should run and does not run with these settings,
+/// or it runs and should not.
+fn needs_restart(wanted: bool, current: Option<(u16, bool)>, next: (u16, bool)) -> bool {
+    match current {
+        Some(running) => !wanted || running != next,
+        // Not running: try again (a port that was in use may be free now), or clear the problem.
+        None => true,
+    }
 }
 
 fn status(app: &AppHandle, state: &BrowserAccessState, inner: &Inner) -> BrowserAccessDto {
@@ -566,6 +589,7 @@ mod tests {
                         ..BrowserAccessConfig::default()
                     },
                     running: None,
+                    listening: None,
                     problem: None,
                 }),
                 hide_on_close: AtomicBool::new(enabled && tray),
@@ -575,12 +599,23 @@ mod tests {
     }
 
     #[test]
+    fn only_a_listening_change_restarts_a_running_server() {
+        let running = Some((8787, true));
+        assert!(!needs_restart(true, running, (8787, true)));
+        assert!(needs_restart(true, running, (8790, true)));
+        assert!(needs_restart(true, running, (8787, false)));
+        assert!(needs_restart(false, running, (8787, true)));
+        assert!(needs_restart(true, None, (8787, true)));
+    }
+
+    #[test]
     fn a_library_that_did_not_open_offers_nothing() {
         let state = BrowserAccessState {
             data_root: None,
             inner: tokio::sync::Mutex::new(Inner {
                 config: BrowserAccessConfig::default(),
                 running: None,
+                listening: None,
                 problem: None,
             }),
             hide_on_close: AtomicBool::new(false),

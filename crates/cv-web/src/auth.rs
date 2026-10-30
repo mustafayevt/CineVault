@@ -263,6 +263,16 @@ impl Auth {
         })
     }
 
+    /// Whether a data folder has a usable password file, without opening the sign-in state (and
+    /// without touching any other file in the folder).
+    #[must_use]
+    pub fn password_exists(data_dir: &Path) -> bool {
+        std::fs::read(data_dir.join(AUTH_FILE))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<AuthFile>(&bytes).ok())
+            .is_some_and(|file| file.version == VERSION)
+    }
+
     fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
         mutex.lock().unwrap_or_else(PoisonError::into_inner)
     }

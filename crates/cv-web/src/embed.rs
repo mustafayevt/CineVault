@@ -305,13 +305,7 @@ impl RunningServer {
 /// Whether the data folder has a browser password.
 #[must_use]
 pub fn has_password(data_root: &Path) -> bool {
-    Auth::open_as(
-        data_root,
-        HostMode::Desktop {
-            computer: String::new(),
-        },
-    )
-    .is_ok_and(|auth| auth.has_password())
+    Auth::password_exists(data_root)
 }
 
 /// Sets the browser password from the desktop's Settings: the person is at the computer, so no
