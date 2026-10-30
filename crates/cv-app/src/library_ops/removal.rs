@@ -17,6 +17,7 @@ use cv_domain::{Item, ItemId};
 use cv_rename::exec::new_batch_id;
 use cv_scan::skip::MARKER_IGNORE;
 
+use super::companions::{self, Companion};
 use super::trash_bin::{BinError, Binned, BinnedItem, FOLDER_PREFIX, OsTrash, SystemBin};
 use super::{LibraryOpsError, TitleKind, parts_below, unique};
 use crate::history::{HistoryKind, NewEntry, NewTitle, record_in, titles_word};
@@ -46,7 +47,8 @@ pub struct RemovalRow {
     pub source: String,
     pub folder: String,
     pub folder_use: FolderUse,
-    /// Files the library knows for the title and everything below it.
+    /// Files the library knows for the title and everything below it, and, for a title without
+    /// a folder of its own, the files on disk named after its videos.
     pub files: u32,
     pub bytes: u64,
     /// Items below the title (seasons and episodes of a show).
@@ -147,6 +149,9 @@ pub(super) struct Loaded {
     pub(super) tree: Vec<ItemId>,
     pub(super) files: Vec<OwnedFile>,
     pub(super) shared: bool,
+    /// Files on disk named after the title's videos that the library does not record for it,
+    /// found when the title is loaded. Empty for a title with its own folder.
+    pub(super) companions: Vec<Companion>,
 }
 
 impl RemovalService {
@@ -241,10 +246,11 @@ impl RemovalService {
 
     /// Sends the files of the titles to the Recycle Bin / Trash and hides the titles (spec
     /// `title-deletion`). A title with its own folder goes as that folder; a title
-    /// that shares its folder with other titles, or sits in the root of its library folder,
-    /// sends only its own files. A path the bin cannot take (a network or removable drive, a
-    /// drive whose bin is off, an item larger than the bin) or refuses goes to
-    /// the library folder's trash folder instead. Nothing is erased.
+    /// that shares its folder with other titles, or sits in the root of its library folder (and
+    /// an episode), sends only its own files: those the library records and those on disk named
+    /// after its videos (see `companions`). A path the bin cannot take (a network or removable
+    /// drive, a drive whose bin is off, an item larger than the bin) or refuses goes to the
+    /// library folder's trash folder instead. Nothing is erased.
     ///
     /// The titles are hidden, not removed: their rows keep every detail, artwork row and stage,
     /// so the delete's History entry (one for the whole call) brings them back with their files.
@@ -419,9 +425,9 @@ impl RemovalService {
         ids: &[ItemId],
     ) -> Result<(Vec<Loaded>, Vec<Problem>), LibraryOpsError> {
         let ids = unique(ids);
-        Ok(self.db.read(move |conn| {
+        let (loaded, skipped) = self.db.read(move |conn| {
             let mut skipped = Vec::new();
-            let mut loaded: Vec<Loaded> = Vec::new();
+            let mut loaded: Vec<(Loaded, Vec<companions::FolderFacts>)> = Vec::new();
             for id in ids {
                 let item = if is_hidden(conn, id)? {
                     None
@@ -449,22 +455,49 @@ impl RemovalService {
                 let shared = kind.owns_folder()
                     && !item.core.path.is_empty()
                     && !other_items_in_folder(conn, id, &item.core.path)?.is_empty();
-                loaded.push(Loaded {
+                let entry = Loaded {
                     item,
                     kind,
                     tree,
                     files,
                     shared,
-                });
+                    companions: Vec::new(),
+                };
+                // A title without a folder of its own goes file by file: the files named after
+                // its videos are looked for next to them.
+                let facts = if folder_use(&entry) == FolderUse::Own {
+                    Vec::new()
+                } else {
+                    let core = &entry.item.core;
+                    let within = (entry.kind.owns_folder() && !core.path.is_empty())
+                        .then_some(core.path.as_str());
+                    companions::folder_facts(
+                        conn,
+                        &entry.tree,
+                        &entry.files,
+                        within,
+                        &core.data_source,
+                    )?
+                };
+                loaded.push((entry, facts));
             }
             // An episode of a selected show goes with the show.
             let covered: BTreeSet<ItemId> = loaded
                 .iter()
-                .flat_map(|entry| entry.tree.iter().skip(1).copied())
+                .flat_map(|(entry, _)| entry.tree.iter().skip(1).copied())
                 .collect();
-            loaded.retain(|entry| entry.item.id.is_none_or(|id| !covered.contains(&id)));
+            loaded.retain(|(entry, _)| entry.item.id.is_none_or(|id| !covered.contains(&id)));
             Ok((loaded, skipped))
-        })?)
+        })?;
+        // The folders are listed outside the library read.
+        let loaded = loaded
+            .into_iter()
+            .map(|(mut entry, facts)| {
+                entry.companions = companions::find(&facts);
+                entry
+            })
+            .collect();
+        Ok((loaded, skipped))
     }
 
     /// Takes the title and everything below it out of the library, and the scanner's memory of
@@ -575,17 +608,28 @@ fn delete_entry(sent: &[SentTitle]) -> NewEntry {
     }
 }
 
+/// What the title has in its folder.
+fn folder_use(entry: &Loaded) -> FolderUse {
+    let core = &entry.item.core;
+    if !entry.kind.owns_folder() || core.path.is_empty() {
+        return FolderUse::NoFolder;
+    }
+    match parts_below(&core.data_source, &core.path) {
+        None => FolderUse::NoFolder,
+        Some(parts) if parts.is_empty() => FolderUse::SourceRoot,
+        Some(_) if entry.shared => FolderUse::Shared,
+        Some(_) => FolderUse::Own,
+    }
+}
+
 pub(super) fn row_of(entry: &Loaded) -> RemovalRow {
     let core = &entry.item.core;
-    let folder_use = if !entry.kind.owns_folder() || core.path.is_empty() {
-        FolderUse::NoFolder
+    let folder_use = folder_use(entry);
+    // A title with its own folder goes as the folder; its companions list is empty.
+    let named = if folder_use == FolderUse::Own {
+        &[][..]
     } else {
-        match parts_below(&core.data_source, &core.path) {
-            None => FolderUse::NoFolder,
-            Some(parts) if parts.is_empty() => FolderUse::SourceRoot,
-            Some(_) if entry.shared => FolderUse::Shared,
-            Some(_) => FolderUse::Own,
-        }
+        &entry.companions[..]
     };
     RemovalRow {
         id: entry.item.id.unwrap_or(ItemId(0)),
@@ -595,8 +639,9 @@ pub(super) fn row_of(entry: &Loaded) -> RemovalRow {
         source: core.data_source.clone(),
         folder: core.path.clone(),
         folder_use,
-        files: u32::try_from(entry.files.len()).unwrap_or(u32::MAX),
-        bytes: entry.files.iter().map(|file| file.size_bytes).sum(),
+        files: u32::try_from(entry.files.len() + named.len()).unwrap_or(u32::MAX),
+        bytes: entry.files.iter().map(|file| file.size_bytes).sum::<u64>()
+            + named.iter().map(|file| file.size).sum::<u64>(),
         children: u32::try_from(entry.tree.len().saturating_sub(1)).unwrap_or(u32::MAX),
         on_disk: !core.path.is_empty() && Path::new(&core.path).is_dir(),
     }
@@ -611,8 +656,9 @@ fn skip_reason(row: &RemovalRow) -> String {
     }
 }
 
-/// The paths that go to the trash: the folder of a title that owns it, else its files that exist.
-/// Every path must lie strictly inside the title's data source.
+/// The paths that go to the trash: the folder of a title that owns it, else its files that exist
+/// and the files named after its videos. Every path must lie strictly inside the title's data
+/// source.
 pub(super) fn paths_to_trash(entry: &Loaded, row: &RemovalRow) -> Result<Vec<PathBuf>, String> {
     let inside = |path: &str| parts_below(&row.source, path).is_some_and(|parts| !parts.is_empty());
     if row.folder_use == FolderUse::Own {
@@ -638,6 +684,17 @@ pub(super) fn paths_to_trash(entry: &Loaded, row: &RemovalRow) -> Result<Vec<Pat
         let path = PathBuf::from(path);
         if path.symlink_metadata().is_ok() && !out.contains(&path) {
             out.push(path);
+        }
+    }
+    for file in &entry.companions {
+        let text = file.path.to_string_lossy();
+        if !inside(&text) {
+            return Err(format!(
+                "{text} is not inside its data source, so nothing was deleted."
+            ));
+        }
+        if file.path.symlink_metadata().is_ok() && !out.contains(&file.path) {
+            out.push(file.path.clone());
         }
     }
     Ok(out)

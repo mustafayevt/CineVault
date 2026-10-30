@@ -149,20 +149,20 @@ describe("Delete from the Library", () => {
 
   it("hides the title from the list at once and brings it back when the backend refuses it", async () => {
     const user = userEvent.setup();
+    // The backend answers only when the test says so, after it has looked at the list: a timer
+    // here raced the test on a slow machine, which then saw the title back before it looked.
+    const pending: { answer: (() => void) | null } = { answer: null };
     const backend: HistoryBackend = {
       ...createSyntheticHistoryBackend(),
       deleteTitles: (ids) =>
         new Promise((resolve) => {
-          // The answer comes only after the test has looked at the list.
-          setTimeout(
-            () =>
-              resolve({
-                deleted: [],
-                refused: ids.map((id) => ({ id, title: "Heat", reason: "Its drive is offline." })),
-                entry_id: null,
-              }),
-            200,
-          );
+          pending.answer = () => {
+            resolve({
+              deleted: [],
+              refused: ids.map((id) => ({ id, title: "Heat", reason: "Its drive is offline." })),
+              entry_id: null,
+            });
+          };
         }),
     };
     setHistoryBackend(backend);
@@ -173,6 +173,8 @@ describe("Delete from the Library", () => {
     await user.keyboard("{Delete}");
     await user.click(await screen.findByTestId("confirm-delete"));
     await waitFor(() => expect(filters.textContent).toMatch(/180 movies/));
+    await waitFor(() => expect(pending.answer).not.toBeNull());
+    pending.answer?.();
     await waitFor(() => expect(filters.textContent).toMatch(/181 movies/));
   });
 

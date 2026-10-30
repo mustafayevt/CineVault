@@ -4,6 +4,10 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ## [Unreleased]
 
+### Changed
+
+- Deleting a title that shares its folder with other titles, or sits directly in a library folder, now also removes the subtitles, posters, NFO files, trailers and other files named after it, even ones added since the last Scan. Deleting an episode does the same for its files. Files of the other titles stay, the confirmation counts the extra files, and Undo brings them back.
+
 ### Fixed
 
 - Ultra HD Blu-ray folders and images with Dolby Vision now show Dolby Vision (profile 7) next to HDR10. The disc's second video layer was taken for a plain HDR10 stream, so only HDR10 was shown.

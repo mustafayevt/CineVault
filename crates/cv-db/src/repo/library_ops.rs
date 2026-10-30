@@ -131,6 +131,30 @@ pub fn other_items_in_folder(
     Ok(ids)
 }
 
+/// Every file the library records directly in `folder` (not below it), whoever owns it: the
+/// titles, episodes and collections. Paths compare by the platform's case rule.
+pub fn files_in_folder(conn: &Connection, folder: &str) -> DbResult<Vec<OwnedFile>> {
+    let folder = folder.trim_end_matches(['\\', '/']);
+    let sql = format!(
+        "SELECT item_id, directory, filename, size_bytes FROM media_file \
+          WHERE {} = {} ORDER BY id",
+        fold(r"rtrim(directory, '\/')"),
+        fold("?1"),
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let files = stmt
+        .query_map([folder], |row| {
+            Ok(OwnedFile {
+                item_id: ItemId(row.get(0)?),
+                directory: row.get(1)?,
+                filename: row.get(2)?,
+                size_bytes: u64::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(files)
+}
+
 /// Deletes the scan fingerprints of every file under `folder`, so the next scan sees the files
 /// as new. Returns how many rows were deleted.
 pub fn delete_fingerprints_under(conn: &Connection, folder: &str) -> DbResult<usize> {
@@ -277,6 +301,31 @@ mod tests {
         assert_eq!(
             other_items_in_folder(&conn, sibling, r"d:\movies\heat 2").unwrap(),
             Vec::<ItemId>::new()
+        );
+    }
+
+    #[test]
+    fn files_in_a_folder_are_listed_for_every_owner_but_not_below_it() {
+        let conn = memory_db();
+        let alien = insert_item(&conn, &movie("Alien", r"D:\Movies\Mixed", "alien.mkv")).unwrap();
+        let heat = insert_item(&conn, &movie("Heat", r"D:\Movies\Mixed", "heat.mkv")).unwrap();
+        insert_item(
+            &conn,
+            &movie("Ronin", r"D:\Movies\Mixed\Ronin", "ronin.mkv"),
+        )
+        .unwrap();
+        insert_item(&conn, &movie("Up", r"D:\Movies\Mixed 2", "up.mkv")).unwrap();
+
+        let files = files_in_folder(&conn, r"D:\Movies\Mixed\").unwrap();
+        let owners: Vec<(ItemId, &str)> = files
+            .iter()
+            .map(|f| (f.item_id, f.filename.as_str()))
+            .collect();
+        assert_eq!(owners, [(alien, "alien.mkv"), (heat, "heat.mkv")]);
+        let folded = files_in_folder(&conn, r"d:\movies\mixed").unwrap();
+        assert_eq!(
+            folded.len(),
+            if cv_fs::paths::CASE_SENSITIVE { 0 } else { 2 }
         );
     }
 

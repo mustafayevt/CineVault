@@ -31,6 +31,7 @@
 
 pub(crate) mod bin_volumes;
 mod change_source;
+mod companions;
 mod erase;
 mod move_engine;
 mod move_plan;

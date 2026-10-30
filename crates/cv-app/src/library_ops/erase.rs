@@ -7,7 +7,7 @@
 //! 1. the caller passes the literal confirmation [`ERASE_CONFIRMATION`] the person typed;
 //! 2. a title on a drive that is offline, a path outside its library folder, a path that is a
 //!    library folder's root or holds one, and a folder other titles share (only the title's own
-//!    files go) are refused;
+//!    files go, with the files named after its videos) are refused;
 //! 3. the History entry is written first, with every path it is about to erase;
 //! 4. titles are erased one by one, file by file, with the short retries of `cv-fs`; a title stops
 //!    at its first file that cannot be erased and keeps the rest, the other titles go on;
