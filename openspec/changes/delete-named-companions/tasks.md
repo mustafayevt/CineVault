@@ -8,7 +8,7 @@
 
 ## 3. Delete
 
-- [ ] 3.1 `library_ops/companions.rs` finds the files named after a title in the folders of its videos; `load` keeps them for titles without a folder of their own, `row_of` counts them and `paths_to_trash` adds them, so the delete to the bin, its History entry, Undo and the permanent delete take them. Verified by `cargo test -p cv-app --lib library_ops` (shared folder, library folder root, episode, the collision names, a sub-folder, the preview count, Undo, permanent delete, an own folder unchanged).
+- [x] 3.1 `library_ops/companions.rs` finds the files named after a title in the folders of its videos; `load` keeps them for titles without a folder of their own, `row_of` counts them and `paths_to_trash` adds them, so the delete to the bin, its History entry, Undo and the permanent delete take them. Verified by `cargo test -p cv-app --lib library_ops` (shared folder, library folder root, episode, the collision names, a sub-folder, the preview count, Undo, permanent delete, an own folder unchanged).
 
 ## 4. Integration
 

@@ -19,6 +19,7 @@ mod edges;
 mod faults;
 mod guards;
 mod moves;
+mod named;
 mod recovery;
 mod rename_stops;
 mod safety;
