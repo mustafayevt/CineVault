@@ -4,7 +4,7 @@
 
 ## 2. Library query
 
-- [ ] 2.1 `cv_db::repo::library_ops::files_in_folder`: every file the library records directly in a folder, by the platform's case rule, not below it. Verified by `cargo test -p cv-db --lib library_ops`.
+- [x] 2.1 `cv_db::repo::library_ops::files_in_folder`: every file the library records directly in a folder, by the platform's case rule, not below it. Verified by `cargo test -p cv-db --lib library_ops`.
 
 ## 3. Delete
 
