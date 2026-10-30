@@ -68,6 +68,12 @@ services:
 docker compose up -d
 ```
 
+
+<picture>
+  <source srcset="site/img/server-login-light.webp" media="(prefers-color-scheme: light)">
+  <img src="site/img/server-login-dark.webp" width="1440" height="900" alt="The CineVault server sign-in page: one password field, a show/hide control and the recovery note">
+</picture>
+
 Open `http://<server>:8787`. The first visit creates the password; then the normal setup adds the
 library folder, the TMDB key and the naming profile. The library folders must be readable and
 writable by the server, because Scan, Scrape and Rename write NFO and artwork next to the media.
