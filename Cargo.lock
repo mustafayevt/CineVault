@@ -724,6 +724,7 @@ dependencies = [
  "cv-artwork",
  "cv-db",
  "cv-domain",
+ "cv-ipc",
  "cv-jobs",
  "cv-media",
  "cv-nfo",
@@ -1199,6 +1200,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "cv-ipc"
+version = "1.1.1"
+dependencies = [
+ "cv-app",
+ "cv-artwork",
+ "cv-db",
+ "cv-domain",
+ "cv-media",
+ "cv-nfo",
+ "cv-template",
+ "serde",
+ "serde_json",
+ "specta",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "cv-jobs"
 version = "1.1.1"
 dependencies = [
@@ -1353,6 +1374,23 @@ dependencies = [
  "tracing",
  "unicode-normalization",
  "win32job",
+]
+
+[[package]]
+name = "cv-web"
+version = "1.1.1"
+dependencies = [
+ "axum",
+ "cv-app",
+ "cv-artwork",
+ "cv-db",
+ "cv-domain",
+ "cv-ipc",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

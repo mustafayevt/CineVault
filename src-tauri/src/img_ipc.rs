@@ -1,8 +1,10 @@
 //! The `cv://img/<key>/<size>` protocol and the command that tells it where an image lives.
 //!
-//! The protocol handler is a thin adapter: the rules (URL parsing, cache headers, lazy
-//! generation) live in `cv_artwork::img`. Images never cross IPC. The UI puts the URL in
-//! `<img src>`, and the web view fetches and caches it. The only command here moves a key.
+//! The protocol handler is a thin adapter over [`cv_ipc::image::ImageContext`]: the rules (URL
+//! parsing, cache headers, lazy generation) live in `cv_artwork::img`, and the poster index and
+//! the service over the thumbnail cache live in the shared context. Images never cross IPC. The UI
+//! puts the URL in `<img src>`, and the web view fetches and caches it. The only command here moves
+//! a key.
 
 #[cfg(debug_assertions)]
 use std::path::PathBuf;
@@ -10,7 +12,9 @@ use std::sync::Arc;
 
 use cv_artwork::img::{ImageRequest, ImageResponse, ImageService};
 use cv_artwork::library_source::LibrarySources;
-use cv_artwork::thumb::{DEFAULT_MAX_BYTES, ThumbCache};
+#[cfg(test)]
+use cv_artwork::thumb::ThumbCache;
+use cv_ipc::image::ImageContext;
 #[cfg(debug_assertions)]
 use serde::Serialize;
 #[cfg(debug_assertions)]
@@ -22,49 +26,37 @@ use tauri::{Manager, Runtime, UriSchemeContext, UriSchemeResponder};
 
 use crate::boot::Boot;
 
-/// Held in Tauri state: the library's key-to-file index and the protocol service over the
-/// thumbnail cache.
-pub struct ImageState {
-    sources: Arc<LibrarySources>,
-    service: Option<ImageService>,
-}
+/// Held in Tauri state: the library's key-to-file index and the image service over the thumbnail
+/// cache, as [`ImageContext`] holds them.
+pub struct ImageState(ImageContext);
 
 impl ImageState {
-    /// The thumbnail cache the app services opened in the data folder's cache folder. When the
-    /// services could not start, a cache under the temp folder serves for this session.
+    /// The index and service over the app services' thumbnail cache. When the services could not
+    /// start, a cache under the temp folder serves for this session.
     pub fn from_boot(boot: &Boot) -> Self {
         if let Some(services) = boot.services() {
-            return Self::with_cache(Some(Arc::clone(services.thumbs())));
+            return Self(ImageContext::from_services(services));
         }
-        let fallback = std::env::temp_dir().join("cinevault-cache");
-        let cache = match ThumbCache::open(&fallback, Some(DEFAULT_MAX_BYTES)) {
-            Ok(cache) => Some(Arc::new(cache)),
-            Err(error) => {
-                tracing::warn!(%error, "cannot open the thumbnail cache");
-                None
-            }
-        };
-        Self::with_cache(cache)
+        Self(ImageContext::with_temp_cache())
     }
 
+    #[cfg(test)]
     fn with_cache(cache: Option<Arc<ThumbCache>>) -> Self {
-        // The path-to-key map is saved beside the thumbnails, so a poster whose folder is offline
-        // still shows its cached thumbnail after a restart.
-        let sources = Arc::new(match &cache {
-            Some(cache) => LibrarySources::with_store(cache.root().join("poster-keys.json")),
-            None => LibrarySources::new(),
-        });
-        let service = cache.map(|cache| ImageService::new(cache, sources.clone()));
-        Self { sources, service }
+        Self(ImageContext::with_cache(cache))
     }
 
     /// The index the library queries fill with each poster's key and file.
     pub fn sources(&self) -> &Arc<LibrarySources> {
-        &self.sources
+        self.0.sources()
     }
 
     pub fn service(&self) -> Option<&ImageService> {
-        self.service.as_ref()
+        self.0.service()
+    }
+
+    /// The context the protocol handler answers from, cloned so it can move to a blocking thread.
+    fn context(&self) -> ImageContext {
+        self.0.clone()
     }
 }
 
@@ -83,17 +75,16 @@ fn to_http(response: ImageResponse) -> http::Response<Vec<u8>> {
 }
 
 /// Answer one request. Blocking: lazy generation decodes and encodes images.
-fn serve(service: &ImageService, request: &http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
+fn serve(images: &ImageContext, request: &http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
     let if_none_match = request
         .headers()
         .get(header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok());
-    let answer = service.handle(&ImageRequest {
+    to_http(images.handle(&ImageRequest {
         method: request.method().as_str(),
         path: request.uri().path(),
         if_none_match,
-    });
-    to_http(answer)
+    }))
 }
 
 /// The handler registered for the `cv` scheme.
@@ -104,11 +95,11 @@ pub fn handle_protocol<R: Runtime>(
 ) {
     // A request that comes before the app has set up its state gets "not ready", not a panic in
     // the web view's callback.
-    let service = context
+    let images = context
         .app_handle()
         .try_state::<ImageState>()
-        .and_then(|state| state.service().cloned());
-    let Some(service) = service else {
+        .map(|state| state.context());
+    let Some(images) = images else {
         responder.respond(
             http::Response::builder()
                 .status(503)
@@ -119,7 +110,7 @@ pub fn handle_protocol<R: Runtime>(
         return;
     };
     tauri::async_runtime::spawn_blocking(move || {
-        responder.respond(serve(&service, &request));
+        responder.respond(serve(&images, &request));
     });
 }
 
@@ -190,7 +181,7 @@ mod tests {
         std::fs::write(&file, png()).unwrap();
         let state = state(tmp.path());
         let key = state.sources().manual().register_file(&file).unwrap();
-        let service = state.service().unwrap().clone();
+        let images = state.context();
 
         // Windows and Android: http://cv.localhost/<encoded path>; others: cv://localhost/<path>.
         let urls = [
@@ -198,7 +189,7 @@ mod tests {
             format!("cv://localhost/img/{key}/grid"),
         ];
         for url in urls {
-            let response = serve(&service, &request(&url, None));
+            let response = serve(&images, &request(&url, None));
             assert_eq!(response.status(), 200, "{url}");
             let headers = response.headers();
             assert_eq!(headers[header::CONTENT_TYPE], "image/webp");
@@ -209,7 +200,7 @@ mod tests {
             assert_eq!(headers[header::ETAG], format!("\"{key}-grid\"").as_str());
             assert!(response.body().starts_with(b"RIFF"));
         }
-        assert_eq!(service.cache().generations(), 1);
+        assert_eq!(state.service().unwrap().cache().generations(), 1);
     }
 
     #[test]
@@ -219,21 +210,16 @@ mod tests {
         std::fs::write(&file, png()).unwrap();
         let state = state(tmp.path());
         let key = state.sources().manual().register_file(&file).unwrap();
-        let service = state.service().unwrap().clone();
+        let images = state.context();
         let url = format!("http://cv.localhost/img%2F{key}%2Flist");
 
-        let first = serve(&service, &request(&url, None));
+        let first = serve(&images, &request(&url, None));
         let tag = first.headers()[header::ETAG].to_str().unwrap().to_owned();
-        let again = serve(&service, &request(&url, Some(&tag)));
+        let again = serve(&images, &request(&url, Some(&tag)));
         assert_eq!(again.status(), 304);
         assert!(again.body().is_empty());
 
         let missing = format!("http://cv.localhost/img%2F{}%2Flist", "0".repeat(32));
-        assert_eq!(serve(&service, &request(&missing, None)).status(), 404);
-    }
-
-    #[test]
-    fn a_state_without_a_cache_has_no_service() {
-        assert!(ImageState::with_cache(None).service().is_none());
+        assert_eq!(serve(&images, &request(&missing, None)).status(), 404);
     }
 }

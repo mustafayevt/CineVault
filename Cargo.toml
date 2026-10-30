@@ -24,6 +24,7 @@ cv-artwork = { path = "crates/cv-artwork" }
 cv-rename = { path = "crates/cv-rename" }
 cv-jobs = { path = "crates/cv-jobs" }
 cv-app = { path = "crates/cv-app" }
+cv-ipc = { path = "crates/cv-ipc" }
 cv-torrent = { path = "crates/cv-torrent" }
 
 # Third-party
