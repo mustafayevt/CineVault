@@ -179,8 +179,8 @@ function MoveToItems({ ids, kind, label, keyboard }: MoveToItemsProps) {
             </p>
             {[0, 1].map((row) => (
               <div key={row} aria-hidden="true" className="flex flex-col gap-1.5 px-2.5 py-2">
-                <Skeleton shape="line" width="55%" immediate />
-                <Skeleton shape="line" width="80%" immediate />
+                <Skeleton shape="line" width="55%" />
+                <Skeleton shape="line" width="80%" />
               </div>
             ))}
           </>
