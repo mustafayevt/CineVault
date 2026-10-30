@@ -3,6 +3,9 @@
 //! `GET {base}/api/get-torrents?imdb_id={digits}&limit=100&page={n}`. Up to three pages are
 //! read while `torrents_count` says there is more. Season and episode filtering is left to the
 //! relevance check, which also shows season packs. TV only.
+//!
+//! The newest releases for the feed: the same call without `imdb_id`, 100 a page, paged with
+//! `page` while `torrents_count` says there are more.
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -12,6 +15,7 @@ use serde::Deserialize;
 use std::sync::LazyLock;
 
 use super::{flexible_u16, flexible_u32, flexible_u64};
+use crate::latest::{FeedKind, FeedSkip, FeedSupport, LatestAnswer};
 use crate::magnet::{normalise_info_hash, validate_magnet};
 use crate::model::{
     MediaKind, RawRelease, SkipReason, SourceError, SourceId, SourceKind, Support, TorrentQuery,
@@ -102,7 +106,9 @@ fn read_item(item: Item) -> Option<RawRelease> {
             .and_then(|secs| DateTime::from_timestamp(secs, 0)),
         imdb: item
             .imdb_id
-            .map(|id| format!("tt{}", id.trim_start_matches("tt"))),
+            .map(|id| id.trim().trim_start_matches("tt").to_owned())
+            .filter(|digits| !digits.is_empty() && digits.bytes().any(|b| b != b'0'))
+            .map(|digits| format!("tt{digits}")),
         season: flexible_u16(item.season.as_ref()).filter(|s| *s > 0),
         episode: flexible_u16(item.episode.as_ref()).filter(|e| *e > 0),
         ..RawRelease::default()
@@ -213,6 +219,53 @@ impl TorrentSource for EztvSource {
             }
         }
         Ok(out)
+    }
+
+    fn latest_support(&self, kind: FeedKind) -> FeedSupport {
+        if kind.wants_tv() {
+            FeedSupport::Yes
+        } else {
+            FeedSupport::Skip(FeedSkip::TvOnly)
+        }
+    }
+
+    /// `get-torrents?limit=100&page={n}` with no IMDb ID: the newest releases of every show.
+    async fn latest(
+        &self,
+        _kind: FeedKind,
+        page: u32,
+        _context: &SearchContext,
+    ) -> Result<LatestAnswer, SourceError> {
+        let url = format!("{}/api/get-torrents", self.base_url);
+        let limit = PAGE_SIZE.to_string();
+        let page_number = (page + 1).to_string();
+        let answer: Answer = self
+            .http
+            .get_json(&url, &[("limit", &limit), ("page", &page_number)])
+            .await?;
+        self.latest_page(answer, page)
+    }
+}
+
+impl EztvSource {
+    /// A page of the newest releases and whether `torrents_count` says there are more.
+    fn latest_page(&self, answer: Answer, page: u32) -> Result<LatestAnswer, SourceError> {
+        check_status(&answer)?;
+        let total = flexible_u64(answer.torrents_count.as_ref()).unwrap_or(0);
+        let got = answer.torrents.len();
+        let rows = answer
+            .torrents
+            .into_iter()
+            .filter_map(read_item)
+            .map(|mut row| {
+                row.details_url = row
+                    .details_url
+                    .map(|path| format!("{}{path}", self.base_url));
+                row
+            })
+            .collect();
+        let more = got > 0 && u64::from(page + 1) * u64::from(PAGE_SIZE) < total;
+        Ok(LatestAnswer::Page { rows, more })
     }
 }
 

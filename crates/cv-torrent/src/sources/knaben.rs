@@ -6,6 +6,10 @@
 //! The adult, unsafe and dead filters stay at the site's defaults (off). The v1 field names
 //! (`title`, `hash`, `magnetUrl`, `bytes`, `seeders`, `peers`, `date`) are the same as v2's;
 //! `liveSeeders` and `livePeers` are read only when the plain counts are missing.
+//!
+//! The newest releases for the feed come from the v1 interface, which can list without search
+//! words: `POST {base}/v1` with `order_by: date`, the movie (`3000000`) and TV (`2000000`)
+//! categories, `hide_xxx` and `hide_unsafe` on, and `from`/`size` paging (100 a page).
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -13,6 +17,7 @@ use cv_providers::http::HttpClient;
 use serde::Deserialize;
 
 use super::{flexible_u32, flexible_u64, run_text_queries};
+use crate::latest::{FeedKind, FeedSupport, LatestAnswer};
 use crate::magnet::{normalise_info_hash, validate_magnet};
 use crate::model::{RawRelease, SourceError, SourceId, SourceKind, Support, TorrentQuery};
 use crate::source::{SearchContext, SourceHttp, TorrentSource};
@@ -21,6 +26,33 @@ use crate::source::{SearchContext, SourceHttp, TorrentSource};
 pub const ID: &str = "knaben";
 /// Hits asked for per query.
 pub const HITS_PER_QUERY: &str = "300";
+/// Releases asked for per page of the newest releases.
+pub const LATEST_PAGE_SIZE: u32 = 100;
+/// Knaben's movie category.
+pub const MOVIE_CATEGORY: u64 = 3_000_000;
+/// Knaben's TV category.
+pub const TV_CATEGORY: u64 = 2_000_000;
+
+/// The body of a request for one page of the newest releases of `kind`.
+#[must_use]
+pub fn latest_body(kind: FeedKind, page: u32) -> serde_json::Value {
+    let mut categories = Vec::new();
+    if kind.wants_movies() {
+        categories.push(MOVIE_CATEGORY);
+    }
+    if kind.wants_tv() {
+        categories.push(TV_CATEGORY);
+    }
+    serde_json::json!({
+        "order_by": "date",
+        "order_direction": "desc",
+        "categories": categories,
+        "from": u64::from(page) * u64::from(LATEST_PAGE_SIZE),
+        "size": LATEST_PAGE_SIZE,
+        "hide_unsafe": true,
+        "hide_xxx": true,
+    })
+}
 
 #[derive(Debug, Deserialize)]
 struct Answer {
@@ -148,6 +180,28 @@ impl TorrentSource for KnabenSource {
             }
         })
         .await
+    }
+
+    fn latest_support(&self, _kind: FeedKind) -> FeedSupport {
+        FeedSupport::Yes
+    }
+
+    async fn latest(
+        &self,
+        kind: FeedKind,
+        page: u32,
+        _context: &SearchContext,
+    ) -> Result<LatestAnswer, SourceError> {
+        let url = format!("{}/v1", self.base_url);
+        let response = self
+            .http
+            .post_json_raw(&url, &latest_body(kind, page))
+            .await?;
+        let answer: Answer = crate::source::parse_json(&response)?;
+        let got = answer.hits.len();
+        let rows = read_answer(answer);
+        let more = got >= LATEST_PAGE_SIZE as usize;
+        Ok(LatestAnswer::Page { rows, more })
     }
 }
 
