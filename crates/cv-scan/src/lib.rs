@@ -1,6 +1,7 @@
 //! Data-source scanning: parallel walker, file classification and name parsers.
 //!
 //! - [`classify`]: file-type classification by path (video, trailer, extras, artwork, disc files).
+//! - [`companion`]: which video a file belongs to by its name in a folder several titles share.
 //! - [`episode`]: the episode and season parser for TV files.
 //! - [`lock`]: the per-data-source lock rescans and file moves share.
 //! - [`parse`]: movie name parsers (title, year, edition, media source, provider IDs).
@@ -15,6 +16,7 @@
 //!   episodes.
 
 pub mod classify;
+pub mod companion;
 pub mod episode;
 mod gate;
 pub mod lock;

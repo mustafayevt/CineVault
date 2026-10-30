@@ -1,6 +1,6 @@
 ## 1. Name rules in the scanner
 
-- [ ] 1.1 Public `cv_scan::companion` module: `stem`, `normalized_base` and `is_sibling` moved from the movie walker (which re-exports them), plus `video_bases`, `is_plain_video` and `owner_by_name` (longest base wins, `Ambiguous` on a tie between owners). Verified by `cargo test -p cv-scan` (the walkers' tests unchanged, new unit tests for the collision names).
+- [x] 1.1 Public `cv_scan::companion` module: `stem`, `normalized_base` and `is_sibling` moved from the movie walker (which re-exports them), plus `video_bases`, `is_plain_video` and `owner_by_name` (longest base wins, `Ambiguous` on a tie between owners). Verified by `cargo test -p cv-scan` (the walkers' tests unchanged, new unit tests for the collision names).
 
 ## 2. Library query
 
