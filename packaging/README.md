@@ -80,7 +80,7 @@ secrets:
     file: ./secrets/cinevault_key
 ```
 
-Create `./secrets/cinevault_key` with a long random value and keep it out of version control (the
+Create `./secrets/cinevault_key` with `openssl rand -base64 32 > secrets/cinevault_key` (the key must be base64 of exactly 32 bytes; any other value stops the server at start) and keep it out of version control (the
 repository's `.gitignore` and `.dockerignore` already exclude `secrets/`). Without a key the server
 still opens the library; Settings says provider keys are locked.
 

@@ -19,7 +19,8 @@ services:
       CINEVAULT_DATA_DIR: /data
       CINEVAULT_WEB_BIND: 0.0.0.0
       CINEVAULT_WEB_PORT: "8787"
-      # Provider-key master key as a Docker secret. Create ./secrets/cinevault_key first and
+      # Provider-key master key as a Docker secret. Create it first with
+      # `openssl rand -base64 32 > secrets/cinevault_key` (base64 of 32 bytes) and
       # uncomment this and the secrets blocks below.
       # CINEVAULT_SECRET_KEY_FILE: /run/secrets/cinevault_key
     volumes:

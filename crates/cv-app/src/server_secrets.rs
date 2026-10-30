@@ -156,6 +156,10 @@ fn decrypt(key: &[u8; KEY_BYTES], bytes: &[u8]) -> Result<BTreeMap<String, Strin
         .map_err(|_| SecretError::Store("the secrets file is damaged".to_owned()))
 }
 
+/// What the server says when the master key is set but is not a 32-byte base64 value.
+const MALFORMED_KEY: &str =
+    "The master key must be base64 of 32 bytes. Make one with `openssl rand -base64 32`.";
+
 /// The master key from the environment: `CINEVAULT_SECRET_KEY_FILE` first, then
 /// `CINEVAULT_SECRET_KEY`, both base64 of exactly 32 bytes. `Ok(None)` means no key is configured.
 ///
@@ -177,10 +181,8 @@ pub fn master_key_from_environment() -> Result<Option<[u8; KEY_BYTES]>, String> 
     };
     let bytes = STANDARD
         .decode(encoded.trim())
-        .map_err(|_| "The master key must be base64 of 32 bytes.".to_owned())?;
-    let key: [u8; KEY_BYTES] = bytes
-        .try_into()
-        .map_err(|_| "The master key must be base64 of 32 bytes.".to_owned())?;
+        .map_err(|_| MALFORMED_KEY.to_owned())?;
+    let key: [u8; KEY_BYTES] = bytes.try_into().map_err(|_| MALFORMED_KEY.to_owned())?;
     Ok(Some(key))
 }
 

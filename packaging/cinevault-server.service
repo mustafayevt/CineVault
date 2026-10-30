@@ -20,7 +20,8 @@ KillSignal=SIGINT
 TimeoutStopSec=30
 
 # Provider-key master key as a systemd credential instead of an environment variable or a file
-# readable by everyone. Create /etc/cinevault/cinevault.key (mode 0600, owned by root), uncomment
+# readable by everyone. Create /etc/cinevault/cinevault.key with `openssl rand -base64 32` (mode
+# 0600, owned by root; base64 of exactly 32 bytes), uncomment
 # both lines, and run `systemctl daemon-reload`.
 #LoadCredential=cinevault_key:/etc/cinevault/cinevault.key
 #Environment=CINEVAULT_SECRET_KEY_FILE=%d/cinevault_key
