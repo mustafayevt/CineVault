@@ -55,7 +55,7 @@ impl ImageState {
     }
 
     /// The context the protocol handler answers from, cloned so it can move to a blocking thread.
-    fn context(&self) -> ImageContext {
+    pub(crate) fn context(&self) -> ImageContext {
         self.0.clone()
     }
 }

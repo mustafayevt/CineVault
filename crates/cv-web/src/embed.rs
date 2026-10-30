@@ -269,6 +269,15 @@ impl RunningServer {
         self.streams.close_all();
     }
 
+    /// Ends every session and stream and asks the server to close, without waiting: for a
+    /// process that is quitting anyway.
+    pub fn begin_stop(self) {
+        self.auth.logout_all_except(None);
+        self.streams.close_all();
+        self.feed.abort();
+        self.shutdown.notify_one();
+    }
+
     /// Ends every session and stream, closes the port and stops the tasks. Returns once the port
     /// no longer accepts connections; a connection that will not close is dropped after three
     /// seconds.
