@@ -226,13 +226,17 @@ function reportErased(result: EraseResult): void {
 export async function erasePermanently(
   targets: readonly DeleteTarget[],
   confirm: string,
-  options: { onDone?: (() => void) | undefined } = {},
+  options: { onDone?: (() => void) | undefined; password?: string | undefined } = {},
 ): Promise<boolean> {
   if (targets.length === 0) return false;
   const ids = targets.map((target) => target.id);
   const store = useDeleteStore.getState();
   try {
-    const result = await currentHistoryBackend().eraseTitles(ids, confirm);
+    const backend = currentHistoryBackend();
+    const result =
+      options.password === undefined
+        ? await backend.eraseTitles(ids, confirm)
+        : await backend.eraseTitles(ids, confirm, options.password);
     reportErased(result);
     store.hide(result.erased.map((entry) => entry.id));
     void queryClient.invalidateQueries({ queryKey: HISTORY_KEY });

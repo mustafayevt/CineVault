@@ -339,6 +339,7 @@ mod tests {
         assert_eq!(decode(&line), file);
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn a_name_that_is_not_utf8_round_trips() {
         let (_root, lib, trash) = setup();

@@ -1,6 +1,5 @@
-import { isTauri } from "@tauri-apps/api/core";
-
 import { commands, events } from "../../bindings";
+import { isServer, transport } from "../../lib/transport";
 import type {
   DeleteTitlesDto,
   EraseTitlesDto,
@@ -51,7 +50,7 @@ export interface HistoryBackend {
   /** Delete: the files go to the Recycle Bin / Trash and the titles leave the library. */
   deleteTitles: (ids: readonly string[]) => Promise<DeleteResult>;
   /** Delete permanently; `confirm` must be exactly `DELETE` or nothing is erased. */
-  eraseTitles: (ids: readonly string[], confirm: string) => Promise<EraseResult>;
+  eraseTitles: (ids: readonly string[], confirm: string, password?: string) => Promise<EraseResult>;
   /** Calls `handler` when an entry was written or undone. Returns the way to stop listening. */
   onChanged: (handler: () => void) => () => void;
 }
@@ -90,6 +89,39 @@ const tauriHistoryBackend: HistoryBackend = {
   },
 };
 
+/** The browser server: reads use the shared commands, permanent delete needs the password. */
+const browserHistoryBackend: HistoryBackend = {
+  ...tauriHistoryBackend,
+  eraseTitles: async (ids, confirm, password = "") => {
+    const csrf = (window as unknown as Record<string, unknown>).__CINEVAULT_CSRF__;
+    const headers = {
+      "content-type": "application/json",
+      "x-cinevault-csrf": typeof csrf === "string" ? csrf : "",
+    };
+    const intentResponse = await fetch("/api/delete/intent", {
+      method: "POST",
+      credentials: "same-origin",
+      headers,
+      body: JSON.stringify({ ids: [...ids], password }),
+    });
+    const intent = (await intentResponse.json()) as { intent?: string; code?: string; message?: string };
+    if (!intentResponse.ok || intent.intent === undefined) {
+      throw new HistoryError(intent.code ?? "not_allowed", intent.message ?? "Permanent delete is not allowed.");
+    }
+    const response = await fetch("/api/delete/erase", {
+      method: "POST",
+      credentials: "same-origin",
+      headers,
+      body: JSON.stringify({ ids: [...ids], confirm, intent: intent.intent, password }),
+    });
+    const body = (await response.json()) as EraseResult & { code?: string; message?: string };
+    if (!response.ok) {
+      throw new HistoryError(body.code ?? "not_allowed", body.message ?? "The titles could not be erased.");
+    }
+    return body;
+  },
+};
+
 let override: HistoryBackend | null = null;
 let fallback: HistoryBackend | null = null;
 
@@ -101,7 +133,8 @@ export function setHistoryBackend(backend: HistoryBackend | null): void {
 /** The backend in use: the override, the Rust services in the desktop app, else a sample. */
 export function currentHistoryBackend(): HistoryBackend {
   if (override !== null) return override;
-  if (isTauri()) return tauriHistoryBackend;
+  if (transport() === "desktop") return tauriHistoryBackend;
+  if (isServer()) return browserHistoryBackend;
   fallback ??= createSyntheticHistoryBackend();
   return fallback;
 }

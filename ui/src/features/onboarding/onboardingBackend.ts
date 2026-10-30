@@ -1,7 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 
 import { commands } from "../../bindings";
-import { transport } from "../../lib/transport";
+import { isServer, transport } from "../../lib/transport";
 import { requestFolderPick } from "../pickers/folderPickerRequest";
 import type {
   FileExampleDto,
@@ -120,11 +120,11 @@ export function previewStart(): { step: 1 | 2 | 3 | 4; folders: string[] } | nul
 export function currentOnboardingBackend(): OnboardingBackend {
   if (override !== null) return override;
   if (transport() === "desktop") return tauriBackend;
-  if (transport() === "browser") return browserBackend;
   if (firstRunPreview()) {
     synthetic ??= createSyntheticOnboardingBackend();
     return synthetic;
   }
+  if (isServer()) return browserBackend;
   return unavailableBackend;
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { transport } from "../../lib/transport";
+import { isServer } from "../../lib/transport";
 import { PICK_EVENT } from "./folderPickerRequest";
 import type { PickRequest } from "./folderPickerRequest";
 
@@ -53,7 +53,7 @@ export function FolderPickerHost() {
   }, []);
 
   useEffect(() => {
-    if (transport() !== "browser") return;
+    if (!isServer()) return;
     const onPick = (event: Event) => {
       const detail = (event as CustomEvent<PickRequest>).detail;
       setRequest(detail);
@@ -275,7 +275,7 @@ export function FolderPickerHost() {
             font: "inherit",
             fontWeight: 600,
             background: "var(--gold)",
-            color: "#1a1405",
+            color: "var(--surface-window)",
             border: 0,
             borderRadius: 8,
             padding: "8px 14px",

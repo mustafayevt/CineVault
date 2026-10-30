@@ -699,6 +699,7 @@ const ALL_SETTINGS: readonly SettingDef[] = [
   ),
   setting("files.trash-folder", "library", { type: "text", mono: true }, ""),
   setting("delete.confirm", "library", { type: "toggle" }, true),
+  setting("server.permanent-delete", "advanced", { type: "toggle" }, false),
   setting(
     "files.auto-empty-days",
     "library",

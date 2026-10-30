@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use axum::body::Body;
+use axum::body::Bytes;
 use axum::extract::{ConnectInfo, Path as UrlPath, Query, State};
 use axum::http::{HeaderMap, StatusCode, Uri, header};
 use axum::response::sse::{KeepAlive, Sse};
@@ -29,9 +30,10 @@ use cv_ipc::image::ImageContext;
 use ipnet::IpNet;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use state::{Commands, WebState};
+use state::{Commands, DeleteGuard, WebState, random_token};
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, SeekFrom};
+use tokio_stream::StreamExt as _;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::io::ReaderStream;
 
@@ -84,6 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(error) => return Err(error.into()),
     };
     let data_root = location.root().to_path_buf();
+    clean_uploads(&data_root);
     let auth = Arc::new(auth::Auth::open(location.root())?);
     let (secrets, keys_locked) =
         cv_app::server_secrets::server_store(&data_root).map_err(std::io::Error::other)?;
@@ -125,6 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         notices,
         streams,
         commands,
+        delete_guard: Arc::new(DeleteGuard::default()),
         data_root: data_root.clone(),
         bind: bind.clone(),
         port,
@@ -142,6 +146,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/server/info", get(server_info))
         .route("/api/server/password", post(server_password))
         .route("/api/server/sign-out-all", post(server_sign_out_all))
+        .route("/api/delete/intent", post(delete_intent))
+        .route("/api/delete/erase", post(delete_erase))
+        .route("/api/artwork/upload", post(artwork_upload))
         .route("/api/invoke", post(invoke))
         .route("/api/stream", get(stream))
         .route("/img/{key}/{size}", get(image))
@@ -533,6 +540,204 @@ async fn logout(
     response
 }
 
+fn write_gate(
+    state: &WebState,
+    headers: &HeaderMap,
+    peer: IpAddr,
+) -> Result<(String, auth::Session), Box<Response>> {
+    let Some((id, session)) = session_of(state, headers) else {
+        return Err(Box::new(signed_out()));
+    };
+    let csrf = headers
+        .get("x-cinevault-csrf")
+        .and_then(|value| value.to_str().ok());
+    if csrf != Some(session.csrf.as_str())
+        || !origin_matches(headers, peer, &state.trust_proxy)
+    {
+        return Err(Box::new(
+            (
+                StatusCode::FORBIDDEN,
+                Json(json!({ "message": "Reload the page and try again." })),
+            )
+                .into_response(),
+        ));
+    }
+    Ok((id, session))
+}
+
+#[derive(Debug, Deserialize)]
+struct DeleteIntentBody {
+    ids: Vec<String>,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeleteEraseBody {
+    ids: Vec<String>,
+    confirm: String,
+    intent: String,
+    password: String,
+}
+
+async fn delete_intent(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<DeleteIntentBody>,
+) -> Response {
+    if let Err(response) = write_gate(&state, &headers, peer.ip()) {
+        return *response;
+    }
+    if !DeleteGuard::enabled(&state.services) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "code": "not_allowed",
+                "message": "Permanent delete is off in Settings › Server."
+            })),
+        )
+            .into_response();
+    }
+    if !state.auth.check_password(&body.password) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "message": "That password is not right." })),
+        )
+            .into_response();
+    }
+    let Some(intent) = state.delete_guard.mint(&body.ids) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "The titles could not be read." })),
+        )
+            .into_response();
+    };
+    Json(json!({ "intent": intent })).into_response()
+}
+
+async fn delete_erase(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<DeleteEraseBody>,
+) -> Response {
+    if let Err(response) = write_gate(&state, &headers, peer.ip()) {
+        return *response;
+    }
+    if !DeleteGuard::enabled(&state.services) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "code": "not_allowed",
+                "message": "Permanent delete is off in Settings › Server."
+            })),
+        )
+            .into_response();
+    }
+    if !state.auth.check_password(&body.password) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "message": "That password is not right." })),
+        )
+            .into_response();
+    }
+    if !state.delete_guard.consume(&body.intent, &body.ids) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "code": "not_allowed",
+                "message": "The confirmation expired. Ask for it again."
+            })),
+        )
+            .into_response();
+    }
+    match cv_ipc::history::erase_titles(
+        &state.commands.library,
+        &state.commands.history,
+        body.ids,
+        body.confirm,
+    )
+    .await
+    {
+        Ok(report) => Json(report).into_response(),
+        Err(error) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::to_value(error).unwrap_or_else(|_| json!({ "message": "The delete failed." }))),
+        )
+            .into_response(),
+    }
+}
+
+fn clean_uploads(data_root: &Path) {
+    let Ok(entries) = std::fs::read_dir(data_root.join("tmp")) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        if name.to_string_lossy().starts_with("artwork-") {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
+fn image_extension(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0x89, b'P', b'N', b'G']) {
+        return Some("png");
+    }
+    if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return Some("jpg");
+    }
+    if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        return Some("webp");
+    }
+    if bytes.len() >= 12 && (&bytes[4..12] == b"ftypavif" || &bytes[4..12] == b"ftypavis") {
+        return Some("avif");
+    }
+    None
+}
+
+async fn artwork_upload(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    if let Err(response) = write_gate(&state, &headers, peer.ip()) {
+        return *response;
+    }
+    if body.len() > 32 * 1024 * 1024 {
+        return (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(json!({ "message": "That image is larger than 32 MiB." })),
+        )
+            .into_response();
+    }
+    let Some(extension) = image_extension(&body) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "That file is not an image." })),
+        )
+            .into_response();
+    };
+    let folder = state.data_root.join("tmp");
+    if let Err(error) = std::fs::create_dir_all(&folder) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "message": error.to_string() })),
+        )
+            .into_response();
+    }
+    let path = folder.join(format!("artwork-{}.{extension}", random_token()));
+    if let Err(error) = cv_fs::write_atomic_with_mode(&path, &body, 0o600) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "message": error.to_string() })),
+        )
+            .into_response();
+    }
+    Json(json!({ "path": path.to_string_lossy() })).into_response()
+}
+
 async fn invoke(
     State(state): State<WebState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
@@ -582,8 +787,13 @@ async fn stream(
     } else {
         query.client
     };
-    let receiver = state.streams.connect(&client);
-    Sse::new(ReceiverStream::new(receiver))
+    let last_event_id = headers
+        .get("last-event-id")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok());
+    let (replay, receiver) = state.streams.connect(&client, last_event_id);
+    let stream = tokio_stream::iter(replay.into_iter().map(Ok)).chain(ReceiverStream::new(receiver));
+    Sse::new(stream)
         .keep_alive(KeepAlive::default())
         .into_response()
 }

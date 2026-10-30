@@ -1,5 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 
+import { isServer } from "../../lib/transport";
+
 import type { Channel } from "@tauri-apps/api/core";
 
 import { commands } from "../../bindings";
@@ -233,6 +235,31 @@ function artworkStreamTransport(
   });
 }
 
+/** The browser server: the streamed search is shared, a dropped file is uploaded first. */
+const browserArtworkBackend: ArtworkBackend = {
+  ...tauriArtworkBackend,
+  placeLocal: async (itemId, slot, image) => {
+    if (image.kind === "path") {
+      return unwrap(await commands.placeArtwork(itemId, slot, image.path));
+    }
+    const csrf = (window as unknown as Record<string, unknown>).__CINEVAULT_CSRF__;
+    const response = await fetch("/api/artwork/upload", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": image.file.type || "application/octet-stream",
+        "x-cinevault-csrf": typeof csrf === "string" ? csrf : "",
+      },
+      body: await image.file.arrayBuffer(),
+    });
+    const body = (await response.json()) as { path?: string; code?: string; message?: string };
+    if (!response.ok || body.path === undefined) {
+      throw new ArtworkRequestError(body.code ?? "upload", body.message ?? t("artwork.unavailable"));
+    }
+    return unwrap(await commands.placeArtwork(itemId, slot, body.path));
+  },
+};
+
 let override: ArtworkBackend | null = null;
 let fallback: ArtworkBackend | null = null;
 /** Replaces the backend; pass `null` to go back to the default. Used by tests. */
@@ -243,6 +270,7 @@ export function setArtworkBackend(backend: ArtworkBackend | null): void {
 export function currentArtworkBackend(): ArtworkBackend {
   if (override !== null) return override;
   if (isTauri()) return tauriArtworkBackend;
+  if (isServer()) return browserArtworkBackend;
   // A plain browser has no providers: it uses fixtures so the picker can be developed.
   fallback ??= createSyntheticArtworkBackend();
   return fallback;

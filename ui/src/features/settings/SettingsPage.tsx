@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentType } from "react";
 
 import { t } from "../../i18n/catalog";
-import { transport } from "../../lib/transport";
+import { isServer } from "../../lib/transport";
 import { AppearanceSection } from "./AppearanceSection";
 import { DeletedFilesSection } from "./DeletedFilesSection";
 import { FoldersSection } from "./FoldersSection";
@@ -37,7 +37,7 @@ const BASE_SECTIONS: readonly SectionDef[] = [
 
 /** The Server section exists only when the page is served by the browser server. */
 const SECTIONS: readonly SectionDef[] =
-  transport() === "browser"
+  isServer()
     ? [...BASE_SECTIONS, { id: "server", label: () => t("settingsPage.server.title"), Body: ServerSection }]
     : BASE_SECTIONS;
 

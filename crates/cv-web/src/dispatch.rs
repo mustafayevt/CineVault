@@ -24,7 +24,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
-use crate::state::WebState;
+use crate::state::{DeleteGuard, WebState};
 
 /// What a command answers: its value, or the typed `{code, message}` error.
 pub(crate) type DispatchResult = Result<Value, Value>;
@@ -1180,6 +1180,17 @@ pub(crate) async fn dispatch(
         "erase_titles" => {
             let ids: Vec<String> = arg(args, "ids")?;
             let confirm: String = arg(args, "confirm")?;
+            let intent: String = arg(args, "intent")?;
+            let password: String = arg(args, "password")?;
+            if !DeleteGuard::enabled(&state.services)
+                || !state.auth.check_password(&password)
+                || !state.delete_guard.consume(&intent, &ids)
+            {
+                return Err(json!({
+                    "code": "not_allowed",
+                    "message": "Permanent delete needs the current password and a fresh confirmation."
+                }));
+            }
             cv_ipc::history::erase_titles(library, &commands.history, ids, confirm)
                 .await
                 .map_err(command_error)

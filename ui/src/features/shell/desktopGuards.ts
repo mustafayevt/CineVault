@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { transport } from "../../lib/transport";
+import { isServer } from "../../lib/transport";
 import { stepAppZoom, zoomActionForKey } from "../settings/zoom";
 import type { ZoomAction } from "../settings/zoom";
 import { handleEscape } from "./escStack";
@@ -98,7 +98,7 @@ function classifyKey(
  */
 export function installDesktopGuards(options: DesktopGuardOptions = {}): () => void {
   const mac = options.mac ?? detectPlatform() === "macos";
-  const browser = transport() === "browser";
+  const browser = isServer();
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
       if (handleEscape(event)) {

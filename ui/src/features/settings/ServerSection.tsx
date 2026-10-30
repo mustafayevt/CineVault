@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "../../components/Button";
+import { Switch } from "../../components/Switch";
 import { t } from "../../i18n/catalog";
 import { FormRow, SettingsSection } from "./FormParts";
+import { useSetting, useSettingsStore } from "./settingsStore";
 
 interface ServerInfo {
   version: string;
@@ -36,6 +38,7 @@ export function ServerSection() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const permanentDelete = useSetting<boolean>("server.permanent-delete");
 
   const reload = useCallback(async () => {
     try {
@@ -164,6 +167,18 @@ export function ServerSection() {
             </div>
           </div>
         )}
+      </FormRow>
+      <FormRow
+        label={t("settings.server.permanent-delete.title")}
+        hint={t("settings.server.permanent-delete.description")}
+      >
+        <Switch
+          checked={permanentDelete}
+          aria-label={t("settings.server.permanent-delete.title")}
+          onCheckedChange={(on) => {
+            useSettingsStore.getState().set("server.permanent-delete", on);
+          }}
+        />
       </FormRow>
       <FormRow
         label={t("settingsPage.server.sessions")}

@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 
-import { transport } from "../../lib/transport";
+import { isServer } from "../../lib/transport";
 
 import { Button } from "../../components/Button";
 import { Switch } from "../../components/Switch";
@@ -113,7 +113,7 @@ export function UpdatesSection() {
   const offer = useUpdateStore((state) => state.offer);
   // Without a router (a section drawn on its own) the link has nowhere to go and is left out.
   const router = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
-  const browser = transport() === "browser";
+  const browser = isServer();
   return (
     <SettingsSection id="updates" title={t("settingsPage.updates.title")}>
       <FormRow

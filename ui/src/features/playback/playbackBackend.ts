@@ -1,5 +1,5 @@
 import { commands } from "../../bindings";
-import { transport } from "../../lib/transport";
+import { isServer, transport } from "../../lib/transport";
 import type { PlayOutcomeDto } from "../../bindings";
 
 /** What pressing Play did: the player that started and how many parts it was given. */
@@ -52,5 +52,6 @@ export function setPlaybackBackend(backend: PlaybackBackend | null): void {
 
 export function currentPlaybackBackend(): PlaybackBackend {
   if (override !== null) return override;
-  return transport() === "desktop" ? tauriPlaybackBackend : browserPlaybackBackend;
+  if (transport() === "desktop") return tauriPlaybackBackend;
+  return isServer() ? browserPlaybackBackend : { play: () => Promise.resolve({ player: "system", parts: 1, opened: 1 }) };
 }

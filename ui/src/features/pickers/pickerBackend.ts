@@ -1,5 +1,5 @@
 import { commands } from "../../bindings";
-import { transport } from "../../lib/transport";
+import { isServer, transport } from "../../lib/transport";
 import { requestFolderPick } from "./folderPickerRequest";
 import type { PickFileKind } from "../../bindings";
 
@@ -63,10 +63,10 @@ let synthetic: PickerBackend | null = null;
 export function currentPickerBackend(): PickerBackend {
   if (override !== null) return override;
   if (transport() === "desktop") return tauriBackend;
-  if (transport() === "browser") return browserBackend;
   if (new URLSearchParams(window.location.search).has("first-run")) {
     synthetic ??= createSyntheticPickerBackend();
     return synthetic;
   }
+  if (isServer()) return browserBackend;
   return unavailableBackend;
 }

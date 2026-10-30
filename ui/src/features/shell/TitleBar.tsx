@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { SpotlightSearch } from "../search/Spotlight";
-import { transport } from "../../lib/transport";
+import { isServer } from "../../lib/transport";
 import { CaptionButtons } from "./CaptionButtons";
 import { LIBRARY_SEARCH_ATTRIBUTE } from "./desktopGuards";
 import type { Platform } from "./platform";
@@ -82,7 +82,7 @@ export function TitleBar({ platform, windowApi }: TitleBarProps) {
         data-tauri-drag-region
         className="flex min-w-0 flex-1 basis-0 items-start justify-end self-stretch"
       >
-        {transport() === "desktop" && (platform === "windows" || platform === "linux") ? (
+        {!isServer() && (platform === "windows" || platform === "linux") ? (
           <CaptionButtons windowApi={windowApi} maximized={maximized} />
         ) : null}
       </div>

@@ -695,6 +695,10 @@ export const settings = {
   "settingsPage.appearance.size.hint": "Ctrl + and Ctrl − change it, Ctrl 0 resets.",
   "settingsPage.appearance.size.hintMac": "⌘ + and ⌘ − change it, ⌘ 0 resets.",
   "settingsPage.appearance.sizeOption": "{percent}%",
+  "settings.server.permanent-delete.title": "Allow permanent delete from a browser",
+  "settings.server.permanent-delete.description":
+    "Permanent delete asks for the typed DELETE and the current password, and the confirmation expires after a minute. Off unless you turn it on.",
+  "settings.server.permanent-delete.keywords": "delete erase permanent password",
   "settingsPage.server.title": "Server",
   "settingsPage.server.address": "Address",
   "settingsPage.server.address.hint": "From CINEVAULT_WEB_BIND and CINEVAULT_WEB_PORT.",

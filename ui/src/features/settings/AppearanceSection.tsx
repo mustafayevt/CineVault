@@ -1,7 +1,7 @@
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { Select } from "../../components/Select";
 import { t } from "../../i18n/catalog";
-import { transport } from "../../lib/transport";
+import { isServer } from "../../lib/transport";
 import type { MessageKey } from "../../i18n/catalog";
 import { detectPlatform } from "../shell/platform";
 import type { Platform } from "../shell/platform";
@@ -28,7 +28,7 @@ export function AppearanceSection() {
   const zoom = snapZoom(useSetting<number>("appearance.zoom"));
   const platform = detectPlatform();
   const mac = platform === "macos";
-  const browser = transport() === "browser";
+  const browser = isServer();
   return (
     <SettingsSection id="appearance" title={t("settingsPage.appearance.title")}>
       <FormRow label={t("settingsPage.appearance.theme")}>
