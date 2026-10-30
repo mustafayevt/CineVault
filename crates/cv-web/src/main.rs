@@ -926,6 +926,17 @@ pub(crate) fn allowed_roots(state: &WebState) -> Vec<PathBuf> {
     roots
 }
 
+/// A path as the person should read and type it. On Windows `canonicalize` returns the verbatim
+/// form (`\\?\C:\...`), which is valid but confusing in the folder browser.
+fn shown_path(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{rest}");
+    }
+    text.strip_prefix(r"\\?\")
+        .map_or_else(|| text.clone().into_owned(), str::to_owned)
+}
+
 /// Whether `path` is inside one of `roots`, compared a path component at a time.
 pub(crate) fn path_inside_roots(path: &Path, roots: &[PathBuf]) -> bool {
     roots.iter().any(|root| {
@@ -994,8 +1005,11 @@ async fn fs_list(
     }
     let roots = allowed_roots(&state);
     let requested = if query.path.trim().is_empty() {
+        // Open where the media is, not in the data folder, when such a root exists.
         roots
-            .first()
+            .iter()
+            .find(|root| **root != state.data_root && root.is_dir())
+            .or_else(|| roots.first())
             .cloned()
             .unwrap_or_else(|| state.data_root.clone())
     } else {
@@ -1041,7 +1055,7 @@ async fn fs_list(
         }
         folders.push(json!({
             "name": entry.file_name().to_string_lossy(),
-            "path": entry.path().to_string_lossy(),
+            "path": shown_path(&entry.path()),
         }));
     }
     folders.sort_by(|a, b| {
@@ -1054,10 +1068,21 @@ async fn fs_list(
     let parent = folder
         .parent()
         .filter(|parent| path_inside_roots(parent, &roots))
-        .map(|parent| parent.to_string_lossy().into_owned());
+        .map(shown_path);
+    // The roots the picker offers as shortcuts: the ones that exist, each once.
+    let mut shortcuts: Vec<String> = Vec::new();
+    for root in &roots {
+        if let Ok(root) = std::fs::canonicalize(root) {
+            let root = shown_path(&root);
+            if !shortcuts.contains(&root) {
+                shortcuts.push(root);
+            }
+        }
+    }
     Json(json!({
-        "path": folder.to_string_lossy(),
+        "path": shown_path(&folder),
         "parent": parent,
+        "roots": shortcuts,
         "folders": folders,
     }))
     .into_response()
@@ -1522,6 +1547,13 @@ mod tests {
         let awkward = attachment_name(Path::new("/media/Blade Runner \"Final\".mkv"));
         assert!(awkward.contains("filename=\"Blade Runner _Final_.mkv\""));
         assert!(awkward.contains("Blade%20Runner%20%22Final%22.mkv"));
+    }
+
+    #[test]
+    fn the_folder_browser_shows_plain_paths() {
+        assert_eq!(shown_path(Path::new(r"\\?\C:\Media")), r"C:\Media");
+        assert_eq!(shown_path(Path::new(r"\\?\UNC\nas\share")), r"\\nas\share");
+        assert_eq!(shown_path(Path::new("/media/movies")), "/media/movies");
     }
 
     #[test]
