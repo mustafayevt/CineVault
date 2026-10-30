@@ -7,6 +7,12 @@ What changed in each version of CineVault, newest first, in plain words. The app
 ### Fixed
 
 - Linux: the AppImage, .deb and .rpm now start on Ubuntu 22.04, Debian 12, Linux Mint 21 and other systems of that age. 1.1.0 was built on a newer system and needed a newer C library (glibc 2.38) than they have, so it closed right away.
+- Ultra HD Blu-ray folders and images with Dolby Vision now show Dolby Vision (profile 7) next to HDR10. The disc's second video layer was taken for a plain HDR10 stream, so only HDR10 was shown.
+- Blu-ray folders and images now show the language of every audio and subtitle track, read from the disc's own track list.
+- Dolby Digital Plus tracks that were shown as AC3 (in Blu-ray files and some MKV files) are now called E-AC-3, with Atmos when they have it.
+- DTS:X tracks with height speakers now show their real layout, such as 7.1, instead of 11.1.
+- Interlaced videos stored as separate fields now show their frame rate (29.97 instead of 59.94).
+- After the update, CineVault reads the media info of Blu-ray discs, disc images, Blu-ray files and the videos above once more, so they show the corrected details.
 
 ## [1.1.0] - 2026-10-28
 
