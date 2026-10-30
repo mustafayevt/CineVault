@@ -76,6 +76,7 @@ openspec/            specs and change proposals
 
 - `bun install`, then `bun run tauri dev` (the desktop app) or `bun run tauri build` (MSI and NSIS installers on Windows, DMG and `.app` on macOS, under `target/release/bundle/`)
 - `bun run server:dev` builds the UI and starts `cinevault-server` on the loopback address; `bun run server:build` builds the release binary; `bun run server:image` builds the container image; `bun run server:package` makes the server `.deb` and `.rpm` on Linux; `bun run server:tarball` makes the tarball; `bun run check:scripts` checks that the `bun run` commands named in this file and the README exist
+- `scripts/install/install.sh` and `install.ps1`: the one-command browser-mode installers (Linux: the server package and its systemd service; macOS, Windows and `--docker`: the container). The Deploy site workflow publishes them at `https://mustafayevt.github.io/CineVault/install.sh` and `install.ps1`. Check `install.sh` with `shellcheck -s sh` after editing it; both must stay plain, readable and free of telemetry.
 - `bun run tools:fetch`: downloads the pinned MediaInfo, FFmpeg and helper tools into the git-ignored `.dev-tools/` (`-- ffmpeg` fetches one, `-- --help` lists them)
 - `bun run bundle:check` (add `-- --artifacts` after a build to require the installers), `bun run package:portable` (portable Windows zip)
 - `bun run notices`: regenerates `THIRD_PARTY_NOTICES.md` (needs `cargo install cargo-about --locked --features cli`)
