@@ -485,7 +485,7 @@ form.onsubmit = async (event) => {{
 }
 
 const PAGE_STYLE: &str = r#"
-:root { color-scheme: dark; --bg: #0c0c0e; --surface: #16161a; --line: #2a2a30; --text: #f2f0ea; --muted: #a8a49b; --gold: #d8b45a; --error: #ff8a7a; }
+:root { color-scheme: dark; --bg: #0c0c0e; --surface: #16161a; --line: #2a2a30; --text: #f2f0ea; --muted: #a8a49b; --gold: #d8b45a; --on-gold: #1a1405; --error: #ff8a7a; }
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 24px; }
 main { width: min(400px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 32px; }
@@ -498,7 +498,7 @@ input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
 .field { position: relative; }
 .field input { padding-right: 64px; }
 .field button { position: absolute; right: 6px; top: 6px; height: 32px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font: inherit; }
-button.primary { width: 100%; margin-top: 20px; padding: 12px; border: 0; border-radius: 10px; background: var(--gold); color: #1a1405; font: inherit; font-weight: 600; cursor: pointer; }
+button.primary { width: 100%; margin-top: 20px; padding: 12px; border: 0; border-radius: 10px; background: var(--gold); color: var(--on-gold); font: inherit; font-weight: 600; cursor: pointer; }
 button.primary:hover { filter: brightness(1.08); }
 p.hint, details, p.warn { color: var(--muted); font-size: 13px; }
 p.warn { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 16px; }
@@ -506,6 +506,9 @@ p.warn { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 16px;
 details { margin-top: 20px; }
 code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
 @media (max-width: 420px) { main { padding: 22px; border: 0; background: transparent; } }
+@media (prefers-color-scheme: light) {
+  :root { color-scheme: light; --bg: #f2f1ee; --surface: #fbfaf8; --line: rgba(0, 0, 0, 0.08); --text: #1a1a19; --muted: #666561; --gold: #7a6438; --on-gold: #f2f1ee; --error: #a82533; }
+}
 "#;
 
 #[cfg(test)]
