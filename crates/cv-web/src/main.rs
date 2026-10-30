@@ -7,7 +7,7 @@
 mod auth;
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex as StdMutex};
@@ -39,6 +39,7 @@ use cv_ipc::library::{
 use cv_ipc::lifecycle::{LifecycleCountsDto, service as lifecycle_service};
 use cv_ipc::scan::{ScanState, find_missing_files, read_pending_media_info, rescan_library};
 use cv_ipc::tv::{TvReader, get_episode_detail, get_show_detail};
+use ipnet::IpNet;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::fs;
@@ -113,6 +114,7 @@ struct WebState {
     bind: String,
     port: u16,
     keys_locked: bool,
+    trust_proxy: Vec<IpNet>,
     ui_dir: PathBuf,
 }
 
@@ -210,6 +212,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         bind: bind.clone(),
         port,
         keys_locked,
+        trust_proxy: parse_trust_proxy(),
         ui_dir: ui_dir.clone(),
     };
     let app = Router::new()
@@ -300,11 +303,73 @@ async fn health(State(state): State<WebState>) -> Response {
     .into_response()
 }
 
-fn is_secure(headers: &HeaderMap) -> bool {
+fn parse_trust_proxy() -> Vec<IpNet> {
+    let Ok(value) = std::env::var("CINEVAULT_WEB_TRUST_PROXY") else {
+        return Vec::new();
+    };
+    value
+        .split(',')
+        .filter_map(|part| {
+            let part = part.trim();
+            part.parse::<IpNet>().ok().or_else(|| {
+                part.parse::<IpAddr>().ok().map(|ip| {
+                    IpNet::new(ip, if ip.is_ipv4() { 32 } else { 128 })
+                        .unwrap_or_else(|_| IpNet::new(IpAddr::from([127, 0, 0, 1]), 32).unwrap())
+                })
+            })
+        })
+        .collect()
+}
+
+fn from_trusted_proxy(peer: IpAddr, trust: &[IpNet]) -> bool {
+    trust.iter().any(|net| net.contains(&peer))
+}
+
+fn effective_secure(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> bool {
+    from_trusted_proxy(peer, trust)
+        && headers
+            .get("x-forwarded-proto")
+            .and_then(|value| value.to_str().ok())
+            == Some("https")
+}
+
+fn client_ip(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> IpAddr {
+    if !from_trusted_proxy(peer, trust) {
+        return peer;
+    }
     headers
-        .get("x-forwarded-proto")
+        .get("x-forwarded-for")
         .and_then(|value| value.to_str().ok())
-        == Some("https")
+        .and_then(|value| value.split(',').next())
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(peer)
+}
+
+fn effective_host(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> Option<String> {
+    let name = if from_trusted_proxy(peer, trust) {
+        "x-forwarded-host"
+    } else {
+        "host"
+    };
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned)
+}
+
+fn origin_matches(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> bool {
+    let Some(origin) = headers
+        .get(header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+    else {
+        // A non-browser client may omit Origin; the CSRF token still protects the command.
+        return true;
+    };
+    let Some(host) = effective_host(headers, peer, trust) else {
+        return false;
+    };
+    let origin_host = origin.split("://").nth(1).unwrap_or(origin);
+    origin_host.eq_ignore_ascii_case(&host)
 }
 
 fn session_of(state: &WebState, headers: &HeaderMap) -> Option<(String, auth::Session)> {
@@ -337,7 +402,11 @@ async fn login_page(State(state): State<WebState>) -> Response {
     axum::response::Html(auth::login_page()).into_response()
 }
 
-async fn setup_page(State(state): State<WebState>, headers: HeaderMap) -> Response {
+async fn setup_page(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Response {
     if state.auth.has_password() {
         return Redirect::to("/login").into_response();
     }
@@ -354,7 +423,10 @@ async fn setup_page(State(state): State<WebState>, headers: HeaderMap) -> Respon
             let mut response = axum::response::Html(auth::setup_page()).into_response();
             set_cookie(
                 &mut response,
-                auth::setup_cookie(&claim, is_secure(&headers)),
+                auth::setup_cookie(
+                    &claim,
+                    effective_secure(&headers, peer.ip(), &state.trust_proxy),
+                ),
             );
             response
         }
@@ -384,12 +456,16 @@ async fn login(
     headers: HeaderMap,
     Json(body): Json<PasswordBody>,
 ) -> Response {
-    match state.auth.login(&body.password, &peer.ip().to_string()) {
+    let client = client_ip(&headers, peer.ip(), &state.trust_proxy).to_string();
+    match state.auth.login(&body.password, &client) {
         Ok((id, _)) => {
             let mut response = Json(json!({ "ok": true })).into_response();
             set_cookie(
                 &mut response,
-                auth::session_cookie(&id, is_secure(&headers)),
+                auth::session_cookie(
+                    &id,
+                    effective_secure(&headers, peer.ip(), &state.trust_proxy),
+                ),
             );
             response
         }
@@ -405,6 +481,7 @@ async fn login(
 
 async fn setup(
     State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<SetupBody>,
 ) -> Response {
@@ -417,11 +494,17 @@ async fn setup(
             let mut response = Json(json!({ "ok": true })).into_response();
             set_cookie(
                 &mut response,
-                auth::session_cookie(&id, is_secure(&headers)),
+                auth::session_cookie(
+                    &id,
+                    effective_secure(&headers, peer.ip(), &state.trust_proxy),
+                ),
             );
             set_cookie(
                 &mut response,
-                auth::clear_cookie("cv_setup", is_secure(&headers)),
+                auth::clear_cookie(
+                    "cv_setup",
+                    effective_secure(&headers, peer.ip(), &state.trust_proxy),
+                ),
             );
             response
         }
@@ -459,6 +542,7 @@ struct PasswordChangeBody {
 
 async fn server_password(
     State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<PasswordChangeBody>,
 ) -> Response {
@@ -468,7 +552,9 @@ async fn server_password(
     let csrf = headers
         .get("x-cinevault-csrf")
         .and_then(|value| value.to_str().ok());
-    if csrf != Some(session.csrf.as_str()) {
+    if csrf != Some(session.csrf.as_str())
+        || !origin_matches(&headers, peer.ip(), &state.trust_proxy)
+    {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({ "message": "Reload the page and try again." })),
@@ -512,14 +598,21 @@ async fn server_sign_out_all(State(state): State<WebState>, headers: HeaderMap) 
     Json(json!({ "ok": true })).into_response()
 }
 
-async fn logout(State(state): State<WebState>, headers: HeaderMap) -> Response {
+async fn logout(
+    State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Response {
     if let Some(id) = auth::cookie(&headers, "cv_session") {
         state.auth.logout(&id);
     }
     let mut response = Json(json!({ "ok": true })).into_response();
     set_cookie(
         &mut response,
-        auth::clear_cookie("cv_session", is_secure(&headers)),
+        auth::clear_cookie(
+            "cv_session",
+            effective_secure(&headers, peer.ip(), &state.trust_proxy),
+        ),
     );
     response
 }
@@ -575,6 +668,7 @@ fn drives(state: &WebState) -> Option<Arc<DrivesService>> {
 
 async fn invoke(
     State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<InvokeBody>,
 ) -> Response {
@@ -584,7 +678,9 @@ async fn invoke(
     let csrf = headers
         .get("x-cinevault-csrf")
         .and_then(|value| value.to_str().ok());
-    if csrf != Some(session.csrf.as_str()) {
+    if csrf != Some(session.csrf.as_str())
+        || !origin_matches(&headers, peer.ip(), &state.trust_proxy)
+    {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({
@@ -1039,6 +1135,7 @@ async fn fs_list(
 
 async fn fs_mkdir(
     State(state): State<WebState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<MkdirBody>,
 ) -> Response {
@@ -1048,7 +1145,9 @@ async fn fs_mkdir(
     let csrf = headers
         .get("x-cinevault-csrf")
         .and_then(|value| value.to_str().ok());
-    if csrf != Some(session.csrf.as_str()) {
+    if csrf != Some(session.csrf.as_str())
+        || !origin_matches(&headers, peer.ip(), &state.trust_proxy)
+    {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({ "message": "Reload the page and try again." })),
@@ -1361,4 +1460,55 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         _ => "application/octet-stream",
     };
     ([(header::CONTENT_TYPE, mime)], body).into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::HeaderValue;
+
+    #[test]
+    fn ranges_are_closed_and_clamped() {
+        assert_eq!(parse_range("bytes=0-99", 1000), Some((0, 99)));
+        assert_eq!(parse_range("bytes=500-", 1000), Some((500, 999)));
+        assert_eq!(parse_range("bytes=900-2000", 1000), Some((900, 999)));
+        assert_eq!(parse_range("bytes=1000-", 1000), None);
+        assert_eq!(parse_range("bytes=99-1", 1000), None);
+        assert_eq!(parse_range("not a range", 1000), None);
+    }
+
+    #[test]
+    fn media_types_are_an_allowlist() {
+        assert_eq!(media_type(Path::new("film.mkv")), "video/x-matroska");
+        assert_eq!(media_type(Path::new("film.MP4")), "video/mp4");
+        assert_eq!(
+            media_type(Path::new("notes.strm")),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            media_type(Path::new("no-extension")),
+            "application/octet-stream"
+        );
+    }
+
+    #[test]
+    fn a_channel_argument_is_parsed() {
+        assert_eq!(channel_id(&json!("__CHANNEL__:7")), Some(7));
+        assert_eq!(channel_id(&json!("7")), None);
+        assert_eq!(channel_id(&json!(null)), None);
+    }
+
+    #[test]
+    fn a_same_origin_matches_the_host() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::HOST, HeaderValue::from_static("nas:8787"));
+        headers.insert(header::ORIGIN, HeaderValue::from_static("http://nas:8787"));
+        let peer = IpAddr::from([127, 0, 0, 1]);
+        assert!(origin_matches(&headers, peer, &[]));
+        headers.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("http://evil.example"),
+        );
+        assert!(!origin_matches(&headers, peer, &[]));
+    }
 }

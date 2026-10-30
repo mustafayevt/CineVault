@@ -54,6 +54,8 @@ sha2 = "0.11"
 argon2 = "0.5"
 # Encrypted provider keys for the browser server (cv-app).
 chacha20poly1305 = "0.10"
+# Trusted reverse proxies for the browser server (cv-web).
+ipnet = "2"
 rand_core = { version = "0.6", features = ["getrandom"] }
 fs4 = { version = "1.1", default-features = false, features = ["sync"] }
 zip = { version = "9", default-features = false, features = ["deflate"] }
