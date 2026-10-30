@@ -1229,10 +1229,18 @@ async fn serve_media(
     if total == 0 {
         return StatusCode::NOT_FOUND.into_response();
     }
-    let range = headers
+    let asked = headers
         .get(header::RANGE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| parse_range(value, total));
+        .and_then(|value| value.to_str().ok());
+    let range = asked.and_then(|value| parse_range(value, total));
+    if asked.is_some_and(|value| value.starts_with("bytes=")) && range.is_none() {
+        // A range past the end is answered as RFC 9110 says, not with the whole file.
+        return Response::builder()
+            .status(StatusCode::RANGE_NOT_SATISFIABLE)
+            .header(header::CONTENT_RANGE, format!("bytes */{total}"))
+            .body(Body::empty())
+            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response());
+    }
     let (status, start, end) = match range {
         Some((start, end)) => (StatusCode::PARTIAL_CONTENT, start, end),
         None => (StatusCode::OK, 0, total - 1),
@@ -1248,7 +1256,10 @@ async fn serve_media(
         .header(header::ACCEPT_RANGES, "bytes")
         .header(header::CACHE_CONTROL, "private, no-store")
         .header("x-content-type-options", "nosniff")
-        .header("content-security-policy", "sandbox");
+        // No scripts, forms or plugins in a document opened from this address. A bare `sandbox`
+        // also made the origin opaque, so the browser's own player document was refused its
+        // video by CORS and Play showed an empty player.
+        .header("content-security-policy", MEDIA_CSP);
     if download {
         builder = builder.header(header::CONTENT_DISPOSITION, attachment_name(&canonical));
     }
@@ -1262,6 +1273,10 @@ async fn serve_media(
         .body(Body::from_stream(ReaderStream::new(file.take(length))))
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
+
+/// The policy on a media response: sandboxed, but keeping the server's origin so the browser's
+/// player document may load the video it shows.
+const MEDIA_CSP: &str = "sandbox allow-same-origin";
 
 /// `attachment; filename="…"; filename*=UTF-8''…`, with a quoted and an RFC 5987 name so a
 /// release name with spaces, quotes or accents saves under its own name.
