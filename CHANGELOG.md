@@ -2,6 +2,18 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Torrents: the page now opens with the latest releases from your torrent sources, in the same list as a search, filling in as each source answers. Choose All, Movies or TV, sort by newest, seeders, size or quality, filter by resolution, and camera and TS copies are hidden unless you switch "Hide CAM and TS" off. Scroll down for more; a source that has nothing more says so. Type a title to search as before, and clear the field to come back to the list.
+- Torrents: releases of titles you already have say "In your library", or "Better than your copy" when they beat the movie you hold. This is worked out from your library alone.
+- Torrents: the Details button on a release (or Enter, or a double-click) opens a side panel that looks the title up on TMDB: poster, plot, rating and links to TMDB, IMDb, Letterboxd and Trakt. If the match looks wrong it says so and lets you pick another title. It also lists the title's other releases and can search all of them. Without a TMDB key it shows what the release name says.
+
+### Fixed
+
+- Torrents: the "Send to torrent app" button at the end of each row was cut off ("Send to t…"). It now reads "Send" and always fits; its tooltip still says what it does.
+
 ## [1.2.0] - 2026-10-30
 
 ### Added
