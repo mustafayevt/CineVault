@@ -50,7 +50,8 @@ function jobEntry(job: JobProgress): Entry {
         : null,
     current: job.current[0],
     paused: job.state === "paused",
-    otherSession: job.started_by != null && job.started_by !== "" && job.started_by !== serverClientId(),
+    otherSession:
+      job.started_by != null && job.started_by !== "" && job.started_by !== serverClientId(),
     setPaused: (paused) => void currentJobControls().setPaused(job.id, paused),
     cancel: () => void currentJobControls().cancel(job.id),
   };

@@ -104,9 +104,16 @@ const browserHistoryBackend: HistoryBackend = {
       headers,
       body: JSON.stringify({ ids: [...ids], password }),
     });
-    const intent = (await intentResponse.json()) as { intent?: string; code?: string; message?: string };
+    const intent = (await intentResponse.json()) as {
+      intent?: string;
+      code?: string;
+      message?: string;
+    };
     if (!intentResponse.ok || intent.intent === undefined) {
-      throw new HistoryError(intent.code ?? "not_allowed", intent.message ?? "Permanent delete is not allowed.");
+      throw new HistoryError(
+        intent.code ?? "not_allowed",
+        intent.message ?? "Permanent delete is not allowed.",
+      );
     }
     const response = await fetch("/api/delete/erase", {
       method: "POST",
@@ -116,7 +123,10 @@ const browserHistoryBackend: HistoryBackend = {
     });
     const body = (await response.json()) as EraseResult & { code?: string; message?: string };
     if (!response.ok) {
-      throw new HistoryError(body.code ?? "not_allowed", body.message ?? "The titles could not be erased.");
+      throw new HistoryError(
+        body.code ?? "not_allowed",
+        body.message ?? "The titles could not be erased.",
+      );
     }
     return body;
   },

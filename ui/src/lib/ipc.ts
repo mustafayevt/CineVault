@@ -23,9 +23,7 @@ type ServerMessage =
   | { kind: "reset"; stream?: number; reason?: string };
 
 function isServerMode(): boolean {
-  return (
-    (window as unknown as Record<string, unknown>).__CINEVAULT_TRANSPORT__ === "server"
-  );
+  return (window as unknown as Record<string, unknown>).__CINEVAULT_TRANSPORT__ === "server";
 }
 
 function randomId(): string {
@@ -138,8 +136,7 @@ function install(): void {
       throw { code: "signed_out", message: "Your session ended. Sign in again." };
     }
     const answer = (await response.json()) as
-      | { ok: true; data: unknown }
-      | { ok: false; error: unknown };
+      { ok: true; data: unknown } | { ok: false; error: unknown };
     if (!answer.ok) throw answer.error;
     return answer.data;
   };

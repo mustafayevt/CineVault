@@ -53,5 +53,7 @@ export function setPlaybackBackend(backend: PlaybackBackend | null): void {
 export function currentPlaybackBackend(): PlaybackBackend {
   if (override !== null) return override;
   if (transport() === "desktop") return tauriPlaybackBackend;
-  return isServer() ? browserPlaybackBackend : { play: () => Promise.resolve({ player: "system", parts: 1, opened: 1 }) };
+  return isServer()
+    ? browserPlaybackBackend
+    : { play: () => Promise.resolve({ player: "system", parts: 1, opened: 1 }) };
 }

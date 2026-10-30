@@ -36,10 +36,12 @@ const BASE_SECTIONS: readonly SectionDef[] = [
 ];
 
 /** The Server section exists only when the page is served by the browser server. */
-const SECTIONS: readonly SectionDef[] =
-  isServer()
-    ? [...BASE_SECTIONS, { id: "server", label: () => t("settingsPage.server.title"), Body: ServerSection }]
-    : BASE_SECTIONS;
+const SECTIONS: readonly SectionDef[] = isServer()
+  ? [
+      ...BASE_SECTIONS,
+      { id: "server", label: () => t("settingsPage.server.title"), Body: ServerSection },
+    ]
+  : BASE_SECTIONS;
 
 /** Older addresses (`?section=library`) and the ids of the old groups, by their new section. */
 const ALIASES: Readonly<Record<string, string>> = {

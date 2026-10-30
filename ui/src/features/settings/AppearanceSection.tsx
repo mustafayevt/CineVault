@@ -51,7 +51,9 @@ export function AppearanceSection() {
       {browser ? null : (
         <FormRow
           label={t("settingsPage.appearance.size")}
-          hint={t(mac ? "settingsPage.appearance.size.hintMac" : "settingsPage.appearance.size.hint")}
+          hint={t(
+            mac ? "settingsPage.appearance.size.hintMac" : "settingsPage.appearance.size.hint",
+          )}
         >
           <Select
             className="w-[120px]"

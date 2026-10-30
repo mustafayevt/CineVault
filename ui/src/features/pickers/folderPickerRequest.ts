@@ -8,16 +8,12 @@ export interface PickRequest {
 
 export function requestFolderPick(title?: string): Promise<string[]> {
   return new Promise((resolve) => {
-    window.dispatchEvent(
-      new CustomEvent<PickRequest>(PICK_EVENT, { detail: { title, resolve } }),
-    );
+    window.dispatchEvent(new CustomEvent<PickRequest>(PICK_EVENT, { detail: { title, resolve } }));
   });
 }
 
 /** Writes and removes a probe file in `path`; the server's answer for the setup rows. */
-export async function probeFolder(
-  path: string,
-): Promise<{ writable: boolean; message?: string }> {
+export async function probeFolder(path: string): Promise<{ writable: boolean; message?: string }> {
   const csrf = (window as unknown as Record<string, unknown>).__CINEVAULT_CSRF__;
   const response = await fetch("/api/fs/probe", {
     method: "POST",
