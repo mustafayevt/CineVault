@@ -235,6 +235,15 @@ pub fn subscribe_job_progress(
     hub.subscribe(sink, update_of(&jobs, &overall));
 }
 
+/// Pauses or resumes one job. Returns false when the job is unknown or already over.
+pub fn set_job_paused(
+    activity: Option<&std::sync::Arc<cv_app::activity::ActivityService>>,
+    id: u32,
+    paused: bool,
+) -> bool {
+    activity.is_some_and(|activity| activity.set_job_paused(cv_jobs::JobId(u64::from(id)), paused))
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};

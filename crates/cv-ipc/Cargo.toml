@@ -16,6 +16,7 @@ cv-domain.workspace = true
 cv-jobs.workspace = true
 cv-media.workspace = true
 cv-nfo.workspace = true
+cv-providers.workspace = true
 cv-rename.workspace = true
 cv-scan.workspace = true
 cv-template.workspace = true
@@ -28,6 +29,5 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-cv-providers.workspace = true
 image.workspace = true
 tempfile.workspace = true

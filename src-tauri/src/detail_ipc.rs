@@ -53,5 +53,5 @@ pub async fn set_movie_watched(
     watched: bool,
 ) -> Result<crate::curation_ipc::WatchReportDto, LibraryCommandError> {
     let id = parse_id(&id)?;
-    crate::curation_ipc::mark_watched(&library, &nfo, &curation, &settings, vec![id], watched).await
+    cv_ipc::curation::mark_watched(&library, &nfo, &curation, &settings, vec![id], watched).await
 }

@@ -5,7 +5,6 @@
 use std::sync::Arc;
 
 use cv_app::activity::ActivityService;
-use cv_jobs::JobId;
 use tauri::State;
 
 use crate::boot::Boot;
@@ -21,14 +20,16 @@ impl ActivityState {
             activity: boot.services().map(|s| Arc::clone(s.activity())),
         }
     }
+
+    /// The activity service, for the command in `cv-ipc`.
+    pub fn activity(&self) -> Option<&Arc<ActivityService>> {
+        self.activity.as_ref()
+    }
 }
 
 /// Pauses or resumes one job. Returns false when the job is unknown or already over.
 #[tauri::command]
 #[specta::specta]
 pub fn set_job_paused(state: State<'_, ActivityState>, id: u32, paused: bool) -> bool {
-    state
-        .activity
-        .as_ref()
-        .is_some_and(|activity| activity.set_job_paused(JobId(u64::from(id)), paused))
+    cv_ipc::jobs::set_job_paused(state.activity(), id, paused)
 }

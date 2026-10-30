@@ -1,14 +1,12 @@
-//! The drives of the library (spec `drives`): `drives_overview` and the typed
-//! `DrivesChanged` event.
+//! The Tauri surface of the drives commands.
 //!
-//! The rules live in `cv_app::drives`. The event tells the sidebar and the Drives page that the
-//! numbers moved (a scan, a move or a delete ended, a drive came or went); they read the overview
-//! again. Announcements are joined by the service, so a scan does not make the event a stream.
+//! The DTOs and the command bodies live in [`cv_ipc::drives`]. The service, its change event and
+//! the taskbar-free state stay here.
 
 use std::sync::Arc;
 
 use cv_app::changes::ChangePart;
-use cv_app::drives::{DrivesService, EmptyError};
+use cv_app::drives::DrivesService;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, State};
@@ -16,12 +14,19 @@ use tauri_specta::Event;
 
 use crate::boot::Boot;
 
+pub use cv_ipc::drives::*;
+
 /// Held in Tauri state. When the app services could not start, the overview is empty.
 pub struct DrivesState {
     service: Option<Arc<DrivesService>>,
 }
 
 impl DrivesState {
+    /// The drives service, for the commands in `cv-ipc`.
+    pub fn service(&self) -> Option<Arc<DrivesService>> {
+        self.service.clone()
+    }
+
     /// Builds the service over the app services and starts telling the interface when the numbers
     /// move: whenever the files or stages of titles change (a scan, a move, a delete) and whenever
     /// a drive comes or goes.
@@ -95,8 +100,6 @@ pub struct DrivesChanged {
     pub at_ms: f64,
 }
 
-pub use cv_ipc::drives::*;
-
 /// The drives that hold a library folder: name, kind, size and free space, the folders on each
 /// with their titles and bytes, the space the library does not use, the resolution mix, whether
 /// the drive answers and when it last did. Reads the disks.
@@ -105,7 +108,7 @@ pub use cv_ipc::drives::*;
 pub async fn drives_overview(
     state: State<'_, DrivesState>,
 ) -> Result<DrivesOverviewDto, DrivesCommandError> {
-    cv_ipc::drives::drives_overview(state.service.clone()).await
+    cv_ipc::drives::drives_overview(state.service()).await
 }
 
 /// What Empty… would erase on the drive `drive_id` (every drive when `None`): the batches of its
@@ -116,21 +119,9 @@ pub async fn drives_trash_contents(
     state: State<'_, DrivesState>,
     drive_id: Option<String>,
 ) -> Result<TrashContentsDto, DrivesCommandError> {
-    cv_ipc::drives::drives_trash_contents(state.service.clone(), drive_id).await
+    cv_ipc::drives::drives_trash_contents(state.service(), drive_id).await
 }
 
-/// What an Empty did.
-#[derive(Debug, Clone, PartialEq, Serialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct EmptyReportDto {
-    pub bytes: f64,
-    pub batches: u32,
-    pub bin_items: u32,
-    /// Paths that could not be erased, each with the reason.
-    pub problems: Vec<String>,
-    /// History entries whose Undo was switched off.
-    pub entries: u32,
-}
 /// Empties the trash of the drive `drive_id` (every drive when `None`): erases its trash folders'
 /// batches and what CineVault sent to the Recycle Bin from it. `confirm` must be the literal
 /// `DELETE` the person typed. History entries whose files were erased lose their Undo.
@@ -141,37 +132,5 @@ pub async fn empty_drives_trash(
     drive_id: Option<String>,
     confirm: String,
 ) -> Result<EmptyReportDto, DrivesCommandError> {
-    let Some(service) = state.service.clone() else {
-        return Err(storage("The library is not open.".to_owned()));
-    };
-    let report = tauri::async_runtime::spawn_blocking(move || {
-        service.empty_trash(drive_id.as_deref(), &confirm)
-    })
-    .await
-    .map_err(|error| storage(error.to_string()))?
-    .map_err(|error| DrivesCommandError {
-        code: match error {
-            EmptyError::Confirmation => "confirmation",
-            EmptyError::Db(_) => "storage",
-        }
-        .to_owned(),
-        message: error.to_string(),
-    })?;
-    Ok(EmptyReportDto {
-        bytes: exact(report.bytes),
-        batches: u32::try_from(report.batches).unwrap_or(u32::MAX),
-        bin_items: u32::try_from(report.bin_items).unwrap_or(u32::MAX),
-        problems: report
-            .problems
-            .into_iter()
-            .map(|(path, why)| {
-                if path.is_empty() {
-                    why
-                } else {
-                    format!("{path}: {why}")
-                }
-            })
-            .collect(),
-        entries: u32::try_from(report.entries.len()).unwrap_or(u32::MAX),
-    })
+    cv_ipc::drives::empty_drives_trash(state.service(), drive_id, confirm).await
 }

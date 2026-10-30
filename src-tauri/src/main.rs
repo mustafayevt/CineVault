@@ -173,12 +173,16 @@ fn main() {
             app.manage(scan_ipc::ScanState::from_services(boot.services()));
             app.manage(drives_ipc::DrivesState::from_boot(&boot, app.handle()));
             app.manage(match_ipc::MatchState::from_services(boot.services()));
-            app.manage(episode_order_ipc::EpisodeOrderState::from_boot(&boot));
+            app.manage(episode_order_ipc::EpisodeOrderState::from_services(
+                boot.services(),
+            ));
             app.manage(episode_scrape_ipc::EpisodeScrapeState::from_services(
                 boot.services(),
             ));
             app.manage(artwork_ipc::ArtworkState::from_services(boot.services()));
-            app.manage(providers_ipc::ProvidersState::from_boot(&boot));
+            app.manage(providers_ipc::ProvidersState::from_services(
+                boot.services(),
+            ));
             app.manage(curation_ipc::CurationState::default());
             app.manage(collections_ipc::CollectionsState::from_boot(&boot));
             app.manage(activity_ipc::ActivityState::from_boot(&boot));

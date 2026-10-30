@@ -74,5 +74,5 @@ pub async fn set_episodes_watched(
         .iter()
         .map(|id| parse_id(id))
         .collect::<Result<Vec<_>, _>>()?;
-    crate::curation_ipc::mark_watched(&library, &nfo, &curation, &settings, ids, watched).await
+    cv_ipc::curation::mark_watched(&library, &nfo, &curation, &settings, ids, watched).await
 }

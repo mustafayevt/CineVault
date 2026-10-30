@@ -8,13 +8,17 @@
 //! both surfaces use, [`EventSink`] carries the typed events, and [`Hub`] is the replaying fan-out
 //! behind job progress and notices.
 
+pub mod actions;
 pub mod artwork;
 pub mod artwork_stream;
 pub mod collections;
+pub mod commands;
 pub mod context;
+pub mod curation;
 pub mod detail;
 pub mod drives;
 pub mod edit;
+pub mod episode_order;
 pub mod episode_scrape;
 pub mod error;
 pub mod events;
@@ -33,6 +37,8 @@ pub mod onboarding;
 pub mod organize;
 pub mod people;
 pub mod provider_stream;
+pub mod providers;
+pub mod ratings;
 pub mod scan;
 pub mod scrape_preview;
 pub mod scrape_stream;

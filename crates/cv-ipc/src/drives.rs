@@ -256,6 +256,61 @@ pub async fn drives_trash_contents(
     Ok(TrashContentsDto { entries, bytes })
 }
 
+/// What an Empty did.
+#[derive(Debug, Clone, PartialEq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EmptyReportDto {
+    pub bytes: f64,
+    pub batches: u32,
+    pub bin_items: u32,
+    /// Paths that could not be erased, each with the reason.
+    pub problems: Vec<String>,
+    /// History entries whose Undo was switched off.
+    pub entries: u32,
+}
+
+/// Empties the trash of the drive `drive_id` (every drive when `None`): erases its trash folders'
+/// batches and what CineVault sent to the Recycle Bin from it. `confirm` must be the literal
+/// `DELETE` the person typed. History entries whose files were erased lose their Undo.
+pub async fn empty_drives_trash(
+    service: Option<Arc<DrivesService>>,
+    drive_id: Option<String>,
+    confirm: String,
+) -> Result<EmptyReportDto, DrivesCommandError> {
+    let Some(service) = service else {
+        return Err(storage("The library is not open.".to_owned()));
+    };
+    let report =
+        tokio::task::spawn_blocking(move || service.empty_trash(drive_id.as_deref(), &confirm))
+            .await
+            .map_err(|error| storage(error.to_string()))?
+            .map_err(|error| DrivesCommandError {
+                code: match error {
+                    cv_app::drives::EmptyError::Confirmation => "confirmation",
+                    cv_app::drives::EmptyError::Db(_) => "storage",
+                }
+                .to_owned(),
+                message: error.to_string(),
+            })?;
+    Ok(EmptyReportDto {
+        bytes: exact(report.bytes),
+        batches: u32::try_from(report.batches).unwrap_or(u32::MAX),
+        bin_items: u32::try_from(report.bin_items).unwrap_or(u32::MAX),
+        problems: report
+            .problems
+            .into_iter()
+            .map(|(path, why)| {
+                if path.is_empty() {
+                    why
+                } else {
+                    format!("{path}: {why}")
+                }
+            })
+            .collect(),
+        entries: u32::try_from(report.entries.len()).unwrap_or(u32::MAX),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use cv_app::drives::{DriveFolder, QualityCounts};
