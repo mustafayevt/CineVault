@@ -85,6 +85,41 @@ fn relative_custom_folder_is_rejected() {
 }
 
 #[test]
+fn environment_folder_wins_over_portable_and_custom() {
+    let t = TempDir::new().unwrap();
+    let i = inputs(&t);
+    DataLocation::set_custom_folder(&i, &t.path().join("custom")).unwrap();
+    fs::write(i.exe_dir.join(PORTABLE_MARKER), "").unwrap();
+    let env = t.path().join("srv/cinevault");
+    let loc = DataLocation::resolve_with_env(&i, Some(env.as_os_str()));
+    assert_eq!(loc.mode(), LocationMode::Environment);
+    assert_eq!(loc.root(), env);
+    assert!(loc.warning().is_none());
+}
+
+#[test]
+fn relative_environment_value_is_refused_and_the_next_rule_decides() {
+    let t = TempDir::new().unwrap();
+    let i = inputs(&t);
+    fs::write(i.exe_dir.join(PORTABLE_MARKER), "").unwrap();
+    let loc = DataLocation::resolve_with_env(&i, Some(std::ffi::OsStr::new("relative")));
+    assert_eq!(loc.mode(), LocationMode::Portable);
+    assert!(
+        loc.warning()
+            .is_some_and(|warning| warning.contains("CINEVAULT_DATA_DIR"))
+    );
+}
+
+#[test]
+fn an_empty_environment_value_is_refused() {
+    let t = TempDir::new().unwrap();
+    let i = inputs(&t);
+    let loc = DataLocation::resolve_with_env(&i, Some(std::ffi::OsStr::new("")));
+    assert_eq!(loc.mode(), LocationMode::UserDefault);
+    assert!(loc.warning().is_some());
+}
+
+#[test]
 fn unusable_pointer_falls_back_with_a_warning_and_is_kept() {
     let t = TempDir::new().unwrap();
     let i = inputs(&t);
