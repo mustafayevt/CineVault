@@ -145,7 +145,21 @@ impl Auth {
     }
 
     pub fn has_password(&self) -> bool {
-        Self::lock(&self.password).is_some()
+        self.current().is_some()
+    }
+
+    /// The password as it is on disk now. `cinevault-server passwd` writes the file while the
+    /// server runs, and the new password must work without a restart. A file that cannot be read
+    /// or parsed keeps the password already in memory.
+    fn current(&self) -> Option<AuthFile> {
+        let mut guard = Self::lock(&self.password);
+        if let Ok(bytes) = std::fs::read(&self.path)
+            && let Ok(file) = serde_json::from_slice::<AuthFile>(&bytes)
+            && file.version == VERSION
+        {
+            *guard = Some(file);
+        }
+        (*guard).clone()
     }
 
     /// True while the welcome window is open and no password exists.
@@ -253,10 +267,7 @@ impl Auth {
         if password != confirm {
             return Err(AuthError::Mismatch);
         }
-        let file = {
-            let guard = Self::lock(&self.password);
-            (*guard).clone()
-        };
+        let file = self.current();
         let Some(file) = file else {
             return Err(AuthError::SetupClosed);
         };
@@ -285,10 +296,7 @@ impl Auth {
 
     /// Checks a password without starting a session (for a sensitive confirmation).
     pub fn check_password(&self, password: &str) -> bool {
-        let file = {
-            let guard = Self::lock(&self.password);
-            (*guard).clone()
-        };
+        let file = self.current();
         let Some(file) = file else {
             return false;
         };
@@ -304,10 +312,7 @@ impl Auth {
     /// ceiling. The check, the verification and the record happen under one lock, so concurrent
     /// attempts cannot slip past the limit together.
     pub fn login(&self, password: &str, client: &str) -> Result<(String, Session), AuthError> {
-        let file = {
-            let guard = Self::lock(&self.password);
-            (*guard).clone()
-        };
+        let file = self.current();
         let Some(file) = file else {
             return Err(AuthError::SetupClosed);
         };
@@ -455,7 +460,7 @@ form.onsubmit = async (event) => {{
   event.preventDefault();
   error.textContent = '';
   const answer = await fetch('/api/login', {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: JSON.stringify({{ password: password.value }}) }});
-  if (answer.ok) {{ const next = new URLSearchParams(location.search).get('next'); location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/'; return; }}
+  if (answer.ok) {{ location.href = {safe_next}; return; }}
   const body = await answer.json().catch(() => ({{ message: 'Could not sign in.' }}));
   error.textContent = body.message;
   password.select();
@@ -463,7 +468,8 @@ form.onsubmit = async (event) => {{
 </script>
 </body></html>"#,
         style = PAGE_STYLE,
-        warning = plain_http_warning(plain_http)
+        warning = plain_http_warning(plain_http),
+        safe_next = SAFE_NEXT
     )
 }
 
@@ -504,16 +510,21 @@ form.onsubmit = async (event) => {{
   error.textContent = '';
   if (password.value !== confirm.value) {{ error.textContent = 'The passwords do not match.'; confirm.select(); return; }}
   const answer = await fetch('/api/setup', {{ method: 'POST', headers: {{ 'content-type': 'application/json' }}, body: JSON.stringify({{ password: password.value, confirm: confirm.value }}) }});
-  if (answer.ok) {{ const next = new URLSearchParams(location.search).get('next'); location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/'; return; }}
+  if (answer.ok) {{ location.href = {safe_next}; return; }}
   const body = await answer.json().catch(() => ({{ message: 'Could not set the password.' }}));
   error.textContent = body.message;
 }};
 </script>
 </body></html>"#,
         style = PAGE_STYLE,
-        warning = plain_http_warning(plain_http)
+        warning = plain_http_warning(plain_http),
+        safe_next = SAFE_NEXT
     )
 }
+
+/// Where the page goes after signing in: the `next` address only when it resolves to this
+/// server. A plain prefix check is not enough, because a browser reads `/\host` as `//host`.
+const SAFE_NEXT: &str = "(() => { try { const next = new URLSearchParams(location.search).get('next'); if (!next) return '/'; const target = new URL(next, location.origin); return target.origin === location.origin ? target.pathname + target.search + target.hash : '/'; } catch { return '/'; } })()";
 
 fn plain_http_warning(plain_http: bool) -> &'static str {
     if plain_http {
@@ -622,6 +633,30 @@ mod tests {
             auth.login("a long enough password", "127.0.0.1"),
             Err(AuthError::TooManyAttempts)
         ));
+    }
+
+    /// `cinevault-server passwd` writes the file while the server runs; the running server
+    /// accepts the new password at once and refuses the old one.
+    #[test]
+    fn a_password_set_on_the_command_line_works_without_a_restart() {
+        let (dir, auth) = auth();
+        let claim = auth.claim_setup(None).unwrap();
+        auth.set_password("the first long password", "the first long password", &claim)
+            .unwrap();
+        let command_line = Auth::open(dir.path()).unwrap();
+        command_line
+            .set_password_unattended("the second long password")
+            .unwrap();
+        assert!(auth.login("the second long password", "a").is_ok());
+        assert!(auth.login("the first long password", "b").is_err());
+    }
+
+    #[test]
+    fn the_sign_in_pages_only_return_to_this_server() {
+        for page in [login_page(false), setup_page(false)] {
+            assert!(page.contains("target.origin === location.origin"));
+            assert!(!page.contains("startsWith('//')"));
+        }
     }
 
     #[test]
