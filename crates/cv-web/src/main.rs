@@ -173,14 +173,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui_dir.display()
     );
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    let stopping = Arc::new(tokio::sync::Notify::new());
     let server = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown(shutdown_state));
+    .with_graceful_shutdown(shutdown(shutdown_state, Arc::clone(&stopping)));
     // A client that refuses to close must not keep the process (and the library's owner file)
-    // alive forever.
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(15), server).await;
+    // alive forever: once the stop signal arrived, the graceful shutdown gets 15 seconds. The cap
+    // starts at the signal, not at start-up, or the server would stop itself after 15 seconds.
+    tokio::select! {
+        result = server => result?,
+        () = async {
+            stopping.notified().await;
+            tokio::time::sleep(SHUTDOWN_GRACE).await;
+        } => {}
+    }
     Ok(())
 }
 
@@ -225,8 +233,13 @@ fn install_logging() {
     cv_app::logging::init_with_default("info");
 }
 
-async fn shutdown(state: WebState) {
+/// How long a graceful stop may take after the signal before the process exits anyway.
+const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
+
+async fn shutdown(state: WebState, stopping: Arc<tokio::sync::Notify>) {
     wait_for_signal().await;
+    // `notify_one` stores a permit, so the grace timer starts even if it is polled later.
+    stopping.notify_one();
     // Dropping every stream ends the SSE responses, so axum can finish its graceful shutdown.
     state.streams.close_all();
     state.services.shutdown();
