@@ -159,7 +159,7 @@ fn main() {
             // Another copy holds the data folder's lock (Linux). Say so and end this copy; it opens
             // no library, so the rest of setup only fills the state objects with empty services.
             if boot.already_running() {
-                instance_lock::report_already_running(app.handle());
+                instance_lock::report_already_running(app.handle(), boot.already_running_message());
             }
             // What changed for which titles reaches open pages as one typed event.
             if let Some(services) = boot.services() {

@@ -6,25 +6,24 @@
 //! still opens: every state object falls back to what it can do without the library, and the
 //! reason reaches the notification centre.
 
-use std::fs::File;
 use std::sync::Arc;
 
 use cv_app::data_location::DataLocation;
 use cv_app::logging;
 use cv_app::notices::{AppNotice, NoticeHub, NoticeLevel};
+use cv_app::owner::{self, OwnerGuard};
 use cv_app::secrets::SecretStore;
 use cv_app::services::{AppServices, BootOptions};
-
-use crate::instance_lock;
 
 /// Held in Tauri state.
 pub struct Boot {
     services: Option<Arc<AppServices>>,
     notices: Arc<NoticeHub>,
-    /// The Linux instance lock. It is kept only so that it stays held until the process ends.
-    _instance_lock: Option<File>,
-    /// Another copy holds the instance lock, so this copy opens nothing and only reports that.
+    /// The data folder's owner file, kept until the process ends.
+    _owner: Option<OwnerGuard>,
+    /// Another process holds the data folder, so this copy opens nothing and only reports that.
     already_running: bool,
+    already_running_message: String,
 }
 
 impl Boot {
@@ -39,23 +38,21 @@ impl Boot {
                 None,
             );
         };
-        // On Linux a second copy can slip past the single-instance plugin (no session bus), so
-        // the data folder's lock is taken before the library opens. Without the lock the copy
-        // still starts; the plugin remains the first check.
-        let instance_lock = if cfg!(target_os = "linux") {
-            match instance_lock::acquire(location.root()) {
-                Ok(Some(file)) => Some(file),
-                Ok(None) => return Self::held_elsewhere(),
-                Err(error) => {
-                    tracing::warn!(
-                        %error,
-                        "the instance lock could not be taken; starting without it"
-                    );
-                    None
-                }
+        // The owner file is the portable one-writer rule: the desktop app and the server check
+        // it on every system, so neither opens a library the other holds.
+        let owner = match owner::acquire(location.root(), "app") {
+            Ok(Some(guard)) => Some(guard),
+            Ok(None) => {
+                let message = owner::read_owner(location.root()).map_or_else(
+                    || "CineVault is already running.".to_owned(),
+                    |owner| format!("{} Stop it, or open another data folder.", owner.sentence()),
+                );
+                return Self::held_elsewhere(message);
             }
-        } else {
-            None
+            Err(error) => {
+                tracing::warn!(%error, "the owner file could not be taken; starting without it");
+                None
+            }
         };
         let options = BootOptions::new(
             location.clone(),
@@ -65,12 +62,13 @@ impl Boot {
             Ok(services) => Self {
                 notices: Arc::clone(services.notices()),
                 services: Some(services),
-                _instance_lock: instance_lock,
+                _owner: owner,
                 already_running: false,
+                already_running_message: String::new(),
             },
             Err(error) => {
                 tracing::error!(%error, "the app services could not start");
-                Self::failed(error.to_string(), instance_lock)
+                Self::failed(error.to_string(), owner)
             }
         }
     }
@@ -81,19 +79,21 @@ impl Boot {
         Self {
             notices: Arc::clone(services.notices()),
             services: Some(services),
-            _instance_lock: None,
+            _owner: None,
             already_running: false,
+            already_running_message: String::new(),
         }
     }
 
-    /// The state of a copy that found the data folder's lock held by another copy. It opens
-    /// nothing, because the library and settings belong to the running copy.
-    fn held_elsewhere() -> Self {
+    /// The state of a copy that found the data folder held by another process. It opens nothing,
+    /// because the library and settings belong to the running copy.
+    fn held_elsewhere(message: String) -> Self {
         Self {
             services: None,
             notices: Arc::new(NoticeHub::new()),
-            _instance_lock: None,
+            _owner: None,
             already_running: true,
+            already_running_message: message,
         }
     }
 
@@ -103,7 +103,12 @@ impl Boot {
         self.already_running
     }
 
-    fn failed(message: String, instance_lock: Option<File>) -> Self {
+    /// The sentence a copy shows when another process holds the library.
+    pub fn already_running_message(&self) -> &str {
+        &self.already_running_message
+    }
+
+    fn failed(message: String, owner: Option<OwnerGuard>) -> Self {
         let notices = Arc::new(NoticeHub::new());
         notices.publish(
             AppNotice::new(NoticeLevel::Error, "CineVault could not open your library")
@@ -113,8 +118,9 @@ impl Boot {
         Self {
             services: None,
             notices,
-            _instance_lock: instance_lock,
+            _owner: owner,
             already_running: false,
+            already_running_message: String::new(),
         }
     }
 
