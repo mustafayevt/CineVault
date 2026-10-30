@@ -1437,8 +1437,12 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         if state.auth.needs_setup() {
             return Redirect::to("/setup").into_response();
         }
+        // The whole address, so a deep link keeps its filters and view after signing in.
+        let target = uri
+            .path_and_query()
+            .map_or(uri.path(), |value| value.as_str());
         let next =
-            percent_encoding::utf8_percent_encode(uri.path(), percent_encoding::NON_ALPHANUMERIC);
+            percent_encoding::utf8_percent_encode(target, percent_encoding::NON_ALPHANUMERIC);
         return Redirect::to(&format!("/login?next={next}")).into_response();
     }
     let mut file = root.join(if requested.is_empty() {
