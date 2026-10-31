@@ -788,7 +788,7 @@ dependencies = [
 
 [[package]]
 name = "cinevault-app"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "async-trait",
  "cv-app",
@@ -827,7 +827,7 @@ dependencies = [
 
 [[package]]
 name = "cinevault-cli"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1157,7 +1157,7 @@ dependencies = [
 
 [[package]]
 name = "cv-app"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -1204,7 +1204,7 @@ dependencies = [
 
 [[package]]
 name = "cv-artwork"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "async-trait",
  "cv-db",
@@ -1230,7 +1230,7 @@ dependencies = [
 
 [[package]]
 name = "cv-compat"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "cv-domain",
  "cv-nfo",
@@ -1245,7 +1245,7 @@ dependencies = [
 
 [[package]]
 name = "cv-db"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "cv-domain",
  "cv-fs",
@@ -1260,7 +1260,7 @@ dependencies = [
 
 [[package]]
 name = "cv-domain"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1269,7 +1269,7 @@ dependencies = [
 
 [[package]]
 name = "cv-fs"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "rustix",
  "tempfile",
@@ -1278,7 +1278,7 @@ dependencies = [
 
 [[package]]
 name = "cv-ipc"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "async-trait",
  "cv-app",
@@ -1305,7 +1305,7 @@ dependencies = [
 
 [[package]]
 name = "cv-jobs"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "cv-db",
  "serde",
@@ -1318,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "cv-match"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "cv-domain",
  "regex",
@@ -1328,7 +1328,7 @@ dependencies = [
 
 [[package]]
 name = "cv-media"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "bzip2",
  "cv-domain",
@@ -1351,7 +1351,7 @@ dependencies = [
 
 [[package]]
 name = "cv-nfo"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "cv-domain",
  "cv-fs",
@@ -1365,7 +1365,7 @@ dependencies = [
 
 [[package]]
 name = "cv-providers"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "async-trait",
  "cv-domain",
@@ -1387,7 +1387,7 @@ dependencies = [
 
 [[package]]
 name = "cv-rename"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "cv-db",
  "cv-domain",
@@ -1405,7 +1405,7 @@ dependencies = [
 
 [[package]]
 name = "cv-scan"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "cv-db",
  "cv-domain",
@@ -1424,7 +1424,7 @@ dependencies = [
 
 [[package]]
 name = "cv-template"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "cv-domain",
  "cv-media",
@@ -1435,7 +1435,7 @@ dependencies = [
 
 [[package]]
 name = "cv-torrent"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -1462,7 +1462,7 @@ dependencies = [
 
 [[package]]
 name = "cv-web"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "argon2",
  "axum",
