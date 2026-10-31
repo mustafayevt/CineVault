@@ -2,7 +2,19 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.3.0] - unreleased
+## [Unreleased]
+
+### Added
+
+- Browser access: turn it on in Settings › Browser access and open your library from a phone, a TV or another computer on your home network, with no Docker and no second install. The CineVault you already run serves it, so the window and the browser see the same library at the same time. The section shows the address to open with a Copy button and a QR code, lets you choose the port, and lists the signed-in browsers with Sign out for each or for all.
+- The password for Browser access is created and changed in Settings, right at the computer. Turning Browser access off closes the port and signs every browser out.
+- Only devices on your home network can reach Browser access unless you turn that off.
+- Two options for Browser access: keep CineVault running in the tray when the window is closed, and start CineVault when you sign in.
+- Server: "Forgot the password?" on the sign-in page writes a one-time PIN to `password-reset-pin.txt` in the data folder. Enter it with a new password from a browser on your home network; it works once, for 15 minutes, and signs every other browser out.
+
+### Changed
+
+- Server: the first-run welcome no longer closes after 30 minutes. It stays until a password exists, but only browsers on the same computer or the home network can use it.
 
 ### Fixed
 

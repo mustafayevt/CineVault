@@ -12,6 +12,9 @@ interface ServerInfo {
   port: number;
   sessions: number;
   keys: string;
+  /** `server` for `cinevault-server`, `desktop` for the desktop app's Browser access. */
+  host?: string;
+  computer?: string | null;
 }
 
 function csrf(): string {
@@ -98,7 +101,11 @@ export function ServerSection() {
     <SettingsSection id="server" title={t("settingsPage.server.title")}>
       <FormRow
         label={t("settingsPage.server.address")}
-        hint={t("settingsPage.server.address.hint")}
+        hint={
+          info?.host === "desktop"
+            ? t("settingsPage.server.address.desktop", { computer: info.computer ?? "" })
+            : t("settingsPage.server.address.hint")
+        }
       >
         <code className="text-(length:--fs-13)">
           {info === null ? "…" : `http://${info.bind}:${info.port}`}

@@ -722,6 +722,73 @@ export const settings = {
   "settingsPage.server.sessions.signOutAll": "Sign out every other session",
   "settingsPage.server.sessions.signedOut": "Every other session was signed out.",
   "settingsPage.server.error": "The server did not answer.",
+  "settingsPage.server.address.desktop":
+    "Browser access is managed in CineVault's Settings on {computer}.",
+  "settingsPage.browserAccess.title": "Browser access",
+  "settingsPage.browserAccess.hint":
+    "Open your library from a phone, a TV or another computer on your home network.",
+  "settingsPage.browserAccess.switch": "Browser access",
+  "settingsPage.browserAccess.switch.hint":
+    "CineVault serves this library to browsers on your network while it runs. Off by default.",
+  "settingsPage.browserAccess.state.off": "Off",
+  "settingsPage.browserAccess.state.running": "Running",
+  "settingsPage.browserAccess.state.portInUse": "Port in use",
+  "settingsPage.browserAccess.state.error": "Not running",
+  "settingsPage.browserAccess.state.noPassword": "Create a password to start",
+  "settingsPage.browserAccess.started": "Browser access is on.",
+  "settingsPage.browserAccess.stopped": "Browser access is off. Every browser was signed out.",
+  "settingsPage.browserAccess.firewall":
+    "Windows will ask to allow CineVault on private networks. Choose Allow.",
+  "settingsPage.browserAccess.password": "Password",
+  "settingsPage.browserAccess.password.needed":
+    "Browsers sign in with this password. Create one to turn Browser access on.",
+  "settingsPage.browserAccess.password.hint":
+    "Changing it signs every browser out. Forgot it? Change it here; no old password is needed.",
+  "settingsPage.browserAccess.password.new": "New password (at least 12 characters)",
+  "settingsPage.browserAccess.password.confirm": "Confirm the new password",
+  "settingsPage.browserAccess.password.create": "Create password",
+  "settingsPage.browserAccess.password.change": "Change password",
+  "settingsPage.browserAccess.password.created": "The password was created.",
+  "settingsPage.browserAccess.password.changed":
+    "The password was changed. Every browser was signed out.",
+  "settingsPage.browserAccess.cancel": "Cancel",
+  "settingsPage.browserAccess.addresses": "Open from another device",
+  "settingsPage.browserAccess.addresses.hint":
+    "Type an address into a browser on the same network, or scan the code with a phone.",
+  "settingsPage.browserAccess.copy": "Copy",
+  "settingsPage.browserAccess.copied": "Copied",
+  "settingsPage.browserAccess.copyAddress": "Copy {address}",
+  "settingsPage.browserAccess.qr": "QR code for {address}",
+  "settingsPage.browserAccess.qr.caption": "Scan with a phone",
+  "settingsPage.browserAccess.port": "Port",
+  "settingsPage.browserAccess.port.hint":
+    "8787 unless another program uses it. Changing it restarts Browser access and signs every browser out.",
+  "settingsPage.browserAccess.port.apply": "Apply",
+  "settingsPage.browserAccess.port.invalid": "Choose a port from 1024 to 65535.",
+  "settingsPage.browserAccess.lanOnly": "Only devices on my home network",
+  "settingsPage.browserAccess.lanOnly.hint":
+    "Browsers from outside your home network are refused, even with the password.",
+  "settingsPage.browserAccess.lanOnly.off":
+    "Anyone who can reach this port can try the password. Turn this on unless you know you need it off.",
+  "settingsPage.browserAccess.sessions": "Signed-in browsers",
+  "settingsPage.browserAccess.sessions.hint": "Turning Browser access off signs them all out.",
+  "settingsPage.browserAccess.sessions.none": "No browser is signed in.",
+  "settingsPage.browserAccess.sessions.browser": "{browser} on {system}",
+  "settingsPage.browserAccess.sessions.unknown": "A browser",
+  "settingsPage.browserAccess.sessions.detail": "{address} · last used {when}",
+  "settingsPage.browserAccess.sessions.signOut": "Sign out",
+  "settingsPage.browserAccess.sessions.signOutOne": "Sign out {name}",
+  "settingsPage.browserAccess.sessions.signOutAll": "Sign out all browsers",
+  "settingsPage.browserAccess.sessions.signedOutOne": "That browser was signed out.",
+  "settingsPage.browserAccess.sessions.signedOutAll": "Every browser was signed out.",
+  "settingsPage.browserAccess.tray": "Keep running in the tray when the window is closed",
+  "settingsPage.browserAccess.tray.hint":
+    "Closing the window hides it while Browser access is on. Open or quit CineVault from its tray icon.",
+  "settingsPage.browserAccess.login": "Start CineVault when I sign in",
+  "settingsPage.browserAccess.login.hint":
+    "With the tray option on, it starts in the tray with Browser access running.",
+  "settingsPage.browserAccess.help":
+    "On a phone, TV or another computer on the same network, open one of the addresses and sign in with the password. Keep {computer} awake and CineVault running. The connection is not encrypted, so use it at home, not on public Wi-Fi.",
   "settingsPage.updates.title": "Updates",
   "settingsPage.updates.version": "CineVault {version}",
   "settingsPage.updates.whatsNew": "What's new in {version}",

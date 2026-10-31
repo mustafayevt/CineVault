@@ -214,10 +214,21 @@ fn now_ms() -> u64 {
         .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }
 
-fn host_name() -> String {
+/// The computer's name: `HOSTNAME`, `COMPUTERNAME`, then the kernel's or `/etc/hostname` (a
+/// desktop session often does not export `HOSTNAME`), or `unknown`.
+#[must_use]
+pub fn host_name() -> String {
     std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
-        .unwrap_or_else(|_| "unknown".to_owned())
+        .ok()
+        .or_else(|| {
+            ["/proc/sys/kernel/hostname", "/etc/hostname"]
+                .iter()
+                .find_map(|path| std::fs::read_to_string(path).ok())
+        })
+        .map(|name| name.trim().to_owned())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "unknown".to_owned())
 }
 
 #[cfg(test)]

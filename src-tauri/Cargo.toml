@@ -28,8 +28,9 @@ cv-rename.workspace = true
 cv-scan.workspace = true
 cv-template.workspace = true
 cv-torrent.workspace = true
+cv-web.workspace = true
 fs4.workspace = true
-tauri = { version = "2", features = ["specta"] }
+tauri = { version = "2", features = ["specta", "tray-icon"] }
 # Native Windows 11 snap-layout flyout over the custom maximize button (no-op elsewhere).
 tauri-plugin-snap-layout = "1.0.9"
 serde.workspace = true
@@ -45,6 +46,8 @@ tauri-plugin-window-state = "2"
 tauri-plugin-opener = "2"
 # Native folder picker for the first-run setup (used from Rust, no JS permission needed).
 tauri-plugin-dialog = "2"
+# "Start CineVault when I sign in" (Browser access), driven from Rust only.
+tauri-plugin-autostart = "2"
 
 [lints]
 workspace = true

@@ -19,6 +19,7 @@ mod artwork_ipc;
 mod artwork_stream_ipc;
 mod automation_ipc;
 mod boot;
+mod browser_access_ipc;
 mod changes_ipc;
 mod chrome;
 mod collections_ipc;
@@ -132,6 +133,12 @@ fn main() {
         // The first-run setup opens the system folder picker from Rust; no capability grants the
         // web view the plugin's own commands.
         .plugin(tauri_plugin_dialog::init())
+        // "Start CineVault when I sign in" (Browser access). Driven from Rust; no capability
+        // grants the web view the plugin's own commands.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![browser_access_ipc::BACKGROUND_ARG]),
+        ))
         // The maximize button of the custom title bar carries this id; the plugin lays a native
         // hit-test region over it so Windows 11 shows the snap-layout flyout on hover.
         .plugin(
@@ -213,6 +220,15 @@ fn main() {
                 boot.services(),
             ));
             app.manage(settings);
+            let browser_access = browser_access_ipc::BrowserAccessState::from_boot(&boot);
+            // A start at sign-in with Browser access kept in the tray opens no window.
+            if browser_access.starts_hidden()
+                && std::env::args().any(|arg| arg == browser_access_ipc::BACKGROUND_ARG)
+                && let Some(window) = app.get_webview_window(instance::MAIN_WINDOW_LABEL)
+            {
+                let _ = window.hide();
+            }
+            app.manage(browser_access);
             app.manage(boot);
             // Stream job progress to the UI and mirror it to the taskbar and dock.
             let taskbar: Arc<dyn jobs_ipc::Taskbar> = Arc::new(app.handle().clone());
@@ -241,6 +257,8 @@ fn main() {
                 background
                     .state::<automation_ipc::AutomationState>()
                     .start(&boot, &image_sources);
+                // Browser access, when it was on at the last quit, over the running services.
+                browser_access_ipc::start_on_launch(&background).await;
             });
             tauri::async_runtime::spawn(async move {
                 let jobs = handle.state::<jobs_ipc::JobsState>();
@@ -254,11 +272,17 @@ fn main() {
             // Closing the main window installs a downloaded update when the user asked for it.
             if let tauri::RunEvent::WindowEvent {
                 label,
-                event: tauri::WindowEvent::CloseRequested { .. },
+                event: tauri::WindowEvent::CloseRequested { api, .. },
                 ..
             } = &event
                 && label == instance::MAIN_WINDOW_LABEL
             {
+                // While Browser access is kept in the tray, closing hides the window and the
+                // server goes on; "Quit CineVault" in the tray quits (and installs an update).
+                if browser_access_ipc::hide_instead_of_close(app) {
+                    api.prevent_close();
+                    return;
+                }
                 cv_app::guard::contain("update on close", || updates_ipc::install_on_close(app));
             }
             // On quit, pause the jobs so the next launch resumes what was unfinished.
@@ -266,6 +290,11 @@ fn main() {
                 // Runs inside a window callback that cannot unwind: a panic must not abort the
                 // shutdown halfway.
                 cv_app::guard::contain("quit", || {
+                    // Browsers are signed out and the port closes before the library shuts down.
+                    if let Some(access) = app.try_state::<browser_access_ipc::BrowserAccessState>()
+                    {
+                        access.stop_now();
+                    }
                     // Close the command-line channel first, so no new batch starts while quitting.
                     if let Some(automation) = app.try_state::<automation_ipc::AutomationState>() {
                         automation.stop();
