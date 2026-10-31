@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use cv_providers::http::HttpClient;
 
 use super::run_text_queries_from;
+use crate::latest::{FeedKind, FeedSkip, FeedSupport, LatestAnswer};
 use crate::model::{
     RawRelease, Scope, SkipReason, SourceError, SourceId, SourceKind, Support, TorrentQuery,
 };
@@ -127,6 +128,53 @@ impl TorrentSource for NyaaSource {
         })
         .await
     }
+
+    fn latest_support(&self, kind: FeedKind) -> FeedSupport {
+        if kind.wants_tv() {
+            FeedSupport::Yes
+        } else {
+            FeedSupport::Skip(FeedSkip::TvOnly)
+        }
+    }
+
+    /// The site's RSS of the newest English-translated anime (`c=1_2`): one page of 75. The RSS
+    /// has no further pages.
+    async fn latest(
+        &self,
+        _kind: FeedKind,
+        page: u32,
+        _context: &SearchContext,
+    ) -> Result<LatestAnswer, SourceError> {
+        if page > 0 {
+            return Ok(LatestAnswer::Page {
+                rows: Vec::new(),
+                more: false,
+            });
+        }
+        let url = format!("{}/", self.base_url);
+        let body = self
+            .http
+            .get_text(&url, &[("page", "rss"), ("c", "1_2"), ("f", "0")])
+            .await?;
+        Ok(LatestAnswer::Page {
+            rows: latest_rows(&body)?,
+            more: false,
+        })
+    }
+}
+
+/// The rows of the newest-anime RSS. They are listed with TV: most are episodes, and the site's
+/// own category ("Anime - English-translated") says nothing about movie or show.
+fn latest_rows(body: &str) -> Result<Vec<RawRelease>, SourceError> {
+    Ok(parse_feed(body)?
+        .items
+        .into_iter()
+        .map(|mut row| {
+            row.source = Some(SourceId(ID.to_owned()));
+            row.category = Some("TV / Anime".to_owned());
+            row
+        })
+        .collect())
 }
 
 #[cfg(test)]

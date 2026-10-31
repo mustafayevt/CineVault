@@ -99,5 +99,31 @@ pub async fn torrent_release_search(
     .await
 }
 
+/// The "Latest releases" feed: the first page of every source that can list its newest releases
+/// (or the rows read in the last few minutes), or with `more` the next page of every source that
+/// has one. Each source answers on the Channel with its rows and, last, where it stands.
+#[tauri::command]
+#[specta::specta]
+pub async fn torrent_latest(
+    state: State<'_, TorrentState>,
+    search: State<'_, SearchState>,
+    request: cv_ipc::torrent_feed::TorrentFeedRequestDto,
+    on_event: Channel<ProviderEvent<cv_ipc::torrent_feed::TorrentFeedItemDto>>,
+) -> CommandResult<cv_ipc::torrent_feed::TorrentFeedStartDto> {
+    cv_ipc::torrent_feed::torrent_latest(&state, &search, request, crate::ipc_sink::sink(on_event))
+        .await
+}
+
+/// Looks one title of the feed up on TMDB (once; the answer is kept): the best match and
+/// whether it is a weak one.
+#[tauri::command]
+#[specta::specta]
+pub async fn torrent_feed_lookup(
+    state: State<'_, TorrentState>,
+    request: cv_ipc::torrent_feed::TorrentFeedLookupRequestDto,
+) -> CommandResult<cv_ipc::torrent_feed::TorrentFeedLookupDto> {
+    cv_ipc::torrent_feed::torrent_feed_lookup(&state, request).await
+}
+
 #[cfg(test)]
 mod tests;

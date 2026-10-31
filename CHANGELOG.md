@@ -6,6 +6,9 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ### Added
 
+- Torrents: the page now opens with the latest releases from your torrent sources, in the same list as a search, filling in as each source answers. Choose All, Movies or TV, sort by newest, seeders, size or quality, filter by resolution, and camera and TS copies are hidden unless you switch "Hide CAM and TS" off. Scroll down for more; a source that has nothing more says so. Type a title to search as before, and clear the field to come back to the list.
+- Torrents: releases of titles you already have say "In your library", or "Better than your copy" when they beat the movie you hold. This is worked out from your library alone.
+- Torrents: click a release (or its Details button) and a side panel slides in and looks the title up on TMDB: poster, plot, rating and links to TMDB, IMDb, Letterboxd and Trakt. If the match looks wrong it says so and lets you pick another title. It also lists the title's other releases and can search all of them. Without a TMDB key it shows what the release name says.
 - Browser access: turn it on in Settings › Browser access and open your library from a phone, a TV or another computer on your home network, with no Docker and no second install. The CineVault you already run serves it, so the window and the browser see the same library at the same time. The section shows the address to open with a Copy button and a QR code, lets you choose the port, and lists the signed-in browsers with Sign out for each or for all.
 - The password for Browser access is created and changed in Settings, right at the computer. Turning Browser access off closes the port and signs every browser out.
 - Only devices on your home network can reach Browser access unless you turn that off.
@@ -18,6 +21,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ### Fixed
 
+- Torrents: the "Send to torrent app" button at the end of each row was cut off ("Send to t…"). It now reads "Send" and always fits; its tooltip still says what it does.
 - The Move to menu is clean and dependable again. Each drive is a row of its own with its free space, the folder's path shortened in the middle (hover it for the whole path) and the free space after the move. A drive that cannot take the titles now says why on its row, such as "Not enough space: needs 71.4 GB, 1.02 GB free.", instead of only looking greyed out, and the menu no longer shows stray scrollbars.
 - A click outside the Move to menu now closes it and does what you clicked, so selecting a title no longer takes two clicks. Pressing "Move to…" again closes the menu, Esc closes it and keeps your selection, and the menu opens above the selection bar without covering it, also in a small window.
 - The Move to menu shows placeholder rows while it measures free space, says when there is no other folder to move to with a way to Settings › Library folders, and works fully from the keyboard.

@@ -17,6 +17,7 @@ use cv_providers::http::HttpClient;
 use tokio::sync::OnceCell;
 
 use super::run_text_queries;
+use crate::latest::{FeedKind, FeedSupport, LatestAnswer};
 use crate::magnet::normalise_info_hash;
 use crate::model::{
     MediaKind, RawRelease, Scope, SourceError, SourceId, SourceKind, Support, TorrentQuery,
@@ -26,6 +27,40 @@ use crate::source::{
     check_status, looks_like_html,
 };
 use crate::torznab::{Caps, FeedError, parse_caps, parse_feed};
+
+/// Releases asked for per page of the newest releases.
+pub const LATEST_PAGE_SIZE: u32 = 100;
+
+/// The Torznab categories of a feed kind: movies `2000`, TV `5000`. Asking only these keeps
+/// adult (`6000`) and everything else out.
+#[must_use]
+pub fn latest_categories(kind: FeedKind) -> &'static str {
+    match kind {
+        FeedKind::All => "2000,5000",
+        FeedKind::Movies => "2000",
+        FeedKind::Tv => "5000",
+    }
+}
+
+/// Whether a Torznab error says the feed cannot list without search words: a missing or wrong
+/// parameter (codes 200 to 299), or a site failure (900) whose text is about the query.
+#[must_use]
+pub fn rejects_empty_query(code: u32, description: &str) -> bool {
+    if (200..300).contains(&code) {
+        return true;
+    }
+    let lower = description.to_lowercase();
+    [
+        "query",
+        "keyword",
+        "search term",
+        "search string",
+        "not supported",
+    ]
+    .iter()
+    .any(|word| lower.contains(word))
+        && !(100..200).contains(&code)
+}
 
 /// The id of the user's own instance.
 pub const USER_INSTANCE_ID: &str = "torznab";
@@ -300,6 +335,75 @@ impl TorrentSource for TorznabSource {
         let (by_id, by_title) = tokio::join!(by_id, by_title);
         combine(by_id, by_title)
     }
+
+    fn latest_support(&self, _kind: FeedKind) -> FeedSupport {
+        FeedSupport::Yes
+    }
+
+    /// `t=search` with no `q`, the movie and TV categories and `limit`/`offset` paging: most feeds
+    /// answer with their newest releases. A feed that refuses a search without words takes no
+    /// part ([`LatestAnswer::Unsupported`]); that is not shown as a failure.
+    async fn latest(
+        &self,
+        kind: FeedKind,
+        page: u32,
+        _context: &SearchContext,
+    ) -> Result<LatestAnswer, SourceError> {
+        let limit = LATEST_PAGE_SIZE.to_string();
+        let offset = (u64::from(page) * u64::from(LATEST_PAGE_SIZE)).to_string();
+        let credentials: Vec<(&str, &str)> = self
+            .api_key
+            .as_deref()
+            .map(|key| vec![("apikey", key)])
+            .unwrap_or_default();
+        let response = self
+            .http
+            .get_credentialed(
+                &self.feed_url,
+                &[
+                    ("t", "search"),
+                    ("cat", latest_categories(kind)),
+                    ("limit", &limit),
+                    ("offset", &offset),
+                ],
+                &credentials,
+            )
+            .await?;
+        latest_answer(&response)
+    }
+}
+
+/// Reads one page of a feed's newest releases.
+///
+/// # Errors
+/// A rejected key, a challenge page, an unreachable feed or an unreadable answer.
+pub fn latest_answer(response: &SourceResponse) -> Result<LatestAnswer, SourceError> {
+    // A feed that wants search words often says so with HTTP 400 and a Torznab error element.
+    if matches!(response.status, 400 | 422) && !looks_like_html(&response.body) {
+        return match parse_feed(&response.text()) {
+            Ok(feed) => match &feed.error {
+                Some(error) if (100..200).contains(&error.code) => Err(SourceError::KeyRejected),
+                Some(error) if !rejects_empty_query(error.code, &error.description) => {
+                    Err(feed_error(error))
+                }
+                _ => Ok(LatestAnswer::Unsupported),
+            },
+            Err(_) => Ok(LatestAnswer::Unsupported),
+        };
+    }
+    check_answer(response)?;
+    let feed = parse_feed(&response.text())?;
+    if let Some(error) = &feed.error {
+        if rejects_empty_query(error.code, &error.description) {
+            return Ok(LatestAnswer::Unsupported);
+        }
+        return Err(feed_error(error));
+    }
+    let more = !feed.items.is_empty();
+    Ok(LatestAnswer::Page {
+        rows: feed.items,
+        more,
+    })
 }
 
 /// The answers of the ID search (`None` when there was none) and the title search as one list.

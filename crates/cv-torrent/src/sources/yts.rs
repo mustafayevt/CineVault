@@ -3,6 +3,9 @@
 //! `GET {base}/api/v2/list_movies.json?query_term={imdb}`. Each movie in `data.movies` lists its
 //! `torrents` (one per quality); every torrent becomes one release named like the site names its
 //! files: `{title_long} {quality} {type} {video_codec} YTS`. Movies only.
+//!
+//! The newest movies for the feed: `list_movies.json?sort_by=date_added&order_by=desc`, 50 movies
+//! a page, paged with `page` while `movie_count` says there are more.
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -10,6 +13,7 @@ use cv_providers::http::HttpClient;
 use serde::Deserialize;
 
 use super::{flexible_u32, flexible_u64};
+use crate::latest::{FeedKind, FeedSkip, FeedSupport, LatestAnswer};
 use crate::magnet::normalise_info_hash;
 use crate::model::{
     MediaKind, RawRelease, SkipReason, SourceError, SourceId, SourceKind, Support, TorrentQuery,
@@ -18,6 +22,8 @@ use crate::source::{SearchContext, SourceHttp, TorrentSource};
 
 /// The id of this source.
 pub const ID: &str = "yts";
+/// Movies asked for per page of the newest movies.
+pub const LATEST_PAGE_SIZE: u32 = 50;
 
 #[derive(Debug, Deserialize)]
 struct Answer {
@@ -30,6 +36,7 @@ struct Answer {
 struct Data {
     #[serde(default)]
     movies: Vec<Movie>,
+    movie_count: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,34 +103,63 @@ fn parse_answer(answer: Answer, imdb: &str) -> Result<Vec<RawRelease>, SourceErr
         {
             continue;
         }
-        for torrent in &movie.torrents {
-            let Some(info_hash) = torrent.hash.as_deref().and_then(normalise_info_hash) else {
-                continue;
-            };
-            let Some(name) = name_of(&movie, torrent) else {
-                continue;
-            };
-            out.push(RawRelease {
-                details_url: movie.url.as_deref().and_then(crate::model::web_page),
-                source: Some(SourceId(ID.to_owned())),
-                name,
-                info_hash: Some(info_hash),
-                torrent_url: torrent
-                    .url
-                    .clone()
-                    .filter(|u| u.starts_with("http://") || u.starts_with("https://")),
-                size: flexible_u64(torrent.size_bytes.as_ref()),
-                seeders: flexible_u32(torrent.seeds.as_ref()),
-                leechers: flexible_u32(torrent.peers.as_ref()),
-                published: torrent
-                    .date_uploaded_unix
-                    .and_then(|secs| DateTime::from_timestamp(secs, 0)),
-                imdb: movie.imdb_code.clone(),
-                ..RawRelease::default()
-            });
-        }
+        out.extend(releases_of(&movie));
     }
     Ok(out)
+}
+
+/// Every torrent of a movie as a release.
+fn releases_of(movie: &Movie) -> Vec<RawRelease> {
+    let mut out = Vec::new();
+    for torrent in &movie.torrents {
+        let Some(info_hash) = torrent.hash.as_deref().and_then(normalise_info_hash) else {
+            continue;
+        };
+        let Some(name) = name_of(movie, torrent) else {
+            continue;
+        };
+        out.push(RawRelease {
+            details_url: movie.url.as_deref().and_then(crate::model::web_page),
+            source: Some(SourceId(ID.to_owned())),
+            name,
+            info_hash: Some(info_hash),
+            torrent_url: torrent
+                .url
+                .clone()
+                .filter(|u| u.starts_with("http://") || u.starts_with("https://")),
+            size: flexible_u64(torrent.size_bytes.as_ref()),
+            seeders: flexible_u32(torrent.seeds.as_ref()),
+            leechers: flexible_u32(torrent.peers.as_ref()),
+            published: torrent
+                .date_uploaded_unix
+                .and_then(|secs| DateTime::from_timestamp(secs, 0)),
+            imdb: movie.imdb_code.clone(),
+            ..RawRelease::default()
+        });
+    }
+    out
+}
+
+/// A page of the newest movies (`sort_by=date_added`): every torrent of every movie, and whether
+/// `movie_count` says there is a next page.
+fn parse_latest(answer: Answer, page: u32) -> Result<LatestAnswer, SourceError> {
+    if answer.status.as_deref().is_some_and(|s| s != "ok") {
+        return Err(SourceError::BadAnswer(
+            answer
+                .status_message
+                .unwrap_or_else(|| "the site reported an error".to_owned()),
+        ));
+    }
+    let data = answer.data;
+    let total = data
+        .as_ref()
+        .and_then(|d| flexible_u64(d.movie_count.as_ref()))
+        .unwrap_or(0);
+    let movies = data.map(|d| d.movies).unwrap_or_default();
+    let got = movies.len();
+    let rows: Vec<RawRelease> = movies.iter().flat_map(releases_of).collect();
+    let more = got > 0 && u64::from(page + 1) * u64::from(LATEST_PAGE_SIZE) < total;
+    Ok(LatestAnswer::Page { rows, more })
 }
 
 /// The YTS source.
@@ -180,6 +216,39 @@ impl TorrentSource for YtsSource {
         let url = format!("{}/api/v2/list_movies.json", self.base_url);
         let answer: Answer = self.http.get_json(&url, &[("query_term", imdb)]).await?;
         parse_answer(answer, imdb)
+    }
+
+    fn latest_support(&self, kind: FeedKind) -> FeedSupport {
+        if kind.wants_movies() {
+            FeedSupport::Yes
+        } else {
+            FeedSupport::Skip(FeedSkip::MoviesOnly)
+        }
+    }
+
+    /// `list_movies.json?sort_by=date_added&order_by=desc&limit=50&page={n}`.
+    async fn latest(
+        &self,
+        _kind: FeedKind,
+        page: u32,
+        _context: &SearchContext,
+    ) -> Result<LatestAnswer, SourceError> {
+        let url = format!("{}/api/v2/list_movies.json", self.base_url);
+        let limit = LATEST_PAGE_SIZE.to_string();
+        let page_number = (page + 1).to_string();
+        let answer: Answer = self
+            .http
+            .get_json(
+                &url,
+                &[
+                    ("sort_by", "date_added"),
+                    ("order_by", "desc"),
+                    ("limit", &limit),
+                    ("page", &page_number),
+                ],
+            )
+            .await?;
+        parse_latest(answer, page)
     }
 }
 

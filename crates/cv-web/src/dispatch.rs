@@ -1742,6 +1742,24 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             .map_err(command_error)
             .and_then(to_value)
         }
+        "torrent_latest" => {
+            let request: cv_ipc::torrent_feed::TorrentFeedRequestDto = arg(args, "request")?;
+            let stream = channel_arg(args, "onEvent")?;
+            let sink = channel_sink::<
+                cv_ipc::provider_stream::ProviderEvent<cv_ipc::torrent_feed::TorrentFeedItemDto>,
+            >(state, client, stream);
+            cv_ipc::torrent_feed::torrent_latest(&commands.torrent, &commands.search, request, sink)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "torrent_feed_lookup" => {
+            let request: cv_ipc::torrent_feed::TorrentFeedLookupRequestDto = arg(args, "request")?;
+            cv_ipc::torrent_feed::torrent_feed_lookup(&commands.torrent, request)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
         "torrent_sources_status" => {
             let commands = Arc::clone(&state.commands);
             on_blocking(move || {

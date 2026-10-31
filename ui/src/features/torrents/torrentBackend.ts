@@ -1,4 +1,4 @@
-import type { Channel } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
 
 import { commands } from "../../bindings";
 import { isServer, transport } from "../../lib/transport";
@@ -10,6 +10,12 @@ import type {
   ProviderEvent,
   TorrentCommandError,
   TorrentEpisodeDto,
+  TorrentFeedItemDto,
+  TorrentFeedLookupDto,
+  TorrentFeedLookupRequestDto,
+  TorrentFeedRowDto,
+  TorrentFeedSourceDto,
+  TorrentFeedStartDto,
   TorrentLandingDto,
   TorrentLandingTitleDto,
   TorrentReleaseDto,
@@ -41,6 +47,26 @@ export type IndexerManagerAccess = IndexerManagerAccessDto;
 export type OwnJackett = OwnJackettDto;
 export type Landing = TorrentLandingDto;
 export type LandingTitle = TorrentLandingTitleDto;
+/** A release of the "Latest releases" feed with what its name says. */
+export type FeedRow = TorrentFeedRowDto;
+/** What a feed source sends: a row, or (last) where it stands. */
+export type FeedItem = TorrentFeedItemDto;
+export type FeedSource = TorrentFeedSourceDto;
+export type FeedStart = TorrentFeedStartDto;
+export type FeedLookup = TorrentFeedLookupDto;
+export type FeedLookupRequest = TorrentFeedLookupRequestDto;
+/** Which releases the feed lists. */
+export type FeedKind = "all" | "movies" | "tv";
+
+/** A request for the feed: the first page (or the recent rows kept), the next page, or anew. */
+export interface FeedRequest {
+  searchId: string;
+  kind: FeedKind;
+  more: boolean;
+  refresh: boolean;
+  generation: string | null;
+}
+
 /** One source of a release search, with the reason it is skipped, if it is. */
 export type SourceInfo = TorrentSearchStartDto["sources"][number];
 
@@ -85,6 +111,18 @@ export interface TorrentBackend {
   releaseTransport: (
     onStart?: (start: SearchStart) => void,
   ) => ProviderSearchTransport<TorrentRelease>;
+  /**
+   * Reads the "Latest releases" feed: the rows stream to `onEvent` as each source answers, one
+   * provider per source; the promise is the start reply (every source's state, the rows kept).
+   */
+  latest: (
+    request: FeedRequest,
+    onEvent: (event: ProviderEvent<FeedItem>) => void,
+  ) => Promise<FeedStart>;
+  /** Stops a feed request. */
+  cancelLatest: (searchId: string) => void;
+  /** Looks one feed title up on TMDB (once; the backend keeps the answer). */
+  feedLookup: (request: FeedLookupRequest) => Promise<FeedLookup>;
   /** Hands a magnet link to the system's torrent app. */
   openMagnet: (magnet: string) => Promise<void>;
   /** Downloads a `.torrent` file and opens it. */
@@ -165,6 +203,16 @@ function releaseStreamTransport(
   });
 }
 
+/** The feed of the desktop app (and of the browser server, whose transport carries Channels). */
+async function latestOverChannel(
+  request: FeedRequest,
+  onEvent: (event: ProviderEvent<FeedItem>) => void,
+): Promise<FeedStart> {
+  const channel = new Channel<ProviderEvent<TorrentFeedItemDto>>();
+  channel.onmessage = onEvent;
+  return unwrap(await commands.torrentLatest(request, channel));
+}
+
 /** The backend of the desktop app: the sources and TMDB live in the Rust service. */
 const tauriTorrentBackend: TorrentBackend = {
   available: true,
@@ -174,6 +222,9 @@ const tauriTorrentBackend: TorrentBackend = {
   episodes: async (tmdbId, season) => unwrap(await commands.torrentTitleEpisodes(tmdbId, season)),
   landing: async () => unwrap(await commands.torrentLanding()),
   releaseTransport: releaseStreamTransport,
+  latest: latestOverChannel,
+  cancelLatest: (searchId) => void commands.cancelSearch(searchId),
+  feedLookup: async (request) => unwrap(await commands.torrentFeedLookup(request)),
   openMagnet: async (magnet) => void unwrap(await commands.torrentOpenMagnet(magnet)),
   openTorrentFile: async (url, name) =>
     void unwrap(await commands.torrentOpenTorrentFile(url, name)),

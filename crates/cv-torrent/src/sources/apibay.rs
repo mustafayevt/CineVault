@@ -4,6 +4,9 @@
 //! 205, 208, 212 for TV. The answer is a JSON array of rows with every number as text and the
 //! info-hash in upper case. "Nothing found" is one row with `id` `"0"`. No paging; about a
 //! hundred rows per query.
+//!
+//! The newest releases for the feed: `q.php?q=category:{id}&page=0` per category, 50 each, one
+//! page only (the site gives the same 50 whatever the page number).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -11,6 +14,7 @@ use cv_providers::http::HttpClient;
 use serde::Deserialize;
 
 use super::{flexible_u32, flexible_u64, run_text_queries};
+use crate::latest::{FeedKind, FeedSupport, LatestAnswer};
 use crate::magnet::normalise_info_hash;
 use crate::model::{
     MediaKind, RawRelease, SourceError, SourceId, SourceKind, Support, TorrentQuery,
@@ -148,6 +152,54 @@ impl TorrentSource for ApibaySource {
         })
         .await
     }
+
+    fn latest_support(&self, _kind: FeedKind) -> FeedSupport {
+        FeedSupport::Yes
+    }
+
+    /// `q.php?q=category:{id}&page=0` for each video category of the kind: the newest 50 of each.
+    /// The site has no further pages (any page number gives the same 50), so the first page is
+    /// the only one.
+    async fn latest(
+        &self,
+        kind: FeedKind,
+        page: u32,
+        context: &SearchContext,
+    ) -> Result<LatestAnswer, SourceError> {
+        if page > 0 {
+            return Ok(LatestAnswer::Page {
+                rows: Vec::new(),
+                more: false,
+            });
+        }
+        let url = format!("{}/q.php", self.base_url);
+        let rows = super::run_text_queries_from(latest_queries(kind), context, |text| {
+            let url = url.clone();
+            async move {
+                // `page=0` matters: without it the site sometimes answers "No results".
+                let rows: Vec<Row> = self
+                    .http
+                    .get_json(&url, &[("q", &text), ("page", "0")])
+                    .await?;
+                Ok(read_answer(rows))
+            }
+        })
+        .await?;
+        Ok(LatestAnswer::Page { rows, more: false })
+    }
+}
+
+/// The category listings of a kind: `category:201` and so on.
+#[must_use]
+pub fn latest_queries(kind: FeedKind) -> Vec<String> {
+    let mut ids: Vec<&str> = Vec::new();
+    if kind.wants_movies() {
+        ids.extend(MOVIE_CATEGORIES.split(','));
+    }
+    if kind.wants_tv() {
+        ids.extend(TV_CATEGORIES.split(','));
+    }
+    ids.into_iter().map(|id| format!("category:{id}")).collect()
 }
 
 #[cfg(test)]

@@ -78,7 +78,10 @@ export function ageText(published: number | null, now: number = Date.now()): str
 // ---- sources -----------------------------------------------------------------------------
 
 /** The name of a source by its id, from the start reply; the id itself when it is not listed. */
-export function sourceName(id: string, sources: readonly SourceInfo[]): string {
+export function sourceName(
+  id: string,
+  sources: readonly Pick<SourceInfo, "id" | "name">[],
+): string {
   return sources.find((source) => source.id === id)?.name ?? id;
 }
 

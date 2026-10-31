@@ -10,6 +10,7 @@
 //! * [`torznab`]: the Torznab and RSS readers;
 //! * [`source`] and [`sources`]: the [`source::TorrentSource`] trait and one module per source;
 //! * [`search`]: the orchestrator that runs the sources at once;
+//! * [`latest`]: the "Latest releases" feed: each source's newest releases, page by page;
 //! * [`indexer_service`]: the managed indexer service (process, admin API, provisioning).
 //!
 //! The pure modules (query, release, magnet, merge, rank, torznab) do no I/O and are table-tested.
@@ -17,6 +18,7 @@
 
 pub mod cancel;
 pub mod indexer_service;
+pub mod latest;
 pub mod magnet;
 pub mod merge;
 pub mod model;

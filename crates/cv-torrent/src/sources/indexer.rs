@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use cv_providers::http::HttpClient;
 
 use super::torznab::TorznabSource;
+use crate::latest::{FeedKind, FeedSupport, LatestAnswer};
 use crate::model::{RawRelease, SourceError, SourceId, SourceKind, Support, TorrentQuery};
 use crate::source::{INDEXER_LANE, SearchContext, SourceHttp, TorrentSource};
 
@@ -79,6 +80,19 @@ impl TorrentSource for IndexerSource {
         context: &SearchContext,
     ) -> Result<Vec<RawRelease>, SourceError> {
         self.inner.search(query, context).await
+    }
+
+    fn latest_support(&self, kind: FeedKind) -> FeedSupport {
+        self.inner.latest_support(kind)
+    }
+
+    async fn latest(
+        &self,
+        kind: FeedKind,
+        page: u32,
+        context: &SearchContext,
+    ) -> Result<LatestAnswer, SourceError> {
+        self.inner.latest(kind, page, context).await
     }
 }
 

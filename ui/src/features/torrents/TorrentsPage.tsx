@@ -14,6 +14,9 @@ import type { QualityTier } from "../../components/QualityBadge";
 import { SuggestPanel } from "../search/SuggestPanel";
 import type { SuggestItem } from "../search/SuggestPanel";
 import { useCombobox } from "../search/useCombobox";
+import { DEFAULT_FEED_VIEW } from "./feedView";
+import type { FeedView } from "./feedView";
+import { LatestFeed } from "./LatestFeed";
 import { ReleaseTable } from "./ReleaseTable";
 import type { OwnedCopy } from "./ReleaseTable";
 import {
@@ -99,7 +102,8 @@ function Rows() {
  * suggests titles (movies and shows from the metadata provider, the ones you own marked), and no
  * release is searched until one is picked. The picked title shows as a chip above the results
  * with an × to change it, and its releases list as the sources answer, with resolution chips and
- * counts, a sortable table, and a hint against the copy the library already holds. The route
+ * counts, a sortable table, and a hint against the copy the library already holds. Until a title
+ * is picked the page lists the newest releases of the sources (`LatestFeed`). The route
  * carries a confirmed title (`?title=movie:123`, from a collection or a title page) or the typed
  * text (`?q=`).
  */
@@ -143,6 +147,9 @@ function TorrentsContent() {
     setText(titleName(choice));
     setTyped(true);
   };
+  // The "Latest releases" feed shows while no title is chosen; its view outlives a search.
+  const [feedView, setFeedView] = useState<FeedView>(DEFAULT_FEED_VIEW);
+  const [feedCount, setFeedCount] = useState<number | null>(null);
   const combobox = useCombobox({
     anchor,
     ids: suggested.map((choice) => choice.id),
@@ -219,12 +226,16 @@ function TorrentsContent() {
 
   const asked = releases.sources.filter((source) => source.skipped === null).length;
   const countText =
-    ref === null || (matching.length === 0 && releases.searching)
-      ? ""
-      : t("torrentsPage.count", {
-          results: t("torrentsPage.count.results", { count: matching.length }),
-          sources: t("torrentsPage.count.sources", { count: asked }),
-        });
+    ref === null
+      ? feedCount === null || shownText !== ""
+        ? ""
+        : t("torrentsFeed.count", { count: feedCount })
+      : matching.length === 0 && releases.searching
+        ? ""
+        : t("torrentsPage.count", {
+            results: t("torrentsPage.count.results", { count: matching.length }),
+            sources: t("torrentsPage.count.sources", { count: asked }),
+          });
 
   const clear = () => {
     setText("");
@@ -257,11 +268,18 @@ function TorrentsContent() {
 
   let body: React.ReactNode;
   if (ref === null) {
-    // Nothing is searched until a title is picked: the field's suggestions do the finding.
+    // No release is searched until a title is picked: the field's suggestions do the finding.
+    // Meanwhile the newest releases of the sources are listed.
     body = (
-      <Message>
-        <p className="m-0">{t("torrentsPage.idle")}</p>
-      </Message>
+      <LatestFeed
+        view={feedView}
+        onView={setFeedView}
+        onSearch={(hit) => {
+          pick(hit);
+          field.current?.focus();
+        }}
+        onCount={setFeedCount}
+      />
     );
   } else if (matching.length === 0) {
     body = releases.searching ? (
@@ -390,7 +408,7 @@ function TorrentsContent() {
             field.current?.focus();
           }}
         />
-        <div className="flex h-6 items-center gap-1.5">
+        <div className={ref === null ? "hidden" : "flex h-6 items-center gap-1.5"}>
           <div
             role="group"
             aria-label={t("torrentsPage.chips")}
@@ -433,6 +451,12 @@ function TorrentsContent() {
       <div aria-busy={searching} className="flex min-h-0 flex-1 flex-col">
         {body}
       </div>
+      <p
+        data-testid="torrent-responsibility"
+        className="m-0 shrink-0 border-t border-solid border-line-section px-6 py-1.5 text-(length:--fs-12) text-text-muted"
+      >
+        {t("torrentsPage.responsibility")}
+      </p>
     </section>
   );
 }
