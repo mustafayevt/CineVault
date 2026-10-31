@@ -16,6 +16,12 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 - Server: the first-run welcome no longer closes after 30 minutes. It stays until a password exists, but only browsers on the same computer or the home network can use it.
 
+### Fixed
+
+- The Move to menu is clean and dependable again. Each drive is a row of its own with its free space, the folder's path shortened in the middle (hover it for the whole path) and the free space after the move. A drive that cannot take the titles now says why on its row, such as "Not enough space: needs 71.4 GB, 1.02 GB free.", instead of only looking greyed out, and the menu no longer shows stray scrollbars.
+- A click outside the Move to menu now closes it and does what you clicked, so selecting a title no longer takes two clicks. Pressing "Move to…" again closes the menu, Esc closes it and keeps your selection, and the menu opens above the selection bar without covering it, also in a small window.
+- The Move to menu shows placeholder rows while it measures free space, says when there is no other folder to move to with a way to Settings › Library folders, and works fully from the keyboard.
+
 ## [1.2.0] - 2026-10-30
 
 ### Added
