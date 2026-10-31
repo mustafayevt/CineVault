@@ -12,6 +12,10 @@ import type { MoveKind } from "./moveToStore";
 export interface MoveOptions {
   /** True until the folders and their plans have been read. */
   loading: boolean;
+  /** True when the library folders could not be read. */
+  failed: boolean;
+  /** Reads the folders and the plans again (after a failure). */
+  retry: () => void;
   options: readonly MoveOption[];
   /** How many bytes the request carries in all, when the plans say. */
   totalBytes: number | null;
@@ -57,7 +61,7 @@ export function useMoveOptions(
   });
 
   const settled = plans.every((plan) => plan.data !== undefined || plan.isError);
-  const loading = sources.isPending || !settled;
+  const loading = (sources.isPending && !sources.isError) || !settled;
   const planKey = plans.map((plan) => plan.dataUpdatedAt).join();
 
   return useMemo<MoveOptions>(() => {
@@ -70,14 +74,22 @@ export function useMoveOptions(
       const drive = drives === undefined ? undefined : driveOfDestination(drives, source);
       built.push({ option: buildOption(source, plan, drive, format.size), plan });
     });
-    const first = plans.find((plan) => plan.data !== undefined)?.data;
-    const totalBytes =
-      first === undefined || first.rows.some((row) => row.bytes === null)
-        ? null
-        : first.rows.reduce((sum, row) => sum + (row.bytes ?? 0), 0);
+    // The size of the request: the folder the titles are in already reports nothing to move, so
+    // the largest plan that knows every title's size is the one that says.
+    let totalBytes: number | null = null;
+    for (const plan of plans) {
+      const rows = plan.data?.rows;
+      if (rows === undefined || rows.length === 0 || rows.some((row) => row.bytes === null)) {
+        continue;
+      }
+      const sum = rows.reduce((total, row) => total + (row.bytes ?? 0), 0);
+      if (totalBytes === null || sum > totalBytes) totalBytes = sum;
+    }
     const best = built.find(({ option }) => option.reason === null);
     return {
       loading,
+      failed: sources.isError,
+      retry: () => void sources.refetch(),
       options: built.map(({ option }) => option),
       totalBytes,
       frees:
@@ -87,5 +99,5 @@ export function useMoveOptions(
     };
     // `planKey` stands for the plans' arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [destinations, planKey, drives, type, format, loading]);
+  }, [destinations, planKey, drives, type, format, loading, sources.isError]);
 }

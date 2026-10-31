@@ -24,6 +24,37 @@ describe("where the Move to menu opens", () => {
     expect(currentAnchor().side).toBe("bottom");
   });
 
+  it("prefers the button just pressed over one that kept the focus", () => {
+    document.body.innerHTML =
+      '<button id="old">Old</button><div role="toolbar"><button id="move">Move to…</button></div>';
+    (document.getElementById("old") as HTMLButtonElement).focus();
+    const move = document.getElementById("move") as HTMLButtonElement;
+    trackPointer({ clientX: 10, clientY: 10, target: move });
+    expect(currentAnchor().element).toBe(move);
+    expect(currentAnchor().side).toBe("top");
+  });
+
+  it("closes when the control that opened it asks again, and opens on the next press", () => {
+    document.body.innerHTML = '<div role="toolbar"><button id="move">Move to…</button></div>';
+    const move = document.getElementById("move") as HTMLButtonElement;
+    trackPointer({ clientX: 10, clientY: 10, target: move });
+    openMoveTo(["a"], "movie", "Heat");
+    expect(useMoveToStore.getState().request?.keyboard).toBe(false);
+    openMoveTo(["a"], "movie", "Heat");
+    expect(useMoveToStore.getState().request).toBeNull();
+    openMoveTo(["a"], "movie", "Heat");
+    expect(useMoveToStore.getState().request).not.toBeNull();
+  });
+
+  it("marks a request with no press before it as a keyboard one", () => {
+    document.body.innerHTML = '<div><button id="move">Move</button></div>';
+    const move = document.getElementById("move") as HTMLButtonElement;
+    trackPointer({ clientX: 0, clientY: 0, target: document.body });
+    move.focus();
+    openMoveTo(["a"], "movie", "Heat");
+    expect(useMoveToStore.getState().request?.keyboard).toBe(true);
+  });
+
   it("keeps the request with its titles and name", () => {
     openMoveTo(["a", "b"], "movie", "2 titles");
     const request = useMoveToStore.getState().request;

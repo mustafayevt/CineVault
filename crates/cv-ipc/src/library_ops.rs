@@ -30,8 +30,9 @@ pub struct LibraryOpsState {
     recovery: OnceLock<Result<Arc<RecoveryService>, String>>,
     /// The poster index behind `cv://img`; told about every move so thumbnails follow files.
     sources: Arc<LibrarySources>,
-    /// Pause and cancel of the move that is running now.
-    control: Mutex<Option<Arc<MoveControl>>>,
+    /// Pause and cancel of the move that is running now. Shared with a second surface (the
+    /// desktop app's Browser access), so only one move runs whichever surface starts it.
+    control: Arc<Mutex<Option<Arc<MoveControl>>>>,
 }
 
 impl LibraryOpsState {
@@ -42,7 +43,17 @@ impl LibraryOpsState {
             review: OnceLock::new(),
             recovery: OnceLock::new(),
             sources,
-            control: Mutex::new(None),
+            control: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// A state for a second surface over the same library: its own services, but the same
+    /// running-move slot as `other`, so a second move is refused as busy wherever it starts.
+    #[must_use]
+    pub fn sharing_moves_with(other: &Self, sources: Arc<LibrarySources>) -> Self {
+        Self {
+            control: Arc::clone(&other.control),
+            ..Self::new(sources)
         }
     }
 
@@ -1094,4 +1105,23 @@ pub async fn relocate_review_row(
         })
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_shared_move_slot_refuses_a_second_move_from_the_other_surface() {
+        let desktop = LibraryOpsState::new(Arc::new(LibrarySources::new()));
+        let browser =
+            LibraryOpsState::sharing_moves_with(&desktop, Arc::new(LibrarySources::new()));
+        let first = MoveControl::new();
+        begin_move(&desktop, &first).expect("the first move starts");
+        let second = MoveControl::new();
+        let refused = begin_move(&browser, &second).expect_err("the second move is refused");
+        assert_eq!(refused.code, "busy");
+        end_move(&desktop, &first);
+        begin_move(&browser, &second).expect("a move starts once the first ended");
+    }
 }
