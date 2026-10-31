@@ -57,6 +57,7 @@
       <div class="log-body">
 <h3>Added</h3>
 <ul>
+<li>Browser mode installs with one command: on Linux it installs the server package and starts it as a service, on Windows and macOS it sets CineVault up in Docker Desktop. Running the same command again updates CineVault, changes its folders or removes it. There is also an Unraid template and a simpler Docker Compose file.</li>
 <li>Torrents: the page now opens with the latest releases from your torrent sources, in the same list as a search, filling in as each source answers. Choose All, Movies or TV, sort by newest, seeders, size or quality, filter by resolution, and camera and TS copies are hidden unless you switch &quot;Hide CAM and TS&quot; off. Scroll down for more; a source that has nothing more says so. Type a title to search as before, and clear the field to come back to the list.</li>
 <li>Torrents: releases of titles you already have say &quot;In your library&quot;, or &quot;Better than your copy&quot; when they beat the movie you hold. This is worked out from your library alone.</li>
 <li>Torrents: click a release (or its Details button) and a side panel slides in and looks the title up on TMDB: poster, plot, rating and links to TMDB, IMDb, Letterboxd and Trakt. If the match looks wrong it says so and lets you pick another title. It also lists the title's other releases and can search all of them. Without a TMDB key it shows what the release name says.</li>
@@ -72,6 +73,9 @@
 </ul>
 <h3>Fixed</h3>
 <ul>
+<li>A password set with <code>cinevault-server passwd</code> as root (with sudo, or <code>docker exec</code> without <code>-u</code>) now works right away instead of only after a restart.</li>
+<li>The server packages and tarball are attached to every release again; 1.2.0 was missing them at first.</li>
+<li>Removing the server <code>.deb</code> no longer takes an empty <code>/usr/local/bin</code> folder with it.</li>
 <li>Torrents: the &quot;Send to torrent app&quot; button at the end of each row was cut off (&quot;Send to t…&quot;). It now reads &quot;Send&quot; and always fits; its tooltip still says what it does.</li>
 <li>The Move to menu is clean and dependable again. Each drive is a row of its own with its free space, the folder's path shortened in the middle (hover it for the whole path) and the free space after the move. A drive that cannot take the titles now says why on its row, such as &quot;Not enough space: needs 71.4 GB, 1.02 GB free.&quot;, instead of only looking greyed out, and the menu no longer shows stray scrollbars.</li>
 <li>A click outside the Move to menu now closes it and does what you clicked, so selecting a title no longer takes two clicks. Pressing &quot;Move to…&quot; again closes the menu, Esc closes it and keeps your selection, and the menu opens above the selection bar without covering it, also in a small window.</li>

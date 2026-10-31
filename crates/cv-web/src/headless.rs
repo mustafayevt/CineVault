@@ -172,6 +172,9 @@ pub fn passwd(arguments: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         return Err("The passwords do not match.".into());
     }
     auth.set_password_unattended(&password)?;
+    // Run as root (`sudo`, or `docker exec` without `-u`), the new file would belong to root with
+    // mode 0600 and the server, which runs as the data folder's owner, could not read it.
+    auth::give_to_folder_owner(&path, location.root());
     println!("Password set. Open the server in a browser and sign in.");
     Ok(())
 }

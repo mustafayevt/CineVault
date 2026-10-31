@@ -34,3 +34,7 @@ anime-offline-database*.json*
 
 # Screenshot check output (bun run shots)
 /ui/.shots/
+
+# Local server data and keys (docker-compose.yml, the install scripts)
+/secret.key
+/secrets/

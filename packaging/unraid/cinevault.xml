@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+  Unraid template for the CineVault server (browser mode, beta).
+  Install: Docker tab > Add Container > Template repositories, or copy this file to
+  /boot/config/plugins/dockerMan/templates-user/my-CineVault.xml and pick it under Add Container.
+-->
+<Container version="2">
+  <Name>CineVault</Name>
+  <Repository>ghcr.io/mustafayevt/cinevault:latest</Repository>
+  <Registry>https://github.com/mustafayevt/CineVault/pkgs/container/cinevault</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/mustafayevt/CineVault/issues</Support>
+  <Project>https://github.com/mustafayevt/CineVault</Project>
+  <Overview>CineVault (beta browser mode) scans your movie and TV folders, identifies the titles, writes NFO and artwork files in the Kodi, Jellyfin and Emby formats and renames folders and files with a preview and Undo. Open the WebUI, choose a password on the welcome page (open for 30 minutes after the container starts), then add your folders as /media/... in setup. Make the Secret key once in the Unraid terminal with: openssl rand -base64 32 and keep a copy.</Overview>
+  <Category>MediaApp:Video Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8787]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/mustafayevt/CineVault/main/site/img/apple-touch-icon.png</Icon>
+  <ExtraParams>--stop-timeout 30</ExtraParams>
+  <Config Name="Web UI port" Target="8787" Default="8787" Mode="tcp" Description="The port to open in the browser." Type="Port" Display="always" Required="true" Mask="false">8787</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/cinevault" Mode="rw" Description="CineVault's library, settings and password. Keep it on the cache or a local pool." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/cinevault</Config>
+  <Config Name="Media" Target="/media" Default="/mnt/user/media" Mode="rw" Description="Your movie and TV share, read-write (CineVault writes NFO and artwork and renames files). In CineVault's setup, add its folders under /media." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media</Config>
+  <Config Name="Secret key" Target="CINEVAULT_SECRET_KEY" Default="" Description="Encrypts your TMDB and other provider keys. Make it once with: openssl rand -base64 32 (base64 of 32 bytes). Without it, provider keys cannot be saved." Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="PUID" Target="PUID" Default="99" Description="The user that owns your media (99 = nobody on Unraid)." Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Description="The group that owns your media (100 = users on Unraid)." Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+</Container>

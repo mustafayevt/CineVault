@@ -317,15 +317,21 @@
     <section class="feature" aria-labelledby="f-server">
       <div class="wrap feature-in">
         <div class="feature-copy">
-          <p class="kicker">Home server</p>
+          <p class="kicker">Browser mode · beta</p>
           <h2 id="f-server">Run it next to the files</h2>
-          <p>CineVault can run headless on the machine that holds the media and be used from any browser on the network. The library folders no longer need to be mounted on the computer you sit at, and the server needs no desktop session, no Tauri and no WebKit.</p>
+          <p>CineVault can run on the computer or NAS that holds the media and be used from any browser at home: phone, tablet or laptop. Install it with one command; run the same command again to update it.</p>
+          <div class="strip strip-install" role="group" aria-label="Install commands">
+            <div class="strip-row"><span class="strip-tag">Linux</span><code>curl -fsSL https://mustafayevt.github.io/CineVault/install.sh | sh</code></div>
+            <div class="strip-row"><span class="strip-tag">Windows</span><code>irm https://mustafayevt.github.io/CineVault/install.ps1 | iex</code></div>
+            <div class="strip-row"><span class="strip-tag">macOS</span><code>curl -fsSL https://mustafayevt.github.io/CineVault/install.sh | sh</code></div>
+            <p class="strip-note">Linux installs a package and a service; Windows (in PowerShell) and macOS need <a href="https://docs.docker.com/desktop/">Docker Desktop</a>. NAS: a Compose file and an Unraid template.</p>
+          </div>
           <ul class="facts">
-            <li>A container image, a .deb and .rpm package, and a tarball</li>
-            <li>One password for the server, with encrypted provider keys and a first-run welcome</li>
+            <li>Choose a password on the welcome page, add your folders, enter your TMDB key</li>
+            <li>Provider keys are stored encrypted; the server stays on your home network</li>
             <li>The desktop app and the server share one library safely: only one of them holds it at a time</li>
           </ul>
-          <p class="note"><a href="https://github.com/mustafayevt/CineVault/blob/main/packaging/README.md">How to run CineVault on a home server</a></p>
+          <p class="note"><a href="https://github.com/mustafayevt/CineVault/blob/main/packaging/README.md">The full guide: install, update, forgotten password and troubleshooting</a></p>
         </div>
         <figure class="window reveal">
           <picture>

@@ -1,15 +1,16 @@
 name: Deploy site
 
-# Publishes site/ (the landing page, https://mustafayevt.github.io/CineVault/) to GitHub Pages when
-# a push to main changes it or CHANGELOG.md (the changelog page is generated from it), and by hand:
-# Actions → Deploy site → Run workflow. Pages must use the "GitHub Actions" source (Settings →
-# Pages → Build and deployment).
+# Publishes site/ (the landing page, https://mustafayevt.github.io/CineVault/) and the server install
+# scripts (scripts/install/) to GitHub Pages when a push to main changes them or CHANGELOG.md (the
+# changelog page is generated from it), and by hand: Actions → Deploy site → Run workflow. Pages
+# must use the "GitHub Actions" source (Settings → Pages → Build and deployment).
 on:
   push:
     branches: [main]
     paths:
       - "site/**"
       - "CHANGELOG.md"
+      - "scripts/install/**"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 
@@ -40,12 +41,14 @@ jobs:
       - name: Site changelog is current
         run: bun run site:changelog -- --check
 
-      # The website is the contents of site/ without its README.
+      # The website is the contents of site/ without its README, plus the server install scripts
+      # (https://mustafayevt.github.io/CineVault/install.sh and install.ps1).
       - name: Stage the site
         run: |
           mkdir -p _site
           cp -R site/. _site/
           rm -f _site/README.md
+          cp scripts/install/install.sh scripts/install/install.ps1 _site/
           touch _site/.nojekyll
           ls -l _site
 

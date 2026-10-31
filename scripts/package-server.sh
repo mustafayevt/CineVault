@@ -167,6 +167,11 @@ EOF
 cat > "$deb_root/DEBIAN/postrm" <<'EOF'
 #!/bin/sh
 set -e
+# The package carries the /usr/local/bin directory entry, so dpkg removes that directory with the
+# package when nothing else is in it. It belongs to the system: put it back.
+if [ "${1:-}" = remove ] || [ "${1:-}" = purge ]; then
+    [ -d /usr/local/bin ] || install -d -m 0755 /usr/local/bin
+fi
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload >/dev/null 2>&1 || true
 fi
