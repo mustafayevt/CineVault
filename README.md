@@ -46,8 +46,16 @@
 
 ## Use it in a browser (beta)
 
-CineVault can run on the computer that holds your movies (a PC, a mini-PC or a NAS) and be used from
-a browser on any phone, tablet or computer at home. Pick the way that fits; each is one command, and
+Use your library from any phone, tablet, TV or computer at home.
+
+**Easiest: Browser access in the desktop app** (Windows and Linux). Install CineVault as usual,
+open **Settings › Browser access**, set a password and switch it on. CineVault shows an address
+like `http://192.168.1.20:8787` and a QR code; open it on any device on your home network. Nothing
+else to install. On Windows, choose **Allow** when the firewall asks the first time. Optionally
+CineVault keeps running in the tray when you close the window and starts when you sign in.
+
+**Or run it as a server** on the computer that holds your movies (a NAS, a mini-PC or an always-on
+PC), so it works without a desktop session. Pick the way that fits; each is one command, and
 running it again updates CineVault, changes its folders or removes it.
 
 **Linux** (Ubuntu 22.04, Debian 12, Fedora 36 or newer; 64-bit): installs the `cinevault-server`
@@ -78,8 +86,9 @@ curl -fsSL https://mustafayevt.github.io/CineVault/install.sh | sh
 The installer asks for your movie and TV folders, starts CineVault and opens
 `http://localhost:8787`; it also prints the address to use from other devices. Then:
 
-1. **Choose a password** on the welcome page. It is open for 30 minutes after CineVault starts; if you
-   miss it, restart CineVault and open the page again.
+1. **Choose a password** on the welcome page, from any device on your home network. It stays there
+   until a password is set. Forgot it later? **Forgot the password?** on the sign-in page gives you a
+   one-time PIN in CineVault's data folder ([how](packaging/README.md#everyday-use)).
 2. **Add your folders** in setup. On Linux they keep their usual paths. With Docker they appear under
    `/media/`, for example your `D:\Movies` is `/media/Movies`; the installer prints the list.
 3. **Enter your free [TMDB key](https://www.themoviedb.org/settings/api)** and Scan.

@@ -158,8 +158,8 @@ finish() { # finish fresh|update "how to restart" "folder lines"
     [ -z "$ip" ] || say "  From another device:   http://$ip:$PORT/"
     say ""
     if [ "$1" = fresh ]; then
-        say "First visit: choose a password (the welcome page stays open for 30 minutes;"
-        say "if you miss it, run: $2). Then add your folders in setup:"
+        say "First visit: choose a password on the welcome page (from any device at home)."
+        say "Then add your folders in setup:"
     else
         say "Sign in with your password. Your folders, as CineVault sees them:"
     fi

@@ -125,8 +125,8 @@ function Finish([bool]$Fresh) {
     if ($ip) { Say "  From another device:   http://$($ip):$($S.Port)/  (allow Docker Desktop in Windows Firewall if asked)" }
     Say ''
     if ($Fresh) {
-        Say 'First visit: choose a password (the welcome page stays open for 30 minutes;'
-        Say 'if you miss it, run: docker restart cinevault). Then add your folders in setup:'
+        Say 'First visit: choose a password on the welcome page (from any device at home).'
+        Say 'Then add your folders in setup:'
     } else {
         Say 'Sign in with your password. Your folders, as CineVault sees them:'
     }

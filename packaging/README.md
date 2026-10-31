@@ -112,10 +112,10 @@ and for Docker `CINEVAULT_DIR` (default `~/cinevault`, on Windows `%USERPROFILE%
    - Windows: run `ipconfig` in PowerShell and use the "IPv4 Address" line.
    - macOS: System Settings › Wi-Fi (or Network) › Details, or `ipconfig getifaddr en0` in Terminal.
    - Linux: `hostname -I` (the first address).
-2. **Choose a password** (12 characters or more) on the welcome page. For safety the welcome page is
-   open only for **30 minutes** after CineVault starts. If you missed it, restart CineVault (Linux
-   service: `sudo systemctl restart cinevault-server`; Docker: `docker restart cinevault`) and open
-   the page again.
+2. **Choose a password** (12 characters or more) on the welcome page. It stays open until a
+   password is set, but only for browsers on the same computer or your home network; from anywhere
+   else it says "Finish setup from your home network". (With Docker's port mapping every client
+   looks local to CineVault, so keep the port off the internet.)
 3. **Add your folders** in setup with the folder browser.
    - **Linux service:** your folders keep their usual paths (`/srv/media/movies`); the folder
      browser shows the folders you gave the installer.
@@ -143,11 +143,20 @@ again and pick from its menu.
 | --- | --- | --- |
 | Stop | `sudo systemctl stop cinevault-server` | `docker stop cinevault` |
 | Start | `sudo systemctl start cinevault-server` | `docker start cinevault` |
-| Restart (also reopens the welcome page while no password is set) | `sudo systemctl restart cinevault-server` | `docker restart cinevault` |
+| Restart | `sudo systemctl restart cinevault-server` | `docker restart cinevault` |
 | See what it is doing | `journalctl -u cinevault-server -e` | `docker logs --tail 100 cinevault` |
 | Where the library is | `/srv/cinevault` | the `data` folder you chose |
 
-**Forgot the password?** Set a new one on the computer CineVault runs on.
+**Forgot the password?** On the sign-in page, choose **Forgot the password?** (from a device on your
+home network). CineVault writes a one-time PIN to `password-reset-pin.txt` in its data folder; type
+it in with a new password. The PIN works once, for 15 minutes, and signs every other browser out.
+To read it:
+
+| Linux service | Docker |
+| --- | --- |
+| `sudo cat /srv/cinevault/password-reset-pin.txt` | `docker exec cinevault cat /data/password-reset-pin.txt` |
+
+Or set a new password directly on the computer CineVault runs on.
 
 Linux service:
 
@@ -162,7 +171,7 @@ docker exec -it -u cinevault cinevault cinevault-server passwd
 ```
 
 Or clear it and choose a new one on the welcome page: add `--reset` after `passwd` (for Docker,
-without `-it`), then restart CineVault as in the table and open the page within 30 minutes.
+without `-it`), restart CineVault as in the table and open the page.
 
 **Back up** the library together with its key (`/srv/cinevault` and
 `/etc/cinevault/cinevault.key`, or the Docker `data` folder and `secret.key`), ideally while
@@ -334,11 +343,9 @@ be able to read and write the library folders (`User=` above, or for example
 - **"Provider keys are locked"** when you enter the TMDB key: CineVault was started without its
   key. Use the installer; by hand, add the two `secret.key` lines of the Docker command and recreate
   the container, or the `LoadCredential` lines of [Linux packages by hand](#linux-packages-by-hand). Health then says `"keys":"configured"` (`curl http://localhost:8787/healthz`).
-- **"The setup window has closed"** or a sign-in page although you never chose a password: more
-  than 30 minutes passed since CineVault started. Restart it
-  (`sudo systemctl restart cinevault-server` or `docker restart cinevault`) and open the page within
-  30 minutes (or set the password with the `passwd` command under
-  [Everyday use](#everyday-use)).
+- **"Finish setup from your home network"** instead of the welcome page: the browser is not on
+  your home network (or comes through a proxy CineVault doesn't trust). Open the page from a device
+  at home, or set the password with the `passwd` command under [Everyday use](#everyday-use).
 - **Port 8787 is already in use:** the installer picks the next free port and prints it. By hand,
   change the left number (`-p 8788:8787`) for Docker, or add `Environment=CINEVAULT_WEB_PORT=8788`
   with `sudo systemctl edit cinevault-server`, and open `http://<computer>:8788`.
