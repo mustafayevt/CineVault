@@ -17,7 +17,7 @@ import { ReleaseTable } from "./ReleaseTable";
 import { TIERS, sortReleases, tierCounts, tierOf, useFeedSort } from "./releaseSort";
 import type { FeedRow, TitleHit, TorrentRelease } from "./torrentBackend";
 import { siteName } from "./torrentModel";
-import { isLowQuality } from "./feedView";
+import { columnsBesidePanel, isLowQuality } from "./feedView";
 import type { FeedView } from "./feedView";
 import { useLatestFeed } from "./useLatestFeed";
 import type { FeedSourceView } from "./useLatestFeed";
@@ -29,11 +29,6 @@ const SORTS: readonly { value: "newest" | "seeders" | "size" | "quality"; sort: 
   { value: "size", sort: { column: "size", direction: "desc" } },
   { value: "quality", sort: { column: "quality", direction: "desc" } },
 ];
-
-/** Below this width of the list, an open panel also hides Size and Seeders. */
-const WIDE_ENOUGH = 1100;
-const BESIDE_PANEL = new Set(["source", "age"]);
-const BESIDE_PANEL_NARROW = new Set(["source", "age", "size", "seeders"]);
 
 /** How close to the end of the list the next page is read. */
 const NEAR_END = 8;
@@ -103,6 +98,16 @@ export function LatestFeed({ view, onView, onSearch, onCount }: LatestFeedProps)
 
   const open = openId === null ? undefined : byId.get(openId);
   const panelOpen = open !== undefined;
+  // The panel slides in when it opens (it keeps that class while it shows the title it opened
+  // with, so a re-render can't cut the slide short); switching titles only swaps its content.
+  const [firstKey, setFirstKey] = useState<string | null>(null);
+  const openKey = open?.titleKey ?? null;
+  const [seenKey, setSeenKey] = useState<string | null>(openKey);
+  if (seenKey !== openKey) {
+    setSeenKey(openKey);
+    setFirstKey(openKey === null ? null : (firstKey ?? openKey));
+  }
+  const entering = openKey !== null && (firstKey === null || firstKey === openKey);
   // The table makes room for the panel by leaving out the columns the panel repeats.
   const area = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -116,11 +121,12 @@ export function LatestFeed({ view, onView, onSearch, onCount }: LatestFeedProps)
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const hiddenColumns = panelOpen
-    ? width > 0 && width < WIDE_ENOUGH
-      ? BESIDE_PANEL_NARROW
-      : BESIDE_PANEL
-    : undefined;
+  // Before the first measure (and in tests without layout) hide what the panel repeats anyway.
+  const hiddenColumns = useMemo(
+    () =>
+      panelOpen ? (width > 0 ? columnsBesidePanel(width) : new Set(["source", "age"])) : undefined,
+    [panelOpen, width],
+  );
   // Esc closes the details panel first (a menu that is open takes the key before it gets here).
   useEffect(() => {
     if (!panelOpen) return;
@@ -370,6 +376,7 @@ export function LatestFeed({ view, onView, onSearch, onCount }: LatestFeedProps)
             onSearch={onSearch}
             onShowRelease={(row: FeedRow) => setOpenId(row.release.id)}
             onClose={() => setOpenId(null)}
+            entering={entering}
           />
         )}
       </div>

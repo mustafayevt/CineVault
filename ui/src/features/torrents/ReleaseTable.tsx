@@ -1,6 +1,6 @@
 import { Copy, Info, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 import { Button } from "../../components/Button";
 import { IconButton } from "../../components/IconButton";
@@ -116,7 +116,27 @@ export function ReleaseTable({
     },
     [byId, onDetails],
   );
-  const selection = useListSelection({ keys, onOpen: open });
+  const listSelection = useListSelection({ keys, onOpen: open });
+  // In the feed one plain click opens the details panel (again, too, after it was closed);
+  // Ctrl/Shift-clicks only extend the selection, as in every other table.
+  const selection = useMemo(() => {
+    if (onDetails === undefined) return listSelection;
+    return {
+      ...listSelection,
+      itemProps: (key: string) => {
+        const props = listSelection.itemProps(key);
+        return {
+          ...props,
+          onClick: (event: MouseEvent) => {
+            props.onClick(event);
+            if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+            const release = byId.get(key);
+            if (release !== undefined) onDetails(release);
+          },
+        };
+      },
+    };
+  }, [listSelection, onDetails, byId]);
   const [chosen] = [...selection.selected];
   const only = selection.count === 1 && chosen !== undefined ? byId.get(chosen) : undefined;
   useEffect(() => {

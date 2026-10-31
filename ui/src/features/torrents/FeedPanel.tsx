@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Check, ExternalLink, Search, Send, X } from "lucide-react";
 import { useState } from "react";
+import type { CSSProperties } from "react";
 
 import { Button } from "../../components/Button";
 import { Field } from "../../components/Field";
@@ -14,6 +15,7 @@ import { SectionLabel } from "../../components/SectionLabel";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { cx } from "../../lib/cx";
 import { CachedImage } from "../images/CachedImage";
 import { openRatingPage } from "../ratings/ratingPage";
 import { titleLinks } from "./feedView";
@@ -109,6 +111,8 @@ interface FeedPanelProps {
   onSearch: (hit: TitleHit) => void;
   onShowRelease: (row: FeedRow) => void;
   onClose: () => void;
+  /** True when the panel has just opened: it slides in. Switching titles inside it does not. */
+  entering?: boolean;
 }
 
 /**
@@ -126,6 +130,7 @@ export function FeedPanel({
   onSearch,
   onShowRelease,
   onClose,
+  entering = false,
 }: FeedPanelProps) {
   const format = useFormat();
   const [picking, setPicking] = useState(false);
@@ -171,7 +176,13 @@ export function FeedPanel({
     <aside
       aria-label={t("torrentsFeed.panel.label")}
       data-testid="feed-panel"
-      className="flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-solid border-line-section bg-surface-card"
+      style={
+        entering ? ({ "--cv-slide-x": "24px", "--cv-slide-y": "0px" } as CSSProperties) : undefined
+      }
+      className={cx(
+        "flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-solid border-line-section bg-surface-card",
+        entering && "cv-slide-up",
+      )}
     >
       <div className="flex items-start gap-3.5 px-5 pt-4">
         <div className="relative aspect-[2/3] w-[84px] shrink-0 overflow-hidden rounded-(--r-10) bg-surface-active">

@@ -51,11 +51,18 @@ A listed release whose title (or original title) and kind, and for a movie whose
 - **THEN** that row says "Better than your copy" and nothing was looked up online
 
 ### Requirement: Release details panel
-Each listed release SHALL have a Details button next to Send; Details, Enter or a double-click SHALL open a side panel, and a single click SHALL only select. While it is open the panel SHALL follow the selected release, and Esc or its close button SHALL close it. The panel SHALL show at once what the release name says: title, year, movie or show, season and episode.
+A plain click on a release SHALL select it and open a side panel, also after the panel was closed; Ctrl- or Shift-clicks SHALL only select. Details, Enter or a double-click SHALL open it too. It SHALL slide in from the right on opening, not on switching titles, follow the selected release, close on Esc, and show at once what the release name gives.
 
-#### Scenario: No accidental hand-off
-- **WHEN** the user double-clicks a listed release
+#### Scenario: One click opens the details, never sends
+- **WHEN** the user clicks a listed release once
 - **THEN** its details open and nothing is sent to the torrent app
+
+### Requirement: Columns beside the details panel
+Beside the open details panel the table SHALL hide Source, Age, Size, Seeders and then Quality, in that order, until the remaining columns fit, so no column is under the panel. The release name and the row's buttons SHALL always stay.
+
+#### Scenario: Every column stays visible beside the panel
+- **WHEN** the details panel is open in a window too narrow for every column
+- **THEN** the table hides the columns the panel repeats until the rest fits, and none sits under the panel
 
 ### Requirement: Release details from TMDB
 Opening the details SHALL look the title up on TMDB once per title for the session: by the IMDb ID a source gave, otherwise by the title and year from the name, with the title search's confidence. The panel SHALL then show the poster, title, year, plot, certification, genres and TMDB rating, and links to the title on TMDB, IMDb, Letterboxd (movies only) and Trakt that open in the browser.

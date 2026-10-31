@@ -52,3 +52,34 @@ export function titleLinks(
   });
   return links;
 }
+
+/** The details panel's width (FeedPanel's w-[380px]). */
+const PANEL_WIDTH = 380;
+/** Room the table needs besides its columns: the selection edge, padding and a scrollbar. */
+const TABLE_CHROME = 32;
+/** What always stays beside the panel: the name at its narrowest and the row's buttons. */
+const ALWAYS_SHOWN = 160 + 148;
+/**
+ * Columns an open panel hides, in this order, until the rest fits beside it (the panel repeats
+ * them), so no column ever sits under the panel. Widths match ReleaseTable's.
+ */
+const HIDE_ORDER: readonly [string, number][] = [
+  ["source", 120],
+  ["age", 74],
+  ["size", 90],
+  ["seeders", 100],
+  ["quality", 104],
+];
+
+/** The columns to hide so the table fits in `width` minus the panel. */
+export function columnsBesidePanel(width: number): ReadonlySet<string> {
+  const room = width - PANEL_WIDTH - TABLE_CHROME;
+  let needed = ALWAYS_SHOWN + HIDE_ORDER.reduce((sum, [, size]) => sum + size, 0);
+  const hidden = new Set<string>();
+  for (const [id, size] of HIDE_ORDER) {
+    if (needed <= room) break;
+    hidden.add(id);
+    needed -= size;
+  }
+  return hidden;
+}

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { restoreLayout, stubLayout } from "../../test/layout";
 import { useNotificationStore } from "../notifications/notificationStore";
 import { useToastStore } from "../toasts/toastStore";
-import { titleLinks } from "./feedView";
+import { columnsBesidePanel, titleLinks } from "./feedView";
 import { ACTIONS_COLUMN_WIDTH, SEND_COLUMN_WIDTH } from "./ReleaseTable";
 import { qualityRank } from "./releaseSort";
 import { TorrentRequestError, setTorrentBackend } from "./torrentBackend";
@@ -204,6 +204,27 @@ describe("the details panel", () => {
     await user.dblClick(within(row).getAllByRole("gridcell")[1] as HTMLElement);
     expect(await screen.findByRole("complementary", { name: "Release details" })).toBeVisible();
     expect(backend.openMagnet).not.toHaveBeenCalled();
+  });
+
+  it("opens with one click on a row, and again on the same row after closing", async () => {
+    const backend = spiedBackend();
+    const user = userEvent.setup();
+    await renderTorrents("/torrents", backend);
+    const cell = within(await rowNamed("Oppenheimer")).getAllByRole("gridcell")[1] as HTMLElement;
+    await user.click(cell);
+    expect(await screen.findByRole("complementary", { name: "Release details" })).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("complementary", { name: "Release details" })).toBeNull();
+    await user.click(cell);
+    expect(await screen.findByRole("complementary", { name: "Release details" })).toBeVisible();
+    expect(backend.openMagnet).not.toHaveBeenCalled();
+  });
+
+  it("hides columns beside the open panel until the rest fits, keeping the name and buttons", () => {
+    expect([...columnsBesidePanel(1600)]).toEqual([]);
+    expect([...columnsBesidePanel(1200)]).toEqual(["source"]);
+    expect([...columnsBesidePanel(1000)]).toEqual(["source", "age", "size"]);
+    expect([...columnsBesidePanel(800)]).toEqual(["source", "age", "size", "seeders", "quality"]);
   });
 
   it("says when the match is weak and offers another title", async () => {
