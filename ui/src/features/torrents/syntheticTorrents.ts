@@ -24,6 +24,8 @@ import {
   syntheticReleases,
 } from "./syntheticCatalog";
 import type { CatalogTitle, SyntheticTarget } from "./syntheticCatalog";
+import { createSyntheticFeed } from "./syntheticFeed";
+import type { SyntheticFeed } from "./syntheticFeed";
 import { TorrentRequestError } from "./torrentBackend";
 import type { SearchStart, TorrentBackend } from "./torrentBackend";
 import type { TitleKind } from "./torrentsSearch";
@@ -133,6 +135,8 @@ export interface SyntheticTorrentOptions {
   indexerState?: string;
   /** Whether a Jackett of the person's own answers on this computer. Default true. */
   ownJackett?: boolean;
+  /** The feed's title lookup fails as without a TMDB key. Default false. */
+  feedNoKey?: boolean;
 }
 
 export interface SyntheticTorrentCalls {
@@ -148,6 +152,7 @@ export interface SyntheticTorrentCalls {
 
 export interface SyntheticTorrentBackend extends TorrentBackend {
   calls: SyntheticTorrentCalls;
+  feedCalls: SyntheticFeed["feedCalls"];
 }
 
 /** How each source answers a release search of a target. */
@@ -214,7 +219,9 @@ export function createSyntheticTorrentBackend(
     slow: input.slow ?? [],
     indexerState: input.indexerState ?? "running",
     ownJackett: input.ownJackett ?? true,
+    feedNoKey: input.feedNoKey ?? false,
   };
+  const feed = createSyntheticFeed({ speed: options.speed, noKey: options.feedNoKey });
   const calls: SyntheticTorrentCalls = {
     magnets: [],
     files: [],
@@ -280,6 +287,7 @@ export function createSyntheticTorrentBackend(
   return {
     available: true,
     calls,
+    ...feed,
     titleTransport: (onStart) =>
       perSearchTransport<TorrentTitleHitDto>((request) => {
         const text = request.query.trim();

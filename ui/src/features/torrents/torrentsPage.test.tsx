@@ -31,8 +31,9 @@ describe("the Torrents page search", () => {
     const user = userEvent.setup();
     await renderTorrents("/torrents?q=dune", backend, false);
     expect(await screen.findByTestId("torrent-notice")).toBeVisible();
-    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Search torrents" })).toBeNull();
     expect(backend.titleStarts).toHaveLength(0);
+    expect(backend.feedCalls.requests).toHaveLength(0);
     await user.click(screen.getByRole("button", { name: "Got it" }));
     expect(await screen.findByRole("combobox", { name: "Search torrents" })).toBeVisible();
   });
@@ -42,7 +43,7 @@ describe("the Torrents page search", () => {
     const user = userEvent.setup();
     await renderTorrents("/torrents", backend);
     const field = await screen.findByRole("combobox", { name: "Search torrents" });
-    expect(screen.getByText("Type a movie or show to see its releases.")).toBeVisible();
+    expect(await screen.findByTestId("latest-feed")).toBeVisible();
     await user.type(field, "blade runner");
     // No title lookup while the typing goes on (the pause is short but real).
     expect(backend.titleStarts).toHaveLength(0);
@@ -60,14 +61,17 @@ describe("the Torrents page search", () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(backend.releaseStarts).toHaveLength(0);
     expect(screen.queryByRole("grid", { name: "Releases" })).toBeNull();
-    expect(screen.getByText("Type a movie or show to see its releases.")).toBeVisible();
+    expect(await screen.findByTestId("latest-feed")).toBeVisible();
   });
 
   it("starts the release search of exactly the picked title, and shows it as a chip", async () => {
     const backend = spiedBackend({ failing: [] });
     const user = userEvent.setup();
     await renderTorrents("/torrents", backend);
-    await user.type(await screen.findByRole("combobox"), "blade runner");
+    await user.type(
+      await screen.findByRole("combobox", { name: "Search torrents" }),
+      "blade runner",
+    );
     await user.click(await screen.findByRole("option", { name: /Blade Runner 2049 \(2017\)/ }));
     await waitFor(() => expect(backend.releaseStarts.length).toBeGreaterThan(0), { timeout: 3000 });
     expect(backend.releaseStarts.at(-1)?.params).toMatchObject({ kind: "movie", tmdbId: 1 });
@@ -75,7 +79,9 @@ describe("the Torrents page search", () => {
     expect(chip).toHaveTextContent("Blade Runner 2049 (2017)");
     expect(chip).toHaveTextContent("Movie");
     expect(screen.queryByRole("listbox")).toBeNull();
-    expect(screen.getByRole("combobox")).toHaveValue("Blade Runner 2049 (2017)");
+    expect(screen.getByRole("combobox", { name: "Search torrents" })).toHaveValue(
+      "Blade Runner 2049 (2017)",
+    );
     expect((await dataRows()).length).toBeGreaterThan(3);
     expect(await screen.findByText(/^\d+ results? · \d+ sources?$/)).toBeVisible();
   });
@@ -84,7 +90,7 @@ describe("the Torrents page search", () => {
     const backend = spiedBackend({ failing: [] });
     const user = userEvent.setup();
     await renderTorrents("/torrents", backend);
-    await user.type(await screen.findByRole("combobox"), "heat");
+    await user.type(await screen.findByRole("combobox", { name: "Search torrents" }), "heat");
     await screen.findByRole("option", { name: /Heat \(1995\)/ });
     expect(backend.releaseStarts).toHaveLength(0);
     await user.keyboard("{Enter}");
@@ -96,11 +102,16 @@ describe("the Torrents page search", () => {
     const backend = spiedBackend({ failing: [] });
     const user = userEvent.setup();
     await renderTorrents("/torrents", backend);
-    await user.type(await screen.findByRole("combobox"), "blade");
-    const options = await screen.findAllByRole("option");
+    await user.type(await screen.findByRole("combobox", { name: "Search torrents" }), "blade");
+    const options = await within(
+      await screen.findByRole("listbox", { name: "Title suggestions" }),
+    ).findAllByRole("option");
     expect(options.length).toBeGreaterThan(1);
     await user.keyboard("{ArrowDown}{ArrowDown}");
-    expect(screen.getByRole("combobox")).toHaveAttribute("aria-activedescendant", options[1]?.id);
+    expect(screen.getByRole("combobox", { name: "Search torrents" })).toHaveAttribute(
+      "aria-activedescendant",
+      options[1]?.id,
+    );
     const second = options[1]?.getAttribute("aria-label") ?? "";
     await user.keyboard("{Enter}");
     await waitFor(() => expect(backend.releaseStarts.length).toBeGreaterThan(0), { timeout: 3000 });
@@ -117,20 +128,20 @@ describe("the Torrents page search", () => {
     await user.click(screen.getByRole("button", { name: "Change title" }));
     await waitFor(() => expect(screen.queryByRole("grid", { name: "Releases" })).toBeNull());
     expect(screen.queryByTestId("picked-title")).toBeNull();
-    expect(screen.getByRole("combobox")).toHaveValue("");
-    expect(screen.getByRole("combobox")).toHaveFocus();
-    expect(screen.getByText("Type a movie or show to see its releases.")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Search torrents" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Search torrents" })).toHaveFocus();
+    expect(await screen.findByTestId("latest-feed")).toBeVisible();
   });
 
   it("drops the title and its results when the field is edited after a pick", async () => {
     const backend = spiedBackend({ failing: [] });
     const user = userEvent.setup();
     const { router } = await renderTorrents("/torrents", backend);
-    await user.type(await screen.findByRole("combobox"), "heat");
+    await user.type(await screen.findByRole("combobox", { name: "Search torrents" }), "heat");
     await user.click(await screen.findByRole("option", { name: /Heat \(1995\)/ }));
     await dataRows();
     await waitFor(() => expect(router.state.location.search).toMatchObject({ title: "movie:3" }));
-    await user.type(screen.getByRole("combobox"), "x");
+    await user.type(screen.getByRole("combobox", { name: "Search torrents" }), "x");
     await waitFor(() => expect(screen.queryByRole("grid", { name: "Releases" })).toBeNull());
     expect(screen.queryByTestId("picked-title")).toBeNull();
     await waitFor(() => expect(router.state.location.search).toEqual({}));
@@ -147,7 +158,7 @@ describe("the Torrents page search", () => {
   it("says when nothing was found", async () => {
     const user = userEvent.setup();
     await renderTorrents("/torrents", spiedBackend({ failing: [] }));
-    await user.type(await screen.findByRole("combobox"), "zzzzqqqq");
+    await user.type(await screen.findByRole("combobox", { name: "Search torrents" }), "zzzzqqqq");
     expect(
       await screen.findByText("Nothing found for “zzzzqqqq”", {}, { timeout: 4000 }),
     ).toBeVisible();

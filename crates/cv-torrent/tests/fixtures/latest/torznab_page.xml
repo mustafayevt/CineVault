@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:torznab="http://torznab.com/schemas/2015/feed">
+  <channel>
+    <title>Example indexer</title>
+    <item>
+      <title>Paper.Lanterns.2025.1080p.BluRay.x264-GRP</title>
+      <guid>https://example.org/details/101</guid>
+      <comments>https://example.org/details/101</comments>
+      <pubDate>Fri, 30 Oct 2026 18:00:00 +0000</pubDate>
+      <size>2147483648</size>
+      <link>https://example.org/dl/101.torrent</link>
+      <category>2040</category>
+      <torznab:attr name="category" value="2040" />
+      <torznab:attr name="seeders" value="25" />
+      <torznab:attr name="peers" value="30" />
+      <torznab:attr name="infohash" value="ff00000000000000000000000000000000000001" />
+    </item>
+    <item>
+      <title>Garden.Rescue.Crew.S04E06.720p.HDTV.x264-GRP</title>
+      <guid>https://example.org/details/102</guid>
+      <pubDate>Fri, 30 Oct 2026 17:00:00 +0000</pubDate>
+      <size>500000000</size>
+      <link>https://example.org/dl/102.torrent</link>
+      <torznab:attr name="category" value="5030" />
+      <torznab:attr name="seeders" value="8" />
+      <torznab:attr name="infohash" value="ff00000000000000000000000000000000000002" />
+    </item>
+  </channel>
+</rss>

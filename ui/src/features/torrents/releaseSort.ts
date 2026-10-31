@@ -7,7 +7,7 @@ import type { SourceInfo, TorrentRelease } from "./torrentBackend";
 import { resolutionOf, siteName, sourceName } from "./torrentModel";
 
 /** The columns the release table sorts by (spec `torrent-search` "Release table columns and sort"). */
-export type ReleaseSortColumn = "size" | "seeders" | "source" | "age";
+export type ReleaseSortColumn = "size" | "seeders" | "source" | "age" | "quality";
 
 /** Most seeders first. */
 export const DEFAULT_SORT: TableSort = { column: "seeders", direction: "desc" };
@@ -15,16 +15,25 @@ export const DEFAULT_SORT: TableSort = { column: "seeders", direction: "desc" };
 const COLUMNS: readonly string[] = ["size", "seeders", "source", "age"];
 const STORAGE_KEY = "cinevault.torrents.sort";
 
+/** The feed's default: the newest first (the smallest age). */
+export const FEED_DEFAULT_SORT: TableSort = { column: "age", direction: "asc" };
+const FEED_COLUMNS: readonly string[] = ["size", "seeders", "source", "age", "quality"];
+const FEED_STORAGE_KEY = "cinevault.torrents.latestSort";
+
 /** The sort the user chose last, or the default when none was saved or it is damaged. */
-export function readSort(): TableSort {
+export function readSort(
+  key: string = STORAGE_KEY,
+  columns: readonly string[] = COLUMNS,
+  fallback: TableSort = DEFAULT_SORT,
+): TableSort {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return DEFAULT_SORT;
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
     const value = JSON.parse(raw) as Partial<TableSort> | null;
     if (
       value !== null &&
       typeof value.column === "string" &&
-      COLUMNS.includes(value.column) &&
+      columns.includes(value.column) &&
       (value.direction === "asc" || value.direction === "desc")
     ) {
       return { column: value.column, direction: value.direction };
@@ -32,13 +41,13 @@ export function readSort(): TableSort {
   } catch {
     // A damaged or unreadable entry means the default.
   }
-  return DEFAULT_SORT;
+  return fallback;
 }
 
 /** Saves the sort; storage that is full or switched off only loses the preference. */
-function writeSort(sort: TableSort): void {
+function writeSort(sort: TableSort, key: string = STORAGE_KEY): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sort));
+    window.localStorage.setItem(key, JSON.stringify(sort));
   } catch {
     // The sort stays in memory for this session.
   }
@@ -46,12 +55,56 @@ function writeSort(sort: TableSort): void {
 
 /** The sort of the release table, remembered across restarts. */
 export function useRememberedSort(): [TableSort, (sort: TableSort) => void] {
-  const [sort, setSort] = useState<TableSort>(readSort);
+  const [sort, setSort] = useState<TableSort>(() => readSort());
   const change = useCallback((next: TableSort) => {
     setSort(next);
     writeSort(next);
   }, []);
   return [sort, change];
+}
+
+/** The sort of the "Latest releases" table (newest first by default), remembered on its own. */
+export function useFeedSort(): [TableSort, (sort: TableSort) => void] {
+  const [sort, setSort] = useState<TableSort>(() =>
+    readSort(FEED_STORAGE_KEY, FEED_COLUMNS, FEED_DEFAULT_SORT),
+  );
+  const change = useCallback((next: TableSort) => {
+    setSort(next);
+    writeSort(next, FEED_STORAGE_KEY);
+  }, []);
+  return [sort, change];
+}
+
+const RESOLUTION_RANK: Readonly<Record<string, number>> = {
+  "2160p": 4,
+  "1080p": 3,
+  "720p": 2,
+  "480p": 1,
+};
+const SOURCE_RANK: Readonly<Record<string, number>> = {
+  Remux: 6,
+  BluRay: 5,
+  "WEB-DL": 4,
+  WEBRip: 3,
+  HDTV: 2,
+  DVD: 1,
+};
+
+/**
+ * How good a release looks by its name, higher is better: the resolution, then HDR, then the
+ * source (remux, disc, web download, web rip, TV, DVD). A cam or screener counts as nothing.
+ */
+export function qualityRank(
+  release: Pick<TorrentRelease, "resolution" | "hdr" | "source" | "flags">,
+): number {
+  const low = release.flags.some((flag) =>
+    ["cam", "telesync", "telecine", "screener"].includes(flag.kind),
+  );
+  if (low) return 0;
+  const resolution = RESOLUTION_RANK[release.resolution] ?? 0;
+  const hdr = release.hdr === null ? 0 : 1;
+  const source = release.source === null ? 0 : (SOURCE_RANK[release.source] ?? 0);
+  return resolution * 100 + hdr * 10 + source;
 }
 
 /** The resolution chip a release belongs to: 480p and unknown are SD. */
@@ -97,6 +150,9 @@ export function sortReleases(
           b.published === null ? null : -b.published,
         ];
         break;
+      case "quality":
+        pair = [qualityRank(a), qualityRank(b)];
+        break;
       case "source":
         return (
           sign * collator.compare(sourceOf(a), sourceOf(b)) || collator.compare(a.name, b.name)
@@ -116,7 +172,10 @@ export function sortReleases(
 }
 
 /** The sources of a release as its row shows them: the first one, and how many more. */
-export function sourceText(release: TorrentRelease, sources: readonly SourceInfo[]): string {
+export function sourceText(
+  release: TorrentRelease,
+  sources: readonly Pick<SourceInfo, "id" | "name">[],
+): string {
   const names = release.sources.map((id) => siteName(sourceName(id, sources)));
   const [first] = names;
   if (first === undefined) return "";

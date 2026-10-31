@@ -739,6 +739,11 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &[],
     },
     CommandInfo {
+        name: "torrent_feed_lookup",
+        module: "torrent_feed",
+        args: &["request"],
+    },
+    CommandInfo {
         name: "torrent_indexer_service_status",
         module: "torrent_indexer",
         args: &[],
@@ -757,6 +762,11 @@ pub const COMMANDS: &[CommandInfo] = &[
         name: "torrent_landing",
         module: "torrent_stream",
         args: &[],
+    },
+    CommandInfo {
+        name: "torrent_latest",
+        module: "torrent_feed",
+        args: &["request", "onEvent"],
     },
     CommandInfo {
         name: "torrent_release_search",

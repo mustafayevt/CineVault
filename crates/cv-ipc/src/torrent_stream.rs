@@ -106,6 +106,8 @@ pub struct TorrentState {
     pub(crate) indexer: Option<Arc<cv_app::torrents::indexer::IndexerServiceManager>>,
     artwork: Option<Arc<ArtworkService>>,
     data_dir: Option<std::path::PathBuf>,
+    /// The "Latest releases" feeds and their title lookups.
+    feeds: Arc<crate::torrent_feed::FeedState>,
 }
 
 impl TorrentState {
@@ -115,12 +117,18 @@ impl TorrentState {
             indexer: services.map(|s| Arc::clone(s.indexer())),
             artwork: services.map(|s| Arc::clone(s.artwork())),
             data_dir: services.map(|s| s.location().root().to_path_buf()),
+            feeds: Arc::default(),
         };
         // Torrent files downloaded for a hand-over in an earlier run are not kept.
         if let Some(root) = &state.data_dir {
             crate::torrent::clear_tmp(&root.join("torrents").join("tmp"));
         }
         state
+    }
+
+    /// The "Latest releases" feeds.
+    pub(crate) fn feeds(&self) -> Arc<crate::torrent_feed::FeedState> {
+        Arc::clone(&self.feeds)
     }
 
     /// The data folder, when the app has one.

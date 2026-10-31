@@ -1,0 +1,3 @@
+{"status":"ok","status_message":"Query was successful","data":{"movie_count":3,"limit":2,"page_number":2,"movies":[
+{"id":90003,"url":"https:\/\/yts.gg\/movies\/winter-orchard-2024","imdb_code":"tt9900003","title":"Winter Orchard","title_long":"Winter Orchard (2024)","year":2024,"state":"ok","torrents":[
+{"url":"https:\/\/yts.gg\/torrent\/download\/AA00000000000000000000000000000000000004","hash":"AA00000000000000000000000000000000000004","quality":"1080p","type":"bluray","video_codec":"x264","bit_depth":"8","seeds":55,"peers":9,"size_bytes":2147483648,"date_uploaded_unix":1793300000}]}]}}

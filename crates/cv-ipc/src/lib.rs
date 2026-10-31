@@ -47,6 +47,7 @@ pub mod sink;
 pub mod sources;
 pub mod tools;
 pub mod torrent;
+pub mod torrent_feed;
 pub mod torrent_indexer;
 pub mod torrent_stream;
 pub mod tv;

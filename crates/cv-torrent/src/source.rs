@@ -15,6 +15,7 @@ use cv_providers::http::{HttpClient, HttpClientBuilder, HttpRequest, ProviderLim
 use serde::de::DeserializeOwned;
 
 use crate::cancel::CancelToken;
+use crate::latest::{FeedKind, FeedSkip, FeedSupport, LatestAnswer};
 use crate::model::{RawRelease, SourceError, SourceId, SourceKind, Support, TorrentQuery};
 
 /// The longest an answer may be.
@@ -141,6 +142,25 @@ pub trait TorrentSource: Send + Sync {
         query: &TorrentQuery,
         context: &SearchContext,
     ) -> Result<Vec<RawRelease>, SourceError>;
+
+    /// Whether the source can list its newest releases of this kind for the "Latest releases"
+    /// feed. A source that searches one title at a time cannot (the default).
+    fn latest_support(&self, kind: FeedKind) -> FeedSupport {
+        let _ = kind;
+        FeedSupport::Skip(FeedSkip::NotOffered)
+    }
+
+    /// One page (from 0) of the source's newest releases of `kind`, newest first. Only called
+    /// when [`Self::latest_support`] says yes.
+    async fn latest(
+        &self,
+        kind: FeedKind,
+        page: u32,
+        context: &SearchContext,
+    ) -> Result<LatestAnswer, SourceError> {
+        let _ = (kind, page, context);
+        Ok(LatestAnswer::Unsupported)
+    }
 }
 
 /// An answer that arrived: what status it had and what it held.
@@ -261,6 +281,24 @@ impl SourceHttp {
         let mut request = self.build(url, query);
         for (name, value) in headers {
             request = request.header(name, value);
+        }
+        self.send(request).await
+    }
+
+    /// Sends a POST with a JSON body and returns whatever answered, whatever its status.
+    ///
+    /// # Errors
+    /// As [`Self::get_raw`].
+    pub async fn post_json_raw(
+        &self,
+        url: &str,
+        body: &serde_json::Value,
+    ) -> Result<SourceResponse, SourceError> {
+        let mut request = HttpRequest::post(&self.lane, url, body.to_string().into_bytes())
+            .uncached()
+            .header("content-type", "application/json");
+        if let Some(timeout) = self.timeout {
+            request = request.timeout(timeout);
         }
         self.send(request).await
     }

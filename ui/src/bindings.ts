@@ -591,6 +591,17 @@ export const commands = {
 	 *  `retry_provider` asks one source again and `cancel_search` stops the search.
 	 */
 	torrentReleaseSearch: (request: TorrentSearchRequestDto, onEvent: Channel<ProviderEvent<TorrentReleaseDto>>) => typedError<TorrentSearchStartDto, TorrentCommandError>(__TAURI_INVOKE("torrent_release_search", { request, onEvent })),
+	/**
+	 *  The "Latest releases" feed: the first page of every source that can list its newest releases
+	 *  (or the rows read in the last few minutes), or with `more` the next page of every source that
+	 *  has one. Each source answers on the Channel with its rows and, last, where it stands.
+	 */
+	torrentLatest: (request: TorrentFeedRequestDto, onEvent: Channel<ProviderEvent<TorrentFeedItemDto>>) => typedError<TorrentFeedStartDto, TorrentCommandError>(__TAURI_INVOKE("torrent_latest", { request, onEvent })),
+	/**
+	 *  Looks one title of the feed up on TMDB (once; the answer is kept): the best match and
+	 *  whether it is a weak one.
+	 */
+	torrentFeedLookup: (request: TorrentFeedLookupRequestDto) => typedError<TorrentFeedLookupDto, TorrentCommandError>(__TAURI_INVOKE("torrent_feed_lookup", { request })),
 	/**  Gives a magnet link to the system's magnet handler (the person's torrent app). */
 	torrentOpenMagnet: (magnet: string) => typedError<null, TorrentCommandError>(__TAURI_INVOKE("torrent_open_magnet", { magnet })),
 	/**  Opens a release's page on its source's site in the browser (`http` and `https` only). */
@@ -3931,6 +3942,92 @@ export type TorrentEpisodeDto = {
 export type TorrentEpisodeRefDto = {
 	season: number,
 	episode: number,
+};
+
+/**  What a source sends on the stream: rows, then (in its final answer) where it stands. */
+export type TorrentFeedItemDto = { type: "row"; row: TorrentFeedRowDto } | 
+/**  `more`, `done` or `unsupported`. */
+{ type: "sourceState"; state: string };
+
+/**  The TMDB title a feed title is most likely to be. */
+export type TorrentFeedLookupDto = {
+	/**  The best match; none when nothing was found. */
+	hit: TorrentTitleHitDto | null,
+	/**  The match may be the wrong title: its confidence is below [`WEAK_MATCH`]. */
+	weak: boolean,
+};
+
+/**  A feed title to look up. */
+export type TorrentFeedLookupRequestDto = {
+	/**  `movie` or `show`. */
+	kind: string,
+	title: string,
+	year: number | null,
+	imdbId: string | null,
+};
+
+/**  A request for the feed. */
+export type TorrentFeedRequestDto = {
+	/**  The search id the page cancels and retries by. */
+	searchId: string,
+	/**  `all`, `movies` or `tv`. */
+	kind: string,
+	/**
+	 *  False: the first page (or the rows kept, when they are recent). True: the next page of
+	 *  every source that has more.
+	 */
+	more: boolean,
+	/**  Start over: forget the rows kept and read every source's first page again. */
+	refresh: boolean,
+	/**
+	 *  For `more`: the generation of the feed the page has. Another one (the feed was
+	 *  refreshed meanwhile) is refused with `feed_expired`.
+	 */
+	generation: string | null,
+};
+
+/**  A release of the feed with what its name says and the library title it matches. */
+export type TorrentFeedRowDto = {
+	release: TorrentReleaseDto,
+	/**  `movie` or `show`. */
+	kind: string,
+	/**  The title as the release name spells it. */
+	title: string,
+	year: number | null,
+	season: number | null,
+	episode: number | null,
+	/**  The IMDb ID a source gave. */
+	imdbId: string | null,
+	/**  Rows with the same key are releases of one title (kind, title and, for a movie, year). */
+	titleKey: string,
+	/**  The library title of the same name (and year), when there is one. */
+	inLibrary: ScrapeLinkDto | null,
+};
+
+/**  One source of the feed and where it stands. */
+export type TorrentFeedSourceDto = {
+	id: string,
+	name: string,
+	/**  `built-in`, `indexer` or `torznab`. */
+	kind: string,
+	/**
+	 *  `asked` (answers on the stream now), `more` (has a next page), `loading` (an earlier
+	 *  request is still reading it), `done` (no more), `unsupported` (cannot list its newest
+	 *  releases), `movies-only` or `tv-only` (not of this kind).
+	 */
+	state: string,
+};
+
+/**
+ *  What a feed request tells the page at once; the rows of the sources asked follow on the
+ *  Channel.
+ */
+export type TorrentFeedStartDto = {
+	/**  The feed's generation, to send back with `more`. */
+	generation: string,
+	sources: TorrentFeedSourceDto[],
+	/**  For a first page: the rows already read (a feed opened again while it is recent). */
+	rows: TorrentFeedRowDto[],
 };
 
 /**  The library strips of the Torrent search landing. */

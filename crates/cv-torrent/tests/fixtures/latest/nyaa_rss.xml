@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:nyaa="https://nyaa.si/xmlns/nyaa" version="2.0">
+	<channel>
+		<title>Nyaa - Home - Torrent File RSS</title>
+		<description>RSS Feed for Home</description>
+		<link>https://nyaa.si/</link>
+		<item>
+			<title>[Group] Starfield Couriers - 07 (1080p) [ABCD1234].mkv</title>
+				<link>https://nyaa.si/download/2180523.torrent</link>
+				<guid isPermaLink="true">https://nyaa.si/view/2180523</guid>
+				<pubDate>Fri, 30 Oct 2026 22:34:06 -0000</pubDate>
+				<nyaa:seeders>120</nyaa:seeders>
+				<nyaa:leechers>15</nyaa:leechers>
+				<nyaa:downloads>300</nyaa:downloads>
+				<nyaa:infoHash>ee00000000000000000000000000000000000001</nyaa:infoHash>
+				<nyaa:categoryId>1_2</nyaa:categoryId>
+				<nyaa:category>Anime - English-translated</nyaa:category>
+				<nyaa:size>1.4 GiB</nyaa:size>
+				<nyaa:comments>0</nyaa:comments>
+				<nyaa:trusted>No</nyaa:trusted>
+				<nyaa:remake>No</nyaa:remake>
+			<description><![CDATA[<a href="https://nyaa.si/view/2180523">#2180523 | [Group] Starfield Couriers - 07</a> | 1.4 GiB | Anime - English-translated]]></description>
+		</item>
+	</channel>
+</rss>
