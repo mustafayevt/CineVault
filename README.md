@@ -145,7 +145,7 @@ The checks to run before a pull request are listed in [CONTRIBUTING.md](CONTRIBU
 
 ## Contributing
 
-CineVault is open source, and contributions are welcome: bug reports, ideas, documentation and pull requests. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; contributors and AI coding assistants also follow [AGENTS.md](AGENTS.md). Every change, including the maintainer's, lands through a pull request from a branch, and CI must pass before it is merged. Please report security issues privately, as described in [SECURITY.md](SECURITY.md).
+CineVault is open source, and contributions are welcome: bug reports, ideas, documentation and pull requests. Questions and open-ended ideas belong in [Discussions](https://github.com/mustafayevt/CineVault/discussions); the issue tracker is for bugs and concrete features. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; contributors and AI coding assistants also follow [AGENTS.md](AGENTS.md). Every change, including the maintainer's, lands through a pull request from a branch, and CI must pass before it is merged. Please report security issues privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Licence
 
