@@ -221,15 +221,46 @@ jobs:
             exit 1
           fi
 
+      # Each artifact is downloaded by name into its own folder. (Downloaded by pattern, a single
+      # match is unpacked straight into `path` with no subfolder, which is how the server packages
+      # of 1.2.0 were skipped: the publish step only reads the subfolders.)
       - uses: actions/download-artifact@v8
         with:
-          pattern: installers-*
-          path: dist
+          name: installers-Windows
+          path: dist/windows
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: server-packages-*
-          path: dist
+          name: installers-Linux
+          path: dist/linux
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-packages-${{ github.sha }}
+          path: dist/server
+
+      # Every asset the release must carry is here, or the release is not published.
+      - name: Check the release assets
+        run: |
+          set -euo pipefail
+          ls -l dist/*/
+          missing=0
+          need() {
+            if [ -z "$(find dist -type f -name "$1" -print -quit)" ]; then
+              echo "::error::No $1 in the downloaded artifacts"
+              missing=1
+            fi
+          }
+          need "CineVault_${VERSION}_x64_en-US.msi"
+          need "CineVault_${VERSION}_x64-setup.exe"
+          need "CineVault_${VERSION}_x64-portable.zip"
+          need "CineVault_${VERSION}_amd64.AppImage"
+          need "CineVault_${VERSION}_amd64.deb"
+          need "CineVault-${VERSION}-*.rpm"
+          need "cinevault-server_${VERSION}_amd64.deb"
+          need "cinevault-server-${VERSION}-*.rpm"
+          need "cinevault-server-${VERSION}-linux-amd64.tar.gz"
+          exit "$missing"
 
       - name: Publish
         env:
@@ -238,8 +269,7 @@ jobs:
           set -euo pipefail
           # One --from-dir per build folder (the script reads each folder as it is).
           args=()
-          for dir in dist/*/; do args+=(--from-dir "${dir%/}"); done
-          ls -l dist/*/
+          for dir in dist/windows dist/linux dist/server; do args+=(--from-dir "$dir"); done
           if [ -n "$UPDATE_KEY" ]; then
             # The key goes to a private temporary file outside the repository, is passed by path and
             # removed again. It is never printed.

@@ -635,6 +635,20 @@ h2 {
   color: var(--text-2);
 }
 
+.strip-install .strip-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 6px 0;
+}
+
+.strip-install code {
+  user-select: all;
+}
+
+.strip-install .strip-note a {
+  color: var(--gold);
+}
+
 /* More grid */
 
 .more {

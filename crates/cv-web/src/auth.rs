@@ -659,6 +659,28 @@ impl Auth {
     }
 }
 
+/// Gives `file` to the owner of `folder` when they differ, so a password file written by root
+/// stays readable by the server that runs as the data folder's owner. Only root can change an
+/// owner; for anyone else the owners already match, and a failure leaves the file as it is.
+#[cfg(unix)]
+pub fn give_to_folder_owner(file: &Path, folder: &Path) {
+    use std::os::unix::fs::MetadataExt as _;
+    let (Ok(file_meta), Ok(folder_meta)) = (std::fs::metadata(file), std::fs::metadata(folder))
+    else {
+        return;
+    };
+    if (file_meta.uid(), file_meta.gid()) != (folder_meta.uid(), folder_meta.gid())
+        && let Err(error) =
+            std::os::unix::fs::chown(file, Some(folder_meta.uid()), Some(folder_meta.gid()))
+    {
+        tracing::warn!(%error, "the password file could not be given to the data folder's owner");
+    }
+}
+
+/// Windows has no owner to hand over; the file inherits the folder's access rules.
+#[cfg(not(unix))]
+pub fn give_to_folder_owner(_file: &Path, _folder: &Path) {}
+
 fn random_hex(bytes: usize) -> String {
     let mut buffer = vec![0u8; bytes];
     OsRng.fill_bytes(&mut buffer);
@@ -1345,5 +1367,23 @@ mod tests {
                 & 0o777;
             assert_eq!(mode, 0o600, "{name}");
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_password_set_from_the_command_line_keeps_the_folder_owner() {
+        use std::os::unix::fs::MetadataExt as _;
+        let (dir, auth) = auth();
+        auth.set_password_unattended("a long enough password")
+            .unwrap();
+        let file = dir.path().join(AUTH_FILE);
+        give_to_folder_owner(&file, dir.path());
+        let (file_meta, folder_meta) = (
+            std::fs::metadata(&file).unwrap(),
+            std::fs::metadata(dir.path()).unwrap(),
+        );
+        assert_eq!(file_meta.uid(), folder_meta.uid());
+        assert_eq!(file_meta.gid(), folder_meta.gid());
+        assert!(auth.check_password("a long enough password"));
     }
 }

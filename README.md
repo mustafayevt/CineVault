@@ -44,52 +44,68 @@
 2. **Add your folders and a free TMDB key.** The first-run screen asks where your movies and shows are, then for a [TMDB API key](https://www.themoviedb.org/settings/api) (free; the only key needed to Scrape).
 3. **Scan, Scrape, Rename.** Scanning starts on its own. Scrape your titles, check the Rename preview, apply. Everything can be undone from History.
 
-## Run on a home server
+## Use it in a browser (beta)
 
-CineVault can run headless next to the media files and be used from a browser on another machine.
-The server links no Tauri, no WebKit and no display stack, so it fits a NAS, a mini-PC or a small
-container.
+Use your library from any phone, tablet, TV or computer at home.
 
-```yaml
-services:
-  cinevault:
-    image: ghcr.io/mustafayevt/cinevault:latest
-    ports: ["8787:8787"]
-    environment:
-      CINEVAULT_DATA_DIR: /data
-      CINEVAULT_WEB_BIND: 0.0.0.0
-    volumes:
-      - ./cinevault-data:/data
-      - /mnt/media:/media
-    restart: unless-stopped
+**Easiest: Browser access in the desktop app** (Windows and Linux). Install CineVault as usual,
+open **Settings › Browser access**, set a password and switch it on. CineVault shows an address
+like `http://192.168.1.20:8787` and a QR code; open it on any device on your home network. Nothing
+else to install. On Windows, choose **Allow** when the firewall asks the first time. Optionally
+CineVault keeps running in the tray when you close the window and starts when you sign in.
+
+**Or run it as a server** on the computer that holds your movies (a NAS, a mini-PC or an always-on
+PC), so it works without a desktop session. Pick the way that fits; each is one command, and
+running it again updates CineVault, changes its folders or removes it.
+
+**Linux** (Ubuntu 22.04, Debian 12, Fedora 36 or newer; 64-bit): installs the `cinevault-server`
+package and starts it as a service.
+
+```sh
+curl -fsSL https://mustafayevt.github.io/CineVault/install.sh | sh
 ```
 
-```bash
-docker compose up -d
+**Windows** (with [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+installed and running): paste in PowerShell.
+
+```powershell
+irm https://mustafayevt.github.io/CineVault/install.ps1 | iex
 ```
 
+**macOS** (with [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/)
+installed and running): paste in Terminal.
+
+```sh
+curl -fsSL https://mustafayevt.github.io/CineVault/install.sh | sh
+```
+
+**NAS and Docker:** an [Unraid template](packaging/unraid/cinevault.xml), a
+[Compose file](docker-compose.yml) for Synology, TrueNAS and others, and the image
+`ghcr.io/mustafayevt/cinevault` ([how to](packaging/README.md#install-by-hand-with-docker)).
+
+The installer asks for your movie and TV folders, starts CineVault and opens
+`http://localhost:8787`; it also prints the address to use from other devices. Then:
+
+1. **Choose a password** on the welcome page, from any device on your home network. It stays there
+   until a password is set. Forgot it later? **Forgot the password?** on the sign-in page gives you a
+   one-time PIN in CineVault's data folder ([how](packaging/README.md#everyday-use)).
+2. **Add your folders** in setup. On Linux they keep their usual paths. With Docker they appear under
+   `/media/`, for example your `D:\Movies` is `/media/Movies`; the installer prints the list.
+3. **Enter your free [TMDB key](https://www.themoviedb.org/settings/api)** and Scan.
 
 <picture>
   <source srcset="site/img/server-login-light.webp" media="(prefers-color-scheme: light)">
   <img src="site/img/server-login-dark.webp" width="1440" height="900" alt="The CineVault server sign-in page: one password field, a show/hide control and the recovery note">
 </picture>
 
-Open `http://<server>:8787`. The first visit creates the password; then the normal setup adds the
-library folder, the TMDB key and the naming profile. The library folders must be readable and
-writable by the server, because Scan, Scrape and Rename write NFO and artwork next to the media.
-
-A `.deb`, an `.rpm` and a tarball are published with each release for hosts without Docker; see
-[`packaging/README.md`](packaging/README.md) for the packages, the systemd unit and the tarball.
-The provider keys are kept in an encrypted `secrets.enc`; supply the master key as a Docker secret
-or a systemd credential (`CINEVAULT_SECRET_KEY_FILE`) and back it up with the data folder.
+Keep it on your home network or behind a VPN; never forward its port to the internet. Not in the
+beta yet: ARM computers (Raspberry Pi, ARM NAS) and "Open in Kodi".
+**[The full guide](packaging/README.md)** covers each step, the commands to stop, start and update it,
+a forgotten password, backups, installing by hand with Docker or the packages, and troubleshooting.
 
 The desktop app and the server can share a data folder, but only one may open it at a time. The
 server holds a `library-owner.json` lock; the desktop app refuses that folder and the `cinevault`
 command line exits with code 2 instead of writing behind the server's back.
-
-Keep the server on the LAN or behind a VPN. For HTTPS, put it behind a reverse proxy and set
-`CINEVAULT_WEB_TRUST_PROXY` to the proxy addresses so the session cookie is marked `Secure` and the
-sign-in limit uses the real client address. Never port-forward it to the internet.
 
 ## Screenshots
 
@@ -129,7 +145,7 @@ The checks to run before a pull request are listed in [CONTRIBUTING.md](CONTRIBU
 
 ## Contributing
 
-CineVault is open source, and contributions are welcome: bug reports, ideas, documentation and pull requests. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; contributors and AI coding assistants also follow [AGENTS.md](AGENTS.md). Every change, including the maintainer's, lands through a pull request from a branch, and CI must pass before it is merged. Please report security issues privately, as described in [SECURITY.md](SECURITY.md).
+CineVault is open source, and contributions are welcome: bug reports, ideas, documentation and pull requests. Questions and open-ended ideas belong in [Discussions](https://github.com/mustafayevt/CineVault/discussions); the issue tracker is for bugs and concrete features. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; contributors and AI coding assistants also follow [AGENTS.md](AGENTS.md). Every change, including the maintainer's, lands through a pull request from a branch, and CI must pass before it is merged. Please report security issues privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Licence
 

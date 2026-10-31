@@ -7,6 +7,7 @@ By taking part you agree to follow the [code of conduct](CODE_OF_CONDUCT.md).
 ## Reporting bugs and asking for features
 
 - Search the [existing issues](https://github.com/mustafayevt/CineVault/issues) first.
+- Questions about setting up, naming templates, which format to write or how a feature is meant to behave go to [Discussions](https://github.com/mustafayevt/CineVault/discussions). Issues are for bugs and concrete feature requests.
 - Use the issue templates: a bug report needs the CineVault version, your operating system, the steps to reproduce and, if you can, a log.
 - Never paste API keys into an issue. Security problems are reported privately (see [SECURITY.md](SECURITY.md)).
 

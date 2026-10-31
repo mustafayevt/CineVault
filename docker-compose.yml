@@ -1,10 +1,13 @@
-# CineVault server on a home server.
+# CineVault server (browser mode, beta) with Docker Compose.
 #
-#   docker compose up -d
+# 1. Put this file in an empty folder, for example ~/cinevault (Windows: C:\Users\you\CineVault).
+# 2. Make the key that encrypts your provider keys, in that folder (once; keep it with the data):
+#      macOS / Linux:  openssl rand -base64 32 > secret.key
+#      PowerShell:     $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [IO.File]::WriteAllText("$PWD\secret.key", [Convert]::ToBase64String($b))
+# 3. Change the media line(s) below to your folders.
+# 4. docker compose up -d   and open http://localhost:8787
 #
-# The data folder holds library.db, settings.json, the server session files and downloaded tools.
-# Library folders are mounted read-write: Scan, Rename, artwork and NFO writes all change files
-# beside the media, and the server must be able to write there.
+# Update: docker compose pull && docker compose up -d   (the data folder is kept)
 services:
   cinevault:
     image: ghcr.io/mustafayevt/cinevault:latest
@@ -14,24 +17,24 @@ services:
     ports:
       - "8787:8787"
     environment:
+      # Linux / NAS: the user and group that own your media (`id -u`, `id -g`). Leave 1000 on
+      # Windows and macOS.
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
-      CINEVAULT_DATA_DIR: /data
-      CINEVAULT_WEB_BIND: 0.0.0.0
-      CINEVAULT_WEB_PORT: "8787"
-      # Provider-key master key as a Docker secret. Create it first with
-      # `openssl rand -base64 32 > secrets/cinevault_key` (base64 of 32 bytes) and
-      # uncomment this and the secrets blocks below.
-      # CINEVAULT_SECRET_KEY_FILE: /run/secrets/cinevault_key
+      CINEVAULT_SECRET_KEY_FILE: /run/secrets/cinevault_key
     volumes:
+      # CineVault's own data: library, settings, password. Keep it on a local disk.
       - ./data:/data
-      # Library folders MUST be read-write. Add one line per folder (movies, TV, ...).
-      - /path/to/media:/media
+      # Your library folders, read-write. Left of the colon: the folder on this computer
+      # (Windows: D:/Movies). Right: the name you pick in CineVault's setup (/media/movies).
+      # Add one line per folder.
+      - /path/to/movies:/media/movies
+      # - /path/to/tv:/media/tv
+    secrets:
+      - cinevault_key
     restart: unless-stopped
     stop_grace_period: 30s
-    # secrets:
-    #   - cinevault_key
 
-# secrets:
-#   cinevault_key:
-#     file: ./secrets/cinevault_key
+secrets:
+  cinevault_key:
+    file: ./secret.key
