@@ -307,7 +307,15 @@ pub fn builder() -> Builder<tauri::Wry> {
             crate::episode_scrape_ipc::search_show_episodes,
             crate::episode_scrape_ipc::assign_episode,
             crate::episode_scrape_ipc::scrape_show_episodes,
-            crate::episode_scrape_ipc::scrape_episode
+            crate::episode_scrape_ipc::scrape_episode,
+            crate::browser_access_ipc::get_browser_access,
+            crate::browser_access_ipc::set_browser_access_enabled,
+            crate::browser_access_ipc::set_browser_access_port,
+            crate::browser_access_ipc::set_browser_access_lan_only,
+            crate::browser_access_ipc::set_browser_access_tray,
+            crate::browser_access_ipc::set_browser_access_password,
+            crate::browser_access_ipc::sign_out_browsers,
+            crate::browser_access_ipc::set_start_at_login
         ])
         .events(events_with_dev!())
         // Every streaming search sends this over its Channel; the item type is the flow's own.

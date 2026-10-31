@@ -7,12 +7,24 @@ What changed in each version of CineVault, newest first, in plain words. The app
 ### Added
 
 - Browser mode installs with one command: on Linux it installs the server package and starts it as a service, on Windows and macOS it sets CineVault up in Docker Desktop. Running the same command again updates CineVault, changes its folders or removes it. There is also an Unraid template and a simpler Docker Compose file.
+- Browser access: turn it on in Settings › Browser access and open your library from a phone, a TV or another computer on your home network, with no Docker and no second install. The CineVault you already run serves it, so the window and the browser see the same library at the same time. The section shows the address to open with a Copy button and a QR code, lets you choose the port, and lists the signed-in browsers with Sign out for each or for all.
+- The password for Browser access is created and changed in Settings, right at the computer. Turning Browser access off closes the port and signs every browser out.
+- Only devices on your home network can reach Browser access unless you turn that off.
+- Two options for Browser access: keep CineVault running in the tray when the window is closed, and start CineVault when you sign in.
+- Server: "Forgot the password?" on the sign-in page writes a one-time PIN to `password-reset-pin.txt` in the data folder. Enter it with a new password from a browser on your home network; it works once, for 15 minutes, and signs every other browser out.
+
+### Changed
+
+- Server: the first-run welcome no longer closes after 30 minutes. It stays until a password exists, but only browsers on the same computer or the home network can use it.
 
 ### Fixed
 
 - A password set with `cinevault-server passwd` as root (with sudo, or `docker exec` without `-u`) now works right away instead of only after a restart.
 - The server packages and tarball are attached to every release again; 1.2.0 was missing them at first.
 - Removing the server `.deb` no longer takes an empty `/usr/local/bin` folder with it.
+- The Move to menu is clean and dependable again. Each drive is a row of its own with its free space, the folder's path shortened in the middle (hover it for the whole path) and the free space after the move. A drive that cannot take the titles now says why on its row, such as "Not enough space: needs 71.4 GB, 1.02 GB free.", instead of only looking greyed out, and the menu no longer shows stray scrollbars.
+- A click outside the Move to menu now closes it and does what you clicked, so selecting a title no longer takes two clicks. Pressing "Move to…" again closes the menu, Esc closes it and keeps your selection, and the menu opens above the selection bar without covering it, also in a small window.
+- The Move to menu shows placeholder rows while it measures free space, says when there is no other folder to move to with a way to Settings › Library folders, and works fully from the keyboard.
 
 ## [1.2.0] - 2026-10-30
 

@@ -30,6 +30,10 @@ interface MenuProps {
   onOpenAutoFocus?: (event: Event) => void;
   /** Overrides where focus goes when the menu closes (it returns to the trigger by default). */
   onCloseAutoFocus?: (event: Event) => void;
+  /** Runs on a press outside the menu; `preventDefault()` keeps the menu open. */
+  onPointerDownOutside?: (event: CustomEvent<{ originalEvent: PointerEvent }>) => void;
+  /** Runs when the focus leaves the menu; `preventDefault()` keeps the menu open. */
+  onFocusOutside?: (event: CustomEvent<{ originalEvent: FocusEvent }>) => void;
 }
 
 /**
@@ -52,6 +56,8 @@ export function Menu({
   style,
   onOpenAutoFocus,
   onCloseAutoFocus,
+  onPointerDownOutside,
+  onFocusOutside,
 }: MenuProps) {
   const container = useFloatingContainer();
   return (
@@ -75,6 +81,8 @@ export function Menu({
           // Radix's menu content runs this handler but leaves it out of its public props.
           {...({ onOpenAutoFocus } as object)}
           onCloseAutoFocus={onCloseAutoFocus}
+          onPointerDownOutside={onPointerDownOutside}
+          onFocusOutside={onFocusOutside}
           className={cx(
             menuSurface,
             "max-h-(--radix-dropdown-menu-content-available-height)",

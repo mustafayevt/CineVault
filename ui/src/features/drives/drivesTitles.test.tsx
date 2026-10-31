@@ -154,8 +154,9 @@ describe("the Move to menu", () => {
     const { menu } = await openMenu();
     expect(within(menu).getByText(/^Move 3 titles · .* to$/)).toBeVisible();
     const archive = within(menu).getByRole("menuitem", { name: /E: Archive/ });
-    expect(within(archive).getByText(/5\.81 TB free →/)).toBeVisible();
+    expect(within(archive).getByText("5.81 TB free")).toBeVisible();
     expect(within(archive).getByText(/^5\.6\d? TB$/)).toBeVisible();
+    expect(within(archive).getByText(/free after/)).toBeVisible();
     // The folder the titles are in, and the TV folders, are not destinations.
     expect(within(menu).queryByRole("menuitem", { name: /D: Media/ })).toBeNull();
     expect(within(menu).queryByRole("menuitem", { name: /Shows/ })).toBeNull();
@@ -167,10 +168,15 @@ describe("the Move to menu", () => {
     const { menu } = await openMenu();
     const videos = within(menu).getByRole("menuitem", { name: /Videos/ });
     expect(videos).toHaveAttribute("aria-disabled", "true");
-    expect(within(videos).getByText(/Needs .* GB and has 41 GB\./)).toBeVisible();
+    const room = within(videos).getByText(/^Not enough space: needs .* GB, 41 GB free\.$/);
+    expect(room).toBeVisible();
+    // The reason is in the row itself, not a floating tip, and describes it for screen readers.
+    expect(videos).toHaveAccessibleDescription(room.textContent ?? "");
+    expect(within(menu).queryByRole("tooltip")).toBeNull();
     const nas = within(menu).getByRole("menuitem", { name: /Z: NAS/ });
     expect(nas).toHaveAttribute("aria-disabled", "true");
     expect(within(nas).getByText("Offline")).toBeVisible();
+    expect(nas).toHaveAccessibleDescription("The drive is offline. Connect it to move here.");
   });
 
   it("starts the move on choosing a destination and offers Undo", async () => {

@@ -706,6 +706,31 @@ export const commands = {
 	 *  the cue to search it by title.
 	 */
 	scrapeEpisode: (episodeId: string, fields: string[] | null, doNotOverwrite: boolean | null) => typedError<EpisodeWriteDto, EpisodeScrapeCommandError>(__TAURI_INVOKE("scrape_episode", { episodeId, fields, doNotOverwrite })),
+	/**  The section's state. */
+	getBrowserAccess: () => typedError<BrowserAccessDto, BrowserAccessError>(__TAURI_INVOKE("get_browser_access")),
+	/**
+	 *  Turns Browser access on or off. Off stops the server, closes the port and signs every browser
+	 *  out. On needs a password.
+	 */
+	setBrowserAccessEnabled: (enabled: boolean) => typedError<BrowserAccessDto, BrowserAccessError>(__TAURI_INVOKE("set_browser_access_enabled", { enabled })),
+	/**  Changes the port and restarts the server on it. */
+	setBrowserAccessPort: (port: number) => typedError<BrowserAccessDto, BrowserAccessError>(__TAURI_INVOKE("set_browser_access_port", { port })),
+	/**  "Only devices on my home network". Restarts the server. */
+	setBrowserAccessLanOnly: (on: boolean) => typedError<BrowserAccessDto, BrowserAccessError>(__TAURI_INVOKE("set_browser_access_lan_only", { on })),
+	/**  "Keep running in the tray when the window is closed". */
+	setBrowserAccessTray: (on: boolean) => typedError<BrowserAccessDto, BrowserAccessError>(__TAURI_INVOKE("set_browser_access_tray", { on })),
+	/**
+	 *  Creates or changes the browser password. The person is at the computer, so the current
+	 *  password is not asked for. Every signed-in browser is signed out.
+	 */
+	setBrowserAccessPassword: (password: string, confirm: string) => typedError<BrowserAccessDto, BrowserAccessError>(__TAURI_INVOKE("set_browser_access_password", { password, confirm })),
+	/**  Signs one browser out by its handle, or every browser when no handle is given. */
+	signOutBrowsers: (handle: string | null) => typedError<BrowserAccessDto, BrowserAccessError>(__TAURI_INVOKE("sign_out_browsers", { handle })),
+	/**
+	 *  "Start CineVault when I sign in": the per-user Run entry on Windows, an autostart `.desktop`
+	 *  file on Linux, a login item on macOS.
+	 */
+	setStartAtLogin: (on: boolean) => typedError<BrowserAccessDto, BrowserAccessError>(__TAURI_INVOKE("set_start_at_login", { on })),
 };
 
 /** Events */
@@ -856,6 +881,48 @@ export type BinnedTitleDto = {
 	 */
 	went_to: string,
 	notes: string[],
+};
+
+/**  What the Browser access section shows. */
+export type BrowserAccessDto = {
+	/**  The library is open; without it nothing can be served. */
+	available: boolean,
+	/**  The switch. */
+	enabled: boolean,
+	/**  `off`, `running`, `portInUse`, `error` or `noPassword`. */
+	state: string,
+	/**  The sentence for `portInUse` and `error`. */
+	message: string | null,
+	port: number,
+	/**  What to open from another device, the computer's network address first. */
+	addresses: string[],
+	lanOnly: boolean,
+	hasPassword: boolean,
+	sessions: BrowserSessionDto[],
+	keepInTray: boolean,
+	startAtLogin: boolean,
+	/**  Windows shows a firewall prompt the first time; the section explains it. */
+	windows: boolean,
+	computer: string,
+};
+
+/**  Why a Browser access command did not do what was asked. */
+export type BrowserAccessError = {
+	/**  `unavailable`, `password`, `port` or `storage`. */
+	code: string,
+	message: string,
+};
+
+/**  One signed-in browser. */
+export type BrowserSessionDto = {
+	/**  A public id for "Sign out"; never the session's cookie. */
+	handle: string,
+	address: string,
+	/**  The browser's `User-Agent`, shortened by the interface. */
+	agent: string,
+	/**  Epoch milliseconds. */
+	signedInMs: number | null,
+	lastUsedMs: number | null,
 };
 
 /**  A portrait fetched for a person of the credits. */

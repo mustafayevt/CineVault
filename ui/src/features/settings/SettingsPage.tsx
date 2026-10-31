@@ -5,6 +5,7 @@ import type { ComponentType } from "react";
 import { t } from "../../i18n/catalog";
 import { isServer } from "../../lib/transport";
 import { AppearanceSection } from "./AppearanceSection";
+import { BrowserAccessSection } from "./BrowserAccessSection";
 import { DeletedFilesSection } from "./DeletedFilesSection";
 import { FoldersSection } from "./FoldersSection";
 import { NamingSection } from "./NamingSection";
@@ -35,13 +36,24 @@ const BASE_SECTIONS: readonly SectionDef[] = [
   { id: "updates", label: () => t("settingsPage.updates.title"), Body: UpdatesSection },
 ];
 
-/** The Server section exists only when the page is served by the browser server. */
+/**
+ * The Server section exists only when the page is served to a browser; Browser access only in the
+ * desktop app (and the development page), where the person is at the computer that serves.
+ */
 const SECTIONS: readonly SectionDef[] = isServer()
   ? [
       ...BASE_SECTIONS,
       { id: "server", label: () => t("settingsPage.server.title"), Body: ServerSection },
     ]
-  : BASE_SECTIONS;
+  : [
+      ...BASE_SECTIONS.slice(0, -1),
+      {
+        id: "browser-access",
+        label: () => t("settingsPage.browserAccess.title"),
+        Body: BrowserAccessSection,
+      },
+      ...BASE_SECTIONS.slice(-1),
+    ];
 
 /** Older addresses (`?section=library`) and the ids of the old groups, by their new section. */
 const ALIASES: Readonly<Record<string, string>> = {

@@ -40,6 +40,8 @@
   --scrim: rgba(8, 8, 10, 0.72);
   --scrim-text: #f1efea;
   --badge-scrim: rgba(8, 8, 10, 0.72);
+  --qr-ink: #121211;
+  --qr-paper: #ffffff;
   --focus-ring: var(--text);
   --shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 250, 240, 0.04);
 }
@@ -78,6 +80,8 @@
   --scrim: rgba(8, 8, 10, 0.72);
   --scrim-text: #f1efea;
   --badge-scrim: rgba(255, 255, 255, 0.94);
+  --qr-ink: #121211;
+  --qr-paper: #ffffff;
   --focus-ring: var(--text);
   --shadow-floating: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(40, 30, 10, 0.08);
 }
@@ -167,6 +171,8 @@
   --color-scrim: var(--scrim);
   --color-scrim-text: var(--scrim-text);
   --color-badge-scrim: var(--badge-scrim);
+  --color-qr-ink: var(--qr-ink);
+  --color-qr-paper: var(--qr-paper);
 }
 
 /* The floating shadow changes with the theme, so its utility reads the variable. */

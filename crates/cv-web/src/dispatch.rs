@@ -33,6 +33,10 @@ pub(crate) fn bad_request(error: impl std::fmt::Display) -> Value {
     json!({ "code": "bad_request", "message": format!("bad argument: {error}") })
 }
 
+/// What a browser hears when it asks to change Browser access.
+const BROWSER_ACCESS_ONLY_AT_THE_COMPUTER: &str =
+    "Browser access is managed in CineVault's Settings on the computer that runs it.";
+
 /// The browser has no equivalent of this command. The interface hides its control.
 pub(crate) fn not_applicable(message: impl Into<String>) -> Value {
     json!({ "code": "not_applicable", "message": message.into() })
@@ -199,9 +203,9 @@ fn inside_roots(state: &WebState, path: &str) -> Result<(), Value> {
             "message": "The folder must be an absolute path."
         }));
     }
-    let roots = crate::allowed_roots(state);
+    let roots = crate::server::allowed_roots(state);
     let resolved = std::fs::canonicalize(&folder).unwrap_or(folder);
-    if crate::path_inside_roots(&resolved, &roots) {
+    if crate::server::path_inside_roots(&resolved, &roots) {
         Ok(())
     } else {
         Err(json!({
@@ -1885,6 +1889,16 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
         "torrent_open_indexer_manager" => Err(not_applicable(
             "The indexer manager runs on the server; open its address in your browser.",
         )),
+        // Browser access is switched, protected and configured only at the computer that runs
+        // it, never from a browser it serves.
+        "get_browser_access" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
+        "set_browser_access_enabled" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
+        "set_browser_access_port" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
+        "set_browser_access_lan_only" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
+        "set_browser_access_tray" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
+        "set_browser_access_password" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
+        "sign_out_browsers" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
+        "set_start_at_login" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
 
         other => {
             // The shim answers the window and webview calls a browser has no use for; anything

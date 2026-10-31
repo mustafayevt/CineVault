@@ -231,6 +231,8 @@ const legacyLibrarySourcesRoute = settingsRedirect("/settings/library", "folders
 const legacyToolsRoute = settingsRedirect("/settings/tools", undefined);
 const legacyProvidersRoute = settingsRedirect("/settings/providers", "providers");
 const legacyAboutRoute = settingsRedirect("/settings/about", undefined);
+// A notice's settings link ("Browser access did not start") opens its section.
+const browserAccessRoute = settingsRedirect("/settings/browser-access", "browser-access");
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -257,6 +259,7 @@ const routeTree = rootRoute.addChildren([
   legacyToolsRoute,
   legacyProvidersRoute,
   legacyAboutRoute,
+  browserAccessRoute,
 ]);
 
 export const router = createRouter({ routeTree, defaultNotFoundComponent: NotFoundPage });
