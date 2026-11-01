@@ -5,7 +5,7 @@ Finds movies the library holds more than once, shows the copies side by side wit
 ## ADDED Requirements
 
 ### Requirement: What counts as copies
-Two or more movies SHALL be copies of one film when they share a TMDB ID or an IMDb ID, or, when one of them has neither ID, when their titles match without regard to case and surrounding spaces and their years are the same and known. Copies SHALL be counted transitively, so every movie linked to a group by one of these rules is in that group. TV shows, seasons and episodes SHALL never be copies.
+Two or more movies SHALL be copies of one film when they share a TMDB ID or an IMDb ID, or, when one of them has neither ID, when their titles match without regard to case and surrounding spaces and their years are the same and known. Copies SHALL be counted transitively, within the limits of "Copies never join two films". TV shows, seasons and episodes SHALL never be copies.
 
 #### Scenario: Same TMDB ID in two folders
 - **WHEN** `D:\Movies\Example Movie (2020) 1080p WEB` and `E:\Films\Example.Movie.2020.2160p.BluRay` are both scraped to the same TMDB ID
@@ -21,6 +21,17 @@ Two or more movies SHALL be copies of one film when they share a TMDB ID or an I
 
 #### Scenario: Unknown year
 - **WHEN** two unscraped movies are both parsed as "Example Movie" with no year
+- **THEN** they are not copies
+
+### Requirement: Copies never join two films
+Two movies with different TMDB IDs SHALL never be in one group, also when an IMDb ID or another movie would link them. A movie with neither ID SHALL join by title and year only when the movies with IDs of that title and year are one film, or when none has an ID.
+
+#### Scenario: Unscraped between two films
+- **WHEN** two scraped movies titled Example Movie from 2020 have different TMDB IDs and a new, unscraped "example movie" from 2020 is added
+- **THEN** none of the three is a copy
+
+#### Scenario: One IMDb ID on two TMDB IDs
+- **WHEN** two movies share an IMDb ID but have different TMDB IDs
 - **THEN** they are not copies
 
 ### Requirement: Different editions are not copies

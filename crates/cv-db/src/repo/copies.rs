@@ -197,19 +197,26 @@ pub(crate) fn register_functions(conn: &Connection) -> rusqlite::Result<()> {
 }
 
 /// Links the candidates by the copy rules and returns the groups of two or more.
+///
+/// Two movies with different TMDB IDs are never put in one group, whatever else links them: an
+/// IMDb ID shared across two TMDB IDs is a wrong ID on one of them, not one film.
 fn group(candidates: &[Candidate]) -> Vec<CopyGroup> {
-    let mut sets = UnionFind::new(candidates.len());
-    let mut first_with: HashMap<(&str, &str, &str), usize> = HashMap::new();
-    let mut same_title: HashMap<(&str, &str, i64), Vec<usize>> = HashMap::new();
-    for (index, c) in candidates.iter().enumerate() {
-        for (provider, value) in [("tmdb", &c.tmdb), ("imdb", &c.imdb)] {
+    let mut sets = UnionFind::new(candidates);
+    // TMDB first, so the films are known before an IMDb link could join two of them.
+    for provider in ["tmdb", "imdb"] {
+        let mut first_with: HashMap<(&str, &str), usize> = HashMap::new();
+        for (index, c) in candidates.iter().enumerate() {
+            let value = if provider == "tmdb" { &c.tmdb } else { &c.imdb };
             if let Some(value) = value {
                 let first = *first_with
-                    .entry((c.edition.as_str(), provider, value.as_str()))
+                    .entry((c.edition.as_str(), value.as_str()))
                     .or_insert(index);
                 sets.union(first, index);
             }
         }
+    }
+    let mut same_title: HashMap<(&str, &str, i64), Vec<usize>> = HashMap::new();
+    for (index, c) in candidates.iter().enumerate() {
         if c.year > 0 && !c.title.is_empty() {
             same_title
                 .entry((c.edition.as_str(), c.title.as_str(), c.year))
@@ -217,15 +224,22 @@ fn group(candidates: &[Candidate]) -> Vec<CopyGroup> {
                 .push(index);
         }
     }
-    // A movie with neither ID joins every movie of its title and year; two movies that both have
-    // IDs are linked by those IDs only.
+    // A movie with neither ID joins the one film its title and year name: the group of every
+    // movie with IDs of that title and year, or the other movies without IDs when none has
+    // one. When the movies with IDs are two films, it is left out: it cannot be told which.
     for members in same_title.values() {
-        for &index in members {
-            let c = &candidates[index];
-            if c.tmdb.is_none() && c.imdb.is_none() {
-                for &other in members {
-                    sets.union(index, other);
-                }
+        let (without, with): (Vec<usize>, Vec<usize>) = members.iter().partition(|&&index| {
+            candidates[index].tmdb.is_none() && candidates[index].imdb.is_none()
+        });
+        let films: BTreeSet<usize> = with.iter().map(|&index| sets.find(index)).collect();
+        let anchor = match films.len() {
+            0 => without.first().copied(),
+            1 => films.first().copied(),
+            _ => None,
+        };
+        if let Some(anchor) = anchor {
+            for index in without {
+                sets.union(anchor, index);
             }
         }
     }
@@ -249,27 +263,43 @@ fn group(candidates: &[Candidate]) -> Vec<CopyGroup> {
     groups
 }
 
-/// A disjoint-set forest over candidate positions.
-struct UnionFind(Vec<usize>);
+/// A disjoint-set forest over candidate positions that never joins two TMDB IDs.
+struct UnionFind<'a> {
+    parent: Vec<usize>,
+    /// The TMDB ID of each set, at its root.
+    tmdb: Vec<Option<&'a str>>,
+}
 
-impl UnionFind {
-    fn new(len: usize) -> Self {
-        Self((0..len).collect())
+impl<'a> UnionFind<'a> {
+    fn new(candidates: &'a [Candidate]) -> Self {
+        Self {
+            parent: (0..candidates.len()).collect(),
+            tmdb: candidates.iter().map(|c| c.tmdb.as_deref()).collect(),
+        }
     }
 
     fn find(&mut self, mut index: usize) -> usize {
-        while self.0[index] != index {
-            self.0[index] = self.0[self.0[index]];
-            index = self.0[index];
+        while self.parent[index] != index {
+            self.parent[index] = self.parent[self.parent[index]];
+            index = self.parent[index];
         }
         index
     }
 
+    /// Joins the sets of `a` and `b`, unless they hold different TMDB IDs.
     fn union(&mut self, a: usize, b: usize) {
         let (a, b) = (self.find(a), self.find(b));
-        if a != b {
-            self.0[a.max(b)] = a.min(b);
+        if a == b {
+            return;
         }
+        if let (Some(x), Some(y)) = (self.tmdb[a], self.tmdb[b])
+            && x != y
+        {
+            return;
+        }
+        let (root, child) = (a.min(b), a.max(b));
+        self.tmdb[root] = self.tmdb[root].or(self.tmdb[child]);
+        self.parent[child] = root;
     }
 }
 
@@ -354,6 +384,50 @@ mod tests {
         movie(&conn, "Example Movie", 2020, "", Some("2"), Some("tt2"));
 
         assert!(groups(&conn).is_empty());
+    }
+
+    #[test]
+    fn an_unscraped_movie_does_not_bridge_two_films_of_one_title() {
+        let conn = memory_db();
+        movie(&conn, "Example Movie", 2020, "", Some("1"), Some("tt1"));
+        movie(&conn, "Example Movie", 2020, "", Some("2"), Some("tt2"));
+        movie(&conn, "Example Movie", 2020, "", None, None);
+        assert!(
+            groups(&conn).is_empty(),
+            "two films: the new one cannot be placed"
+        );
+
+        // One film of that title in the library twice: the new movie joins it.
+        let conn = memory_db();
+        let a = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        let b = movie(&conn, "Example Movie", 2020, "", Some("1"), Some("tt1"));
+        let new = movie(&conn, "Example Movie", 2020, "", None, None);
+        assert_eq!(groups(&conn), vec![vec![a, b, new]]);
+    }
+
+    #[test]
+    fn two_unscraped_movies_of_one_title_and_year_are_copies() {
+        let conn = memory_db();
+        let a = movie(&conn, "Example Movie", 2020, "", None, None);
+        let b = movie(&conn, "example movie", 2020, "", None, None);
+
+        assert_eq!(groups(&conn), vec![vec![a, b]]);
+    }
+
+    #[test]
+    fn an_imdb_id_never_joins_two_tmdb_ids() {
+        let conn = memory_db();
+        movie(&conn, "Example Movie", 2020, "", Some("1"), Some("tt1"));
+        movie(&conn, "Example Movie", 2020, "", Some("2"), Some("tt1"));
+        assert!(groups(&conn).is_empty());
+
+        // Through a third movie with the IMDb ID only, the first film keeps it and the second
+        // stays apart.
+        let conn = memory_db();
+        let a = movie(&conn, "Example Movie", 2020, "", Some("1"), Some("tt1"));
+        let b = movie(&conn, "Example Movie", 2020, "", None, Some("tt1"));
+        movie(&conn, "Example Movie", 2020, "", Some("2"), Some("tt1"));
+        assert_eq!(groups(&conn), vec![vec![a, b]]);
     }
 
     #[test]
