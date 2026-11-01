@@ -10,10 +10,12 @@
 //! The schema lives in `schema.sql` (version 100). When the database is opened, [`migrate`] first
 //! reads the file header ([`header`]) and refuses a file of an earlier or a newer build untouched,
 //! then upgrades the file: a verified backup goes to `backups/pre-migration/`, then all pending
-//! migrations run in one transaction, so a failure leaves the file untouched.
+//! migrations run in one transaction, so a failure leaves the file untouched. [`backup`] writes
+//! the verified daily copies into `backups/`.
 //! [`repo`] holds the repositories on top of it: item CRUD, composable filters and sorts with
 //! keyset paging, and the full-text index.
 
+pub mod backup;
 mod connection;
 mod error;
 pub mod header;
@@ -142,6 +144,8 @@ impl std::fmt::Debug for Database {
     }
 }
 
+#[cfg(test)]
+mod backup_tests;
 #[cfg(test)]
 mod migrate_tests;
 #[cfg(test)]

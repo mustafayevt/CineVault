@@ -8,6 +8,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+chrono.workspace = true
 cv-domain.workspace = true
 cv-fs.workspace = true
 rusqlite.workspace = true

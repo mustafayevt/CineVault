@@ -2,7 +2,7 @@
 
 ## 1. Writing a verified backup
 
-- [ ] 1.1 Add `cv_db::backup` with `verify` moved from `migrate.rs` (the pre-migration snapshot calls it from there) and `write(db, backups_dir, date)`: remove stale `*.partial`, `VACUUM INTO` on a dedicated read-only connection, `sync_all`, verify, rename, sync the folder on Unix; remove the partial file on any failure. Verified by `cargo test -p cv-db`: the backup opens with the same rows and `user_version`; a write committed during the copy is not blocked; a stale `.partial` is removed; a same-day file is replaced; a forced verification failure leaves no `library-*.db` and no `.partial`; the existing pre-migration tests still pass.
+- [x] 1.1 Add `cv_db::backup` with `verify` moved from `migrate.rs` (the pre-migration snapshot calls it from there) and `write(db, backups_dir, date)`: remove stale `*.partial`, `VACUUM INTO` on a dedicated read-only connection, `sync_all`, verify, rename, sync the folder on Unix; remove the partial file on any failure. Verified by `cargo test -p cv-db`: the backup opens with the same rows and `user_version`; a write committed during the copy is not blocked; a stale `.partial` is removed; a same-day file is replaced; a forced verification failure leaves no `library-*.db` and no `.partial`; the existing pre-migration tests still pass.
 - [ ] 1.2 Add `backup::prune(backups_dir, 7)` over exact `library-YYYY-MM-DD.db` names only. Verified by tests with nine dated files, a `pre-migration` folder, a `.partial` and an unrelated file: the newest seven daily files and every other entry remain.
 
 ## 2. Scheduling in both owners
