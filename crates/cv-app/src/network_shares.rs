@@ -34,6 +34,21 @@
 //! folder that cannot be read marks them offline, never missing, and on macOS an empty share
 //! mount folder does not pass for the share (`cv_fs::paths::drive_is_mounted`).
 //!
+//! # Forgetting a share
+//!
+//! Removing the last library folder on a share marks it unused, and adding a folder on it again
+//! (the Undo of the removal) clears the mark ([`DataSourceService`] keeps it in step).
+//! [`NetworkShareService::sweep`] forgets a share that has stayed unused for [`FORGET_AFTER`]
+//! (longer than any Undo toast), and at start every unused share: once no job is running, it
+//! disconnects the share (a disconnect refused because files are open is accepted; the
+//! connection then ends at sign-out), deletes the stored password, then the row. The titles of
+//! the removed folders stay in the library, offline.
+//!
+//! [`NetworkShareService::clean_mount_folders`] removes, at start, the mount folders below
+//! `~/CineVault Shares` that belong to no share (left by an interrupted connect): a mounted one is
+//! unmounted first and left alone when it stays mounted, and a folder is only ever removed with
+//! `rmdir`, so one that still holds anything stays.
+//!
 //! Connecting writes, moves and deletes nothing on the share. A share this service connected for
 //! a folder that could not be added is disconnected again.
 
@@ -65,6 +80,19 @@ pub const PASSWORD_NEEDED: &str = "password_needed";
 
 /// Called with the library folders (data source ids) of a share whose connect step ended.
 pub type AfterConnect = Arc<dyn Fn(Vec<i64>) + Send + Sync>;
+
+/// How long a share stays unused before it is forgotten: longer than any Undo toast.
+pub const FORGET_AFTER: Duration = Duration::from_secs(60);
+
+/// How often the app looks for shares to forget.
+pub const SWEEP_EVERY: Duration = Duration::from_secs(15);
+
+/// Whether work that may read or write a share is running (a scan, a rename, a move, an artwork
+/// or NFO write): a share is not forgotten under it.
+pub type Busy = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// Tells whether a folder is a mount point.
+type MountCheck = Arc<dyn Fn(&Path) -> bool + Send + Sync>;
 
 /// What the network shares say about a library folder, ahead of its own probe.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,6 +224,11 @@ pub struct NetworkShareService {
     /// The shares being connected at start.
     connecting: Mutex<HashSet<i64>>,
     after_connect: Mutex<Option<AfterConnect>>,
+    busy: Mutex<Option<Busy>>,
+    /// Where CineVault mounts shares itself (`~/CineVault Shares` on macOS), and how to tell a
+    /// mount point there.
+    mount_folders: Option<std::path::PathBuf>,
+    is_mounted: MountCheck,
     /// The time the shares of one server have at start ([`RECONNECT_LIMIT`]).
     reconnect_limit: Duration,
 }
@@ -235,7 +268,15 @@ impl NetworkShareService {
             connecting: Mutex::new(HashSet::new()),
             after_connect: Mutex::new(None),
             reconnect_limit: RECONNECT_LIMIT,
+            busy: Mutex::new(None),
+            mount_folders: own_mount_folders(),
+            is_mounted: mount_check(),
         }
+    }
+
+    /// Asks `busy` before forgetting a share, and waits while it says work is running.
+    pub fn set_busy(&self, busy: Busy) {
+        *locked(&self.busy) = Some(busy);
     }
 
     /// Calls `hook` with the library folders of a share whose connect step at start ended, and of
@@ -419,6 +460,11 @@ impl NetworkShareService {
                 return Vec::new();
             }
         };
+        // An unused share is about to be forgotten; it is not connected again.
+        let shares: Vec<NetworkShare> = shares
+            .into_iter()
+            .filter(|share| share.unused_since_ms.is_none())
+            .collect();
         locked(&self.connecting).extend(shares.iter().map(|share| share.id));
         let roots = shares.iter().map(|s| s.local_root.clone()).collect();
         let mut servers: BTreeMap<String, Vec<NetworkShare>> = BTreeMap::new();
@@ -607,6 +653,106 @@ impl NetworkShareService {
         }
     }
 
+    /// Forgets every share that has been unused for at least `unused_for` (see the module notes),
+    /// unless work is running, and returns how many. Call it off the UI thread: a disconnect runs
+    /// the system's tool.
+    pub fn sweep(&self, unused_for: Duration) -> usize {
+        let due_ms =
+            now_ms().saturating_sub(i64::try_from(unused_for.as_millis()).unwrap_or(i64::MAX));
+        let due: Vec<NetworkShare> = match self.list() {
+            Ok(shares) => shares
+                .into_iter()
+                .filter(|share| share.unused_since_ms.is_some_and(|since| since <= due_ms))
+                .collect(),
+            Err(error) => {
+                tracing::warn!(%error, "the network shares could not be read");
+                return 0;
+            }
+        };
+        if due.is_empty() {
+            return 0;
+        }
+        let busy = locked(&self.busy).clone();
+        if busy.is_some_and(|busy| busy()) {
+            tracing::debug!("work is running; unused network shares are forgotten later");
+            return 0;
+        }
+        due.iter().filter(|share| self.forget(share)).count()
+    }
+
+    /// Disconnects a share, deletes its password and its row. Returns whether it was forgotten.
+    fn forget(&self, share: &NetworkShare) -> bool {
+        // A folder added on it since it was marked keeps it.
+        if self
+            .folders_of(share)
+            .map_or(true, |folders| !folders.is_empty())
+        {
+            return false;
+        }
+        if let Ok(address) = address_of(share) {
+            self.disconnect_quietly(&address);
+        }
+        if let Err(error) = self.secrets.delete(&secret_account(share.id)) {
+            tracing::warn!(%error, "the password of an unused network share could not be deleted; trying later");
+            return false;
+        }
+        if let Some(password) = locked(&self.unsaved).remove(&share.id) {
+            redact::unregister_secret(password.expose());
+        }
+        let id = share.id;
+        match self.db.write(move |tx| rows::delete_share(tx, id)) {
+            Ok(_) => {
+                tracing::info!(server = %share.server, share = %share.share, "unused network share forgotten");
+                true
+            }
+            Err(error) => {
+                tracing::warn!(%error, "an unused network share could not be removed");
+                false
+            }
+        }
+    }
+
+    /// Removes the mount folders CineVault made for shares it no longer knows (see the module
+    /// notes). Never recursive: only empty folders that are not mount points go.
+    pub fn clean_mount_folders(&self) {
+        let Some(base) = &self.mount_folders else {
+            return;
+        };
+        let Ok(shares) = self.list() else {
+            return;
+        };
+        let known = |folder: &Path| {
+            shares
+                .iter()
+                .any(|share| paths::same_path(Path::new(&share.local_root), folder))
+        };
+        for server in subfolders(base) {
+            for folder in subfolders(&server) {
+                if known(&folder) {
+                    continue;
+                }
+                if (self.is_mounted)(&folder) {
+                    let names = (server.file_name(), folder.file_name());
+                    if let (Some(host), Some(name)) = names
+                        && let Ok(address) =
+                            ShareAddress::new(&host.to_string_lossy(), &name.to_string_lossy())
+                    {
+                        self.disconnect_quietly(&address);
+                    }
+                    if (self.is_mounted)(&folder) {
+                        tracing::info!(folder = %folder.display(), "a share mount folder is still mounted; left alone");
+                        continue;
+                    }
+                }
+                // `remove_dir` removes only an empty folder.
+                if std::fs::remove_dir(&folder).is_ok() {
+                    tracing::info!(folder = %folder.display(), "removed an unused share mount folder");
+                }
+            }
+            let _ = std::fs::remove_dir(&server);
+        }
+    }
+
     fn disconnect_quietly(&self, share: &cv_shares::ShareAddress) {
         if let Err(error) = self.connector.disconnect(share, &Cancel::new()) {
             tracing::info!(
@@ -621,6 +767,39 @@ impl NetworkShareService {
     #[cfg(test)]
     fn unsaved_password(&self, id: i64) -> Option<Password> {
         locked(&self.unsaved).get(&id).cloned()
+    }
+}
+
+/// The folders right inside `folder`, links not followed.
+fn subfolders(folder: &Path) -> Vec<std::path::PathBuf> {
+    std::fs::read_dir(folder)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+                .map(|entry| entry.path())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// `~/CineVault Shares` on macOS, where the connector mounts shares; nowhere elsewhere.
+fn own_mount_folders() -> Option<std::path::PathBuf> {
+    if cfg!(target_os = "macos") {
+        dirs::home_dir().map(|home| home.join(paths::MAC_SHARE_MOUNTS))
+    } else {
+        None
+    }
+}
+
+fn mount_check() -> MountCheck {
+    #[cfg(unix)]
+    {
+        Arc::new(paths::is_mount_point)
+    }
+    #[cfg(not(unix))]
+    {
+        Arc::new(|_| false)
     }
 }
 

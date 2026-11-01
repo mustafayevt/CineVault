@@ -596,3 +596,182 @@ fn a_folder_of_a_share_that_did_not_connect_says_why() {
 fn the_mount_folder_of_the_macos_connector_is_the_one_folder_health_checks() {
     assert_eq!(cv_shares::MAC_MOUNT_FOLDER, paths::MAC_SHARE_MOUNTS);
 }
+
+// ---- forgetting ------------------------------------------------------------------------------
+
+fn remove_folder(rig: &Rig, source: i64) {
+    rig.service.sources.remove(source).unwrap();
+}
+
+#[test]
+fn removing_the_last_folder_marks_the_share_and_adding_one_again_clears_the_mark() {
+    let rig = rig();
+    rig.share_with(&["Films", "Series"]);
+    let films = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Films", PASSWORD, true),
+            &Cancel::new(),
+        )
+        .unwrap();
+    let series = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Series", PASSWORD, true),
+            &Cancel::new(),
+        )
+        .unwrap();
+    let id = films.share.id;
+
+    remove_folder(&rig, films.source.id);
+    assert_eq!(
+        row(&rig.service, id).unused_since_ms,
+        None,
+        "Series still uses it"
+    );
+    remove_folder(&rig, series.source.id);
+    assert!(row(&rig.service, id).unused_since_ms.is_some());
+
+    // Undo puts the folder back: the share is used again and keeps its password.
+    rig.service
+        .sources
+        .add(SourceKind::Movie, &series.source.path)
+        .unwrap();
+    assert_eq!(row(&rig.service, id).unused_since_ms, None);
+    assert_eq!(rig.service.sweep(Duration::ZERO), 0);
+    assert!(rig.secrets.contains(&secret_account(id)).unwrap());
+    assert!(!rig.fake.calls().contains(&FakeCall::Disconnect(movies())));
+}
+
+#[test]
+fn an_unused_share_is_forgotten_a_minute_later_and_its_files_stay() {
+    let rig = rig();
+    let root = rig.share_with(&["Films"]);
+    std::fs::write(root.join("Films").join("Heat (1995).mkv"), b"heat").unwrap();
+    let films = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Films", PASSWORD, true),
+            &Cancel::new(),
+        )
+        .unwrap();
+    remove_folder(&rig, films.source.id);
+
+    assert_eq!(rig.service.sweep(FORGET_AFTER), 0, "not within the minute");
+    assert_eq!(rig.service.sweep(Duration::ZERO), 1);
+
+    assert!(rig.service.list().unwrap().is_empty());
+    assert!(
+        !rig.secrets
+            .contains(&secret_account(films.share.id))
+            .unwrap()
+    );
+    assert!(rig.fake.calls().contains(&FakeCall::Disconnect(movies())));
+    assert!(!rig.fake.is_connected(&movies(), &Cancel::new()).unwrap());
+    assert_eq!(
+        std::fs::read(root.join("Films").join("Heat (1995).mkv")).unwrap(),
+        b"heat"
+    );
+}
+
+#[test]
+fn a_share_is_not_forgotten_while_a_job_runs() {
+    let rig = rig();
+    rig.share_with(&["Films"]);
+    let films = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Films", PASSWORD, false),
+            &Cancel::new(),
+        )
+        .unwrap();
+    remove_folder(&rig, films.source.id);
+    let running = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let flag = Arc::clone(&running);
+    rig.service.set_busy(Arc::new(move || {
+        flag.load(std::sync::atomic::Ordering::SeqCst)
+    }));
+
+    assert_eq!(rig.service.sweep(Duration::ZERO), 0);
+    assert_eq!(rig.service.list().unwrap().len(), 1);
+    assert!(!rig.fake.calls().contains(&FakeCall::Disconnect(movies())));
+
+    running.store(false, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(rig.service.sweep(Duration::ZERO), 1);
+    assert!(rig.service.unsaved_password(films.share.id).is_none());
+}
+
+#[test]
+fn a_share_whose_files_are_open_is_forgotten_without_being_disconnected() {
+    let rig = rig();
+    rig.share_with(&["Films"]);
+    let films = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Films", PASSWORD, true),
+            &Cancel::new(),
+        )
+        .unwrap();
+    remove_folder(&rig, films.source.id);
+    rig.fake.fail_disconnect(
+        &movies(),
+        Some(ShareError::new(ShareErrorKind::InUse, "files are open")),
+    );
+
+    assert_eq!(rig.service.sweep(Duration::ZERO), 1);
+    assert!(rig.service.list().unwrap().is_empty());
+    assert!(
+        !rig.secrets
+            .contains(&secret_account(films.share.id))
+            .unwrap()
+    );
+    assert!(rig.fake.is_connected(&movies(), &Cancel::new()).unwrap());
+}
+
+#[test]
+fn an_unused_share_is_not_connected_again_at_start() {
+    let rig = rig();
+    let movies = add(&rig, "nas", "movies", true);
+    remove_folder(&rig, movies.source.id);
+    let (service, fake) = restarted(&rig);
+    assert!(service.reconnect_at_start().is_empty());
+    assert!(fake.calls().is_empty());
+}
+
+#[test]
+fn only_empty_mount_folders_of_no_share_are_removed_and_never_while_mounted() {
+    let rig = rig();
+    let known = add(&rig, "nas", "movies", true);
+    let (service, fake) = restarted(&rig);
+    let mut service = Arc::into_inner(service).unwrap();
+    // The fake shows shares below `shares`, as the macOS connector does below its mount folder.
+    let base = rig.dir.path().join("shares");
+    service.mount_folders = Some(base.clone());
+    service.is_mounted = Arc::new(|folder: &Path| folder.ends_with("busy"));
+
+    let nas = base.join("nas");
+    let (gone, busy, full) = (nas.join("gone"), nas.join("busy"), nas.join("full"));
+    for folder in [&gone, &busy, &full] {
+        std::fs::create_dir_all(folder).unwrap();
+    }
+    std::fs::write(full.join("keep.txt"), b"mine").unwrap();
+    let old_server = base.join("old");
+    std::fs::create_dir_all(old_server.join("films")).unwrap();
+
+    service.clean_mount_folders();
+
+    assert!(!gone.exists(), "an empty folder that is not mounted goes");
+    assert!(busy.exists(), "a folder that stays mounted is left alone");
+    let busy_share = cv_shares::ShareAddress::new("nas", "busy").unwrap();
+    assert!(fake.calls().contains(&FakeCall::Disconnect(busy_share)));
+    assert_eq!(std::fs::read(full.join("keep.txt")).unwrap(), b"mine");
+    assert!(Path::new(&known.share.local_root).join("Films").exists());
+    assert!(!old_server.exists(), "an emptied server folder goes too");
+    assert!(
+        !fake
+            .calls()
+            .iter()
+            .any(|call| matches!(call, FakeCall::Disconnect(share) if share.share() != "busy")),
+        "only a mounted folder is unmounted"
+    );
+}

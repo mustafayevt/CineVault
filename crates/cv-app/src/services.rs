@@ -732,10 +732,42 @@ impl AppServices {
             }
         }));
         let waiting = self.shares.reconnect_at_start();
+        self.forget_unused_shares();
         // The scan on startup, the watcher and the pending media info come after the resume, so
         // a scan the last session left unfinished is not started a second time.
         self.scan.startup(report.rescans, &waiting);
         report
+    }
+
+    /// Forgets the network shares no library folder uses any more, once no job is running: the
+    /// unused ones at once, and from then on each a minute after its last folder was removed.
+    /// Mount folders an interrupted connect left behind go too.
+    fn forget_unused_shares(&self) {
+        let jobs = self.jobs.clone();
+        self.shares.set_busy(Arc::new(move || {
+            jobs.list().iter().any(|job| !job.state.is_terminal())
+        }));
+        let shares = Arc::clone(&self.shares);
+        let sweeper = tokio::spawn(async move {
+            let first = Arc::clone(&shares);
+            let _ = tokio::task::spawn_blocking(move || {
+                first.clean_mount_folders();
+                first.sweep(Duration::ZERO);
+            })
+            .await;
+            loop {
+                tokio::time::sleep(crate::network_shares::SWEEP_EVERY).await;
+                let shares = Arc::clone(&shares);
+                let _ = tokio::task::spawn_blocking(move || {
+                    shares.sweep(crate::network_shares::FORGET_AFTER)
+                })
+                .await;
+            }
+        });
+        self.tasks
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(sweeper);
     }
 
     /// Starts again every persisted job kind. A kind that cannot be read is logged and reported
