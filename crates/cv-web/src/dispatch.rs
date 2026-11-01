@@ -2251,4 +2251,80 @@ mod tests {
         let through = root.join("link").join("trash");
         assert!(!folder_inside_roots(through.to_str().unwrap(), &[root]));
     }
+
+    /// The settings whose value is a path, a program, a command or an address the server uses.
+    /// They are not host settings, and were reviewed: patterns and names are text the scan and
+    /// the renamer read, and the torrent addresses reach the network, not a program or a file.
+    const REVIEWED_TEXT_SETTINGS: &[&str] = &[
+        "library.skip-patterns",
+        "library.bad-words",
+        "metadata.collection-name-replacement",
+        "renamer.unwanted-patterns",
+        "artwork.languages",
+        "torrents.torznab.url",
+        "torrents.indexer-service.solver-url",
+        "torrents.url.torrentio",
+        "torrents.url.yts",
+        "torrents.url.eztv",
+        "torrents.url.apibay",
+        "torrents.url.knaben",
+        "torrents.url.nyaa",
+    ];
+
+    /// The keys of the `mono` text settings (paths, programs, commands, patterns) declared in a
+    /// copy of `ui/src/features/settings/schema.ts`: each `setting(` call that has `mono: true`.
+    fn mono_settings(schema: &str) -> Vec<String> {
+        let mut keys = Vec::new();
+        let starts: Vec<usize> = schema
+            .match_indices("setting(")
+            .map(|(at, _)| at)
+            .filter(|at| {
+                schema[..*at]
+                    .chars()
+                    .next_back()
+                    .is_none_or(|before| !before.is_alphanumeric() && before != '_')
+            })
+            .collect();
+        for (index, start) in starts.iter().enumerate() {
+            let end = starts.get(index + 1).copied().unwrap_or(schema.len());
+            let call = &schema[*start..end];
+            let key = call.split('"').nth(1).unwrap_or_default();
+            if !key.is_empty() && call.contains("mono: true") {
+                keys.push(key.to_owned());
+            }
+        }
+        keys
+    }
+
+    fn undecided(schema: &str) -> Vec<String> {
+        mono_settings(schema)
+            .into_iter()
+            .filter(|key| {
+                !host_setting(key)
+                    && !HOST_FOLDERS.contains(&key.as_str())
+                    && !REVIEWED_TEXT_SETTINGS.contains(&key.as_str())
+            })
+            .collect()
+    }
+
+    /// Fails when a setting whose value is a path, a program or a command is added to the
+    /// interface without a decision: a host setting, a host folder or a reviewed text setting.
+    #[test]
+    fn every_path_setting_has_a_browser_decision() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../ui/src/features/settings/schema.ts"
+        );
+        let schema = std::fs::read_to_string(path).expect("the settings schema must exist");
+        let found = mono_settings(&schema);
+        assert!(found.contains(&"player.custom-command".to_owned()));
+        assert!(found.contains(&"files.trash-folder".to_owned()));
+        assert_eq!(undecided(&schema), Vec::<String>::new());
+
+        // A made-up key of that kind is caught.
+        let added = format!(
+            "{schema}\n  setting(\"player.example-path\", \"advanced\", {{ type: \"text\", mono: true }}, \"\"),\n"
+        );
+        assert_eq!(undecided(&added), vec!["player.example-path".to_owned()]);
+    }
 }
