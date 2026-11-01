@@ -19,6 +19,8 @@ export const copies = {
   "copies.page.sub.same": "{count} copies · {size} in all · same picture, sound and size",
   "copies.page.same.two": "These two copies look the same.",
   "copies.page.same.many": "These {count} copies look the same.",
+  "copies.page.lengths": "Lengths differ by {minutes} min — these may be different films.",
+  "copies.lengthDiffers": "Lengths differ",
   "copies.page.same.frees": "Keeping one frees {size}, and nothing about the movie changes.",
   "copies.page.sameFile.before":
     "These may be the same file reached through two library folders. CineVault won't delete either from here; check the folders under ",

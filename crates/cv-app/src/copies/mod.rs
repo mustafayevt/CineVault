@@ -11,6 +11,6 @@ mod service;
 
 pub use labels::label_attributes;
 pub use service::{
-    Comparison, CopiesService, CopyMedia, CopyRow, KeepCopyError, audio_label, open_count,
-    source_label,
+    Comparison, CopiesService, CopyMedia, CopyRow, KeepCopyError, SAME_LENGTH_MINUTES, audio_label,
+    open_count, source_label,
 };

@@ -25,7 +25,7 @@ import { useTitleSubject } from "../scrape/titleSubject";
 import { askAgain, copyName, keepBoth, keepThisOne } from "./copiesActions";
 import { currentCopiesBackend } from "./copiesBackend";
 import type { Comparison } from "./copiesBackend";
-import { ROW_IDS, cardsOf, freedBytes, totalBytes } from "./compareModel";
+import { ROW_IDS, cardsOf, freedBytes, lengthWarning, totalBytes } from "./compareModel";
 import type { Card, Cell, RowId } from "./compareModel";
 import { comparisonKey } from "./useCopiesOf";
 
@@ -78,8 +78,18 @@ function Value({ cell }: { cell: Cell }) {
         cell.verdict === "lose" && "text-text-2",
         cell.verdict === "same" && "text-text-muted",
         cell.verdict === "plain" && (cell.mono === true ? "text-text-2" : "text-text"),
+        cell.warn === true && "text-warn",
       )}
     >
+      {cell.warn === true && (
+        <AlertTriangle
+          size={14}
+          strokeWidth={1.75}
+          role="img"
+          aria-label={t("copies.lengthDiffers")}
+          className="shrink-0"
+        />
+      )}
       {text}
       {cell.verdict === "win" && (
         <Check
@@ -216,6 +226,7 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
   const name = own !== undefined ? copyName(own) : "";
   const poster = subject.data?.poster ?? null;
   const count = page.copies.length;
+  const lengthGap = lengthWarning(page);
 
   // One Keep this one at a time: from the click until its confirmation is answered and its
   // delete has run, every card waits.
@@ -268,7 +279,7 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
             {t("copies.page.title", { title: name })}
           </h1>
           <div className="text-(length:--fs-12) text-text-muted tabular-nums">
-            {page.look_same
+            {page.look_same && lengthGap === null
               ? t("copies.page.sub.same", {
                   count,
                   size: format.size(totalBytes(page)),
@@ -298,7 +309,18 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
               </span>
             </p>
           )}
-          {page.look_same && (
+          {lengthGap !== null && (
+            <p
+              role="note"
+              className="m-0 flex items-center gap-2 text-(length:--fs-14) leading-normal"
+            >
+              <Icon icon={AlertTriangle} size={16} className="shrink-0 text-warn" />
+              <span className="font-(weight:--fw-600)">
+                {t("copies.page.lengths", { minutes: lengthGap })}
+              </span>
+            </p>
+          )}
+          {page.look_same && lengthGap === null && (
             <p className="m-0 flex items-center gap-2 text-(length:--fs-14) leading-normal">
               <Icon icon={Copy} size={16} className="text-gold" />
               <span className="font-(weight:--fw-600)">

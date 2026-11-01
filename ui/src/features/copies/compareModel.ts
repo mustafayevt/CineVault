@@ -28,6 +28,8 @@ export interface Cell {
   /** The whole text when `text` is cut for the width (the folder path). */
   full?: string;
   mono?: boolean;
+  /** The value tells against the copies being one film (lengths far apart). */
+  warn?: boolean;
 }
 
 export interface Card {
@@ -209,6 +211,7 @@ export function cardsOf(page: Comparison, format: CardFormat): Card[] {
   const lengthVerdict: Verdict = lengths.every((value) => value !== null && value === lengths[0])
     ? "same"
     : "plain";
+  const lengthsDiffer = (lengthGap(page) ?? 0) > DIFFERENT_LENGTH_MINUTES;
   const largest = Math.max(...copies.map((copy) => copy.size_bytes ?? 0));
 
   return copies.map((copy, index) => {
@@ -225,7 +228,12 @@ export function cardsOf(page: Comparison, format: CardFormat): Card[] {
         verdict: verdict("source"),
       },
       { row: "bitrate", text: bitrateText(copy), verdict: verdict("bitrate") },
-      { row: "length", text: lengthText(copy, format.runtime), verdict: lengthVerdict },
+      {
+        row: "length",
+        text: lengthText(copy, format.runtime),
+        verdict: lengthVerdict,
+        ...(lengthsDiffer ? { warn: true } : {}),
+      },
       {
         row: "size",
         text: format.size(size),
@@ -248,6 +256,23 @@ export function cardsOf(page: Comparison, format: CardFormat): Card[] {
       cells,
     };
   });
+}
+
+/** Lengths further apart than this many minutes may be different films. */
+export const DIFFERENT_LENGTH_MINUTES = 5;
+
+/** How many minutes the shortest and the longest known length are apart; `null` with fewer than two. */
+export function lengthGap(page: Comparison): number | null {
+  const known = page.copies
+    .map((copy) => copy.media?.duration_minutes ?? 0)
+    .filter((minutes) => minutes > 0);
+  return known.length < 2 ? null : Math.max(...known) - Math.min(...known);
+}
+
+/** The minutes the lengths differ by when that is enough to be different films, else `null`. */
+export function lengthWarning(page: Comparison): number | null {
+  const gap = lengthGap(page);
+  return gap !== null && gap > DIFFERENT_LENGTH_MINUTES ? gap : null;
 }
 
 /** The size of every copy together. */

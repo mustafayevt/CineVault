@@ -296,6 +296,45 @@ describe("the Compare copies page", () => {
     expect(screen.queryByText("Best quality")).toBeNull();
   });
 
+  it("warns when the lengths differ by more than five minutes and says nothing about freeing space", async () => {
+    const cut = copy("2", {
+      media: {
+        resolution: "1080p",
+        hdr_formats: [],
+        audio: "AAC 5.1",
+        video_bitrate_kbps: 6600,
+        duration_minutes: 98,
+      },
+    });
+    backend({ copies: [copy("1"), cut], kept: false, look_same: false, same_file: false });
+    await renderPage();
+    const [first] = (await cards()) as [HTMLElement];
+
+    expect(
+      screen.getByText("Lengths differ by 14 min — these may be different films."),
+    ).toBeVisible();
+    expect(screen.queryByText(/^Keeping one frees/)).toBeNull();
+    expect(first.querySelector('[data-row="length"]')).toHaveClass("text-warn");
+    expect(within(first).getByRole("img", { name: "Lengths differ" })).toBeInTheDocument();
+  });
+
+  it("does not warn about lengths a few minutes apart", async () => {
+    const credits = copy("2", {
+      media: {
+        resolution: "1080p",
+        hdr_formats: [],
+        audio: "AAC 5.1",
+        video_bitrate_kbps: 6600,
+        duration_minutes: 115,
+      },
+    });
+    backend({ copies: [copy("1"), credits], kept: false, look_same: false, same_file: false });
+    await renderPage();
+    await cards();
+
+    expect(screen.queryByText(/^Lengths differ/)).toBeNull();
+  });
+
   it("says Not read yet for a copy whose media info is missing and marks no winner", async () => {
     const unread = copy("2", { media: null, source: "" });
     backend({ copies: [copy("1"), unread], kept: false, look_same: false, same_file: false });
@@ -422,6 +461,10 @@ describe("Keep this one", () => {
     });
     expect(deleteTitles).not.toHaveBeenCalled();
     expect(copies.labelToDrop).toHaveBeenCalledWith("1");
+    // Each copy to delete shows its folder, so two copies of one title can be told apart.
+    await waitFor(() =>
+      expect(within(dialog).getByRole("list")).toHaveTextContent(String.raw`D:\Movies\Title 2`),
+    );
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(deleteTitles).toHaveBeenCalledWith(["2"]));

@@ -152,7 +152,7 @@ The page SHALL mark one copy "Best quality": the one with the highest resolution
 - **THEN** the 1080p card still offers "Keep this one"
 
 ### Requirement: Identical copies on the compare page
-When the copies of a group show the same values in Resolution, HDR, Audio and Source, the page SHALL say "These two copies look the same." ("These <n> copies look the same." for more) and suggest keeping one of them.
+When the copies of a group show the same values in Resolution, HDR, Audio and Source and known lengths no more than 3 minutes apart, the page SHALL say "These two copies look the same." ("These <n> copies look the same." for more) and suggest keeping one of them.
 
 #### Scenario: Same download twice
 - **WHEN** two copies are both 1080p SDR WEB-DL with AAC 5.1
@@ -179,6 +179,24 @@ When any two copies of a group may be one file, the Compare copies page SHALL of
 #### Scenario: Copies through a network share
 - **WHEN** the user opens Compare copies for the two copies of Example Movie (2020) under `D:\Movies` and `\SERVER\Movies`
 - **THEN** no card offers "Keep this one" and the page says "These may be the same file reached through two library folders. CineVault won't delete either from here; check the folders under Settings › Library folders."
+
+### Requirement: Lengths far apart
+When the known lengths of a group's copies differ by more than 5 minutes, the page SHALL say "Lengths differ by <n> min — these may be different films.", SHALL mark the Length row, and SHALL NOT say how much keeping one frees.
+
+#### Scenario: A different cut
+- **WHEN** one copy of Example Movie (2020) runs 1h 52m and the other 1h 38m
+- **THEN** the page says "Lengths differ by 14 min — these may be different films." and no "Keeping one frees"
+
+#### Scenario: Credits a little longer
+- **WHEN** two copies otherwise the same run 1h 52m and 1h 55m
+- **THEN** the page says "These two copies look the same." and gives no length warning
+
+### Requirement: The delete confirmation tells copies apart
+The confirmations that "Keep this one" opens SHALL show each copy to delete with its folder, shortened to fit, with the full path on hover, so two copies of one title can be told apart.
+
+#### Scenario: Two copies of one title
+- **WHEN** the user chooses "Keep this one" on the 2160p copy and the Delete confirmation opens
+- **THEN** its row reads Example Movie (2020) with the folder of the 1080p copy under it
 
 ### Requirement: Keep this one
 Each card SHALL offer "Keep this one", which deletes every other copy of the group exactly as Delete does for those titles: it follows Settings › Deleted files, with the same confirmation, toast, History entry and Undo. The kept copy, its folder and its files SHALL NOT change. Cancelling a confirmation SHALL delete nothing.

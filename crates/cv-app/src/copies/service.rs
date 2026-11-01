@@ -76,7 +76,8 @@ pub struct Comparison {
     pub copies: Vec<CopyRow>,
     /// The "keep both" decision covering the group, when the user made one.
     pub kept: Option<KeptSetId>,
-    /// Every copy shows the same Resolution, HDR, Audio and Source, and no two may be one file.
+    /// Every copy shows the same Resolution, HDR, Audio and Source, their lengths are within
+    /// [`SAME_LENGTH_MINUTES`] of each other, and no two may be one file.
     pub look_same: bool,
     /// Two of the copies may be one file reached through two library folders (a network share
     /// of a local folder, a mapped drive, a link): deleting one would delete the other, so the
@@ -361,7 +362,12 @@ impl CopiesService {
     }
 }
 
-/// Every copy has read media info with the same Resolution, HDR, Audio and Source.
+/// How far apart the lengths of copies that "look the same" may be.
+pub const SAME_LENGTH_MINUTES: u32 = 3;
+
+/// Every copy has read media info with the same Resolution, HDR, Audio and Source, and a known
+/// length within [`SAME_LENGTH_MINUTES`] of the others: two films of one title and year can share
+/// everything else.
 fn look_alike(copies: &[CopyRow]) -> bool {
     let Some(media) = copies
         .iter()
@@ -370,11 +376,17 @@ fn look_alike(copies: &[CopyRow]) -> bool {
     else {
         return false;
     };
-    copies.windows(2).zip(media.windows(2)).all(|(pair, m)| {
-        (&m[0].resolution, &m[0].hdr_formats, &m[0].audio)
-            == (&m[1].resolution, &m[1].hdr_formats, &m[1].audio)
-            && pair[0].source == pair[1].source
-    })
+    let lengths = || media.iter().map(|m| m.duration_minutes);
+    let (Some(shortest), Some(longest)) = (lengths().min(), lengths().max()) else {
+        return false;
+    };
+    shortest > 0
+        && longest - shortest <= SAME_LENGTH_MINUTES
+        && copies.windows(2).zip(media.windows(2)).all(|(pair, m)| {
+            (&m[0].resolution, &m[0].hdr_formats, &m[0].audio)
+                == (&m[1].resolution, &m[1].hdr_formats, &m[1].audio)
+                && pair[0].source == pair[1].source
+        })
 }
 
 /// For each copy, whether its main video may be the same file as another copy's. A copy without
@@ -799,5 +811,33 @@ mod tests {
         // Two of the copies may be one file.
         std::fs::remove_file(lab.dir.path().join("media/c/Example Movie c.mkv")).unwrap();
         assert_eq!(code(lab.service.keep_copy(a, &[b])), "same_file");
+    }
+
+    #[test]
+    fn copies_whose_lengths_differ_do_not_look_the_same() {
+        let lab = Lab::new();
+        let a = lab.copy("a", 1920, MediaSource::WebDl, ("AAC", 6));
+        let b = lab.copy("b", 1920, MediaSource::WebDl, ("AAC", 6));
+        let length = |id: ItemId, secs: u32| {
+            lab.db
+                .write(move |tx| {
+                    Ok(tx
+                        .execute(
+                            "UPDATE media_file SET duration_secs = ?2 WHERE item_id = ?1",
+                            rusqlite::params![id.0, secs],
+                        )
+                        .map(|_| ())?)
+                })
+                .unwrap();
+        };
+
+        // Three minutes apart still look the same (a different cut of the credits) ...
+        length(b, 6000 + 180);
+        assert!(lab.service.compare(a).unwrap().unwrap().look_same);
+        // ... more does not, and neither does an unknown length.
+        length(b, 6000 + 240);
+        assert!(!lab.service.compare(a).unwrap().unwrap().look_same);
+        length(b, 0);
+        assert!(!lab.service.compare(a).unwrap().unwrap().look_same);
     }
 }

@@ -40,6 +40,7 @@
 - [x] 6.5 `CHANGELOG.md` line under the unreleased version and `bun run site:changelog`; README and landing page wording; screenshots in `.github/assets/` and `site/img/` (dark and light) showing the chip, the Compare copies page and a labelled Rename preview. Verified by `bun run site:changelog -- --check` and the refreshed images.
 - [x] 6.6 The page offers no "Keep this one" and explains why when the copies may be one file. Verified by `bun run test` (`compare.test.tsx`).
 - [x] 6.7 Keep this one asks `keep_copy` first, deletes only the confirmed copies, says why on a refusal, and disables every card's button while one runs. Verified by `bun run test` (`compare.test.tsx`).
+- [x] 6.8 Lengths: "look the same" needs known lengths at most 3 minutes apart; more than 5 minutes apart shows "Lengths differ by N min — these may be different films.", marks the Length row and drops "Keeping one frees"; the Delete and permanent-delete confirmations show each title's folder. Verified by `cargo test -p cv-app --lib copies` (lengths 3 and 4 minutes apart, an unknown length) and `bun run test` (`compare.test.tsx`, `delete.test.tsx`).
 
 ## 7. Integration
 

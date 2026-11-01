@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { PathText } from "../../components/PathText";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { isServer } from "../../lib/transport";
@@ -112,9 +113,16 @@ function Confirmation({
               >
                 <div className="min-w-0">
                   <div className="truncate font-(weight:--fw-600) text-text">{nameOf(row)}</div>
-                  <div className="cv-selectable truncate font-mono text-(length:--fs-12) text-text-muted">
-                    {row.folder === "" ? t("delete.dialog.noFolder") : row.folder}
-                  </div>
+                  {row.folder === "" ? (
+                    <div className="text-(length:--fs-12) text-text-muted">
+                      {t("delete.dialog.noFolder")}
+                    </div>
+                  ) : (
+                    <PathText
+                      path={row.folder}
+                      className="cv-selectable font-mono text-(length:--fs-12) text-text-muted"
+                    />
+                  )}
                   {row.folder_use === "shared" || row.folder_use === "source_root" ? (
                     <div className="text-(length:--fs-12) text-warn">
                       {t(
