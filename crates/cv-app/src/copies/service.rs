@@ -7,7 +7,7 @@ use cv_db::repo::copies::{
     CopyGroup, KeptSetId, copy_groups, copy_sizes, keep_set, remove_kept_set,
 };
 use cv_db::{Database, DbError};
-use cv_domain::{Item, ItemDetail, ItemId, MediaSource};
+use cv_domain::{Item, ItemDetail, ItemId, MediaSource, SourceKind};
 use cv_media::resolution::resolution_label;
 use cv_template::tokens::{audio_channels_dot, media_source_label};
 
@@ -37,6 +37,8 @@ pub struct CopyMedia {
     /// The lead audio track's codec and layout, such as `TrueHD Atmos 7.1`; empty without audio.
     pub audio: String,
     pub video_bitrate_kbps: u32,
+    /// The running time of the video in whole minutes; `0` when the file does not say.
+    pub duration_minutes: u32,
 }
 
 /// One card of the Compare copies page.
@@ -54,6 +56,11 @@ pub struct CopyRow {
     pub size_bytes: u64,
     /// The copy's folder.
     pub folder: String,
+    /// The name of the copy's main video file.
+    pub file_name: String,
+    /// The label of the library folder the copy lives on ("Media (D:)"); empty when it was
+    /// removed.
+    pub source_label: String,
     /// The suggested copy ("Best quality").
     pub best: bool,
 }
@@ -175,14 +182,23 @@ impl CopiesService {
         };
         let mut order = group.members.clone();
         order.sort_by_key(|member| (*member != id, *member));
-        let (items, sizes) = self.db.read(move |conn| {
+        let (items, sizes, labels) = self.db.read(move |conn| {
             let mut items = Vec::with_capacity(order.len());
+            let mut labels = Vec::with_capacity(order.len());
             for member in &order {
                 if let Some(item) = cv_db::repo::get_item(conn, *member)? {
+                    labels.push(
+                        cv_db::repo::data_sources::label_of_root(
+                            conn,
+                            SourceKind::Movie,
+                            &item.core.data_source,
+                        )?
+                        .unwrap_or_default(),
+                    );
                     items.push(item);
                 }
             }
-            Ok((items, copy_sizes(conn, &order)?))
+            Ok((items, copy_sizes(conn, &order)?, labels))
         })?;
 
         let qualities: Vec<Option<Quality>> = items.iter().map(quality).collect();
@@ -200,6 +216,10 @@ impl CopiesService {
                     source: movie_source(item),
                     size_bytes: sizes.get(&id).copied().unwrap_or(0),
                     folder: item.core.path.clone(),
+                    file_name: main_video(item)
+                        .map(|video| video.filename.clone())
+                        .unwrap_or_default(),
+                    source_label: labels[index].clone(),
                     best: marked == Some(index),
                 }
             })
@@ -277,6 +297,7 @@ fn media_of(item: &Item) -> Option<CopyMedia> {
         hdr_formats: video.hdr_formats.clone(),
         audio: audio_label(video, original_language(item)),
         video_bitrate_kbps: video.video_bitrate_kbps,
+        duration_minutes: video.duration_secs.div_ceil(60),
     })
 }
 

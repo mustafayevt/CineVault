@@ -14,6 +14,7 @@ pub mod artwork_stream;
 pub mod collections;
 pub mod commands;
 pub mod context;
+pub mod copies;
 pub mod curation;
 pub mod detail;
 pub mod drives;

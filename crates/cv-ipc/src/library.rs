@@ -212,6 +212,9 @@ pub enum LibraryChipFieldDto {
     RenamePending,
     /// Files or library folder out of reach: the lifecycle's Missing flag.
     Missing,
+    /// Movies in groups of copies the user has not kept (`movie-copies`): they are listed with
+    /// the copies of each film together.
+    Copies,
     // Ranges: `min` and `max`, inclusive, either may be open.
     Year,
     Runtime,
@@ -411,6 +414,8 @@ impl LibraryChipDto {
             F::NotMatched => Some(context.lifecycle("not-matched")),
             F::RenamePending => Some(context.lifecycle("rename-pending")),
             F::Missing => Some(context.lifecycle("missing")),
+            // The reader restricts the query to the copies' members; the chip adds no condition.
+            F::Copies => None,
             F::Year => self.range(|range| Filter::Year { range }),
             F::Runtime => self.range(|range| Filter::RuntimeMinutes { range }),
             F::Top250 => self.range(|range| Filter::Top250 { range }),
@@ -562,6 +567,10 @@ pub struct LibraryCardDto {
     /// Short HDR label such as `DV` or `HDR10`; `None` for SDR or unknown.
     pub hdr: Option<String>,
     pub poster: Option<PosterDto>,
+    /// The copies of a movie whose group the user has not kept (the poster badge), else 0.
+    pub copies: u32,
+    /// The copies in the movie's group, kept or not (the Compare entry), else 0.
+    pub copies_total: u32,
 }
 
 /// One row of the list and table views: the card plus every column the table can show.
@@ -830,6 +839,21 @@ impl LibraryReader {
             .unwrap_or_default()
     }
 
+    /// The database query of `query`: its chips, and for the Copies chip the movies of the open
+    /// groups, the copies of each film together with the best first.
+    fn item_query(&self, query: &LibraryQueryDto) -> Result<ItemQuery, LibraryCommandError> {
+        let mut item_query = query.to_query_for(&self.chip_context())?;
+        let wants_copies = query
+            .filters
+            .iter()
+            .any(|chip| chip.field == LibraryChipFieldDto::Copies && !chip.negated);
+        if wants_copies && query.kind == LibraryKindDto::Movies {
+            let members = cv_app::copies::CopiesService::new(Arc::clone(&self.db)).listing()?;
+            item_query = item_query.copies(members);
+        }
+        Ok(item_query)
+    }
+
     /// Rows `offset..offset + limit` and the total. Blocking.
     pub fn window(
         &self,
@@ -838,7 +862,7 @@ impl LibraryReader {
         limit: u32,
     ) -> Result<LibraryWindowDto, LibraryCommandError> {
         let limit = limit.clamp(1, MAX_ROWS) as usize;
-        let query = query.to_query_for(&self.chip_context())?;
+        let query = self.item_query(query)?;
         let total = self.db.read(|conn| count_items(conn, &query))?;
         let rows = self
             .db
@@ -858,7 +882,7 @@ impl LibraryReader {
         limit: u32,
     ) -> Result<LibraryRowsWindowDto, LibraryCommandError> {
         let limit = limit.clamp(1, MAX_ROWS) as usize;
-        let query = query.to_query_for(&self.chip_context())?;
+        let query = self.item_query(query)?;
         let total = self.db.read(|conn| count_items(conn, &query))?;
         let rows = self
             .db
@@ -879,7 +903,7 @@ impl LibraryReader {
         facet: &str,
     ) -> Result<Vec<FacetValueDto>, LibraryCommandError> {
         let id = parse_filter_id(facet)?;
-        let query = query.to_query_for(&self.chip_context())?;
+        let query = self.item_query(query)?;
         let values = self
             .db
             .read(|conn| facet_values(conn, query.kind, id, &query.filter))?;
@@ -893,7 +917,7 @@ impl LibraryReader {
         &self,
         query: &LibraryQueryDto,
     ) -> Result<Vec<SourceGroupDto>, LibraryCommandError> {
-        let query = query.to_query_for(&self.chip_context())?;
+        let query = self.item_query(query)?;
         let groups = self
             .db
             .read(|conn| cv_db::repo::source_groups(conn, &query))?;
@@ -1030,6 +1054,8 @@ impl LibraryReader {
                     original_title: row.original_title,
                     title: row.title,
                     poster,
+                    copies: u32::from(row.copies),
+                    copies_total: u32::from(row.copies_total),
                 }
             })
             .collect())
@@ -1296,6 +1322,66 @@ mod tests {
             facets: Vec::new(),
             rating_source: None,
         }
+    }
+
+    /// Two scraped copies of one film and a movie alone: the Copies chip lists only the pair, the
+    /// cards carry the group size, and keeping both takes the pair out of the chip but not out of
+    /// the group size the right-click menu reads.
+    #[test]
+    fn the_copies_chip_lists_the_open_groups_and_the_cards_carry_their_size() {
+        let f = fixture();
+        let with_video = |mut item: Item, name: &str| {
+            item.core.media_files = vec![MediaFile {
+                kind: MediaFileType::Video,
+                directory: item.core.path.clone(),
+                filename: name.into(),
+                ..MediaFile::default()
+            }];
+            item
+        };
+        let first = f.add(with_video(f.movie("Example Movie", 2020), "a.mkv"));
+        let second = f.add(with_video(f.movie("Example Movie 2160p", 2020), "b.mkv"));
+        let mut alone = f.movie("Another Example", 2018);
+        alone.core.ids.set(id_key::TMDB, "2");
+        f.add(with_video(alone, "c.mkv"));
+
+        let mut copies = query();
+        copies.filters.push(LibraryChipDto {
+            field: LibraryChipFieldDto::Copies,
+            negated: false,
+            values: Vec::new(),
+            min: None,
+            max: None,
+        });
+        let reader = f.reader();
+        let window = reader.window(&copies, 0, 50).unwrap();
+        assert_eq!(window.total, 2);
+        assert!(
+            window
+                .items
+                .iter()
+                .all(|c| c.copies == 2 && c.copies_total == 2)
+        );
+
+        let everything = reader.window(&query(), 0, 50).unwrap();
+        let alone = everything
+            .items
+            .iter()
+            .find(|c| c.title == "Another Example")
+            .unwrap();
+        assert_eq!((alone.copies, alone.copies_total), (0, 0));
+
+        cv_app::copies::CopiesService::new(f.db.clone())
+            .keep_all(&[first, second])
+            .unwrap();
+        assert_eq!(reader.window(&copies, 0, 50).unwrap().total, 0);
+        let kept = reader.window(&query(), 0, 50).unwrap();
+        let card = kept
+            .items
+            .iter()
+            .find(|c| c.id == first.0.to_string())
+            .unwrap();
+        assert_eq!((card.copies, card.copies_total), (0, 2));
     }
 
     #[test]

@@ -19,7 +19,7 @@
 
 ## 4. Commands
 
-- [ ] 4.1 Typed `tauri-specta` commands for `copies_of`, `compare_copies`, `keep_all_copies`, `ask_again_copies` and `copy_label_to_drop` (the label a kept copy could drop, from `plan_plain`), the same routes in `cv-web`, and `ui/src/bindings.ts` regenerated. Verified by `cargo test -p cinevault-app` (`generated_bindings_are_up_to_date`) and the `cv-web` route tests.
+- [x] 4.1 Typed `tauri-specta` commands for `copies_of`, `compare_copies`, `keep_all_copies`, `ask_again_copies` and `copy_label_to_drop` (the label a kept copy could drop, from `plan_plain`), the same routes in `cv-web`, and `ui/src/bindings.ts` regenerated. Verified by `cargo test -p cinevault-app` (`generated_bindings_are_up_to_date`) and the `cv-web` route tests.
 
 ## 5. Library and Movie page
 

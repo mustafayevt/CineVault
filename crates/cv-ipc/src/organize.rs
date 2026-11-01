@@ -479,22 +479,12 @@ fn parse_id(text: &str) -> Result<ItemId, OrganizeCommandError> {
         })
 }
 
-fn to_request(
-    settings: &SettingsState,
-    dto: OrganizeRequestDto,
-) -> Result<PreviewRequest, OrganizeCommandError> {
-    let scope = match dto.scope {
-        OrganizeScopeDto::Everything => Scope::Everything,
-        OrganizeScopeDto::Selection { ids } => Scope::Items(
-            ids.iter()
-                .map(|id| parse_id(id))
-                .collect::<Result<Vec<_>, _>>()?,
-        ),
-    };
+/// The profile `profile_id` names (else the active one) with the Settings choices that apply to
+/// every rename: NFO and artwork names, clean-up, subfolders and colons.
+fn profile_with_choices(settings: &SettingsState, profile_id: Option<&str>) -> RenameProfile {
     let current = rename_settings(settings);
-    let mut profile = current
-        .book
-        .get(&dto.profile_id)
+    let mut profile = profile_id
+        .and_then(|id| current.book.get(id))
         .unwrap_or_else(|| current.book.active());
     rename_settings::apply_nfo_choices(&mut profile, &nfo_settings(settings));
     rename_settings::apply_artwork_choices(&mut profile, &artwork_names(settings));
@@ -508,6 +498,22 @@ fn to_request(
         rename_settings::keep_subfolders(&values),
     );
     rename_settings::apply_colon_choice(&mut profile, &values);
+    profile
+}
+
+fn to_request(
+    settings: &SettingsState,
+    dto: OrganizeRequestDto,
+) -> Result<PreviewRequest, OrganizeCommandError> {
+    let scope = match dto.scope {
+        OrganizeScopeDto::Everything => Scope::Everything,
+        OrganizeScopeDto::Selection { ids } => Scope::Items(
+            ids.iter()
+                .map(|id| parse_id(id))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+    };
+    let mut profile = profile_with_choices(settings, Some(&dto.profile_id));
     PatternSet::from(dto.patterns).apply_to(&mut profile);
     let mut choices = BTreeMap::new();
     for choice in dto.choices {
@@ -868,6 +874,28 @@ pub async fn organize_preview(
             None => service.preview(&request)?,
         };
         Ok(preview.into())
+    })
+    .await
+}
+
+/// The copy label (such as `2160p` or `copy 2`) a kept movie still carries in its folder or video
+/// name that the active naming profile no longer needs, because its other copies are gone; `None`
+/// when its names are plain. Lets the Undo toast of "Keep this one" offer to drop it. Nothing is
+/// renamed.
+pub async fn copy_label_to_drop(
+    library: &LibraryState,
+    organize: &OrganizeState,
+    settings: &SettingsState,
+    id: String,
+) -> Result<Option<String>, OrganizeCommandError> {
+    let service = organize.service(library)?;
+    let id = parse_id(&id)?;
+    let profile = profile_with_choices(settings, None);
+    blocking(move || {
+        crate::copies::label_to_drop(&service, &profile, id).map_err(|error| OrganizeCommandError {
+            code: "storage".to_owned(),
+            message: error.message,
+        })
     })
     .await
 }

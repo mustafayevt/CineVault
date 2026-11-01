@@ -23,6 +23,7 @@ mod browser_access_ipc;
 mod changes_ipc;
 mod chrome;
 mod collections_ipc;
+mod copies_ipc;
 mod curation_ipc;
 mod detail_ipc;
 mod drives_ipc;

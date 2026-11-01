@@ -250,6 +250,8 @@ pub struct LifecycleCountsDto {
     pub missing: u32,
     /// Titles whose names are still being checked against the naming style.
     pub checking: u32,
+    /// Movies in groups of copies the user has not kept (the Copies chip); 0 for shows.
+    pub copies: u32,
 }
 
 impl From<LifecycleCounts> for LifecycleCountsDto {
@@ -272,6 +274,7 @@ impl From<LifecycleCounts> for LifecycleCountsDto {
             locked: counts.locked,
             missing: counts.missing,
             checking: counts.checking,
+            copies: counts.copies,
         }
     }
 }
