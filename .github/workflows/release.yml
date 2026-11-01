@@ -49,7 +49,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Tag and version files agree
         id: version
@@ -75,7 +75,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - uses: ./.github/actions/setup-build
         with:
@@ -113,7 +113,7 @@ jobs:
           fi
           ls -l out
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: installers-${{ runner.os }}
           path: out/*
@@ -128,11 +128,13 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
     env:
       VERSION: ${{ needs.verify.outputs.version }}
       IMAGE: ghcr.io/${{ github.repository_owner }}/cinevault
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - uses: ./.github/actions/setup-build
         with:
@@ -147,16 +149,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # arm64 joins the image once the linux-aarch64 tool manifest entry and a native runner land
-      # (task 7.6). The amd64 image and every package are built from this tag.
+      # (task 7.6). The amd64 image and every package are built from this tag. Only the version tag
+      # is pushed here; `latest` moves in the last job, once the release is published.
       - name: Build and push the server image
-        uses: docker/build-push-action@v6
+        id: image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           platforms: linux/amd64
@@ -165,7 +169,6 @@ jobs:
             CINEVAULT_VERSION=${{ env.VERSION }}
           tags: |
             ${{ env.IMAGE }}:${{ env.VERSION }}
-            ${{ env.IMAGE }}:latest
 
       - name: Build the server packages and tarball
         run: |
@@ -182,7 +185,7 @@ jobs:
           test -f "out/cinevault-server-${VERSION}-linux-amd64.tar.gz"
           ls -l out
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: server-packages-${{ github.sha }}
           path: out/*
@@ -202,9 +205,9 @@ jobs:
       TAG: ${{ needs.verify.outputs.tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
 
@@ -224,17 +227,17 @@ jobs:
       # Each artifact is downloaded by name into its own folder. (Downloaded by pattern, a single
       # match is unpacked straight into `path` with no subfolder, which is how the server packages
       # of 1.2.0 were skipped: the publish step only reads the subfolders.)
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: installers-Windows
           path: dist/windows
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: installers-Linux
           path: dist/linux
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: server-packages-${{ github.sha }}
           path: dist/server
@@ -289,3 +292,31 @@ jobs:
       - name: Remove the key file
         if: always()
         run: rm -f "$RUNNER_TEMP/cinevault-update-key.pem"
+
+  # `latest` follows a release only after it is published, so a failed installer build or publish
+  # never moves it. It points at the digest the server job pushed.
+  latest:
+    name: Move the latest image tag
+    needs: [verify, server, publish]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/cinevault
+      DIGEST: ${{ needs.server.outputs.digest }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag the image as latest
+        run: |
+          set -euo pipefail
+          test -n "$DIGEST"
+          docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE@$DIGEST"
+          docker buildx imagetools inspect "$IMAGE:latest"
