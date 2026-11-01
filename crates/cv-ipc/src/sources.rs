@@ -19,6 +19,8 @@ use cv_scan::sources::SourceGuard;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::shares::{NetworkShareDto, OfflineReasonDto};
+
 /// Which library a folder feeds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -70,6 +72,10 @@ pub struct SourceHealthDto {
     pub missing: u32,
     /// Titles still waiting for their media info.
     pub pending_media_info: u32,
+    /// Why an offline folder on a network share is offline.
+    pub reason: Option<OfflineReasonDto>,
+    /// The network share the folder is on, when CineVault connected one for it.
+    pub share: Option<NetworkShareDto>,
 }
 
 fn small(n: u64) -> u32 {
@@ -86,6 +92,8 @@ impl From<SourceHealth> for SourceHealthDto {
             titles: small(health.counts.titles),
             missing: small(health.counts.missing),
             pending_media_info: small(health.counts.pending_media_info),
+            reason: health.reason.map(Into::into),
+            share: health.share.as_ref().map(Into::into),
         }
     }
 }

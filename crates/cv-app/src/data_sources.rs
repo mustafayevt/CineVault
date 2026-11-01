@@ -9,6 +9,9 @@
 //!   a nested pair past each other.
 //! - **Remove** drops the source only. Its items stay in the library (offline until the folder
 //!   is added again); the library is never purged by this service.
+//! - **Network shares**: removing the last folder on a connected share marks the share unused,
+//!   and adding a folder on it again (the Undo of the removal) clears the mark
+//!   ([`crate::network_shares`] forgets a share that stays unused).
 //! - **Reorder** takes the full new order of one library's sources.
 //! - **Change type** moves a source to the other library type (Movies or TV shows) when that
 //!   library has no folder that equals, contains or lies inside it. No title is touched; the
@@ -21,9 +24,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use cv_db::repo::data_sources as rows;
+use cv_db::repo::network_shares as shares;
 use cv_db::{Database, DbError};
 use cv_domain::{DataSource, SourceKind};
+use cv_fs::paths;
 use cv_scan::sources::{ExistingSource, SourceError, SourceGuard};
+use rusqlite::Connection;
 
 pub use cv_db::repo::data_sources::{RemapReport, RemovedSource};
 
@@ -105,20 +111,34 @@ impl DataSourceService {
     /// # Errors
     /// [`DataSourceError::Rejected`] with the rule that failed, or a storage error.
     pub fn add(&self, kind: SourceKind, raw_path: &str) -> Result<DataSource, DataSourceError> {
-        let existing = self.existing(kind)?;
-        let path = self.guard.check_with_links(raw_path, &existing, None)?;
-        self.require_reachable(&path)?;
+        let path = self.check_new(kind, raw_path)?;
 
         let guard = self.guard.clone();
         let outcome = self.db.write(move |tx| {
             // Check again against what is stored now, inside the transaction.
             let existing = to_existing(rows::list_sources(tx, Some(kind))?);
             Ok(match guard.check(&path, &existing, None) {
-                Ok(path) => Ok(rows::insert_source(tx, kind, &path)?),
+                Ok(path) => {
+                    let source = rows::insert_source(tx, kind, &path)?;
+                    note_share_use(tx, &source.path)?;
+                    Ok(source)
+                }
                 Err(error) => Err(error),
             })
         })?;
         Ok(outcome?)
+    }
+
+    /// Checks that `raw_path` could be added as a source of `kind` now, with the rules of
+    /// [`Self::add`], without adding it. Returns the normalised path.
+    ///
+    /// # Errors
+    /// [`DataSourceError::Rejected`] with the rule that failed, or a storage error.
+    pub fn check_new(&self, kind: SourceKind, raw_path: &str) -> Result<String, DataSourceError> {
+        let existing = self.existing(kind)?;
+        let path = self.guard.check_with_links(raw_path, &existing, None)?;
+        self.require_reachable(&path)?;
+        Ok(path)
     }
 
     /// Checks that `raw_path` could be a library folder at all, before its type is known: a full
@@ -139,7 +159,13 @@ impl DataSourceService {
     /// [`SourceError::UnknownSource`] when it does not exist.
     pub fn remove(&self, id: i64) -> Result<RemovedSource, DataSourceError> {
         self.db
-            .write(move |tx| rows::remove_source(tx, id))?
+            .write(move |tx| {
+                let removed = rows::remove_source(tx, id)?;
+                if let Some(removed) = &removed {
+                    note_share_use(tx, &removed.source.path)?;
+                }
+                Ok(removed)
+            })?
             .ok_or_else(|| SourceError::UnknownSource.into())
     }
 
@@ -248,7 +274,11 @@ impl DataSourceService {
             let existing = to_existing(rows::list_sources(tx, Some(current.kind))?);
             Ok(match guard.check(&path, &existing, Some(id)) {
                 Ok(path) => match rows::remap_source(tx, id, &path)? {
-                    Some(report) => Ok(report),
+                    Some(report) => {
+                        note_share_use(tx, &current.path)?;
+                        note_share_use(tx, &path)?;
+                        Ok(report)
+                    }
                     None => Err(SourceError::UnknownSource),
                 },
                 Err(error) => Err(error),
@@ -289,4 +319,37 @@ fn to_existing(sources: Vec<DataSource>) -> Vec<ExistingSource> {
             path: s.path,
         })
         .collect()
+}
+
+/// Keeps the unused mark of the network share that holds `path` in step with the library folders
+/// on it: set when none is left, cleared when one is there again. A path on no share is left alone.
+fn note_share_use(tx: &Connection, path: &str) -> Result<(), DbError> {
+    let all = shares::list_shares(tx)?;
+    let Some(share) = shares::share_holding(&all, path, paths::CASE_SENSITIVE) else {
+        return Ok(());
+    };
+    let used = rows::list_sources(tx, None)?.iter().any(|source| {
+        paths::is_within_with(&source.path, &share.local_root, paths::CASE_SENSITIVE)
+    });
+    let unused_since_ms = if used {
+        None
+    } else {
+        share.unused_since_ms.or_else(|| Some(now_ms()))
+    };
+    if unused_since_ms == share.unused_since_ms {
+        return Ok(());
+    }
+    shares::update_share(
+        tx,
+        &shares::NetworkShare {
+            unused_since_ms,
+            ..share.clone()
+        },
+    )
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
 }

@@ -21,6 +21,8 @@ import { validateRenameSearch } from "./features/rename/renameSearch";
 import { MatchPickerPage } from "./features/scrape/MatchPickerPage";
 import { ScrapePage } from "./features/scrape/ScrapePage";
 import { validateScrapeSearch } from "./features/scrape/scrapeSearch";
+import { NetworkSharePage } from "./features/shares/NetworkSharePage";
+import { validateNetworkShareSearch } from "./features/shares/shareMode";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { TorrentsPage } from "./features/torrents/TorrentsPage";
 import { validateTorrentsSearch } from "./features/torrents/torrentsSearch";
@@ -158,6 +160,14 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
+const networkShareRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/network-share",
+  // `?kind=movie|tv` the library the folder goes to, `?share=<id>` an offline share to connect again.
+  validateSearch: validateNetworkShareSearch,
+  component: NetworkSharePage,
+});
+
 const releaseNotesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/release-notes",
@@ -249,6 +259,7 @@ const routeTree = rootRoute.addChildren([
   torrentsRoute,
   historyRoute,
   settingsRoute,
+  networkShareRoute,
   releaseNotesRoute,
   welcomeRoute,
   ...devRoutes,

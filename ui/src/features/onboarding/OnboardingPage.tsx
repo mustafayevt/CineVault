@@ -19,6 +19,7 @@ import { CaptionButtons } from "../shell/CaptionButtons";
 import { detectPlatform } from "../shell/platform";
 import { tauriWindowApi, useWindowMaximized } from "../shell/windowApi";
 import type { WindowApi } from "../shell/windowApi";
+import type { ShareAdded } from "../shares/sharesBackend";
 import { showToast } from "../toasts/toastStore";
 import {
   failedEntry,
@@ -36,6 +37,7 @@ import {
   previewStart,
 } from "./onboardingBackend";
 import { downloadTools, queueRecommendedTools } from "./setupTools";
+import { ShareStep } from "./ShareStep";
 import { FoldersStep, NamingStep, RatingsStep, Stepper, TmdbStep } from "./SetupSteps";
 import type { Step } from "./SetupSteps";
 import { markCurrentVersionSeen } from "../changelog/whatsNew";
@@ -101,6 +103,8 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
   // `null` until the user picks one: the active profile applies.
   const [chosen, setChosen] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
+  // The Network share page is open in place of the Folders step.
+  const [sharing, setSharing] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
 
@@ -127,7 +131,7 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
       return;
     }
     heading.current?.focus({ preventScroll: true });
-  }, [step]);
+  }, [step, sharing]);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -152,7 +156,13 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
         }
         try {
           const found = await currentOnboardingBackend().analyze(path);
-          patchEntry(path, () => readyEntry({ ...found, path }));
+          // A folder on a network share is in the library already: it keeps its type and its row.
+          patchEntry(path, (entry) => ({
+            ...readyEntry({ ...found, path }),
+            ...(entry.sourceId === null
+              ? {}
+              : { kind: entry.kind, added: true, sourceId: entry.sourceId }),
+          }));
         } catch (error: unknown) {
           patchEntry(path, () => failedEntry(path, analysisError(path, error)));
         }
@@ -199,12 +209,55 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
       });
   };
 
+  /** Runs a change to the library folder a share's entry already has; a refusal is told in a toast. */
+  const changeSource = (
+    entry: FolderEntry | undefined,
+    change: (id: number) => Promise<unknown>,
+  ) => {
+    if (entry === undefined || entry.sourceId === null) return;
+    change(entry.sourceId).catch((error: unknown) => {
+      showToast({ tone: "error", message: messageOf(error) });
+    });
+  };
+
   const setKind = (path: string, kind: SourceKind) => {
     patchEntry(path, (entry) => ({ ...entry, kind, error: null }));
+    changeSource(
+      entriesRef.current.find((entry) => entry.path === path),
+      (id) => currentSourcesBackend().setKind(id, kind),
+    );
   };
 
   const remove = (path: string) => {
+    changeSource(
+      entriesRef.current.find((entry) => entry.path === path),
+      (id) => currentSourcesBackend().remove(id),
+    );
     setEntries((current) => current.filter((entry) => entry.path !== path));
+  };
+
+  /** A network share was connected: its folder is in the library, and the list shows it. */
+  const shareAdded = ({ source }: ShareAdded) => {
+    setSharing(false);
+    const entry = {
+      ...lookingEntry(source.path),
+      kind: source.kind,
+      added: true,
+      sourceId: source.id,
+    };
+    entriesRef.current = [
+      ...entriesRef.current.filter((other) => !samePath(other.path, source.path)),
+      entry,
+    ];
+    setEntries(entriesRef.current);
+    analyse(source.path);
+  };
+
+  /** Leaves out the folders on shares that were added while the step was open. */
+  const dropShareFolders = () => {
+    entriesRef.current.forEach((entry) => {
+      changeSource(entry, (id) => currentSourcesBackend().remove(id));
+    });
   };
 
   const selected = chosen ?? active ?? profiles[0]?.id ?? "clean";
@@ -246,6 +299,7 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
     setBuilding(true);
     try {
       const adding = folders ? foldersToAdd(entries) : [];
+      if (!folders) dropShareFolders();
       if (folders && !(await addFolders())) {
         // Back to the folders, where each refused one says why.
         setStep(1);
@@ -274,7 +328,10 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
   };
 
   const skipStep = () => {
-    if (step === 1) setEntries([]);
+    if (step === 1) {
+      dropShareFolders();
+      setEntries([]);
+    }
     if (step < LAST_STEP) setStep((step + 1) as Step);
     else void finish({ folders: true, style: false });
   };
@@ -316,12 +373,30 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
             aria-label={t("setup.region")}
             className="overflow-hidden rounded-(--r-14) border border-solid border-line-edge bg-surface-floating shadow-floating"
           >
-            {step === 1 ? (
+            {step === 1 && sharing ? (
+              <ShareStep
+                headingRef={heading}
+                onDone={(done) => {
+                  if (done.kind === "added") shareAdded(done.added);
+                }}
+                onCancel={() => {
+                  setSharing(false);
+                }}
+                onAddFolder={() => {
+                  setSharing(false);
+                  browse();
+                }}
+              />
+            ) : null}
+            {step === 1 && !sharing ? (
               <FoldersStep
                 entries={entries}
                 over={over}
                 headingRef={heading}
                 onBrowse={browse}
+                onShare={() => {
+                  setSharing(true);
+                }}
                 onKind={setKind}
                 onRemove={remove}
               />
@@ -337,35 +412,37 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
                 headingRef={heading}
               />
             ) : null}
-            <div className="flex items-center gap-2 border-t border-solid border-line-section bg-surface-floating px-4 py-3.5">
-              <Button
-                variant="ghost"
-                disabled={building}
-                onClick={() => {
-                  void finish({ folders: false, style: false });
-                }}
-              >
-                {t("setup.skipSetup")}
-              </Button>
-              <span className="flex-1" />
-              <Button variant="ghost" disabled={building} onClick={skipStep}>
-                {t("setup.skipStep")}
-              </Button>
-              <Button
-                variant="primary"
-                disabled={building}
-                {...(reason === undefined
-                  ? {}
-                  : {
-                      disabledReason: reason,
-                      enabledBy:
-                        step === 2 ? t("setup.tmdb.needsKeyFix") : t("setup.folders.needOneFix"),
-                    })}
-                onClick={cont}
-              >
-                {building ? t("setup.building") : t("setup.continue")}
-              </Button>
-            </div>
+            {sharing ? null : (
+              <div className="flex items-center gap-2 border-t border-solid border-line-section bg-surface-floating px-4 py-3.5">
+                <Button
+                  variant="ghost"
+                  disabled={building}
+                  onClick={() => {
+                    void finish({ folders: false, style: false });
+                  }}
+                >
+                  {t("setup.skipSetup")}
+                </Button>
+                <span className="flex-1" />
+                <Button variant="ghost" disabled={building} onClick={skipStep}>
+                  {t("setup.skipStep")}
+                </Button>
+                <Button
+                  variant="primary"
+                  disabled={building}
+                  {...(reason === undefined
+                    ? {}
+                    : {
+                        disabledReason: reason,
+                        enabledBy:
+                          step === 2 ? t("setup.tmdb.needsKeyFix") : t("setup.folders.needOneFix"),
+                      })}
+                  onClick={cont}
+                >
+                  {building ? t("setup.building") : t("setup.continue")}
+                </Button>
+              </div>
+            )}
           </section>
           <p className="m-0 text-center text-(length:--fs-12) text-text-muted">
             {t("setup.laterNote")}

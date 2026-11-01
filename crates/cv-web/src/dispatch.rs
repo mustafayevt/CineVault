@@ -37,6 +37,9 @@ pub(crate) fn bad_request(error: impl std::fmt::Display) -> Value {
 const BROWSER_ACCESS_ONLY_AT_THE_COMPUTER: &str =
     "Browser access is managed in CineVault's Settings on the computer that runs it.";
 
+/// What a browser hears when it asks to connect a network share.
+const NETWORK_SHARES_ONLY_BY_THE_INSTALLER: &str = "Network shares are connected on the server by its installer; then add the folder with Add folder…";
+
 /// The browser has no equivalent of this command. The interface hides its control.
 pub(crate) fn not_applicable(message: impl Into<String>) -> Value {
     json!({ "code": "not_applicable", "message": message.into() })
@@ -1986,6 +1989,12 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
         "set_browser_access_password" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
         "sign_out_browsers" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
         "set_start_at_login" => Err(not_applicable(BROWSER_ACCESS_ONLY_AT_THE_COMPUTER)),
+        // Network shares are connected on the server by its installer, never from a browser.
+        "network_share_support" => Err(not_applicable(NETWORK_SHARES_ONLY_BY_THE_INSTALLER)),
+        "connect_network_share" => Err(not_applicable(NETWORK_SHARES_ONLY_BY_THE_INSTALLER)),
+        "connect_network_share_again" => Err(not_applicable(NETWORK_SHARES_ONLY_BY_THE_INSTALLER)),
+        "cancel_network_share_connect" => Err(not_applicable(NETWORK_SHARES_ONLY_BY_THE_INSTALLER)),
+        "list_network_shares" => Err(not_applicable(NETWORK_SHARES_ONLY_BY_THE_INSTALLER)),
 
         other => {
             // The shim answers the window and webview calls a browser has no use for; anything

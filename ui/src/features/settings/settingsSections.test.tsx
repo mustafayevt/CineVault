@@ -5,6 +5,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  useSearch,
 } from "@tanstack/react-router";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -23,15 +24,28 @@ import { useToastStore } from "../toasts/toastStore";
 import { setUpdatesBackend } from "../updates/updatesBackend";
 import type { UpdatesBackend } from "../updates/updatesBackend";
 import { useUpdateStore } from "../updates/updateStore";
+import { validateNetworkShareSearch } from "../shares/shareMode";
+import type { NetworkShare } from "../shares/sharesBackend";
 import { SettingsPage } from "./SettingsPage";
 import { settleSettingSaves, useSettingsStore } from "./settingsStore";
 import { stepAppZoom } from "./zoom";
+
+/** Stands in for the Network share page: shows the search it was opened with. */
+function SearchProbe() {
+  return <p data-testid="share-page">{JSON.stringify(useSearch({ strict: false }))}</p>;
+}
 
 async function renderSettings() {
   const root = createRootRoute();
   const router = createRouter({
     routeTree: root.addChildren([
       createRoute({ getParentRoute: () => root, path: "/settings", component: SettingsPage }),
+      createRoute({
+        getParentRoute: () => root,
+        path: "/network-share",
+        validateSearch: validateNetworkShareSearch,
+        component: SearchProbe,
+      }),
     ]),
     history: createMemoryHistory({ initialEntries: ["/settings"] }),
   });
@@ -116,6 +130,8 @@ function folders(initial: LibrarySource[], refuseKind?: string) {
           titles: entry.kind === "tv" ? 18 : 142,
           missing: 0,
           pending_media_info: 0,
+          reason: null,
+          share: null,
         })),
       ),
     readPendingMediaInfo: () => Promise.resolve("ready"),
@@ -150,7 +166,7 @@ describe("Settings, Library folders", () => {
     );
   });
 
-  it("adds a folder from the picker with the type it looks like", async () => {
+  it("adds a folder from the picker to the library whose Add folder… was pressed", async () => {
     const user = userEvent.setup();
     const state = folders(SAMPLE);
     const onboarding: OnboardingBackend = {
@@ -175,7 +191,8 @@ describe("Settings, Library folders", () => {
     };
     setOnboardingBackend(onboarding);
     await renderSettings();
-    await user.click(await screen.findByRole("button", { name: "Add folder…" }));
+    const tvGroup = await screen.findByRole("group", { name: "TV shows" });
+    await user.click(within(tvGroup).getByRole("button", { name: "Add folder…" }));
     await waitFor(() => {
       expect(state.calls).toContain("add tv F:\\Series");
     });
@@ -343,5 +360,88 @@ describe("Settings, Updates", () => {
     await settleSettingSaves();
     expect(useSettingsStore.getState().values["updates.install-on-close"]).toBe(true);
     expect(option).toBeChecked();
+  });
+});
+
+describe("Settings, Library folders on network shares", () => {
+  const SHARE_ONLINE: NetworkShare = {
+    id: 1,
+    address: "\\\\nas\\movies",
+    user: "alex",
+    remember: true,
+    reason: null,
+  };
+  const SHARE_OFFLINE: NetworkShare = {
+    id: 2,
+    address: "\\\\backup\\movies",
+    user: "alex",
+    remember: true,
+    reason: "wrong_password" as const,
+  };
+  const FOLDERS = [
+    folder(1, "movie", "D:\\Movies"),
+    folder(2, "movie", "\\\\nas\\movies\\Films"),
+    folder(3, "movie", "\\\\backup\\movies\\Classics"),
+  ];
+
+  function withShares() {
+    folders(FOLDERS);
+    const health = (
+      id: number,
+      path: string,
+      online: boolean,
+      share: typeof SHARE_ONLINE | null,
+    ) => ({
+      id,
+      kind: "movie" as const,
+      path,
+      online,
+      titles: id === 3 ? 120 : 412,
+      missing: 0,
+      pending_media_info: 0,
+      reason: share?.reason ?? null,
+      share,
+    });
+    setScanBackend({
+      available: false,
+      rescan: () => Promise.resolve({ job_id: 0, sources: 0, media_info: "ready" }),
+      findMissing: () => Promise.resolve([]),
+      sourceHealth: () =>
+        Promise.resolve([
+          health(1, "D:\\Movies", true, null),
+          health(2, "\\\\nas\\movies\\Films", true, SHARE_ONLINE),
+          health(3, "\\\\backup\\movies\\Classics", false, SHARE_OFFLINE),
+        ]),
+      readPendingMediaInfo: () => Promise.resolve("ready"),
+    });
+  }
+
+  it("says which share a folder is on and as whom, and why an offline one is offline", async () => {
+    withShares();
+    await renderSettings();
+    expect(await screen.findByText(/412 titles · on/)).toHaveTextContent(
+      "412 titles · on \\\\nas\\movies as alex",
+    );
+    expect(screen.getByText("Wrong password")).toBeVisible();
+    expect(screen.getByText(/120 titles kept/)).toBeVisible();
+    // Only the offline share's folder offers Connect….
+    expect(screen.getAllByRole("button", { name: /^Connect to / })).toHaveLength(1);
+  });
+
+  it("opens the Network share page for the library, and Connect… for the share", async () => {
+    const user = userEvent.setup();
+    withShares();
+    await renderSettings();
+    const tv = await screen.findByRole("group", { name: "TV shows" });
+    await user.click(within(tv).getByRole("button", { name: "Network share…" }));
+    expect(await screen.findByTestId("share-page")).toHaveTextContent('{"kind":"tv"}');
+  });
+
+  it("connects an offline share from its folder row", async () => {
+    const user = userEvent.setup();
+    withShares();
+    await renderSettings();
+    await user.click(await screen.findByRole("button", { name: "Connect to \\\\backup\\movies" }));
+    expect(await screen.findByTestId("share-page")).toHaveTextContent('{"share":2}');
   });
 });

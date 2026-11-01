@@ -11,6 +11,7 @@ import { Tag } from "../../components/Tag";
 import { t } from "../../i18n/catalog";
 import type { MessageKey } from "../../i18n/catalog";
 import { cx } from "../../lib/cx";
+import { NetworkShareButton } from "../shares/NetworkShareButton";
 import { KeyField } from "../providers/KeyField";
 import type { ProviderCredentials } from "../providers/providersBackend";
 import type { ProviderKeys } from "../providers/useProviderKeys";
@@ -73,7 +74,7 @@ interface StepHeadingProps {
 }
 
 /** The title and the sentence under it, at the top of the card of every step. */
-function StepHeading({ title, children, headingRef }: StepHeadingProps) {
+export function StepHeading({ title, children, headingRef }: StepHeadingProps) {
   return (
     <div className="px-6 pt-[22px] pb-4">
       <h1
@@ -151,6 +152,7 @@ interface FoldersStepProps {
   over: boolean;
   headingRef: Ref<HTMLHeadingElement>;
   onBrowse: () => void;
+  onShare: () => void;
   onKind: (path: string, kind: SourceKind) => void;
   onRemove: (path: string) => void;
 }
@@ -161,6 +163,7 @@ export function FoldersStep({
   over,
   headingRef,
   onBrowse,
+  onShare,
   onKind,
   onRemove,
 }: FoldersStepProps) {
@@ -197,6 +200,7 @@ export function FoldersStep({
         <Button icon={Plus} onClick={onBrowse}>
           {t("setup.folders.add")}
         </Button>
+        <NetworkShareButton onOpen={onShare}>{t("setup.folders.addShare")}</NetworkShareButton>
         <span className="text-text-muted">{t("setup.folders.drop")}</span>
       </div>
     </>

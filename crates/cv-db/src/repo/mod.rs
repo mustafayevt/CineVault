@@ -48,6 +48,8 @@
 //! - [`watched`]: watched state and play counts of movies and episodes, with show and season expansion.
 //! - [`history`]: the lasting record of renames, moves, deletes, artwork and match changes, with
 //!   their titles, for the History page and its Undo.
+//! - [`network_shares`]: the network shares connected with their own login, and which share holds
+//!   a library folder.
 //! - [`fts`]: the `item_fts` index, kept in step by every insert and update, and search.
 //! - [`search`]: the folded title keys and the forgiving quick search over them (punctuation,
 //!   spacing, diacritics, numerals, small typos) with its ranking.
@@ -74,6 +76,7 @@ pub mod lifecycle;
 pub mod locks;
 pub mod match_targets;
 pub mod media_info;
+pub mod network_shares;
 pub mod organize_state;
 pub(crate) mod path_case;
 pub mod people;

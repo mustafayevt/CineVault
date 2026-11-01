@@ -30,6 +30,7 @@ pub mod logging;
 pub mod match_service;
 pub mod matching;
 pub mod media_info;
+pub mod network_shares;
 pub mod nfo;
 pub mod notices;
 pub mod onboarding;

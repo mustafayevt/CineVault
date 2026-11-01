@@ -1174,6 +1174,7 @@ dependencies = [
  "cv-providers",
  "cv-rename",
  "cv-scan",
+ "cv-shares",
  "cv-template",
  "cv-torrent",
  "dirs 7.0.0",
@@ -1292,6 +1293,7 @@ dependencies = [
  "cv-providers",
  "cv-rename",
  "cv-scan",
+ "cv-shares",
  "cv-template",
  "cv-torrent",
  "image",
@@ -1420,6 +1422,20 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "cv-shares"
+version = "1.3.0"
+dependencies = [
+ "base64 0.23.1",
+ "cv-fs",
+ "dirs 7.0.0",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
  "tracing",
 ]
 

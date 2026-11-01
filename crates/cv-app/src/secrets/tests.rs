@@ -180,3 +180,29 @@ mod per_location {
         assert_eq!(service_name_for(&moved), name);
     }
 }
+
+#[test]
+fn a_value_stays_masked_while_another_stored_secret_uses_it() {
+    let store = SecretStore::in_memory();
+    store.set("network-share.1", "shared-pass-77x").unwrap();
+    store.set("network-share.2", "shared-pass-77x").unwrap();
+
+    store.delete("network-share.1").unwrap();
+    assert!(!redact::redact("pass shared-pass-77x").contains("shared-pass"));
+
+    store.delete("network-share.2").unwrap();
+    assert!(redact::redact("pass shared-pass-77x").contains("shared-pass"));
+}
+
+#[test]
+fn a_value_stays_masked_while_a_secret_held_in_memory_uses_it() {
+    let store = SecretStore::in_memory();
+    redact::hold_secret("test-memory-owner", "memory-pass-88y");
+    store.set("network-share.3", "memory-pass-88y").unwrap();
+
+    store.delete("network-share.3").unwrap();
+    assert!(!redact::redact("pass memory-pass-88y").contains("memory-pass"));
+
+    redact::release_secret("test-memory-owner");
+    assert!(redact::redact("pass memory-pass-88y").contains("memory-pass"));
+}

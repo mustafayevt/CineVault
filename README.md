@@ -41,7 +41,7 @@
 1. **Install.** Download the installer from the [website](https://mustafayevt.github.io/CineVault/) or the [releases page](https://github.com/mustafayevt/CineVault/releases). The Windows builds are not code-signed yet, so SmartScreen ("More info", then "Run anyway") warns on first launch.
    - **Linux (beta, 64-bit):** Ubuntu 22.04 or newer, Fedora 38 or newer. The AppImage needs FUSE 2 (`libfuse2t64` on Ubuntu 24.04): `chmod +x CineVault-x86_64.AppImage`, then open it; it updates itself from inside the app. Or install the `.deb` (`sudo apt install ./CineVault-amd64.deb`) or the `.rpm` (`sudo dnf install ./CineVault-x86_64.rpm`). If the window stays blank on some graphics drivers, start CineVault with `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
    - **macOS:** a version is planned.
-2. **Add your folders and a free TMDB key.** The first-run screen asks where your movies and shows are, then for a [TMDB API key](https://www.themoviedb.org/settings/api) (free; the only key needed to Scrape).
+2. **Add your folders and a free TMDB key.** The first-run screen asks where your movies and shows are, then for a [TMDB API key](https://www.themoviedb.org/settings/api) (free; the only key needed to Scrape). A folder on a NAS that wants its own user name and password is added with **Network share…** next to **Add folder…**; CineVault keeps the password in your system's credential store.
 3. **Scan, Scrape, Rename.** Scanning starts on its own. Scrape your titles, check the Rename preview, apply. Everything can be undone from History.
 
 ## Backups
@@ -114,7 +114,8 @@ The installer asks for your movie and TV folders, starts CineVault and opens
 Keep it on your home network or behind a VPN; never forward its port to the internet. Not in the
 beta yet: ARM computers (Raspberry Pi, ARM NAS) and "Open in Kodi".
 **[The full guide](packaging/README.md)** covers each step, the commands to stop, start and update it,
-a forgotten password, backups, installing by hand with Docker or the packages, and troubleshooting.
+a forgotten password, backups, installing by hand with Docker or the packages,
+[library folders on a NAS](packaging/README.md#library-folders-on-a-nas) and troubleshooting.
 
 The desktop app and the server can share a data folder, but only one may open it at a time. The
 server holds a `library-owner.json` lock; the desktop app refuses that folder and the `cinevault`
