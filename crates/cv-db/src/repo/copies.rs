@@ -9,24 +9,35 @@
 //! it covered. A group is kept while all its current members belong to one set, so a new copy
 //! opens it again and a copy that leaves does not.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use cv_domain::{ItemId, id_key};
 use rusqlite::{Connection, params};
 
-use crate::error::DbResult;
+use crate::error::{DbError, DbResult};
 
 /// A group of two or more copies of one film.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CopyGroup {
     /// The copies, in id order.
     pub members: Vec<ItemId>,
+    /// The "keep both" decision that covers every current member, when there is one.
+    pub kept: Option<KeptSetId>,
 }
+
+/// One "keep both" decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct KeptSetId(pub i64);
 
 impl CopyGroup {
     /// The group's id: its oldest member.
     pub fn id(&self) -> ItemId {
         self.members[0]
+    }
+
+    /// Whether the user has not kept the group: it counts and shows its badges.
+    pub fn is_open(&self) -> bool {
+        self.kept.is_none()
     }
 }
 
@@ -40,7 +51,7 @@ struct Candidate {
     edition: String,
 }
 
-/// Every group of copies in the library, ordered by their oldest member.
+/// Every group of copies in the library, ordered by their oldest member, with its kept state.
 pub fn copy_groups(conn: &Connection) -> DbResult<Vec<CopyGroup>> {
     let mut stmt = conn.prepare_cached(
         "SELECT i.id, t.value, m.value, i.title, i.year, i.edition FROM item i \
@@ -62,7 +73,77 @@ pub fn copy_groups(conn: &Connection) -> DbResult<Vec<CopyGroup>> {
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(group(&candidates))
+    let mut groups = group(&candidates);
+    if !groups.is_empty() {
+        let kept = kept_sets(conn)?;
+        for g in &mut groups {
+            g.kept = covering_set(&kept, &g.members);
+        }
+    }
+    Ok(groups)
+}
+
+/// The kept sets each movie belongs to.
+fn kept_sets(conn: &Connection) -> DbResult<HashMap<ItemId, BTreeSet<KeptSetId>>> {
+    let mut stmt = conn.prepare_cached("SELECT item_id, set_id FROM copies_kept")?;
+    let mut rows = stmt.query([])?;
+    let mut sets: HashMap<ItemId, BTreeSet<KeptSetId>> = HashMap::new();
+    while let Some(r) = rows.next()? {
+        sets.entry(ItemId(r.get(0)?))
+            .or_default()
+            .insert(KeptSetId(r.get(1)?));
+    }
+    Ok(sets)
+}
+
+/// The newest kept set that holds every one of `members`.
+fn covering_set(
+    kept: &HashMap<ItemId, BTreeSet<KeptSetId>>,
+    members: &[ItemId],
+) -> Option<KeptSetId> {
+    let (first, rest) = members.split_first()?;
+    let mut common = kept.get(first)?.clone();
+    for member in rest {
+        let sets = kept.get(member)?;
+        common.retain(|set| sets.contains(set));
+    }
+    common.last().copied()
+}
+
+/// Records that the user keeps all of `members` as copies ("Keep both" / "Keep all"), in one new
+/// set. Returns the set, which [`remove_kept_set`] takes back.
+///
+/// # Errors
+/// Fewer than two movies, or one of them does not exist.
+pub fn keep_set(conn: &Connection, members: &[ItemId], now_ms: i64) -> DbResult<KeptSetId> {
+    let members: BTreeSet<ItemId> = members.iter().copied().collect();
+    if members.len() < 2 {
+        return Err(DbError::InvalidData(
+            "keeping copies needs at least two movies".into(),
+        ));
+    }
+    for &id in &members {
+        if !super::items::item_exists(conn, id)? {
+            return Err(DbError::ItemNotFound(id.0));
+        }
+    }
+    let set: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(set_id), 0) + 1 FROM copies_kept",
+        [],
+        |r| r.get(0),
+    )?;
+    let mut insert = conn
+        .prepare_cached("INSERT INTO copies_kept (set_id, item_id, kept_ms) VALUES (?1, ?2, ?3)")?;
+    for id in members {
+        insert.execute(params![set, id.0, now_ms])?;
+    }
+    Ok(KeptSetId(set))
+}
+
+/// Takes back a "keep both" decision ("Ask again", or Undo of the keep): the group counts again.
+pub fn remove_kept_set(conn: &Connection, set: KeptSetId) -> DbResult<()> {
+    conn.execute("DELETE FROM copies_kept WHERE set_id = ?1", [set.0])?;
+    Ok(())
 }
 
 /// Text compared without regard to case and surrounding spaces.
@@ -113,7 +194,10 @@ fn group(candidates: &[Candidate]) -> Vec<CopyGroup> {
         .filter(|members| members.len() > 1)
         .map(|mut members| {
             members.sort();
-            CopyGroup { members }
+            CopyGroup {
+                members,
+                kept: None,
+            }
         })
         .collect();
     groups.sort_by_key(CopyGroup::id);
@@ -338,6 +422,69 @@ mod tests {
         let d = movie(&conn, "example film", 2021, "", None, None);
 
         assert_eq!(groups(&conn), vec![vec![a, b, c, d]]);
+    }
+
+    #[test]
+    fn a_kept_group_is_closed_until_a_new_copy_joins() {
+        let conn = memory_db();
+        let a = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        let b = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        assert!(copy_groups(&conn).unwrap()[0].is_open());
+
+        let set = keep_set(&conn, &[b, a], 10).unwrap();
+        let kept = copy_groups(&conn).unwrap();
+        assert_eq!(kept[0].kept, Some(set));
+        assert!(!kept[0].is_open());
+
+        // A third copy found later opens the group again, with all three.
+        let c = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        let reopened = copy_groups(&conn).unwrap();
+        assert_eq!(reopened[0].members, vec![a, b, c]);
+        assert!(reopened[0].is_open());
+    }
+
+    #[test]
+    fn a_kept_group_that_loses_a_copy_stays_kept() {
+        let conn = memory_db();
+        let a = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        let b = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        let c = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        let set = keep_set(&conn, &[a, b, c], 10).unwrap();
+
+        conn.execute("UPDATE item SET trashed_entry = 3 WHERE id = ?1", [c.0])
+            .unwrap();
+
+        let groups = copy_groups(&conn).unwrap();
+        assert_eq!(groups[0].members, vec![a, b]);
+        assert_eq!(groups[0].kept, Some(set));
+    }
+
+    #[test]
+    fn ask_again_opens_a_kept_group() {
+        let conn = memory_db();
+        let a = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        let b = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+        let first = keep_set(&conn, &[a, b], 10).unwrap();
+        let second = keep_set(&conn, &[a, b], 20).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(copy_groups(&conn).unwrap()[0].kept, Some(second));
+
+        remove_kept_set(&conn, second).unwrap();
+        assert_eq!(copy_groups(&conn).unwrap()[0].kept, Some(first));
+        remove_kept_set(&conn, first).unwrap();
+        assert!(copy_groups(&conn).unwrap()[0].is_open());
+    }
+
+    #[test]
+    fn keeping_needs_two_existing_movies() {
+        let conn = memory_db();
+        let a = movie(&conn, "Example Movie", 2020, "", Some("1"), None);
+
+        assert!(keep_set(&conn, &[a, a], 10).is_err());
+        assert!(matches!(
+            keep_set(&conn, &[a, ItemId(999)], 10),
+            Err(DbError::ItemNotFound(999))
+        ));
     }
 
     #[test]
