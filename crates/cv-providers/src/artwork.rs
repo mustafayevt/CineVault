@@ -139,8 +139,8 @@ pub const FRAME_GRAB_ID: &str = "ffmpeg";
 /// disable and reorder them per library type.
 pub fn default_provider_order(kind: MediaKind) -> &'static [&'static str] {
     match kind {
-        MediaKind::Movie => &["tmdb", "fanart", "imdb", "mpdb", FRAME_GRAB_ID, "tvdb"],
-        MediaKind::Show => &["tvdb", "fanart", "tmdb", "imdb", FRAME_GRAB_ID],
+        MediaKind::Movie => &["tmdb", "fanart", "mpdb", FRAME_GRAB_ID, "tvdb"],
+        MediaKind::Show => &["tvdb", "fanart", "tmdb", FRAME_GRAB_ID],
     }
 }
 

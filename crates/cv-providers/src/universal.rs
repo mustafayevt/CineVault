@@ -1,7 +1,7 @@
 //! The universal provider: one title assembled from several providers, field by field.
 //!
 //! The user picks, per [`MetaField`], which provider supplies the value (title from TMDB, plot
-//! from IMDb, ratings from OMDb, collection from TMDB, ...). A field with no choice comes from
+//! and ratings from OMDb, collection from TMDB, ...). A field with no choice comes from
 //! the *search* provider. When the chosen provider has no value for a field, the ordered
 //! [`UniversalConfig::fallbacks`] are tried and the first one that has a value wins.
 //!
@@ -44,7 +44,7 @@ pub const UNIVERSAL_ID: &str = "universal";
 
 /// Which provider supplies what.
 ///
-/// Provider keys are the providers' [`Provider::id`] values (`tmdb`, `imdb`, `omdb`, ...). A key
+/// Provider keys are the providers' [`Provider::id`] values (`tmdb`, `tvdb`, `omdb`, ...). A key
 /// that names no available provider is ignored, so a setting that outlives a provider does not
 /// break scraping; [`UniversalProvider::unknown_sources`] lists such keys for Settings.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

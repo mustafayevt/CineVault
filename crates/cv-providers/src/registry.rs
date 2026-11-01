@@ -238,7 +238,7 @@ mod tests {
     fn artwork_providers_follow_the_default_order_of_each_library_type() {
         let mut registry = ProviderRegistry::new();
         registry.register_metadata(Arc::new(Titles("tmdb")));
-        for id in ["tmdb", "tvdb", "fanart", "mpdb", "imdb", "unlisted"] {
+        for id in ["tmdb", "tvdb", "fanart", "mpdb", "unlisted"] {
             registry.register_artwork(Arc::new(Images(id)));
         }
         let ids = |kind| -> Vec<&'static str> {
@@ -248,14 +248,11 @@ mod tests {
                 .map(|p| p.id())
                 .collect()
         };
-        assert_eq!(
-            ids(MediaKind::Movie),
-            ["tmdb", "fanart", "imdb", "mpdb", "tvdb"]
-        );
-        assert_eq!(ids(MediaKind::Show), ["tvdb", "fanart", "tmdb", "imdb"]);
+        assert_eq!(ids(MediaKind::Movie), ["tmdb", "fanart", "mpdb", "tvdb"]);
+        assert_eq!(ids(MediaKind::Show), ["tvdb", "fanart", "tmdb"]);
         // Registered in registration order, found by credential tests, and TMDB stays a
         // metadata provider too.
-        assert_eq!(registry.artwork_providers().len(), 6);
+        assert_eq!(registry.artwork_providers().len(), 5);
         assert!(registry.get("fanart").is_some());
         assert_eq!(registry.metadata_providers().len(), 1);
         assert_eq!(registry.ids().filter(|id| *id == "tmdb").count(), 1);

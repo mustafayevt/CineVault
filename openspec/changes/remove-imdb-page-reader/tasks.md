@@ -1,6 +1,6 @@
 ## 1. Providers
 
-- [ ] 1.1 Remove `crates/cv-providers/src/imdb/`, its exports, fixtures and tests, and `Top250Source` with `Top250List` when nothing else uses them. Verified by `cargo test -p cv-providers` and `cargo lint`.
+- [x] 1.1 Remove `crates/cv-providers/src/imdb/`, its exports, fixtures and tests, and `Top250Source` with `Top250List` when nothing else uses them. Verified by `cargo test -p cv-providers` and `cargo lint`.
 - [ ] 1.2 Drop IMDb from the metadata registration and the artwork order in `cv-app` (with the order tests), remove `top250.rs` and the IMDb cases of `tests/unavailable_providers.rs`, and the `fetch_imdb_top250` command from `cv-ipc` and `src-tauri`; regenerate `ui/src/bindings.ts`. Verified by `cargo test --workspace` (the provider order tests, `generated_bindings_are_up_to_date`) and `cargo test -p cv-compat` (golden files unchanged).
 
 ## 2. Wording
