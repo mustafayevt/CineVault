@@ -3,9 +3,10 @@
 //! [`AppServices::boot`] opens the one shared library [`Database`], loads the settings (a damaged
 //! file is set aside and its notice goes to the notification centre), opens the thumbnail cache
 //! in the data location's cache folder, and builds the [`JobManager`] over a [`JobStore`] in the
-//! same library. [`AppServices::start`] then begins the background work: the job failure watcher
-//! and the resume of every persisted job kind. [`AppServices::shutdown`] pauses the jobs so the
-//! next launch picks them up.
+//! same library. [`AppServices::start`] then begins the background work: the job failure watcher,
+//! the daily library backup and the resume of every persisted job kind.
+//! [`AppServices::shutdown`] pauses the jobs so the next launch picks them up, and stops the
+//! backup checks.
 //!
 //! The GUI and the CLI both borrow from this struct instead of opening their own copies.
 
@@ -24,6 +25,7 @@ use crate::actions::{ActionsService, RatingSources};
 use crate::activity::ActivityService;
 use crate::app_settings::SettingsService;
 use crate::artwork::ArtworkService;
+use crate::backups::{BackupSchedule, LibraryBackups};
 use crate::caches::CacheService;
 use crate::changes::{ChangeHub, ChangePart};
 use crate::data_location::DataLocation;
@@ -84,6 +86,8 @@ pub struct BootOptions {
     /// the write after media info is read). On unless a test needs the files to stay as it left
     /// them.
     pub background_nfo: bool,
+    /// When the daily backup of the library is checked.
+    pub backups: BackupSchedule,
 }
 
 impl BootOptions {
@@ -96,6 +100,7 @@ impl BootOptions {
             change_window: crate::changes::DEFAULT_WINDOW,
             fresh_start: true,
             background_nfo: true,
+            backups: BackupSchedule::default(),
         }
     }
 
@@ -114,6 +119,13 @@ impl BootOptions {
     #[must_use]
     pub fn without_background_nfo(mut self) -> Self {
         self.background_nfo = false;
+        self
+    }
+
+    /// Checks the daily backup on `schedule` instead of a minute after start and then hourly.
+    #[must_use]
+    pub fn with_backup_schedule(mut self, schedule: BackupSchedule) -> Self {
+        self.backups = schedule;
         self
     }
 
@@ -179,6 +191,8 @@ pub struct AppServices {
     activity: Arc<ActivityService>,
     torrents: Arc<TorrentService>,
     indexer: Arc<IndexerServiceManager>,
+    backups: Arc<LibraryBackups>,
+    backup_schedule: BackupSchedule,
     tasks: Mutex<Vec<JoinHandle<()>>>,
 }
 
@@ -196,6 +210,7 @@ impl AppServices {
             change_window,
             fresh_start,
             background_nfo,
+            backups,
         } = options;
         // What changed for which titles: services announce it, the shell relays it to open pages.
         let changes = ChangeHub::new(change_window);
@@ -539,6 +554,8 @@ impl AppServices {
             }));
         }
 
+        let library_backups = Arc::new(LibraryBackups::new(Arc::clone(&db)));
+
         Ok(Arc::new(Self {
             location,
             db,
@@ -561,6 +578,8 @@ impl AppServices {
             activity,
             torrents,
             indexer,
+            backups: library_backups,
+            backup_schedule: backups,
             tasks: Mutex::new(Vec::new()),
         }))
     }
@@ -679,10 +698,12 @@ impl AppServices {
     pub fn start(self: &Arc<Self>) -> ResumeReport {
         // The failure watcher goes first so a job that ends at once is still reported.
         let watcher = tokio::spawn(Arc::clone(&self.notices).watch_jobs(self.jobs.clone()));
+        // The daily backup of the library: a minute after start, then hourly.
+        let backups = tokio::spawn(Arc::clone(&self.backups).run(self.backup_schedule));
         self.tasks
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .extend([watcher]);
+            .extend([watcher, backups]);
         // The indexer service starts in the background when the Torrent search notice was
         // accepted and the service is wanted; before that this does nothing at all.
         self.indexer.request_apply();

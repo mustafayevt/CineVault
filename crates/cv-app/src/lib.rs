@@ -6,6 +6,7 @@ pub mod anime_crosswalk;
 pub mod app_settings;
 pub mod artwork;
 pub mod automation;
+pub mod backups;
 pub mod caches;
 pub mod changes;
 pub mod collections;
