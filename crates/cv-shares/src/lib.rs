@@ -19,6 +19,8 @@ mod address;
 mod connector;
 mod error;
 pub mod fake;
+#[cfg(any(target_os = "linux", test))]
+mod linux;
 #[cfg(any(target_os = "macos", test))]
 mod macos;
 mod process;
@@ -31,7 +33,8 @@ pub use address::{Address, InputError, ShareAddress, check_user, folder_in_share
 pub use connector::{Cancel, Login, Password, ShareConnector, Support};
 pub use error::{ShareError, ShareErrorKind};
 
-/// The connector of this operating system: `New-SmbMapping` on Windows, `mount_smbfs` on macOS.
+/// The connector of this operating system: `New-SmbMapping` on Windows, `mount_smbfs` on macOS,
+/// `gio` on a Linux desktop.
 #[must_use]
 pub fn system_connector() -> Arc<dyn ShareConnector> {
     #[cfg(windows)]
@@ -42,7 +45,11 @@ pub fn system_connector() -> Arc<dyn ShareConnector> {
     {
         Arc::new(macos::MacConnector::new())
     }
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(target_os = "linux")]
+    {
+        Arc::new(linux::LinuxConnector::new())
+    }
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
     {
         Arc::new(Unsupported)
     }
@@ -52,10 +59,10 @@ pub fn system_connector() -> Arc<dyn ShareConnector> {
 pub const MAC_MOUNT_FOLDER: &str = "CineVault Shares";
 
 /// Any other system: shares are connected with the system's own tools, then added as folders.
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 struct Unsupported;
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 impl ShareConnector for Unsupported {
     fn support(&self) -> Support {
         Support::NoUserMounting
