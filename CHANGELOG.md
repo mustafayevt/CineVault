@@ -2,25 +2,31 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.3.1] - unreleased
+## [1.4.0] - unreleased
+
+### Added
+
+- Network shares: add a library folder from a NAS with its user name and password (Settings › Library folders › Network share…). CineVault keeps the password in your system's credential store, reconnects at start, and says why a share is offline ("Wrong password", "Server not reachable") with Connect… to fix it. It never disconnects a connection you made yourself. The server installers set shares up for browser mode.
+- Copies: if you have the same movie twice (say a 4K and a 1080p download), the Copies filter shows them, Compare puts them side by side, and Keep this one deletes the other the usual way. Keep both, and Rename gives each its own name, like "- 2160p" and "- 1080p". When two copies may be one file reached two ways (a drive and its network share), Compare does not offer to delete either.
+- CineVault keeps a checked backup of your library every day (the last seven), so History and Undo can be brought back, and tells you if backups keep failing.
+
+### Changed
+
+- One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item is gone, Shift+Delete does the same as Delete, and a permanent delete asks Yes or No instead of making you type DELETE.
+- The Delete confirmation shows each title's folder under its name, so two titles with the same name can be told apart.
+- A library folder that is already in your library under another path (a network share, a mapped drive or a link) can no longer be added a second time.
+- IMDb is no longer read from its web site, which kept asking for a human check. IMDb IDs come with every TMDB match, IMDb ratings from IMDb's own ratings file, and with an OMDb key OMDb adds IMDb data to Scrape.
+- Browsers stay signed in when the server restarts or the desktop app updates. Switching Browser access off, changing its port, signing out or choosing a new password still signs them out.
 
 ### Fixed
 
 - Linux and browser mode: titles on a network share mounted at a folder such as `/media/nas`, or in a Docker install, no longer show as missing. They are available again, and Rename and Move work on them.
 - Scrape: a title whose name already ends in its year, such as `Example Movie (2003)`, is no longer searched with the year twice, which found nothing.
-- Linux installer: updating with the server tarball no longer ends with a list of "Permission denied" messages about its temporary folder.
-- Rename to another drive: a folder that holds a link to another folder is no longer moved, so files outside the title can't be touched; move such a title by hand.
 - Rename to another drive: the copy is written to the disk before the original is removed, so a power cut during a rename can no longer lose the file.
+- Rename to another drive: a folder that holds a link to another folder is no longer moved, so files outside the title can't be touched; move such a title by hand.
+- Linux installer: updating with the server tarball no longer ends with a list of "Permission denied" messages about its temporary folder.
+- Windows Docker installer: Update, Change folders and Remove show the right data folder again.
 - Docker: the container starts faster with a large library and keeps the groups your NAS folders need.
-### Changed
-
-- IMDb is no longer read from its web site, which kept asking for a human check. IMDb data comes through OMDb with your OMDb key, and IMDb ratings as before.
-### Added
-
-- CineVault keeps a checked backup of your library every day (the last seven), so History and Undo can be brought back; it tells you if backups keep failing.
-### Changed
-
-- Browsers stay signed in when the server restarts or the desktop app updates. Switching Browser access off, changing its port, signing out or choosing a new password still signs them out.
 
 ### Security
 
@@ -28,21 +34,6 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - A request that comes through a reverse proxy or tunnel is treated as outside your home network unless the proxy is listed in `CINEVAULT_WEB_TRUST_PROXY`, so a stranger cannot reach the welcome page or a password reset through it, and "Only devices on my home network" refuses it.
 - A flood of wrong passwords from the internet no longer stops you from signing in from your home network, and checking passwords no longer slows the server for everyone else.
 - No other website can show CineVault inside a frame.
-### Changed
-
-- One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item and Shift+Delete are gone, and a permanent delete asks Yes or No instead of making you type DELETE.
-### Added
-
-- Network shares: add a library folder from a NAS with its user name and password (Settings › Library folders › Network share…). CineVault keeps the password in your system's credential store and reconnects at start; the server installers set shares up for browser mode.
-### Added
-
-- Copies: if you have the same movie twice (say a 4K and a 1080p download), the Copies filter shows them, Compare puts them side by side, and Keep this one deletes the other the usual way. Keep both, and Rename gives each its own name, like '- 2160p' and '- 1080p'. When two copies may be one file reached two ways (a drive and its network share), Compare does not offer to delete either.
-
-### Changed
-
-- A library folder that is already in your library under another path (a network share, a mapped drive or a link) can no longer be added a second time.
-- The Delete confirmation shows each title's folder under its name, so two titles with the same name can be told apart.
-- One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item and Shift+Delete are gone, and a permanent delete asks Yes or No instead of making you type DELETE.
 
 ## [1.3.0] - 2026-10-31
 
