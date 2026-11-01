@@ -1,4 +1,4 @@
-//! Moving a whole folder across volumes: copy the tree beside the destination, verify
+//! Moving a whole folder across volumes: copy the tree beside the destination, flush and verify
 //! every file, rename it into place, and only then take the original files away.
 //!
 //! The same rules as a single file (see [`super::run`]): a crash at any point leaves the original
@@ -9,7 +9,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::fs::Fs;
-use super::run::part_path;
+use super::run::{part_path, put_in_place};
 
 /// What a folder move left behind at the source.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -36,7 +36,7 @@ pub(crate) fn move_tree(fs: &dyn Fs, from: &Path, to: &Path) -> io::Result<Remna
         let _ = remove_tree(fs, &part);
         return Err(e);
     }
-    if let Err(e) = fs.rename(&part, to) {
+    if let Err(e) = put_in_place(fs, &part, to) {
         let _ = remove_tree(fs, &part);
         return Err(e);
     }
@@ -44,6 +44,7 @@ pub(crate) fn move_tree(fs: &dyn Fs, from: &Path, to: &Path) -> io::Result<Remna
 }
 
 /// Copies the folder `from` to `to`, folders included, and checks each file against its copy.
+/// Each folder of the copy is flushed once its files are in it.
 fn copy_tree(fs: &dyn Fs, from: &Path, to: &Path) -> io::Result<()> {
     fs.create_dir_all(to)?;
     for name in fs.list_dir(from)? {
@@ -63,6 +64,7 @@ fn copy_tree(fs: &dyn Fs, from: &Path, to: &Path) -> io::Result<()> {
             }
         }
     }
+    fs.sync_dir(to);
     Ok(())
 }
 

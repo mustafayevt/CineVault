@@ -1057,10 +1057,11 @@ impl<'a> Executor<'a> {
 }
 
 /// Renames a path, creating the parent of the destination. A file on another volume is copied
-/// next to the destination under a part name, compared byte for byte with the original, renamed
-/// into place, and only then is the original deleted: a crash at any point leaves the original
-/// whole. A folder on another volume is copied as a tree the same way (see [`super::tree`]); the
-/// files of the original that cannot be removed afterwards stay where they are. No journal.
+/// next to the destination under a part name, flushed to the disk, compared byte for byte with
+/// the original, renamed into place (the folder flushed too), and only then is the original
+/// deleted: a crash or a power cut at any point leaves the original whole. A folder on another
+/// volume is copied as a tree the same way (see [`super::tree`]); the files of the original that
+/// cannot be removed afterwards stay where they are. No journal.
 pub(crate) fn move_path(fs: &dyn Fs, from: &Path, to: &Path, is_dir: bool) -> io::Result<()> {
     if let Some(parent) = to.parent() {
         fs.create_dir_all(parent)?;
@@ -1095,7 +1096,18 @@ fn copy_verified(fs: &dyn Fs, from: &Path, to: &Path) -> io::Result<()> {
         let _ = fs.remove_file(&part);
         return Err(io::Error::other("the copy does not match the original"));
     }
-    fs.rename(&part, to)
+    put_in_place(fs, &part, to)
+}
+
+/// Renames a finished copy from its part name to `to` and flushes the folder, so the copy keeps
+/// its name on the disk before anything is done to the original. Without that a power cut could
+/// leave only the part name, which recovery removes as an unfinished copy.
+pub(crate) fn put_in_place(fs: &dyn Fs, part: &Path, to: &Path) -> io::Result<()> {
+    fs.rename(part, to)?;
+    if let Some(parent) = to.parent() {
+        fs.sync_dir(parent);
+    }
+    Ok(())
 }
 
 /// `path`, or `name (2).ext`, `name (3).ext` ... when it is taken.

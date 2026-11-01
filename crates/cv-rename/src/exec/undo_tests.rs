@@ -316,6 +316,9 @@ fn undo_runs_newest_operation_first() {
         fn list_dir(&self, p: &Path) -> io::Result<Vec<String>> {
             StdFs.list_dir(p)
         }
+        fn sync_dir(&self, path: &Path) {
+            StdFs.sync_dir(path);
+        }
     }
     let rows = journal.batch("b1").unwrap();
     let expected: Vec<String> = rows
@@ -775,6 +778,9 @@ impl Fs for FailingRename<'_> {
     }
     fn list_dir(&self, p: &Path) -> io::Result<Vec<String>> {
         StdFs.list_dir(p)
+    }
+    fn sync_dir(&self, path: &Path) {
+        StdFs.sync_dir(path);
     }
 }
 

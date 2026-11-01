@@ -317,6 +317,9 @@ impl Fs for StdMoveFs {
     fn list_dir(&self, path: &Path) -> io::Result<Vec<String>> {
         StdFs.list_dir(path)
     }
+    fn sync_dir(&self, path: &Path) {
+        StdFs.sync_dir(path);
+    }
 }
 
 struct StdWrite(std::fs::File);

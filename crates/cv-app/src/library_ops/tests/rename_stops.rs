@@ -50,6 +50,9 @@ impl Fs for DiesBetweenSteps {
     fn list_dir(&self, path: &Path) -> std::io::Result<Vec<String>> {
         StdFs.list_dir(path)
     }
+    fn sync_dir(&self, path: &Path) {
+        StdFs.sync_dir(path);
+    }
 }
 
 fn files_in(dir: &Path) -> Vec<String> {

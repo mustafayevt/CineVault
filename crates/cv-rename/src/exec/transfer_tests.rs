@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 
 use tempfile::TempDir;
 
-use super::tests::{Crash, FaultFs};
+use super::run::part_path;
+use super::tests::{Crash, FaultFs, Logging};
 use super::*;
 
 /// Two data sources side by side in one temp folder.
@@ -159,6 +160,33 @@ fn across_volumes_the_tree_is_copied_verified_and_the_original_removed() {
     assert!(
         !new.keys().any(|path| path.ends_with(".cvpart")),
         "no copy left: {new:?}"
+    );
+}
+
+#[test]
+fn across_volumes_no_original_file_goes_before_the_whole_copy_is_on_the_disk() {
+    let sources = Sources::new();
+    sources.heat();
+    let fs = Logging::new(FaultFs::across_volumes());
+    let report = move_with(
+        &fs,
+        &mut MemoryJournal::new(),
+        "b1",
+        &[sources.the_move("Heat (1995)")],
+    );
+    assert_eq!(report.done(), 1, "{report:?}");
+
+    let to = sources.new.join("Heat (1995)");
+    let part = part_path(&to);
+    // Every folder of the copy is flushed with its files in it, then the copy is renamed into
+    // place and its parent flushed; only then does the first original file go.
+    let copied = [fs.at("sync", &part.join("extras")), fs.at("sync", &part)];
+    let named = fs.at("rename", &to);
+    let synced = fs.at("sync", &sources.new);
+    let removed = fs.first_below("remove", &sources.old.join("Heat (1995)"));
+    assert!(
+        copied.iter().all(|&at| at < named) && named < synced && synced < removed,
+        "copy flushed {copied:?}, rename {named}, sync {synced}, first removal {removed}"
     );
 }
 
