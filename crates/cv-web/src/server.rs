@@ -14,7 +14,7 @@ use crate::{auth, dispatch, network};
 use axum::body::Body;
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, DefaultBodyLimit, Path as UrlPath, Query, State};
-use axum::http::{HeaderMap, StatusCode, Uri, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::response::sse::{KeepAlive, Sse};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
@@ -74,7 +74,22 @@ pub(crate) fn router(state: WebState) -> Router {
             state.clone(),
             home_network_guard,
         ))
+        .layer(axum::middleware::map_response(no_framing))
         .with_state(state)
+}
+
+/// No other site may show a CineVault page in a frame: every response says so, the refusals of
+/// the home-network guard included. A handler's own policy already carries `frame-ancestors`.
+async fn no_framing(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    if !headers.contains_key(header::CONTENT_SECURITY_POLICY) {
+        headers.insert(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static("frame-ancestors 'none'"),
+        );
+    }
+    response
 }
 
 /// The sentence a request from outside the home network gets while the desktop's "Only devices
@@ -238,7 +253,7 @@ fn signed_out() -> Response {
 }
 
 fn set_cookie(response: &mut Response, value: String) {
-    if let Ok(value) = axum::http::HeaderValue::from_str(&value) {
+    if let Ok(value) = HeaderValue::from_str(&value) {
         response.headers_mut().append(header::SET_COOKIE, value);
     }
 }
@@ -1284,7 +1299,7 @@ async fn serve_media(
         // No scripts, forms or plugins in a document opened from this address. A bare `sandbox`
         // also made the origin opaque, so the browser's own player document was refused its
         // video by CORS and Play showed an empty player.
-        .header("content-security-policy", MEDIA_CSP);
+        .header(header::CONTENT_SECURITY_POLICY, MEDIA_CSP);
     if download {
         builder = builder.header(header::CONTENT_DISPOSITION, attachment_name(&canonical));
     }
@@ -1300,8 +1315,8 @@ async fn serve_media(
 }
 
 /// The policy on a media response: sandboxed, but keeping the server's origin so the browser's
-/// player document may load the video it shows.
-const MEDIA_CSP: &str = "sandbox allow-same-origin";
+/// player document may load the video it shows, and never in another site's frame.
+const MEDIA_CSP: &str = "sandbox allow-same-origin; frame-ancestors 'none'";
 
 /// `attachment; filename="…"; filename*=UTF-8''…`, with a quoted and an RFC 5987 name so a
 /// release name with spaces, quotes or accents saves under its own name.
@@ -1588,7 +1603,7 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         body,
     )
         .into_response();
-    if let Ok(value) = axum::http::HeaderValue::from_str(&mime) {
+    if let Ok(value) = HeaderValue::from_str(&mime) {
         response.headers_mut().insert(header::CONTENT_TYPE, value);
     }
     response
@@ -1597,7 +1612,6 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::http::HeaderValue;
 
     #[test]
     fn ranges_are_closed_and_clamped() {

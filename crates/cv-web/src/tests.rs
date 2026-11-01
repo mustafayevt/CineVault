@@ -80,6 +80,7 @@ fn web_state(
 
 struct Answer {
     status: StatusCode,
+    headers: axum::http::HeaderMap,
     cookies: Vec<String>,
     body: String,
 }
@@ -125,6 +126,7 @@ async fn call(
         .await
         .unwrap();
     let status = response.status();
+    let headers = response.headers().clone();
     let cookies = response
         .headers()
         .get_all(header::SET_COOKIE)
@@ -136,6 +138,7 @@ async fn call(
         .unwrap();
     Answer {
         status,
+        headers,
         cookies,
         body: String::from_utf8_lossy(&bytes).into_owned(),
     }
@@ -714,6 +717,102 @@ async fn origin_and_token_protect_the_commands() {
     ])
     .await;
     assert_eq!(foreign.status, StatusCode::FORBIDDEN);
+    services.shutdown();
+}
+
+/// Both framing headers, and a single policy.
+fn assert_no_framing(answer: &Answer, what: &str) {
+    assert_eq!(
+        answer.headers.get(header::X_FRAME_OPTIONS).unwrap(),
+        "DENY",
+        "{what}"
+    );
+    let policies: Vec<_> = answer
+        .headers
+        .get_all(header::CONTENT_SECURITY_POLICY)
+        .iter()
+        .collect();
+    assert_eq!(policies.len(), 1, "{what}");
+    assert!(
+        policies[0]
+            .to_str()
+            .unwrap()
+            .contains("frame-ancestors 'none'"),
+        "{what}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn no_response_may_be_framed() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    let welcome = call(&state, "GET", "/setup", "192.168.1.30", &[], None).await;
+    assert_eq!(welcome.status, StatusCode::OK);
+    assert_no_framing(&welcome, "welcome page");
+
+    set_password(&state);
+    let login = call(&state, "GET", "/login", "192.168.1.30", &[], None).await;
+    assert_no_framing(&login, "sign-in page");
+    let (cookie, _) = signed_in(&state).await;
+    let signed = [("cookie", cookie.as_str())];
+    let shell = call(&state, "GET", "/", "192.168.1.30", &signed, None).await;
+    assert_eq!(shell.status, StatusCode::OK);
+    assert_no_framing(&shell, "shell");
+    let image = call(&state, "GET", "/img/1/grid", "192.168.1.30", &signed, None).await;
+    assert_no_framing(&image, "image");
+    let missing = call(
+        &state,
+        "GET",
+        "/api/media/unknown/0",
+        "192.168.1.30",
+        &signed,
+        None,
+    )
+    .await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+    assert_no_framing(&missing, "404");
+
+    // A title with one small video file in a library folder.
+    let folder = state.data_root.join("media").join("Film (2019)");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("Film.mp4"), b"0123456789").unwrap();
+    let source = state.data_root.join("media").to_string_lossy().into_owned();
+    let directory = folder.to_string_lossy().into_owned();
+    let item: i64 = services
+        .db()
+        .write(move |tx| {
+            cv_db::repo::data_sources::insert_source(tx, cv_domain::SourceKind::Movie, &source)?;
+            tx.execute_batch("INSERT INTO item (kind, title) VALUES ('movie', 'Film')")?;
+            let item = tx.last_insert_rowid();
+            tx.execute(
+                "INSERT INTO media_file (item_id, kind, directory, filename) \
+                 VALUES (?1, 'video', ?2, 'Film.mp4')",
+                (item, directory),
+            )?;
+            Ok(item)
+        })
+        .unwrap();
+    let range = [("cookie", cookie.as_str()), ("range", "bytes=0-3")];
+    let media = call(
+        &state,
+        "GET",
+        &format!("/api/media/{item}/0"),
+        "192.168.1.30",
+        &range,
+        None,
+    )
+    .await;
+    assert_eq!(media.status, StatusCode::PARTIAL_CONTENT, "{}", media.body);
+    assert_eq!(media.body, "0123");
+    assert_no_framing(&media, "media range");
+    let policy = media.headers.get(header::CONTENT_SECURITY_POLICY).unwrap();
+    assert!(
+        policy
+            .to_str()
+            .unwrap()
+            .starts_with("sandbox allow-same-origin")
+    );
     services.shutdown();
 }
 
