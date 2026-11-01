@@ -8,6 +8,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 - Linux and browser mode: titles on a network share mounted at a folder such as `/media/nas`, or in a Docker install, no longer show as missing. They are available again, and Rename and Move work on them.
 - Scrape: a title whose name already ends in its year, such as `Example Movie (2003)`, is no longer searched with the year twice, which found nothing.
+- Linux installer: updating with the server tarball no longer ends with a list of "Permission denied" messages about its temporary folder.
 
 ## [1.3.0] - 2026-10-31
 

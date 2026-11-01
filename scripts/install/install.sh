@@ -271,7 +271,8 @@ n_install_package() {
             else as_root zypper --non-interactive install --allow-unsigned-rpm "$PKG"; fi ;;
         *)
             # No package manager this script knows: the tarball, laid out as the packages are.
-            as_root tar -xzf "$PKG" -C "$TMP"
+            # Unpacked as the user, so the cleanup on exit can remove it.
+            tar -xzf "$PKG" -C "$TMP"
             src="$TMP/cinevault-server-$VERSION"
             as_root install -d /usr/local/bin /etc/systemd/system
             as_root install -m 0755 "$src/bin/cinevault-server" "$src/bin/cinevault" /usr/local/bin/
