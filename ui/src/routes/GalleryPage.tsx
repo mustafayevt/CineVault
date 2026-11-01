@@ -14,6 +14,7 @@ import type { Theme } from "../stores/shell";
 import { ContainerSections } from "./GalleryPageContainers";
 import { ControlSections } from "./GalleryPageControls";
 import { FloatingSections, MotionSections } from "./GalleryPageFloating";
+import { ShareSections } from "./GalleryPageShares";
 import { GalleryThemeContext } from "./galleryTheme";
 import { Group, Row } from "./GalleryPageParts";
 
@@ -74,6 +75,7 @@ function ThemePanel({ theme }: { theme: Theme }) {
           <ControlSections />
           <ContainerSections />
           <FloatingSections />
+          <ShareSections />
           <MotionSections />
           <Art />
         </FloatingContainerContext>

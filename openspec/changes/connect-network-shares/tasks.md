@@ -26,7 +26,7 @@
 
 ## 5. Interface
 
-- [ ] 5.1 Add the Network share page (fields, paste parsing, path preview, Show/Hide, Remember with the store's name, busy state with Esc to cancel, inline errors and banners, the Linux explanation, reconnect mode) and show it on `/gallery`. Verified by vitest tests for each state and error, and `bun run lint`, `typecheck`, `format:check`.
+- [x] 5.1 Add the Network share page (fields, paste parsing, path preview, Show/Hide, Remember with the store's name, busy state with Esc to cancel, inline errors and banners, the Linux explanation, reconnect mode) and show it on `/gallery`. Verified by vitest tests for each state and error, and `bun run lint`, `typecheck`, `format:check`.
 - [ ] 5.2 Add "Network share…" to Settings › Library folders and the onboarding Folders step, the offline reason and "Connect…" on folder rows, and the "on \\nas\movies as alex" line. Verified by vitest tests for the section and the step with a fake backend.
 - [ ] 5.3 Add the browser popover for "Network share…" with the installer command and Copy. Verified by a vitest test in server mode that shows the popover and no password field.
 - [ ] 5.4 Refresh the screenshots that show Library folders (`bun run shots`, `.github/assets/`, `site/img/`), the landing page wording and the README where Library folders are described, and add the `CHANGELOG.md` line with `bun run site:changelog`. Verified by `bun run site:changelog -- --check` and the refreshed images in the pull request.

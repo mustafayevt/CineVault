@@ -116,6 +116,8 @@ function folders(initial: LibrarySource[], refuseKind?: string) {
           titles: entry.kind === "tv" ? 18 : 142,
           missing: 0,
           pending_media_info: 0,
+          reason: null,
+          share: null,
         })),
       ),
     readPendingMediaInfo: () => Promise.resolve("ready"),

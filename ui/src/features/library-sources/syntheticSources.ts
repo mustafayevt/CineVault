@@ -18,9 +18,17 @@ export function createSyntheticSourcesBackend(seeded = false): SourcesBackend {
         },
         { id: 2, kind: "movie", path: "D:\\Archive", label: "Archive", position: 1 },
         { id: 3, kind: "tv", path: "Z:\\NAS\\TV Shows", label: "TV Shows", position: 0 },
+        { id: 4, kind: "movie", path: "\\\\nas\\movies\\Films", label: "Films", position: 2 },
+        {
+          id: 5,
+          kind: "movie",
+          path: "\\\\backup\\movies\\Classics",
+          label: "Classics",
+          position: 3,
+        },
       ]
     : [];
-  let nextId = seeded ? 4 : 1;
+  let nextId = seeded ? 6 : 1;
   const unknown = () => Promise.reject(new SourceRequestError("unknown", "Unknown folder"));
   return {
     available: true,

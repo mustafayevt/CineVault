@@ -1,7 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 
 import { commands } from "../../bindings";
-import { SYNTHETIC_SOURCE_HEALTH } from "./syntheticSources";
+import { SYNTHETIC_SHARE_HEALTH, SYNTHETIC_SOURCE_HEALTH } from "./syntheticSources";
 import type {
   MediaInfoStatusDto,
   MissingInSourceDto,
@@ -62,7 +62,13 @@ export const unavailableScanBackend: ScanBackend = {
   available: false,
   rescan: () => Promise.resolve({ job_id: 0, sources: 0, media_info: "ready" }),
   findMissing: () => Promise.resolve([]),
-  sourceHealth: () => Promise.resolve([...SYNTHETIC_SOURCE_HEALTH]),
+  sourceHealth: () =>
+    Promise.resolve([
+      ...SYNTHETIC_SOURCE_HEALTH,
+      ...(new URLSearchParams(window.location.search).has("synthetic-folders")
+        ? SYNTHETIC_SHARE_HEALTH
+        : []),
+    ]),
   readPendingMediaInfo: () => Promise.resolve("ready"),
 };
 
