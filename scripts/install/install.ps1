@@ -10,9 +10,18 @@
 # Run it again to update; your library, settings and password stay in the data folder. It sends
 # nothing anywhere except the image download from ghcr.io. It needs no administrator rights.
 #
+# A library folder can be on a network share: give \\nas\movies (or //nas/movies, smb://nas/movies),
+# with a folder inside it if you like (\\nas\movies\Films). Docker Desktop cannot see the shares
+# Windows is connected to, so the installer asks for the share's user and password (the password is
+# not shown) and makes a CIFS volume, cinevault-<server>-<share>, that the container sees as
+# /media/<share>. The volume is created through Docker's own API, so the password never appears in
+# a docker command line; Docker keeps it in the volume's options.
+#
 # Without questions (all optional except CINEVAULT_MEDIA on a first install):
 #   $env:CINEVAULT_YES='1'                       accept every default, never ask
-#   $env:CINEVAULT_MEDIA='D:\Movies;E:\TV'       library folders, separated by ";"
+#   $env:CINEVAULT_MEDIA='D:\Movies;E:\TV'       library folders, separated by ";" (shares too: \\nas\movies)
+#   $env:CINEVAULT_SHARE_USER='alex'             the user for every share in CINEVAULT_MEDIA
+#   $env:CINEVAULT_SHARE_PASSWORD_FILE='C:\Users\alex\nas-password.txt'   a file whose first line is that password
 #   $env:CINEVAULT_DIR="$HOME\CineVault"         where the data folder and the key file go
 #   $env:CINEVAULT_PORT='8787'                   the port to open in the browser
 #   $env:CINEVAULT_IMAGE='ghcr.io/mustafayevt/cinevault:latest'
@@ -26,7 +35,7 @@ $Name = 'cinevault'
 $Image = if ($env:CINEVAULT_IMAGE) { $env:CINEVAULT_IMAGE } else { 'ghcr.io/mustafayevt/cinevault:latest' }
 $Action = if ($args.Count -gt 0) { [string]$args[0] } elseif ($env:CINEVAULT_ACTION) { $env:CINEVAULT_ACTION } else { 'install' }
 $Yes = [bool]$env:CINEVAULT_YES
-$S = @{ Binds = @(); Envs = @(); Port = '8787' }   # what the container is run with
+$S = @{ Binds = @(); Envs = @(); Port = '8787'; LastUser = '' }   # what the container is run with
 $KeepIn = 'CINEVAULT_SECRET_KEY|CINEVAULT_SECRET_KEY_FILE|PUID|PGID|TZ|CINEVAULT_WEB_TRUST_PROXY|CINEVAULT_WEB_ROOTS'
 
 function Say([string]$Text) { Write-Host $Text }
@@ -131,7 +140,12 @@ function Finish([bool]$Fresh) {
         Say 'Sign in with your password. Your folders, as CineVault sees them:'
     }
     foreach ($b in $S.Binds) {
-        if ($b -match '^(.*):(/media/[^:]+)(:.*)?$') { Say ("  {0}    (your folder {1})" -f $Matches[2], $Matches[1]) }
+        if ($b -match '^(.*):(/media/[^:]+)(:.*)?$') {
+            $media = $Matches[2]; $source = $Matches[1]
+            $share = if ($source -notmatch '[\\/]') { Volume-Share $source } else { '' }
+            if ($share) { Say ("  {0}    (the network share {1}; its folders are inside)" -f $media, ($share -replace '/', '\')) }
+            else { Say ("  {0}    (your folder {1})" -f $media, $source) }
+        }
     }
     Say ''
     Say 'Keep Docker Desktop starting with Windows (Docker Desktop > Settings > General >'
@@ -208,6 +222,7 @@ function Mount-Name([string]$Folder) {
 
 function Add-Media([string]$Folder) {
     $Folder = $Folder.Trim().Trim('"').Trim("'")
+    if (Is-Share $Folder) { return Add-Share $Folder }
     if (-not $Folder -or -not (Test-Path -LiteralPath $Folder -PathType Container)) {
         Say "  There is no folder '$Folder'."
         return $false
@@ -216,6 +231,211 @@ function Add-Media([string]$Folder) {
     if ($full -match '^[A-Za-z]:$') { $full += '\' }
     $S.Binds += "$($full):/media/$(Mount-Name $full)"
     return $true
+}
+
+# ---- network shares -----------------------------------------------------------------------------
+# The password is read with Read-Host -AsSecureString (or from the first line of
+# CINEVAULT_SHARE_PASSWORD_FILE) and only ever leaves this window in the body sent to Docker's API.
+function Is-Share([string]$Text) { return $Text -match '^(\\\\|//|smb://)' }
+
+function Share-Key([string]$Server, [string]$Share) {
+    return (("$Server-$Share").ToLowerInvariant() -replace '[^a-z0-9._-]', '-').TrimEnd('-')
+}
+
+function Parse-Share([string]$Address) {
+    $a = ($Address -replace '\\', '/') -replace '^smb://', '' -replace '^//', ''
+    $a = ($a -replace '/+', '/').TrimEnd('/')
+    $parts = @($a -split '/', 3)
+    $server = $parts[0]
+    $hint = ''   # the user in smb://alex@nas/movies
+    if ($server -match '^(.*)@([^@]*)$') { $hint = $Matches[1]; $server = $Matches[2] }
+    $share = if ($parts.Count -gt 1) { $parts[1] } else { '' }
+    $sub = if ($parts.Count -gt 2) { $parts[2] } else { '' }
+    if ($server -cnotmatch '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$') {
+        Say "  $Address does not start with a server name or IPv4 address, like \\nas\movies."
+        return $null
+    }
+    if (-not $share) { Say "  $Address names no share. Type it like \\$server\movies."; return $null }
+    if ($share -cnotmatch '^[A-Za-z0-9._$ -]{1,80}$') {
+        Say "  The share name ""$share"" has a sign the installer cannot use (letters, digits, spaces, . _ - and `$ are fine)."
+        return $null
+    }
+    if ("/$sub/" -match '/\.\.?/') { Say '  The folder inside the share may not have . or .. in its path.'; return $null }
+    if ($sub -match '[\x00-\x1f"]') { Say '  The folder inside the share has a sign the installer cannot use.'; return $null }
+    return @{ Server = $server; Share = $share; Sub = $sub; Key = (Share-Key $server $share); Hint = $hint }
+}
+
+function Share-Kind([string]$Output) {
+    if ($Output -match 'error\(13\)|permission denied|logon failure') { return 'login' }
+    if ($Output -match 'error\(2\)|no such file') { return 'missing' }
+    if ($Output -match 'resolve') { return 'noname' }
+    return 'other'
+}
+
+function Mask([string]$Text) { return $Text -replace 'password=.*,uid=', 'password=********,uid=' }
+
+function Share-Error($Sh, [string]$Output) {
+    $name = "\\$($Sh.Server)\$($Sh.Share)"
+    $unreachable = "$($Sh.Server) could not be reached. Check the name or address and that it is switched on."
+    switch (Share-Kind $Output) {
+        'login' { return "Wrong user name or password for $name." }
+        'missing' { return "There is no share named $($Sh.Share) on $($Sh.Server)." }
+        'noname' { return $unreachable }
+    }
+    if ($Output -match 'error\((110|111|112|113)\)|host is down|no route|timed out|unreachable') { return $unreachable }
+    $line = @($Output -split "`r?`n" | Where-Object { $_ -match 'error' } | Select-Object -First 1)
+    return "$name could not be mounted: $(Mask ([string]$line))"
+}
+
+function Plain([Security.SecureString]$Secure) {
+    $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secure)
+    try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+}
+
+function Ask-Login($Sh) {
+    $name = "\\$($Sh.Server)\$($Sh.Share)"
+    if ($Yes -or $env:CINEVAULT_SHARE_PASSWORD_FILE) {
+        $user = if ($env:CINEVAULT_SHARE_USER) { $env:CINEVAULT_SHARE_USER } else { $Sh.Hint }
+        $file = $env:CINEVAULT_SHARE_PASSWORD_FILE
+        if (-not $user -or -not $file) {
+            Fail "For the share $name, set CINEVAULT_SHARE_USER and CINEVAULT_SHARE_PASSWORD_FILE (a file whose first line is the password)."
+        }
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { Fail "The password file $file cannot be read." }
+        $secure = New-Object Security.SecureString
+        foreach ($c in ([string](Get-Content -LiteralPath $file -TotalCount 1)).ToCharArray()) { $secure.AppendChar($c) }
+    } else {
+        $default = if ($env:CINEVAULT_SHARE_USER) { $env:CINEVAULT_SHARE_USER } elseif ($Sh.Hint) { $Sh.Hint } else { $S.LastUser }
+        do { $user = Ask "User for $name" $default } until ($user)
+        $secure = Read-Host -AsSecureString "Password for $user on $($Sh.Server) (it is not shown)"
+    }
+    if ($user -match '[,=\x00-\x1f]') { Fail "The user name for $name cannot have , or = or control characters." }
+    $S.LastUser = $user
+    return @{ User = $user; Password = $secure }
+}
+
+function Volume-Body([string]$Name, $Sh, [string]$User, [string]$Password, [string]$Vers, [string]$Uid, [string]$Gid) {
+    $u = $User
+    $domain = ''
+    if ($u -match '^(.*?)\\(.*)$') { $domain = ",domain=$($Matches[1])"; $u = $Matches[2] }
+    # A comma in a mount option value is written twice.
+    $o = "addr=$($Sh.Server),username=$u$domain,password=$($Password -replace ',', ',,'),uid=$Uid,gid=$Gid,file_mode=0664,dir_mode=0775,vers=$Vers"
+    $device = "//$($Sh.Server)/$($Sh.Share)"
+    $body = [ordered]@{
+        Name = $Name
+        Driver = 'local'
+        DriverOpts = [ordered]@{ type = 'cifs'; device = $device; o = $o }
+        Labels = [ordered]@{ 'cinevault.share' = $device; 'cinevault.key' = $Sh.Key }
+    }
+    return ($body | ConvertTo-Json -Compress -Depth 4)
+}
+
+function Docker-Pipe {
+    $endpoint = $env:DOCKER_HOST
+    if (-not $endpoint) {
+        try { $endpoint = @(docker context inspect | Out-String | ConvertFrom-Json)[0].Endpoints.docker.Host } catch { }
+    }
+    if ($endpoint -match '^npipe://.*/pipe/(.+)$') { return $Matches[1] }
+    return 'docker_engine'
+}
+
+# Sends one request to the Docker Engine API over its named pipe, in this process, so the body never
+# appears in a command line.
+function Docker-Api([string]$Method, [string]$Path, [string]$Body) {
+    $pipe = New-Object IO.Pipes.NamedPipeClientStream('.', (Docker-Pipe), [IO.Pipes.PipeDirection]::InOut)
+    try {
+        $pipe.Connect(10000)
+        $data = [Text.Encoding]::UTF8.GetBytes($Body)
+        $head = [Text.Encoding]::ASCII.GetBytes("$Method $Path HTTP/1.1`r`nHost: docker`r`nContent-Type: application/json`r`nContent-Length: $($data.Length)`r`nConnection: close`r`n`r`n")
+        $pipe.Write($head, 0, $head.Length)
+        $pipe.Write($data, 0, $data.Length)
+        $pipe.Flush()
+        [Array]::Clear($data, 0, $data.Length)
+        $reply = (New-Object IO.StreamReader($pipe, [Text.Encoding]::UTF8)).ReadToEnd()
+    } finally {
+        $pipe.Dispose()
+    }
+    $code = 0
+    if ($reply -match '^HTTP/\S+ (\d{3})') { $code = [int]$Matches[1] }
+    return @{ Code = $code; Text = @($reply -split "`r`n`r`n", 2)[-1] }
+}
+
+function Volume-Test([string]$Vol, [string]$Sub) {
+    $target = if ($Sub) { "/m/$Sub" } else { '/m' }
+    $out = (& docker run --rm -v "$($Vol):/m" --entrypoint test $Image -d $target 2>&1 | Out-String)
+    if ($LASTEXITCODE -eq 0) { return @{ Kind = 'ok'; Out = '' } }
+    if ($LASTEXITCODE -eq 1) { return @{ Kind = 'folder'; Out = '' } }
+    return @{ Kind = (Share-Kind $out); Out = $out }
+}
+
+function Free-Volume([string]$Base) {
+    $candidate = $Base
+    $n = 2
+    while ($true) {
+        docker volume inspect $candidate *> $null
+        if ($LASTEXITCODE -ne 0) { return $candidate }
+        $candidate = "$Base-$n"
+        $n++
+    }
+}
+
+function Container-Ids {
+    $uid = '1000'; $gid = '1000'
+    foreach ($e in $S.Envs) {
+        if ($e -match '^PUID=(\d+)$') { $uid = $Matches[1] }
+        if ($e -match '^PGID=(\d+)$') { $gid = $Matches[1] }
+    }
+    return @($uid, $gid)
+}
+
+# A CIFS volume for the share, checked by mounting it in a throwaway container. Returns its name.
+function Share-Volume($Sh) {
+    docker image inspect $Image *> $null
+    if ($LASTEXITCODE -ne 0) { Pull | Out-Host }
+    $name = "\\$($Sh.Server)\$($Sh.Share)"
+    $vol = @(docker volume ls -q --filter "label=cinevault.key=$($Sh.Key)") | Select-Object -First 1
+    if ($vol) {
+        $t = Volume-Test $vol $Sh.Sub
+        if ($t.Kind -eq 'ok') { Say "  $name is the volume $vol already, with the login saved before."; return $vol }
+        if ($t.Kind -eq 'folder') { Say "  $($Sh.Sub) was not found on $name."; return $null }
+        Say "  The volume $vol no longer mounts. $(Share-Error $Sh $t.Out)"
+    }
+    $ids = Container-Ids
+    for ($tries = 1; ; $tries++) {
+        $login = Ask-Login $Sh
+        $vol = Free-Volume "cinevault-$($Sh.Key)"
+        $t = @{ Kind = 'other'; Out = '' }
+        # SMB 3.0 first; some older NAS units only speak 2.1.
+        foreach ($vers in '3.0', '2.1') {
+            $reply = Docker-Api 'POST' '/volumes/create' (Volume-Body $vol $Sh $login.User (Plain $login.Password) $vers $ids[0] $ids[1])
+            if ($reply.Code -lt 200 -or $reply.Code -ge 300) { Fail "Docker could not make the volume $($vol): $(Mask $reply.Text)" }
+            $t = Volume-Test $vol $Sh.Sub
+            if ($t.Kind -eq 'ok') { break }
+            docker volume rm $vol *> $null
+            if ($t.Kind -ne 'other') { break }
+        }
+        $login.Password.Dispose()
+        if ($t.Kind -eq 'ok') {
+            Say "  $name is the volume $vol. Docker keeps its login in the volume's options, which anyone"
+            Say '  who may use Docker on this computer can read.'
+            return $vol
+        }
+        if ($t.Kind -eq 'folder') { Say "  $($Sh.Sub) was not found on $name."; return $null }
+        Say "  $(Share-Error $Sh $t.Out)"
+        if ($t.Kind -ne 'login' -or $Yes -or $env:CINEVAULT_SHARE_PASSWORD_FILE -or $tries -ge 3) { return $null }
+    }
+}
+
+function Add-Share([string]$Address) {
+    $sh = Parse-Share $Address
+    if (-not $sh) { return $false }
+    $vol = Share-Volume $sh
+    if (-not $vol) { return $false }
+    if (-not ($S.Binds | Where-Object { $_ -like "$($vol):*" })) { $S.Binds += "$($vol):/media/$(Mount-Name $sh.Share)" }
+    return $true
+}
+
+function Volume-Share([string]$Vol) { # the share a volume made by this installer holds, or ''
+    try { return [string]@(docker volume inspect $Vol 2>$null | Out-String | ConvertFrom-Json)[0].Labels.'cinevault.share' } catch { return '' }
 }
 
 function Port-Free([int]$P) {
@@ -272,6 +492,67 @@ function Install {
     Wait-Healthy
     Finish $true
 }
+
+# install.ps1 -SelfTest: checks the share parsing and the body sent to Docker, without Docker.
+function Self-Test {
+    $T = @{ Fails = 0 }
+    function Expect([string]$What, $Got, $Want) {
+        if ("$Got" -cne "$Want") { Write-Host "FAIL $What`n  expected: $Want`n  got:      $Got"; $T.Fails++ }
+    }
+    function Parsed([string]$Address) {
+        $p = Parse-Share $Address 6>$null
+        if (-not $p) { return 'refused' }
+        return '{0}|{1}|{2}|{3}|{4}' -f $p.Server, $p.Share, $p.Sub, $p.Key, $p.Hint
+    }
+    Expect 'share \\nas\movies' (Is-Share '\\nas\movies') $true
+    Expect 'share //nas/movies' (Is-Share '//nas/movies') $true
+    Expect 'share smb://nas/movies' (Is-Share 'smb://nas/movies') $true
+    Expect 'share SMB://nas/movies' (Is-Share 'SMB://nas/movies') $true
+    Expect 'local D:\Movies' (Is-Share 'D:\Movies') $false
+    Expect 'local Movies' (Is-Share 'Movies') $false
+
+    Expect 'parse \\nas\movies' (Parsed '\\nas\movies') 'nas|movies||nas-movies|'
+    Expect 'parse \\NAS\Movies\Films\HD' (Parsed '\\NAS\Movies\Films\HD') 'NAS|Movies|Films/HD|nas-movies|'
+    Expect 'parse //nas/movies/Films/' (Parsed '//nas/movies/Films/') 'nas|movies|Films|nas-movies|'
+    Expect 'parse smb://alex@nas.local/movies' (Parsed 'smb://alex@nas.local/movies') 'nas.local|movies||nas.local-movies|alex'
+    Expect 'parse smb://192.168.1.5/Media Library/TV' (Parsed 'smb://192.168.1.5/Media Library/TV') '192.168.1.5|Media Library|TV|192.168.1.5-media-library|'
+    Expect 'parse \\nas\movies$' (Parsed '\\nas\movies$') 'nas|movies$||nas-movies|'
+    Expect 'refuse \\nas' (Parsed '\\nas') 'refused'
+    Expect 'refuse \\-nas\movies' (Parsed '\\-nas\movies') 'refused'
+    Expect 'refuse \\nas\mo*vies' (Parsed '\\nas\mo*vies') 'refused'
+    Expect 'refuse \\nas\movies\..\x' (Parsed '\\nas\movies\..\x') 'refused'
+
+    $sh = Parse-Share '\\nas\movies'
+    $body = Volume-Body 'cinevault-nas-movies' $sh 'WORK\alex' 'a,b"c\d' '3.0' '1000' '1000' | ConvertFrom-Json
+    Expect 'volume name' $body.Name 'cinevault-nas-movies'
+    Expect 'volume driver' $body.Driver 'local'
+    Expect 'volume type' $body.DriverOpts.type 'cifs'
+    Expect 'volume device' $body.DriverOpts.device '//nas/movies'
+    Expect 'volume options' $body.DriverOpts.o 'addr=nas,username=alex,domain=WORK,password=a,,b"c\d,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,vers=3.0'
+    Expect 'volume share label' $body.Labels.'cinevault.share' '//nas/movies'
+    Expect 'volume key label' $body.Labels.'cinevault.key' 'nas-movies'
+
+    $secure = New-Object Security.SecureString
+    foreach ($c in 'Pa,ss w"rd'.ToCharArray()) { $secure.AppendChar($c) }
+    Expect 'password from the secure string' (Plain $secure) 'Pa,ss w"rd'
+
+    Expect 'kind wrong login' (Share-Kind 'failed to mount local volume: mount //nas/movies:/var/lib/docker/volumes/v/_data, data: addr=nas: permission denied') 'login'
+    Expect 'kind no share' (Share-Kind 'failed to mount local volume: mount //nas/x:/var/lib/docker/volumes/v/_data: no such file or directory') 'missing'
+    Expect 'kind other' (Share-Kind 'failed to mount local volume: invalid argument') 'other'
+    Expect 'password masked' (Mask 'data: addr=nas,username=alex,password=se,,cret,uid=1000,gid=1000: permission denied') 'data: addr=nas,username=alex,password=********,uid=1000,gid=1000: permission denied'
+    Expect 'error wrong login' (Share-Error $sh 'mount error(13): Permission denied') 'Wrong user name or password for \\nas\movies.'
+    Expect 'error host down' (Share-Error $sh 'mount: host is down') 'nas could not be reached. Check the name or address and that it is switched on.'
+
+    $S.Binds = @()
+    Expect 'mount name of a share' (Mount-Name 'Media Library') 'Media-Library'
+    $S.Binds = @('cinevault-nas-movies:/media/movies')
+    Expect 'second share named movies' (Mount-Name 'movies') 'movies-2'
+    $S.Binds = @()
+
+    if ($T.Fails -eq 0) { Write-Host 'install.ps1 self-test passed' } else { Write-Host "install.ps1 self-test: $($T.Fails) failed"; exit 1 }
+}
+
+if ($Action -match '^(-SelfTest|self-test)$') { Self-Test; return }
 
 try {
     Ensure-Docker
