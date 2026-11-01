@@ -1141,7 +1141,7 @@ async fn start_sign_in_invoke_and_stop_closes_the_port() {
         "the port is closed after stop"
     );
 
-    // A new start begins with no sessions: the old cookie is signed out.
+    // Switching off ends the sessions: after a new start the old cookie is signed out.
     let again = embed::start(options(port), shared(&services)).expect("it starts again");
     let (status, _, _) = http(port, "GET", "/api/server/info", Some(&cookie), &[], None)
         .await
@@ -1245,6 +1245,25 @@ async fn browsers_are_signed_out_one_by_one_or_all_together() {
         .unwrap();
     assert_eq!(status, 200);
     running.stop().await;
+    services.shutdown();
+}
+
+/// Quitting the app (an update, a restart) keeps the browsers signed in.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn quitting_keeps_the_sessions_for_the_next_start() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let root = services.location().root().to_path_buf();
+    embed::set_password(&root, PASSWORD, PASSWORD).unwrap();
+    let port = free_port();
+    let running = embed::start(options(port), shared(&services)).unwrap();
+    let cookie = sign_in(port).await;
+    running.begin_stop();
+    // The quitting server may still hold its port for a moment; the next start takes another.
+    let next = free_port();
+    let again = embed::start(options(next), shared(&services)).unwrap();
+    assert_eq!(futures_status(next, &cookie).await, 200);
+    again.stop().await;
     services.shutdown();
 }
 

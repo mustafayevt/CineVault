@@ -144,7 +144,8 @@ impl BrowserAccessState {
         self.hide_on_close()
     }
 
-    /// Ends every browser session and closes the port without waiting, for quitting.
+    /// Closes the port without waiting, for quitting; the browser sessions are kept for the next
+    /// start.
     pub fn stop_now(&self) {
         if let Ok(mut inner) = self.inner.try_lock()
             && let Some(running) = inner.running.take()
