@@ -47,6 +47,16 @@ fn two_copies_get_a_label_each_and_undo_puts_both_back() {
         "Example Movie (2020) - 1080p.mkv"
     );
     assert_eq!(row(&preview, uhd).after, "Example Movie (2020) - 2160p");
+    // The preview says which part of each name is a copy label, and which copy it is.
+    let note = |id| row(&preview, id).copy.clone().expect("a copy note");
+    assert_eq!(
+        (note(hd).nth, note(hd).of, note(hd).label),
+        (1, 2, "1080p".to_owned())
+    );
+    assert_eq!(
+        (note(uhd).nth, note(uhd).of, note(uhd).label),
+        (2, 2, "2160p".to_owned())
+    );
 
     let applied = lib
         .service
@@ -84,6 +94,9 @@ fn a_copy_renamed_alone_is_labelled_next_to_its_plain_named_twin() {
     assert_eq!(preview.counts.conflicts, 0, "{preview:?}");
     assert_eq!(row(&preview, new).after, "Example Movie (2020) - 1080p");
     assert!(preview.rows.iter().all(|r| r.id != twin.0.to_string()));
+    // The twin that is not in the batch still counts for "Copy 2 of 2".
+    let note = row(&preview, new).copy.clone().expect("a copy note");
+    assert_eq!((note.nth, note.of, note.label.as_str()), (2, 2, "1080p"));
 }
 
 #[test]
@@ -154,4 +167,17 @@ fn a_plain_name_has_no_label_to_drop() {
 
     assert_eq!(plain.folder, "Example Movie (2020)");
     assert_eq!(plain.label_to_drop(), None);
+}
+
+#[test]
+fn a_movie_without_copies_has_no_copy_note() {
+    let lib = Lib::new();
+    let alone = lib.movie("dl", "another.example", "Another Example", 2018);
+
+    let preview = lib
+        .service
+        .preview(&lib.request(Scope::Everything))
+        .unwrap();
+
+    assert_eq!(row(&preview, alone).copy, None);
 }

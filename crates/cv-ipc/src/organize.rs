@@ -596,6 +596,18 @@ fn file_kind(kind: MediaFileType) -> &'static str {
     }
 }
 
+/// A movie that is one of several copies of a film.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct CopyNoteDto {
+    /// Its place among the copies, from 1.
+    pub nth: u32,
+    /// How many copies the film has.
+    pub of: u32,
+    /// The label (`2160p`, `copy 2`) added after the names of its folder and video so the copies
+    /// keep different names; empty when its names need none.
+    pub label: String,
+}
+
 /// One item of the diff list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct PreviewRowDto {
@@ -618,6 +630,8 @@ pub struct PreviewRowDto {
     /// Every file that moves, is copied or goes to the trash: the video, its companions, a
     /// show's episodes.
     pub files: Vec<FileChangeDto>,
+    /// Set for a movie that has copies in the library.
+    pub copy: Option<CopyNoteDto>,
 }
 
 impl From<PreviewRow> for PreviewRowDto {
@@ -657,6 +671,11 @@ impl From<PreviewRow> for PreviewRowDto {
                 trailers: row.companions.trailers,
                 other: row.companions.other,
             },
+            copy: row.copy.map(|note| CopyNoteDto {
+                nth: note.nth,
+                of: note.of,
+                label: note.label,
+            }),
             files: row
                 .files
                 .into_iter()

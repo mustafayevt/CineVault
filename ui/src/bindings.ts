@@ -1100,6 +1100,19 @@ export type CopyMediaDto = {
 	duration_minutes: number,
 };
 
+/**  A movie that is one of several copies of a film. */
+export type CopyNoteDto = {
+	/**  Its place among the copies, from 1. */
+	nth: number,
+	/**  How many copies the film has. */
+	of: number,
+	/**
+	 *  The label (`2160p`, `copy 2`) added after the names of its folder and video so the copies
+	 *  keep different names; empty when its names need none.
+	 */
+	label: string,
+};
+
 /**  One card of the Compare copies page. */
 export type CopyRowDto = {
 	/**  Item id as text. */
@@ -3211,6 +3224,8 @@ export type PreviewRowDto = {
 	 *  show's episodes.
 	 */
 	files: FileChangeDto[],
+	/**  Set for a movie that has copies in the library. */
+	copy: CopyNoteDto | null,
 };
 
 /**  Scheduling priority as the UI sees it. */

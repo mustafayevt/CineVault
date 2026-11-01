@@ -28,9 +28,9 @@ use super::examples::{episode_example, examples};
 use super::load::{Loaded, LoadedMovie, load, scope_ids};
 use super::model::{
     Applied, AppliedItem, AppliedStatus, ApplyRequest, BusyTitle, Choice, CompanionCounts,
-    ConflictCode, ConflictRow, Counts, FileChange, JournalBatch, NotRestorable, OrganizeError,
-    PatternField, Preview, PreviewRequest, PreviewRow, ResolutionOption, RowKind, RowStatus,
-    TemplateProblem, UndoOutcome,
+    ConflictCode, ConflictRow, CopyNote, Counts, FileChange, JournalBatch, NotRestorable,
+    OrganizeError, PatternField, Preview, PreviewRequest, PreviewRow, ResolutionOption, RowKind,
+    RowStatus, TemplateProblem, UndoOutcome,
 };
 
 /// Why a title that is not scraped yet is not planned, as the organize-state cache keeps it.
@@ -113,6 +113,8 @@ struct Planned {
     /// Items whose names use media-info tokens while their video details are not read: listed,
     /// but not planned until the details are read (see `cv_rename::media_guard`).
     media_unread: BTreeSet<String>,
+    /// The movies that have copies: their place among them and the label they were given, by id.
+    copy_notes: BTreeMap<String, CopyNote>,
     /// Items whose names already match the profile.
     tidy: BTreeSet<String>,
     /// Items that are locked and so not planned.
@@ -861,6 +863,7 @@ impl OrganizeService {
             blocked: BTreeSet::new(),
             unscraped: BTreeSet::new(),
             media_unread: BTreeSet::new(),
+            copy_notes: BTreeMap::new(),
             tidy: BTreeSet::new(),
             locked: BTreeSet::new(),
             report: ConflictReport::default(),
@@ -1134,7 +1137,7 @@ impl OrganizeService {
 
         // Copies whose names clash get a label of their own first; a labelled copy whose names
         // already carry its label has nothing to change.
-        let held = separate_copies(
+        let separated = separate_copies(
             &self.db,
             &mut items,
             &copy_group_of,
@@ -1142,7 +1145,8 @@ impl OrganizeService {
             &movie_renamer,
             &options,
         )?;
-        planned.media_unread.extend(held);
+        planned.media_unread.extend(separated.held);
+        planned.copy_notes = copy_notes(&copy_group_of, &separated.labels);
         let (unchanged, changing): (Vec<BatchItem>, Vec<BatchItem>) =
             items.into_iter().partition(is_unchanged);
         items = changing;
@@ -1667,6 +1671,34 @@ fn merge_conflicts(rows: Vec<ConflictRow>) -> Vec<ConflictRow> {
 }
 
 /// The files of an item that change, for the preview.
+/// Each copy's place among the copies of its film (by library id) and the label it was given.
+fn copy_notes(
+    group_of: &BTreeMap<ItemId, ItemId>,
+    labels: &BTreeMap<String, String>,
+) -> BTreeMap<String, CopyNote> {
+    let mut groups: BTreeMap<ItemId, Vec<ItemId>> = BTreeMap::new();
+    for (member, group) in group_of {
+        groups.entry(*group).or_default().push(*member);
+    }
+    let mut notes = BTreeMap::new();
+    for members in groups.values() {
+        let of = u32::try_from(members.len()).unwrap_or(u32::MAX);
+        // `group_of` is a BTreeMap, so the members come in id order.
+        for (index, member) in members.iter().enumerate() {
+            let key = member.0.to_string();
+            notes.insert(
+                key.clone(),
+                CopyNote {
+                    nth: u32::try_from(index + 1).unwrap_or(u32::MAX),
+                    of,
+                    label: labels.get(&key).cloned().unwrap_or_default(),
+                },
+            );
+        }
+    }
+    notes
+}
+
 fn file_changes(item: &BatchItem) -> Vec<FileChange> {
     item.files
         .iter()
@@ -1714,6 +1746,7 @@ fn describe(planned: Planned, title: TitleLookup<'_>) -> Preview {
             trashed: 0,
             companions: CompanionCounts::default(),
             files: Vec::new(),
+            copy: planned.copy_notes.get(id).cloned(),
         };
         if planned.unscraped.contains(id) {
             row.status = RowStatus::Unscraped;

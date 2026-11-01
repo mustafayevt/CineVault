@@ -44,7 +44,7 @@ pub use check::{Finding, FindingSeverity, TokenInfo, check_pattern, token_catalo
 pub use file_example::{FileExample, SAMPLE_FILE, example_for_file, tag_count};
 pub use model::{
     Applied, AppliedItem, AppliedStatus, ApplyRequest, BusyTitle, Choice, CompanionCounts,
-    ConflictCode, ConflictRow, Counts, Example, ExampleKind, FileChange, JournalBatch,
+    ConflictCode, ConflictRow, CopyNote, Counts, Example, ExampleKind, FileChange, JournalBatch,
     NotRestorable, OrganizeError, PatternField, Preview, PreviewRequest, PreviewRow,
     ResolutionOption, RowKind, RowStatus, Scope, TemplateProblem, UndoOutcome,
 };

@@ -30,9 +30,18 @@ pub(super) fn group_of_movies(db: &Database) -> Result<BTreeMap<ItemId, ItemId>,
         .collect())
 }
 
+/// What labelling the copies of a batch did.
+#[derive(Debug, Default)]
+pub(super) struct Separated {
+    /// The ids of the batch items held back because a copy they clash with has no media info
+    /// yet; they are removed from the items.
+    pub held: BTreeSet<String>,
+    /// The label ` - <label>` given to each labelled item, by id.
+    pub labels: BTreeMap<String, String>,
+}
+
 /// Labels the clashing copies among `items`. `attributes` holds the label facts of the batch's
-/// copies by item id (`None` while unread). Returns the ids of the batch items held back because
-/// a copy they clash with has no media info yet; they are removed from `items`.
+/// copies by item id (`None` while unread).
 pub(super) fn separate_copies(
     db: &Database,
     items: &mut Vec<BatchItem>,
@@ -40,14 +49,14 @@ pub(super) fn separate_copies(
     attributes: &BTreeMap<String, Option<CopyAttributes>>,
     renamer: &MovieRenamer,
     options: &ConflictOptions,
-) -> Result<BTreeSet<String>, DbError> {
+) -> Result<Separated, DbError> {
     let id_of = |key: &str| key.parse::<i64>().ok().map(ItemId);
     let groups: BTreeSet<ItemId> = items
         .iter()
         .filter_map(|item| id_of(&item.id).and_then(|id| group_of.get(&id)).copied())
         .collect();
     if groups.is_empty() {
-        return Ok(BTreeSet::new());
+        return Ok(Separated::default());
     }
 
     // The other copies of those groups, planned but never run.
@@ -129,5 +138,5 @@ pub(super) fn separate_copies(
     }
     all.retain(|item| !fixed_ids.contains(&item.id) && !held.contains(&item.id));
     *items = all;
-    Ok(held)
+    Ok(Separated { held, labels })
 }
