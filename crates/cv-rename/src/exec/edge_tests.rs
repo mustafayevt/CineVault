@@ -342,6 +342,8 @@ impl Fs for FoldingFs {
         names.sort();
         Ok(names)
     }
+
+    fn sync_dir(&self, _: &Path) {}
 }
 
 const MEM: &str = "/mem/ds";

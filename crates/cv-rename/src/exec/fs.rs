@@ -22,7 +22,8 @@ pub trait Fs {
     fn meta(&self, path: &Path) -> io::Result<Option<Meta>>;
     fn create_dir_all(&self, path: &Path) -> io::Result<()>;
     fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;
-    /// Copies the content and the modification time of a file. An existing `to` is replaced.
+    /// Copies the content and the modification time of a file and flushes the copy to the disk.
+    /// An existing `to` is replaced.
     fn copy_file(&self, from: &Path, to: &Path) -> io::Result<()>;
     /// True when both files hold the same bytes.
     fn same_content(&self, a: &Path, b: &Path) -> io::Result<bool>;
@@ -31,6 +32,9 @@ pub trait Fs {
     fn remove_dir(&self, path: &Path) -> io::Result<()>;
     /// The names in a folder.
     fn list_dir(&self, path: &Path) -> io::Result<Vec<String>>;
+    /// Flushes a folder's entries to the disk, so a file created or renamed into it is still
+    /// there after a power cut. Best effort: a file system that cannot is left as it is.
+    fn sync_dir(&self, path: &Path);
 }
 
 /// Paths from this many UTF-16 units on are written in the extended-length form on Windows.
@@ -145,10 +149,12 @@ impl Fs for StdFs {
             writable.set_readonly(false);
             fs::set_permissions(&dst, writable)?;
         }
+        // The copy is flushed through the same handle, before anyone reads it back to verify it
+        // or removes the original.
         let timed = File::options()
             .write(true)
             .open(&dst)
-            .and_then(|file| file.set_modified(modified));
+            .and_then(|file| file.set_modified(modified).and_then(|()| file.sync_all()));
         if perms.readonly() {
             fs::set_permissions(&dst, perms)?;
         }
@@ -203,6 +209,17 @@ impl Fs for StdFs {
         }
         names.sort();
         Ok(names)
+    }
+
+    fn sync_dir(&self, path: &Path) {
+        // NTFS journals its folders itself; elsewhere a new name is on the disk only once the
+        // folder is flushed. Some network and FUSE file systems refuse that, which is let go.
+        #[cfg(unix)]
+        if let Ok(dir) = File::open(Self::native(path)) {
+            let _ = dir.sync_all();
+        }
+        #[cfg(not(unix))]
+        let _ = path;
     }
 }
 
@@ -297,6 +314,10 @@ impl Fs for Patient<'_> {
 
     fn list_dir(&self, path: &Path) -> io::Result<Vec<String>> {
         cv_fs::retry("list dir", path, || self.inner.list_dir(path))
+    }
+
+    fn sync_dir(&self, path: &Path) {
+        self.inner.sync_dir(path);
     }
 }
 

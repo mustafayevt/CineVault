@@ -1,7 +1,7 @@
 //! Tests of the executor: file operations in temp folders, ordering, trash, clean-up, the
 //! database journal and, above all, a crash at every point of a batch.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
@@ -12,7 +12,8 @@ use std::sync::Arc;
 use cv_domain::{Item, MediaFile, MediaFileType};
 use tempfile::TempDir;
 
-use super::run::{order_items, order_ops};
+use super::fs::{is_within, same_path};
+use super::run::{order_items, order_ops, part_path};
 use super::*;
 use crate::conflict::BatchItem;
 use crate::plan::{Fate, FolderChange, Op, OpKind, Owner, PlannedFile};
@@ -264,6 +265,79 @@ pub(super) fn case_scenario() -> (Tree, Vec<BatchItem>) {
 
 /// The shared fault-injection file system; a stop of it is the simulated crash.
 pub(super) use super::fault::{FaultFs, Stop as Crash};
+
+/// A file system that writes down, in order, what another one does to the disk: the copies,
+/// renames and removals (by the path they change) and the folder flushes.
+pub(super) struct Logging<F> {
+    inner: F,
+    log: RefCell<Vec<(&'static str, PathBuf)>>,
+}
+
+impl<F: Fs> Logging<F> {
+    pub(super) fn new(inner: F) -> Self {
+        Logging {
+            inner,
+            log: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn note(&self, what: &'static str, path: &Path) {
+        self.log.borrow_mut().push((what, path.to_path_buf()));
+    }
+
+    /// Where the first `what` of `path` is in the log.
+    pub(super) fn at(&self, what: &str, path: &Path) -> usize {
+        let log = self.log.borrow();
+        log.iter()
+            .position(|(w, p)| *w == what && same_path(p, path))
+            .unwrap_or_else(|| panic!("no {what} of {}: {log:?}", path.display()))
+    }
+
+    /// Where the first `what` of a path below `dir` is in the log.
+    pub(super) fn first_below(&self, what: &str, dir: &Path) -> usize {
+        let log = self.log.borrow();
+        log.iter()
+            .position(|(w, p)| *w == what && is_within(dir, p))
+            .unwrap_or_else(|| panic!("no {what} below {}: {log:?}", dir.display()))
+    }
+}
+
+impl<F: Fs> Fs for Logging<F> {
+    fn meta(&self, path: &Path) -> io::Result<Option<Meta>> {
+        self.inner.meta(path)
+    }
+    fn create_dir_all(&self, path: &Path) -> io::Result<()> {
+        self.inner.create_dir_all(path)
+    }
+    fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
+        self.inner.rename(from, to)?;
+        self.note("rename", to);
+        Ok(())
+    }
+    fn copy_file(&self, from: &Path, to: &Path) -> io::Result<()> {
+        self.inner.copy_file(from, to)?;
+        self.note("copy", to);
+        Ok(())
+    }
+    fn same_content(&self, a: &Path, b: &Path) -> io::Result<bool> {
+        self.inner.same_content(a, b)
+    }
+    fn remove_file(&self, path: &Path) -> io::Result<()> {
+        self.note("remove", path);
+        self.inner.remove_file(path)
+    }
+    fn remove_dir(&self, path: &Path) -> io::Result<()> {
+        self.note("remove dir", path);
+        self.inner.remove_dir(path)
+    }
+    fn list_dir(&self, path: &Path) -> io::Result<Vec<String>> {
+        self.inner.list_dir(path)
+    }
+    fn sync_dir(&self, path: &Path) {
+        self.inner.sync_dir(path);
+        self.note("sync", path);
+    }
+}
 
 /// Runs the batch and returns the number of mutations it made.
 pub(super) fn count_mutations(
@@ -779,6 +853,9 @@ fn a_row_is_on_the_journal_before_the_disk_changes() {
         fn list_dir(&self, p: &Path) -> io::Result<Vec<String>> {
             self.inner.list_dir(p)
         }
+        fn sync_dir(&self, path: &Path) {
+            self.inner.sync_dir(path);
+        }
     }
 
     let (_tree, items) = shared_folder_scenario();
@@ -859,6 +936,31 @@ fn across_volumes_files_are_copied_verified_and_then_removed() {
     assert_eq!(tree.read("New/A (2000).en.srt"), "a subtitle");
     assert!(!tree.exists("Multi/a.srt"));
     assert!(tree.files().keys().all(|p| !p.ends_with(".cvpart")));
+}
+
+#[test]
+fn across_volumes_the_original_goes_only_after_its_copy_is_on_the_disk_under_its_new_name() {
+    let (tree, items) = shared_folder_scenario();
+    let fs = Logging::new(FaultFs::across_volumes());
+    let report = run_with(
+        &fs,
+        &mut MemoryJournal::new(),
+        ExecOptions::new("x"),
+        &items,
+    );
+    assert_eq!(report.done(), 1, "{report:?}");
+
+    let from = tree.root.join("Multi/a.srt");
+    let to = tree.root.join("New/A (2000).en.srt");
+    // `copy_file` flushes the copy itself; the folder is flushed after the copy is renamed.
+    let copied = fs.at("copy", &part_path(&to));
+    let named = fs.at("rename", &to);
+    let synced = fs.at("sync", &tree.root.join("New"));
+    let removed = fs.at("remove", &from);
+    assert!(
+        copied < named && named < synced && synced < removed,
+        "copy {copied}, rename {named}, sync {synced}, remove {removed}"
+    );
 }
 
 #[test]

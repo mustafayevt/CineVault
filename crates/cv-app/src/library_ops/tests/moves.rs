@@ -213,6 +213,9 @@ impl Fs for FaultFs {
     fn list_dir(&self, path: &Path) -> io::Result<Vec<String>> {
         self.shim.list_dir(path)
     }
+    fn sync_dir(&self, path: &Path) {
+        self.shim.sync_dir(path);
+    }
 }
 
 /// Gives the first byte of a file flipped.
@@ -298,6 +301,9 @@ impl Fs for SharedFaultFs {
     }
     fn list_dir(&self, path: &Path) -> io::Result<Vec<String>> {
         self.0.list_dir(path)
+    }
+    fn sync_dir(&self, path: &Path) {
+        self.0.sync_dir(path);
     }
 }
 
