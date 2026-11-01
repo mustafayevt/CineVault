@@ -16,22 +16,54 @@
 //! [`Password`] never shows in `Debug` or `Display`. Errors carry the kind of failure and the
 //! system's message (scrubbed of the password by the connector), never the password.
 //!
+//! # At start
+//!
+//! [`NetworkShareService::reconnect_at_start`] connects every share that is not connected yet,
+//! before the folder health check and the scan of its folders: the shares of one server one after
+//! the other, the servers in parallel, each server within [`RECONNECT_LIMIT`]. Folders on other
+//! drives do not wait. While a share is being connected its folders keep their state
+//! ([`ShareState::Connecting`]); when it is done, connected or not, the failure code is stored on
+//! its row and its folders are handed to the after-connect hook, which scans them. A share whose
+//! password is not remembered cannot connect by itself and records [`PASSWORD_NEEDED`].
+//!
 //! Connecting writes, moves and deletes nothing on the share. A share this service connected for
 //! a folder that could not be added is disconnected again.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 use cv_db::repo::network_shares::{self as rows, NetworkShare, NewNetworkShare};
 use cv_db::{Database, DbError};
 use cv_domain::{DataSource, SourceKind};
 use cv_fs::paths;
-use cv_shares::{Address, Cancel, Login, Password, ShareConnector, ShareError, folder_in_share};
+use cv_shares::{
+    Address, Cancel, Login, Password, ShareAddress, ShareConnector, ShareError, ShareErrorKind,
+    folder_in_share,
+};
 
 use crate::data_sources::{DataSourceError, DataSourceService};
 use crate::redact;
 use crate::secrets::{SecretError, SecretStore};
+
+/// How long the shares of one server may take to connect at start before they count as not
+/// reachable for that start.
+pub const RECONNECT_LIMIT: Duration = Duration::from_secs(15);
+
+/// The failure code of a share whose password is not remembered and that is not connected: it
+/// waits for "Connect…".
+pub const PASSWORD_NEEDED: &str = "password_needed";
+
+/// Called with the library folders (data source ids) of a share whose connect step ended.
+pub type AfterConnect = Arc<dyn Fn(Vec<i64>) + Send + Sync>;
+
+/// What the network shares say about a library folder, ahead of its own probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShareState {
+    /// Its share is being connected at start: the folder keeps its last known state until then.
+    Connecting,
+}
 
 /// The credential-store account of a share's remembered password.
 #[must_use]
@@ -71,6 +103,9 @@ pub enum ShareConnectError {
     /// The library database failed.
     #[error("The library database could not be updated: {0}")]
     Storage(#[from] DbError),
+    /// The share asked for is not known (any more).
+    #[error("This network share is no longer known.")]
+    UnknownShare,
 }
 
 impl ShareConnectError {
@@ -84,6 +119,7 @@ impl ShareConnectError {
             Self::Credential(SecretError::NoKeyring) => "no_keyring",
             Self::Credential(_) => "credential_store",
             Self::Storage(_) => "storage",
+            Self::UnknownShare => "unknown_share",
         }
     }
 }
@@ -96,6 +132,11 @@ pub struct NetworkShareService {
     secrets: Arc<SecretStore>,
     /// The passwords that are not remembered, by share id, for the life of the process.
     unsaved: Mutex<HashMap<i64, Password>>,
+    /// The shares being connected at start.
+    connecting: Mutex<HashSet<i64>>,
+    after_connect: Mutex<Option<AfterConnect>>,
+    /// The time the shares of one server have at start ([`RECONNECT_LIMIT`]).
+    reconnect_limit: Duration,
 }
 
 impl std::fmt::Debug for NetworkShareService {
@@ -130,7 +171,16 @@ impl NetworkShareService {
             connector,
             secrets,
             unsaved: Mutex::new(HashMap::new()),
+            connecting: Mutex::new(HashSet::new()),
+            after_connect: Mutex::new(None),
+            reconnect_limit: RECONNECT_LIMIT,
         }
+    }
+
+    /// Calls `hook` with the library folders of a share whose connect step at start ended, and of
+    /// a share connected again with [`Self::connect_again`], so they are scanned.
+    pub fn set_after_connect(&self, hook: AfterConnect) {
+        *locked(&self.after_connect) = Some(hook);
     }
 
     /// Every share CineVault connected, oldest first.
@@ -188,7 +238,13 @@ impl NetworkShareService {
             .sources
             .check_new(request.kind, &folder.to_string_lossy())?;
         let is_new = known.is_none();
-        let share = self.keep_login(known, root, request)?;
+        let share = self.keep_login(
+            known,
+            &request.address.share,
+            root,
+            &request.login,
+            request.remember,
+        )?;
         match self.sources.add(request.kind, &path) {
             Ok(source) => {
                 tracing::info!(share = %request.address.share, user = %share.user, "network share folder added");
@@ -208,23 +264,21 @@ impl NetworkShareService {
     fn keep_login(
         &self,
         known: Option<NetworkShare>,
+        address: &ShareAddress,
         root: &Path,
-        request: &ConnectRequest,
+        login: &Login,
+        remember: bool,
     ) -> Result<NetworkShare, ShareConnectError> {
-        let user = request.login.user();
+        let user = login.user();
         let share = match known {
             Some(share) => {
-                self.keep_password(share.id, request.remember, request.login.password())
+                self.keep_password(share.id, remember, login.password())
                     .map_err(ShareConnectError::Credential)?;
                 share
             }
             None => {
-                let (server, name) = (
-                    request.address.share.server().to_owned(),
-                    request.address.share.share().to_owned(),
-                );
+                let (server, name) = (address.server().to_owned(), address.share().to_owned());
                 let (user, local_root) = (user.to_owned(), root.to_string_lossy().into_owned());
-                let remember = request.remember;
                 let share = self.db.write(move |tx| {
                     rows::insert_share(
                         tx,
@@ -237,9 +291,7 @@ impl NetworkShareService {
                         },
                     )
                 })?;
-                if let Err(error) =
-                    self.keep_password(share.id, request.remember, request.login.password())
-                {
+                if let Err(error) = self.keep_password(share.id, remember, login.password()) {
                     let id = share.id;
                     self.db.write(move |tx| rows::delete_share(tx, id))?;
                     return Err(ShareConnectError::Credential(error));
@@ -249,7 +301,7 @@ impl NetworkShareService {
         };
         let share = NetworkShare {
             user: user.to_owned(),
-            remember: request.remember,
+            remember,
             last_connected_ms: Some(now_ms()),
             last_error: None,
             ..share
@@ -257,6 +309,196 @@ impl NetworkShareService {
         let row = share.clone();
         self.db.write(move |tx| rows::update_share(tx, &row))?;
         Ok(share)
+    }
+
+    /// Connects a known share again with a new login ("Connect…" on an offline folder), keeps the
+    /// password as asked and hands its folders to the after-connect hook, so they come online and
+    /// are scanned. A failed attempt stores its code on the row.
+    ///
+    /// # Errors
+    /// [`ShareConnectError::UnknownShare`], [`ShareConnectError::Share`] with the reason, or
+    /// [`ShareConnectError::Credential`] when the password cannot be remembered (the share is
+    /// connected then; the page offers to go on without remembering it).
+    pub fn connect_again(
+        &self,
+        id: i64,
+        login: &Login,
+        remember: bool,
+        cancel: &Cancel,
+    ) -> Result<NetworkShare, ShareConnectError> {
+        redact::register_secret(login.password().expose());
+        let share = self
+            .db
+            .read(move |c| rows::get_share(c, id))?
+            .ok_or(ShareConnectError::UnknownShare)?;
+        let address = address_of(&share)?;
+        let root = match self.connector.connect(&address, login, cancel) {
+            Ok(root) => root,
+            Err(error) => {
+                if error.kind() != ShareErrorKind::Cancelled {
+                    self.record_failure(&share, error.kind().code());
+                }
+                return Err(error.into());
+            }
+        };
+        let share = self.keep_login(Some(share), &address, &root, login, remember)?;
+        tracing::info!(share = %address, user = %share.user, "network share connected again");
+        self.hand_over(&share);
+        Ok(share)
+    }
+
+    /// Starts connecting every known share that is not connected yet, in the background (see the
+    /// module notes), and returns the folders the shares appear in: library folders below them
+    /// wait for their share, the others need not.
+    pub fn reconnect_at_start(self: &Arc<Self>) -> Vec<String> {
+        let shares = match self.list() {
+            Ok(shares) => shares,
+            Err(error) => {
+                tracing::warn!(%error, "the network shares could not be read");
+                return Vec::new();
+            }
+        };
+        locked(&self.connecting).extend(shares.iter().map(|share| share.id));
+        let roots = shares.iter().map(|s| s.local_root.clone()).collect();
+        let mut servers: BTreeMap<String, Vec<NetworkShare>> = BTreeMap::new();
+        for share in shares {
+            servers
+                .entry(share.server.to_lowercase())
+                .or_default()
+                .push(share);
+        }
+        for (server, shares) in servers {
+            let me = Arc::clone(self);
+            let spawned = std::thread::Builder::new()
+                .name("cv-share-reconnect".to_owned())
+                .spawn(move || {
+                    let cancel = Cancel::with_limit(me.reconnect_limit);
+                    for share in &shares {
+                        me.reconnect(share, &cancel);
+                    }
+                });
+            if let Err(error) = spawned {
+                tracing::warn!(%error, server, "the shares of a server could not be connected");
+            }
+        }
+        roots
+    }
+
+    /// One share's connect step at start: connected unless it already was, the result stored on
+    /// its row, then its folders handed over.
+    fn reconnect(&self, share: &NetworkShare, cancel: &Cancel) {
+        let outcome = address_of(share)
+            .map_err(|error| error.kind().code())
+            .and_then(|address| self.connect_known(share, &address, cancel));
+        match outcome {
+            Ok(()) => {
+                let row = NetworkShare {
+                    last_connected_ms: Some(now_ms()),
+                    last_error: None,
+                    ..share.clone()
+                };
+                if let Err(error) = self.db.write(move |tx| rows::update_share(tx, &row)) {
+                    tracing::warn!(%error, "a network share row could not be updated");
+                }
+            }
+            Err(code) => {
+                tracing::info!(
+                    server = %share.server,
+                    share = %share.share,
+                    code,
+                    "a network share did not connect at start"
+                );
+                self.record_failure(share, code);
+            }
+        }
+        locked(&self.connecting).remove(&share.id);
+        self.hand_over(share);
+    }
+
+    fn connect_known(
+        &self,
+        share: &NetworkShare,
+        address: &ShareAddress,
+        cancel: &Cancel,
+    ) -> Result<(), &'static str> {
+        if self
+            .connector
+            .is_connected(address, cancel)
+            .unwrap_or(false)
+        {
+            return Ok(());
+        }
+        let password = self.password_of(share).ok_or(PASSWORD_NEEDED)?;
+        let login = Login::new(&share.user, password).map_err(|_| ShareErrorKind::Other.code())?;
+        self.connector
+            .connect(address, &login, cancel)
+            .map(drop)
+            .map_err(|error| error.kind().code())
+    }
+
+    /// The password a known share connects with: the remembered one (none stored means an empty
+    /// one), or the one kept in memory. `None` when there is none to use.
+    fn password_of(&self, share: &NetworkShare) -> Option<Password> {
+        if !share.remember {
+            return locked(&self.unsaved).get(&share.id).cloned();
+        }
+        match self.secrets.get(&secret_account(share.id)) {
+            Ok(stored) => Password::new(stored.as_ref().map_or("", |secret| secret.expose())).ok(),
+            Err(error) => {
+                tracing::warn!(%error, "a remembered share password could not be read");
+                None
+            }
+        }
+    }
+
+    fn record_failure(&self, share: &NetworkShare, code: &str) {
+        let row = NetworkShare {
+            last_error: Some(code.to_owned()),
+            ..share.clone()
+        };
+        if let Err(error) = self.db.write(move |tx| rows::update_share(tx, &row)) {
+            tracing::warn!(%error, "a network share row could not be updated");
+        }
+    }
+
+    /// Gives the library folders below `share` to the after-connect hook.
+    fn hand_over(&self, share: &NetworkShare) {
+        let Some(hook) = locked(&self.after_connect).clone() else {
+            return;
+        };
+        match self.folders_of(share) {
+            Ok(folders) => hook(folders),
+            Err(error) => {
+                tracing::warn!(%error, "the library folders of a share could not be read")
+            }
+        }
+    }
+
+    /// The library folders (data source ids) below `share`.
+    fn folders_of(&self, share: &NetworkShare) -> Result<Vec<i64>, DbError> {
+        let sources = self
+            .db
+            .read(|c| cv_db::repo::data_sources::list_sources(c, None))?;
+        Ok(sources
+            .into_iter()
+            .filter(|s| paths::is_within_with(&s.path, &share.local_root, paths::CASE_SENSITIVE))
+            .map(|s| s.id)
+            .collect())
+    }
+
+    /// What the shares say about the library folder at `path`: [`ShareState::Connecting`] while
+    /// its share is being connected at start, else nothing.
+    #[must_use]
+    pub fn folder_state(&self, path: &str) -> Option<ShareState> {
+        let connecting = locked(&self.connecting).clone();
+        if connecting.is_empty() {
+            return None;
+        }
+        let shares = self.list().ok()?;
+        let share = rows::share_holding(&shares, path, paths::CASE_SENSITIVE)?;
+        connecting
+            .contains(&share.id)
+            .then_some(ShareState::Connecting)
     }
 
     /// Keeps a share's password: in the credential store when `remember`, else in this process.
@@ -320,6 +562,12 @@ impl NetworkShareService {
     fn unsaved_password(&self, id: i64) -> Option<Password> {
         locked(&self.unsaved).get(&id).cloned()
     }
+}
+
+/// The address of a known share.
+fn address_of(share: &NetworkShare) -> Result<ShareAddress, ShareError> {
+    ShareAddress::new(&share.server, &share.share)
+        .map_err(|error| ShareError::new(ShareErrorKind::Other, error.to_string()))
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use cv_scan::sources::{PathStyle, SourceGuard, SystemFolders};
 use cv_shares::ShareErrorKind;
@@ -281,19 +282,20 @@ fn without_a_keyring_nothing_is_kept_until_the_user_connects_without_remembering
 
 #[test]
 fn no_file_holds_the_password_whether_remembered_or_not() {
+    // Passwords of this test only: the log redaction is shared by every test in the process.
+    let (kept, unsaved) = ("Remembered-Pass-31", "Unsaved-Pass-77");
     let rig = rig();
-    rig.share_with(&["Films", "Series"]);
+    rig.share_with(&["Films"]);
+    let series = cv_shares::ShareAddress::new("nas", "series").unwrap();
+    std::fs::create_dir_all(rig.fake.root_of(&series)).unwrap();
     rig.service
-        .connect_and_add(
-            &request(r"\\nas\movies\Films", PASSWORD, true),
-            &Cancel::new(),
-        )
+        .connect_and_add(&request(r"\\nas\movies\Films", kept, true), &Cancel::new())
         .unwrap();
-    let mut tv = request(r"\\nas\movies\Series", "Other-Pass-77", false);
+    let mut tv = request(r"\\nas\series", unsaved, false);
     tv.kind = SourceKind::Tv;
     rig.service.connect_and_add(&tv, &Cancel::new()).unwrap();
 
-    for secret in [PASSWORD, "Other-Pass-77"] {
+    for secret in [kept, unsaved] {
         assert_eq!(files_holding(rig.dir.path(), secret), Vec::<PathBuf>::new());
         assert_eq!(
             redact::redact(&format!("log {secret} line")),
@@ -336,4 +338,198 @@ fn a_short_password_never_shows_in_a_formatted_error() {
     assert_eq!(errors[1].code(), "wrong_login");
     assert!(rig.service.list().unwrap().is_empty());
     assert!(rig.sources().is_empty());
+}
+
+// ---- at start ------------------------------------------------------------------------------
+
+/// The same library after a restart of the computer: a new service, and a fake on which no share
+/// is connected.
+fn restarted(rig: &Rig) -> (Arc<NetworkShareService>, Arc<FakeConnector>) {
+    let guard = SourceGuard::new(
+        PathStyle::current(),
+        SystemFolders::new(PathStyle::current()),
+    );
+    let fake = Arc::new(FakeConnector::new(rig.dir.path().join("shares")));
+    let service = NetworkShareService::new(
+        DataSourceService::new(Arc::clone(&rig.db), guard),
+        Arc::clone(&fake) as Arc<dyn ShareConnector>,
+        Arc::clone(&rig.secrets),
+    );
+    (Arc::new(service), fake)
+}
+
+/// Connects `\server\share` and adds its folder `Films`.
+fn add(rig: &Rig, server: &str, share: &str, remember: bool) -> ShareAdded {
+    let address = cv_shares::ShareAddress::new(server, share).unwrap();
+    std::fs::create_dir_all(rig.fake.root_of(&address).join("Films")).unwrap();
+    rig.service
+        .connect_and_add(
+            &request(&format!(r"\\{server}\{share}\Films"), PASSWORD, remember),
+            &Cancel::new(),
+        )
+        .unwrap()
+}
+
+type Events = Arc<Mutex<Vec<Vec<i64>>>>;
+
+fn record_hand_overs(service: &NetworkShareService) -> Events {
+    let events: Events = Arc::default();
+    let sink = Arc::clone(&events);
+    service.set_after_connect(Arc::new(move |folders| sink.lock().unwrap().push(folders)));
+    events
+}
+
+fn wait_for(events: &Events, count: usize) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    while events.lock().unwrap().len() < count {
+        assert!(std::time::Instant::now() < deadline, "timed out");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+fn row(service: &NetworkShareService, id: i64) -> NetworkShare {
+    service
+        .list()
+        .unwrap()
+        .into_iter()
+        .find(|s| s.id == id)
+        .unwrap()
+}
+
+#[test]
+fn remembered_shares_reconnect_per_server_and_record_why_one_did_not() {
+    let rig = rig();
+    let movies = add(&rig, "nas", "movies", true);
+    let tv = add(&rig, "nas", "tv", true);
+    let private = add(&rig, "nas", "private", false);
+    let films = add(&rig, "box", "films", true);
+
+    let (service, fake) = restarted(&rig);
+    fake.set_delay(Duration::from_millis(150));
+    let tv_address = cv_shares::ShareAddress::new("nas", "tv").unwrap();
+    fake.fail_connect(
+        &tv_address,
+        Some(ShareError::new(ShareErrorKind::WrongLogin, "logon failure")),
+    );
+    let box_address = cv_shares::ShareAddress::new("box", "films").unwrap();
+    fake.mark_connected(&box_address);
+    let events = record_hand_overs(&service);
+
+    let waiting = service.reconnect_at_start();
+    assert_eq!(waiting.len(), 4);
+    assert_eq!(
+        service.folder_state(&movies.source.path),
+        Some(ShareState::Connecting)
+    );
+    assert_eq!(service.folder_state(&text(rig.dir.path())), None);
+    wait_for(&events, 4);
+
+    // The share already connected on the other server is handed over first, without waiting
+    // for the slow server.
+    let events = events.lock().unwrap().clone();
+    assert_eq!(events[0], vec![films.source.id]);
+    assert!(events.contains(&vec![movies.source.id]));
+    assert!(events.contains(&vec![tv.source.id]));
+    assert!(events.contains(&vec![private.source.id]));
+
+    assert_eq!(row(&service, movies.share.id).last_error, None);
+    assert!(row(&service, movies.share.id).last_connected_ms >= movies.share.last_connected_ms);
+    assert_eq!(
+        row(&service, tv.share.id).last_error.as_deref(),
+        Some("wrong_login")
+    );
+    assert_eq!(
+        row(&service, private.share.id).last_error.as_deref(),
+        Some(PASSWORD_NEEDED)
+    );
+    assert_eq!(row(&service, films.share.id).last_error, None);
+    assert_eq!(service.folder_state(&movies.source.path), None);
+
+    let connects: Vec<(String, String)> = fake
+        .calls()
+        .into_iter()
+        .filter_map(|call| match call {
+            FakeCall::Connect {
+                share, password, ..
+            } => Some((share.share().to_owned(), password.expose().to_owned())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(connects.len(), 2, "{connects:?}");
+    assert!(connects.contains(&("movies".to_owned(), PASSWORD.to_owned())));
+    assert!(connects.contains(&("tv".to_owned(), PASSWORD.to_owned())));
+}
+
+#[test]
+fn a_share_that_does_not_answer_in_time_is_unreachable_for_this_start() {
+    let rig = rig();
+    let movies = add(&rig, "nas", "movies", true);
+    let (service, fake) = restarted(&rig);
+    let mut service = Arc::into_inner(service).unwrap();
+    service.reconnect_limit = Duration::from_millis(50);
+    let service = Arc::new(service);
+    fake.set_delay(Duration::from_secs(30));
+    let events = record_hand_overs(&service);
+
+    let started = std::time::Instant::now();
+    service.reconnect_at_start();
+    wait_for(&events, 1);
+
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert_eq!(
+        row(&service, movies.share.id).last_error.as_deref(),
+        Some("unreachable")
+    );
+}
+
+#[test]
+fn connecting_again_brings_the_folders_back_and_a_wrong_password_is_recorded() {
+    let rig = rig();
+    let private = add(&rig, "nas", "private", false);
+    let (service, fake) = restarted(&rig);
+    let events = record_hand_overs(&service);
+    service.reconnect_at_start();
+    wait_for(&events, 1);
+    events.lock().unwrap().clear();
+
+    let address = cv_shares::ShareAddress::new("nas", "private").unwrap();
+    fake.fail_connect(
+        &address,
+        Some(ShareError::new(ShareErrorKind::WrongLogin, "logon failure")),
+    );
+    let login = Login::new("alex", Password::new("Old-Pass-1").unwrap()).unwrap();
+    let error = service
+        .connect_again(private.share.id, &login, true, &Cancel::new())
+        .unwrap_err();
+    assert_eq!(error.code(), "wrong_login");
+    assert_eq!(
+        row(&service, private.share.id).last_error.as_deref(),
+        Some("wrong_login")
+    );
+    assert!(events.lock().unwrap().is_empty());
+
+    fake.fail_connect(&address, None);
+    let login = Login::new(r"HOME\alex", Password::new("New-Pass-2").unwrap()).unwrap();
+    let share = service
+        .connect_again(private.share.id, &login, true, &Cancel::new())
+        .unwrap();
+    assert_eq!(share.last_error, None);
+    assert!(share.remember);
+    assert_eq!(share.user, r"HOME\alex");
+    assert_eq!(
+        rig.secrets
+            .get(&secret_account(share.id))
+            .unwrap()
+            .map(|s| s.expose().to_owned()),
+        Some("New-Pass-2".to_owned())
+    );
+    assert_eq!(*events.lock().unwrap(), vec![vec![private.source.id]]);
+
+    assert_eq!(
+        service
+            .connect_again(9_999, &login, true, &Cancel::new())
+            .unwrap_err()
+            .code(),
+        "unknown_share"
+    );
 }

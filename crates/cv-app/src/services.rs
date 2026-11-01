@@ -27,11 +27,13 @@ use crate::artwork::ArtworkService;
 use crate::caches::CacheService;
 use crate::changes::{ChangeHub, ChangePart};
 use crate::data_location::DataLocation;
+use crate::data_sources::DataSourceService;
 use crate::lifecycle::{LifecycleService, Working};
 use crate::local_library::submit_local_import;
 use crate::match_service::MatchService;
 use crate::matching::ScrapedHook;
 use crate::matching::batch::MatchContext;
+use crate::network_shares::NetworkShareService;
 use crate::nfo::NfoService;
 use crate::notices::{AppNotice, NoticeHub, NoticeLevel};
 use crate::organize::OrganizeStateService;
@@ -84,6 +86,8 @@ pub struct BootOptions {
     /// the write after media info is read). On unless a test needs the files to stay as it left
     /// them.
     pub background_nfo: bool,
+    /// Connects network shares; the system's own tools unless a test gives a fake.
+    pub share_connector: Arc<dyn cv_shares::ShareConnector>,
 }
 
 impl BootOptions {
@@ -96,7 +100,15 @@ impl BootOptions {
             change_window: crate::changes::DEFAULT_WINDOW,
             fresh_start: true,
             background_nfo: true,
+            share_connector: cv_shares::system_connector(),
         }
+    }
+
+    /// Connects network shares with `connector` instead of the system's tools.
+    #[must_use]
+    pub fn with_share_connector(mut self, connector: Arc<dyn cv_shares::ShareConnector>) -> Self {
+        self.share_connector = connector;
+        self
     }
 
     /// Never makes the fresh start: a data folder whose library or settings come from an earlier
@@ -168,6 +180,7 @@ pub struct AppServices {
     providers: Arc<ProviderCredentialsService>,
     tools: Arc<ToolsService>,
     scan: Arc<ScanService>,
+    shares: Arc<NetworkShareService>,
     matching: Arc<MatchService>,
     artwork: Arc<ArtworkService>,
     actions: Arc<ActionsService>,
@@ -196,6 +209,7 @@ impl AppServices {
             change_window,
             fresh_start,
             background_nfo,
+            share_connector,
         } = options;
         // What changed for which titles: services announce it, the shell relays it to open pages.
         let changes = ChangeHub::new(change_window);
@@ -288,6 +302,17 @@ impl AppServices {
             Arc::clone(&notices),
             tools.manager(),
         );
+        // Library folders on network shares follow the same folder rules as "Add folder…".
+        let guard = cv_scan::sources::SourceGuard::for_current_os(&[location
+            .root()
+            .to_string_lossy()
+            .into_owned()]);
+        let shares = Arc::new(NetworkShareService::new(
+            DataSourceService::new(Arc::clone(&db), guard),
+            share_connector,
+            Arc::clone(&secrets),
+        ));
+        scan.set_shares(Arc::clone(&shares));
         let matching = MatchService::new(
             Arc::clone(&db),
             jobs.clone(),
@@ -550,6 +575,7 @@ impl AppServices {
             providers,
             tools,
             scan,
+            shares,
             matching,
             artwork,
             actions,
@@ -609,6 +635,11 @@ impl AppServices {
     /// The scan pipeline: Rescan, the watcher, Find missing, media info and source health.
     pub fn scan(&self) -> &Arc<ScanService> {
         &self.scan
+    }
+
+    /// Network shares: connecting them, their folders and their passwords.
+    pub fn shares(&self) -> &Arc<NetworkShareService> {
+        &self.shares
     }
 
     /// Matching: batches, the Needs review inbox and the search-and-scrape panel.
@@ -690,9 +721,20 @@ impl AppServices {
         // Titles with no name check for the active profile (a new install, an update, a profile
         // changed while the app was closed) get one.
         self.organize_state.refresh_missing();
+        // Remembered network shares connect before the health check and the scan of their
+        // folders; folders on other drives do not wait for them.
+        let runtime = tokio::runtime::Handle::current();
+        let scan = Arc::downgrade(&self.scan);
+        self.shares.set_after_connect(Arc::new(move |folders| {
+            if let Some(scan) = scan.upgrade() {
+                let _inside = runtime.enter();
+                scan.folders_connected(&folders);
+            }
+        }));
+        let waiting = self.shares.reconnect_at_start();
         // The scan on startup, the watcher and the pending media info come after the resume, so
         // a scan the last session left unfinished is not started a second time.
-        self.scan.startup(report.rescans);
+        self.scan.startup(report.rescans, &waiting);
         report
     }
 
