@@ -123,7 +123,12 @@ pub fn remove_partials(dir: &Path) {
 /// the earlier backups are unchanged.
 pub fn write(db: &Database, dir: &Path, date: NaiveDate) -> DbResult<PathBuf> {
     let version = db.schema_version()?;
-    write_checked(db, dir, date, |copy| verify(copy, version))
+    write_checked(db, dir, date, |copy| {
+        verify(copy, version).inspect_err(|_| {
+            // A copy is only as sound as what it was copied from.
+            tracing::warn!(db = %db.path().display(), "the backup failed its check; the library itself may need checking");
+        })
+    })
 }
 
 /// [`write`] with the check of the copy given, so a test can make it fail.

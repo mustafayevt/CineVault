@@ -1,10 +1,12 @@
-//! The backup checks with a clock the tests move: due, not due, failing and stopped.
+//! The backup checks with a clock the tests move: due, not due, failing, reported and stopped.
 
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use cv_db::Database;
+
+use crate::notices::{AppNotice, NoticeHub};
 use tempfile::TempDir;
 
 use super::*;
@@ -16,6 +18,7 @@ struct Fixture {
     _dir: TempDir,
     backups: Arc<LibraryBackups>,
     ahead: Arc<Mutex<Duration>>,
+    notices: Arc<Mutex<Vec<AppNotice>>>,
 }
 
 impl Fixture {
@@ -27,16 +30,37 @@ impl Fixture {
             let ahead = Arc::clone(&ahead);
             Arc::new(move || SystemTime::now() + *ahead.lock().unwrap())
         };
-        let backups = Arc::new(LibraryBackups::new(db).with_clock(clock));
+        let hub = Arc::new(NoticeHub::new());
+        let notices = Arc::new(Mutex::new(Vec::new()));
+        {
+            let notices = Arc::clone(&notices);
+            hub.subscribe(move |notice| {
+                notices.lock().unwrap().push(notice.clone());
+                true
+            });
+        }
+        let backups = Arc::new(LibraryBackups::new(db, hub).with_clock(clock));
         Self {
             _dir: dir,
             backups,
             ahead,
+            notices,
         }
     }
 
     fn later(&self, by: Duration) {
         *self.ahead.lock().unwrap() += by;
+    }
+
+    /// Makes the backup of the clock's day fail: a folder stands where its partial copy goes.
+    fn block(&self) {
+        let ahead = *self.ahead.lock().unwrap();
+        let name = format!("{}.partial", today_after(ahead));
+        std::fs::create_dir_all(self.backups.dir().join(name)).unwrap();
+    }
+
+    fn notices(&self) -> Vec<AppNotice> {
+        self.notices.lock().unwrap().clone()
     }
 
     fn files(&self) -> Vec<String> {
@@ -134,4 +158,57 @@ async fn the_schedule_checks_after_its_delay_and_stops_when_aborted() {
     f.later(25 * HOUR);
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(written(&f), 1);
+}
+
+#[test]
+fn backups_failing_for_three_days_are_reported_once_and_cleared_by_a_success() {
+    let f = Fixture::new();
+    assert!(matches!(f.backups.check(), BackupCheck::Written(_)));
+    let good_day = DateTime::<Local>::from(SystemTime::now())
+        .format("%-d %B %Y")
+        .to_string();
+
+    // Due a day later; failing for two days says nothing.
+    for _ in 0..3 {
+        f.later(25 * HOUR);
+        f.block();
+        assert!(matches!(f.backups.check(), BackupCheck::Failed(_)));
+    }
+    assert!(f.notices().is_empty());
+
+    // The third day of failures is reported, once.
+    f.later(24 * HOUR);
+    f.block();
+    assert!(matches!(f.backups.check(), BackupCheck::Failed(_)));
+    f.later(HOUR);
+    f.block();
+    assert!(matches!(f.backups.check(), BackupCheck::Failed(_)));
+    let notices = f.notices();
+    assert_eq!(notices.len(), 1, "{notices:?}");
+    let notice = &notices[0];
+    assert_eq!(
+        notice.title,
+        format!("The library has not been backed up since {good_day}.")
+    );
+    assert!(notice.detail.as_deref().is_some_and(|d| !d.is_empty()));
+    assert_eq!(notice.topic.as_deref(), Some(NOTICE_TOPIC));
+    assert!(!notice.resolves);
+
+    // The next good backup takes it away.
+    f.later(24 * HOUR);
+    assert!(matches!(f.backups.check(), BackupCheck::Written(_)));
+    let notices = f.notices();
+    assert_eq!(notices.len(), 2);
+    assert!(notices[1].resolves);
+    assert_eq!(notices[1].topic.as_deref(), Some(NOTICE_TOPIC));
+}
+
+#[test]
+fn a_success_without_a_report_publishes_nothing() {
+    let f = Fixture::new();
+    f.block();
+    assert!(matches!(f.backups.check(), BackupCheck::Failed(_)));
+    f.later(25 * HOUR);
+    assert!(matches!(f.backups.check(), BackupCheck::Written(_)));
+    assert!(f.notices().is_empty());
 }

@@ -554,7 +554,7 @@ impl AppServices {
             }));
         }
 
-        let library_backups = Arc::new(LibraryBackups::new(Arc::clone(&db)));
+        let library_backups = Arc::new(LibraryBackups::new(Arc::clone(&db), Arc::clone(&notices)));
 
         Ok(Arc::new(Self {
             location,

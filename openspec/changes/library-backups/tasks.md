@@ -8,7 +8,7 @@
 ## 2. Scheduling in both owners
 
 - [x] 2.1 Add the backup task to `AppServices::start` (60-second delay, hourly check, due after 24 hours, one at a time, `spawn_blocking`, failure logged) and stop it in `shutdown`. Verified by `cv-app` tests with a short injected delay and clock: a library with no backup gets one; a 5-hour-old backup is left alone; a 25-hour-old one is replaced by today's; a failure (read-only `backups` folder) is logged, does not panic and is retried at the next check; `shutdown` stops the task.
-- [ ] 2.2 Report backups that keep failing: after three days without a successful backup while one was due, one notification-centre message with the date of the last good backup and the reason, cleared by the next success; in the server, the same text in its notifications. Verified by `cv-app` tests with an injected clock (no message after two days of failures, one message after three, none after a success).
+- [x] 2.2 Report backups that keep failing: after three days without a successful backup while one was due, one notification-centre message with the date of the last good backup and the reason, cleared by the next success; in the server, the same text in its notifications. Verified by `cv-app` tests with an injected clock (no message after two days of failures, one message after three, none after a success).
 - [ ] 2.3 Make the three comments true and precise: `src-tauri/src/main.rs:237`, `crates/cv-app/tests/app_services.rs:2` (with a test in that file that a booted temporary data folder gets a daily backup), and `crates/cv-db/src/migrate.rs:27`. Verified by `cargo test -p cv-app --test app_services` and by reading the diff.
 
 ## 3. Documentation
