@@ -250,3 +250,27 @@ describe("the Rename page", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("copies in the Rename page", () => {
+  it("shows the copy label of each copy apart from the rename, with the hint and its place", async () => {
+    renderRename("/rename?ids=12,13,14");
+    const first = await rowOf("Example Movie", 0);
+    const second = await rowOf("Example Movie", 1);
+    const alone = await rowOf("Another Film");
+
+    // The label is its own highlighted part of both the folder and the file name.
+    const marks = within(first).getAllByTestId("copy-label");
+    expect(marks).toHaveLength(2);
+    expect(marks[0]?.textContent).toBe(" - 2160p DV");
+    expect(marks[1]?.textContent).toBe(" - 2160p DV");
+    expect(within(second).getAllByTestId("copy-label")[0]?.textContent).toBe(" - 2160p HDR10");
+    expect(within(first).getByText("Added so your two copies keep different names")).toBeVisible();
+    expect(within(first).getByText("Copy 1 of 2")).toBeVisible();
+    expect(within(second).getByText("Copy 2 of 2")).toBeVisible();
+    // A movie with no copy keeps its normal name and shows no hint.
+    expect(within(alone).queryByTestId("copy-label")).toBeNull();
+    expect(within(alone).queryByTestId("copy-hint")).toBeNull();
+    // Separated by their labels, neither copy is in conflict.
+    expect(screen.queryByText(/would also become/)).toBeNull();
+  });
+});

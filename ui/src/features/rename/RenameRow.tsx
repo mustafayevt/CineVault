@@ -1,4 +1,4 @@
-import { ArrowRight, File, Folder, TriangleAlert } from "lucide-react";
+import { ArrowRight, Copy, File, Folder, Info, TriangleAlert } from "lucide-react";
 import type { Ref } from "react";
 
 import type { ChoiceDto, ConflictDto, PreviewRowDto } from "../../bindings";
@@ -18,12 +18,15 @@ function Pair({
   before,
   after,
   mark,
+  label,
 }: {
   icon: typeof Folder;
   before: string;
   after: string;
   /** The warning glyph replaces the arrow on a blocked name. */
   mark?: "warn";
+  /** The copy label (" - 2160p DV") inside `after`, shown apart from the rename. */
+  label?: string | undefined;
 }) {
   return (
     <div className="grid grid-cols-[18px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 leading-[22px]">
@@ -39,6 +42,7 @@ function Pair({
         after={after}
         side="after"
         className={mark === "warn" ? "text-warn" : undefined}
+        mark={label}
       />
     </div>
   );
@@ -139,6 +143,8 @@ export function RenameRow({
       : t("renamePage.row.metaNoYear", { folder: rootText(row.root) });
   // The first free numbered name the backend found for this title ("Crash (2004) (2)").
   const suggestion = conflict?.suggestions[conflict.items.indexOf(row.id)] ?? "";
+  // The copy label the planner added so this copy keeps its own name: " - 2160p DV".
+  const copyLabel = row.copy !== null && row.copy.label !== "" ? ` - ${row.copy.label}` : undefined;
   return (
     // The row is a list item; its controls (checkbox, buttons, links) are real elements.
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
@@ -173,6 +179,12 @@ export function RenameRow({
         <div title={meta} className="cv-selectable truncate text-(length:--fs-12) text-text-muted">
           {meta}
         </div>
+        {row.copy !== null && (
+          <div className="flex items-center gap-1 text-(length:--fs-12) text-text-muted">
+            <Icon icon={Copy} size={12} />
+            {t("copies.rename.nth", { n: row.copy.nth, count: row.copy.of })}
+          </div>
+        )}
       </div>
       <div className="min-w-0 font-mono text-(length:--fs-12)">
         {held ? (
@@ -191,6 +203,7 @@ export function RenameRow({
               icon={Folder}
               before={beforeFolder}
               after={blocked ? afterFolder : folderChanges ? afterFolder : beforeFolder}
+              label={copyLabel}
               {...(blocked ? { mark: "warn" as const } : {})}
             />
             {row.after_file === "" && !fileChanges ? null : (
@@ -198,7 +211,19 @@ export function RenameRow({
                 icon={File}
                 before={row.before_file}
                 after={fileChanges ? row.after_file : row.before_file}
+                label={copyLabel}
               />
+            )}
+            {copyLabel !== undefined && row.copy !== null && (
+              <div
+                data-testid="copy-hint"
+                className="mt-0.5 ml-6 flex items-center gap-1.5 font-sans text-(length:--fs-12) text-text-muted"
+              >
+                <Icon icon={Info} size={12} className="text-gold" />
+                {row.copy.of === 2
+                  ? t("copies.rename.hint.two")
+                  : t("copies.rename.hint.many", { count: row.copy.of })}
+              </div>
             )}
           </>
         )}

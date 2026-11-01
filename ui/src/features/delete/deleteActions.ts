@@ -12,6 +12,7 @@ import { readSetting } from "../settings/settingsStore";
 import { binName } from "../shell/binName";
 import { detectPlatform } from "../shell/platform";
 import { showToast } from "../toasts/toastStore";
+import type { ToastInput } from "../toasts/toastStore";
 
 /** A title to delete: its id and the name the messages use. */
 export interface DeleteTarget {
@@ -24,6 +25,14 @@ export interface PermanentRequest {
   targets: readonly DeleteTarget[];
   /** Runs after the titles were deleted, for example to leave a title page. */
   onDone?: (() => void) | undefined;
+  /** A button after the message of the toast that reports the delete ("Rename to drop…"). */
+  toastAction?: ToastInput["action"] | undefined;
+}
+
+/** What a delete does besides deleting: after it went through, and on its toast. */
+export interface DeleteOptions {
+  onDone?: (() => void) | undefined;
+  toastAction?: ToastInput["action"] | undefined;
 }
 
 interface DeleteState {
@@ -70,10 +79,7 @@ export function deletedMode(): DeletedMode {
  * Settings › Deleted files › "Ask before deleting" (`delete.confirm`) is off, in which case the
  * titles go at once with an Undo toast.
  */
-export function requestDelete(
-  targets: readonly DeleteTarget[],
-  options: { onDone?: (() => void) | undefined } = {},
-): void {
+export function requestDelete(targets: readonly DeleteTarget[], options: DeleteOptions = {}): void {
   if (targets.length === 0) return;
   if (deletedMode() === "erase") {
     requestPermanentDelete(targets, options);
@@ -83,7 +89,9 @@ export function requestDelete(
     void deleteToBin(targets, options);
     return;
   }
-  useDeleteStore.getState().askConfirm({ targets, onDone: options.onDone });
+  useDeleteStore
+    .getState()
+    .askConfirm({ targets, onDone: options.onDone, toastAction: options.toastAction });
 }
 
 function messageOf(error: unknown): string {
@@ -135,7 +143,7 @@ function toastFor(result: DeleteResult): string {
  */
 export async function deleteToBin(
   targets: readonly DeleteTarget[],
-  options: { onDone?: (() => void) | undefined } = {},
+  options: DeleteOptions = {},
 ): Promise<boolean> {
   if (targets.length === 0) return false;
   const ids = targets.map((target) => target.id);
@@ -164,6 +172,7 @@ export async function deleteToBin(
     showToast({
       glyph: Trash2,
       message: toastFor(result),
+      ...(options.toastAction === undefined ? {} : { action: options.toastAction }),
       ...(entry === null
         ? {}
         : {
@@ -191,16 +200,22 @@ export async function deleteToBin(
 /** Opens the one confirmation dialog for a permanent delete (Delete under "Delete permanently"). */
 function requestPermanentDelete(
   targets: readonly DeleteTarget[],
-  options: { onDone?: (() => void) | undefined } = {},
+  options: DeleteOptions = {},
 ): void {
   if (targets.length === 0) return;
-  useDeleteStore.getState().ask({ targets, onDone: options.onDone });
+  useDeleteStore
+    .getState()
+    .ask({ targets, onDone: options.onDone, toastAction: options.toastAction });
 }
 
 /** Says what a permanent delete did: what went, what stopped at a file, what was refused. */
-function reportErased(result: EraseResult): void {
+function reportErased(result: EraseResult, options: DeleteOptions): void {
   if (result.erased.length > 0) {
-    showToast({ glyph: Trash2, message: t("delete.erased", { count: result.erased.length }) });
+    showToast({
+      glyph: Trash2,
+      message: t("delete.erased", { count: result.erased.length }),
+      ...(options.toastAction === undefined ? {} : { action: options.toastAction }),
+    });
   }
   for (const stopped of result.stopped) {
     notify({
@@ -225,7 +240,7 @@ function reportErased(result: EraseResult): void {
  */
 export async function erasePermanently(
   targets: readonly DeleteTarget[],
-  options: { onDone?: (() => void) | undefined; password?: string | undefined } = {},
+  options: DeleteOptions & { password?: string | undefined } = {},
 ): Promise<boolean> {
   if (targets.length === 0) return false;
   const ids = targets.map((target) => target.id);
@@ -236,7 +251,7 @@ export async function erasePermanently(
       options.password === undefined
         ? await backend.eraseTitles(ids)
         : await backend.eraseTitles(ids, options.password);
-    reportErased(result);
+    reportErased(result, options);
     store.hide(result.erased.map((entry) => entry.id));
     void queryClient.invalidateQueries({ queryKey: HISTORY_KEY });
     await refreshAll();

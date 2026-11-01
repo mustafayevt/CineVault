@@ -9,7 +9,7 @@ import { currentLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import type { RemovalPlan } from "../library-ops/libraryOpsBackend";
 import { EraseConfirmDialog } from "../trash/EraseConfirmDialog";
 import { erasePermanently, useDeleteStore } from "./deleteActions";
-import type { DeleteTarget } from "./deleteActions";
+import type { DeleteOptions, DeleteTarget } from "./deleteActions";
 
 /** "Heat (1995)", or the title alone without a year. */
 function nameOf(row: { title: string; year: number }): string {
@@ -32,6 +32,7 @@ export function PermanentDeleteDialog() {
       key={request.targets.map((target) => target.id).join(",")}
       targets={request.targets}
       onDone={request.onDone}
+      toastAction={request.toastAction}
       onClose={close}
     />
   );
@@ -40,10 +41,12 @@ export function PermanentDeleteDialog() {
 function Confirmation({
   targets,
   onDone,
+  toastAction,
   onClose,
 }: {
   targets: readonly DeleteTarget[];
   onDone: (() => void) | undefined;
+  toastAction: DeleteOptions["toastAction"];
   onClose: () => void;
 }) {
   const format = useFormat();
@@ -70,7 +73,11 @@ function Confirmation({
     setBusy(true);
     const listed = rows.map((row) => ({ id: row.id, title: nameOf(row) }));
     onClose();
-    await erasePermanently(listed, { onDone, password: browser ? password : undefined });
+    await erasePermanently(listed, {
+      onDone,
+      toastAction,
+      password: browser ? password : undefined,
+    });
   };
 
   return (

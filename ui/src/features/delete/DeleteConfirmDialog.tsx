@@ -16,7 +16,7 @@ import { useSetting, useSettingsStore } from "../settings/settingsStore";
 import { binName } from "../shell/binName";
 import { detectPlatform } from "../shell/platform";
 import { deleteToBin, useDeleteStore } from "./deleteActions";
-import type { DeleteTarget } from "./deleteActions";
+import type { DeleteOptions, DeleteTarget } from "./deleteActions";
 
 /** How many titles the list names; the rest are counted. */
 const LISTED = 5;
@@ -41,6 +41,7 @@ export function DeleteConfirmDialog() {
       key={request.targets.map((target) => target.id).join(",")}
       targets={request.targets}
       onDone={request.onDone}
+      toastAction={request.toastAction}
       onClose={close}
     />
   );
@@ -59,10 +60,12 @@ function bodyOf(mode: DeletedMode, count: number, folder: string): string {
 function Confirmation({
   targets,
   onDone,
+  toastAction,
   onClose,
 }: {
   targets: readonly DeleteTarget[];
   onDone: (() => void) | undefined;
+  toastAction: DeleteOptions["toastAction"];
   onClose: () => void;
 }) {
   const format = useFormat();
@@ -89,7 +92,7 @@ function Confirmation({
   const confirm = () => {
     if (dontAsk) useSettingsStore.getState().set("delete.confirm", false);
     onClose();
-    void deleteToBin(targets, { onDone });
+    void deleteToBin(targets, { onDone, toastAction });
   };
   // Enter on the "Don't ask again" box deletes too, as it does on the Delete button.
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
