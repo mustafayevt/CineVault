@@ -84,6 +84,17 @@ impl Password {
     pub fn expose(&self) -> &str {
         &self.0
     }
+
+    /// `text` with every occurrence of the password replaced by `[REDACTED]`. Passwords shorter
+    /// than four characters are not searched for, as they would mask ordinary words; tool output
+    /// never holds them anyway, since the tools do not echo what they read.
+    pub(crate) fn scrub(&self, text: &str) -> String {
+        if self.0.len() < 4 {
+            text.to_owned()
+        } else {
+            text.replace(&self.0, "[REDACTED]")
+        }
+    }
 }
 
 impl fmt::Debug for Password {
@@ -181,6 +192,10 @@ impl Cancel {
     pub fn timed_out(&self) -> bool {
         self.deadline.is_some_and(|at| Instant::now() >= at)
     }
+
+    pub(crate) fn deadline(&self) -> Option<Instant> {
+        self.deadline
+    }
 }
 
 #[cfg(test)]
@@ -208,6 +223,16 @@ mod tests {
         }
         assert!(Password::new("spaces and ünïcode ok").is_ok());
         assert!(Password::new("").is_ok());
+    }
+
+    #[test]
+    fn scrubbing_removes_the_password_from_tool_output() {
+        let password = Password::new("Example-Pass-42").unwrap();
+        assert_eq!(
+            password.scrub("bad Example-Pass-42 here"),
+            "bad [REDACTED] here"
+        );
+        assert_eq!(Password::new("ab").unwrap().scrub("about"), "about");
     }
 
     #[test]

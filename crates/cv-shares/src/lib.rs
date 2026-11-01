@@ -19,7 +19,64 @@ mod address;
 mod connector;
 mod error;
 pub mod fake;
+mod process;
+#[cfg(any(windows, test))]
+mod windows;
+
+use std::sync::Arc;
 
 pub use address::{Address, InputError, ShareAddress, check_user, folder_in_share};
 pub use connector::{Cancel, Login, Password, ShareConnector, Support};
 pub use error::{ShareError, ShareErrorKind};
+
+/// The connector of this operating system: `New-SmbMapping` on Windows.
+#[must_use]
+pub fn system_connector() -> Arc<dyn ShareConnector> {
+    #[cfg(windows)]
+    {
+        Arc::new(windows::WindowsConnector::new())
+    }
+    #[cfg(not(windows))]
+    {
+        Arc::new(Unsupported)
+    }
+}
+
+/// Any other system: shares are connected with the system's own tools, then added as folders.
+#[cfg(not(windows))]
+struct Unsupported;
+
+#[cfg(not(windows))]
+impl ShareConnector for Unsupported {
+    fn support(&self) -> Support {
+        Support::NoUserMounting
+    }
+
+    fn connect(
+        &self,
+        _share: &ShareAddress,
+        _login: &Login,
+        _cancel: &Cancel,
+    ) -> Result<std::path::PathBuf, ShareError> {
+        Err(ShareError::new(
+            ShareErrorKind::NoUserMounting,
+            "this system cannot connect network shares for apps",
+        ))
+    }
+
+    fn is_connected(&self, _share: &ShareAddress, _cancel: &Cancel) -> Result<bool, ShareError> {
+        Ok(false)
+    }
+
+    fn disconnect(&self, _share: &ShareAddress, _cancel: &Cancel) -> Result<(), ShareError> {
+        Ok(())
+    }
+
+    fn local_root(
+        &self,
+        _share: &ShareAddress,
+        _cancel: &Cancel,
+    ) -> Result<Option<std::path::PathBuf>, ShareError> {
+        Ok(None)
+    }
+}
