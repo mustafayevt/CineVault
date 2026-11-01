@@ -82,6 +82,15 @@ pub fn is_within(path: &Path, folder: &Path) -> bool {
     within_keys(&key(path), &key(folder))
 }
 
+/// [`is_within`] for path texts, where names are case-sensitive when `case_sensitive` is true.
+#[must_use]
+pub fn is_within_with(path: &str, folder: &str, case_sensitive: bool) -> bool {
+    within_keys(
+        &key_with(path, case_sensitive),
+        &key_with(folder, case_sensitive),
+    )
+}
+
 fn within_keys(path: &str, folder: &str) -> bool {
     if folder.is_empty() {
         return false;
@@ -298,6 +307,9 @@ mod tests {
             is_within(Path::new(r"D:\MOVIES\x"), Path::new(r"d:\movies")),
             !CASE_SENSITIVE
         );
+        assert!(is_within_with(r"\\NAS\Movies\x", r"\\nas\movies", false));
+        assert!(!is_within_with(r"\\NAS\Movies\x", r"\\nas\movies", true));
+        assert!(!is_within_with(r"\\nas\movies2", r"\\nas\movies", false));
     }
 
     #[test]

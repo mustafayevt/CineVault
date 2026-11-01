@@ -272,3 +272,45 @@ fn opening_reports_the_upgrade_and_a_restart_does_not_repeat_it() {
     assert_eq!(second.migration_report().from, SCHEMA_VERSION);
     assert!(second.migration_report().backup.is_none());
 }
+
+#[test]
+fn migration_104_adds_the_network_share_table_after_a_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("library.db");
+    let before_104: Vec<Migration> = MIGRATIONS
+        .iter()
+        .copied()
+        .filter(|m| m.version < 104)
+        .collect();
+    upgrade_file(&path, &before_104).unwrap();
+    Connection::open(&path)
+        .unwrap()
+        .execute(
+            "INSERT INTO item (kind, title) VALUES ('movie', 'Alien')",
+            [],
+        )
+        .unwrap();
+    assert!(!has_table(&path, "network_share"));
+
+    let report = upgrade_file(&path, MIGRATIONS).unwrap();
+
+    assert_eq!((report.from, report.to), (103, SCHEMA_VERSION));
+    let backup = report.backup.expect("a backup was taken");
+    assert_eq!(version_of(&backup), 103);
+    assert!(!has_table(&backup, "network_share"));
+    assert!(has_table(&path, "network_share"));
+    assert_eq!(titles(&path), ["Alien"]);
+    for column in [
+        "server",
+        "share",
+        "user",
+        "local_root",
+        "remember",
+        "created_ms",
+        "last_connected_ms",
+        "last_error",
+        "unused_since_ms",
+    ] {
+        assert!(has_column(&path, "network_share", column), "{column}");
+    }
+}

@@ -2,7 +2,7 @@
 
 ## 1. Storage
 
-- [ ] 1.1 Add the `network_share` table and its migration in `cv-db` (server, share, user, local root unique, remember, created, last connected, last error code, unused since), with a repository to insert, list, update and delete rows and to find the share that holds a path (case-insensitive on Windows). Verified by `cargo test -p cv-db`: migration from the previous schema with the backup taken, path lookup for a share root, a folder below it, a sibling with a common prefix (`\\nas\movies2`) and a Windows case difference.
+- [x] 1.1 Add the `network_share` table and its migration in `cv-db` (server, share, user, local root unique, remember, created, last connected, last error code, unused since), with a repository to insert, list, update and delete rows and to find the share that holds a path (case-insensitive on Windows). Verified by `cargo test -p cv-db`: migration from the previous schema with the backup taken, path lookup for a share root, a folder below it, a sibling with a common prefix (`\\nas\movies2`) and a Windows case difference.
 
 ## 2. Connectors
 
