@@ -74,6 +74,8 @@ pub struct ShareError {
     kind: ShareErrorKind,
     code: Option<i64>,
     message: String,
+    /// The tool was stopped before it ended: by the user, or because it ran out of time.
+    interrupted: bool,
 }
 
 impl ShareError {
@@ -82,6 +84,7 @@ impl ShareError {
             kind,
             code: None,
             message: message.into(),
+            interrupted: false,
         }
     }
 
@@ -109,8 +112,29 @@ impl ShareError {
         &self.message
     }
 
+    /// Whether the tool was stopped before it ended (cancelled, or out of time), so the system
+    /// may have connected the share after all.
+    #[must_use]
+    pub fn is_interrupted(&self) -> bool {
+        self.interrupted
+    }
+
     pub(crate) fn cancelled() -> Self {
-        Self::new(ShareErrorKind::Cancelled, "stopped")
+        Self {
+            interrupted: true,
+            ..Self::new(ShareErrorKind::Cancelled, "stopped")
+        }
+    }
+
+    /// A tool that did not end in time: the server counts as not reachable.
+    pub(crate) fn timed_out() -> Self {
+        Self {
+            interrupted: true,
+            ..Self::new(
+                ShareErrorKind::Unreachable,
+                "the server did not answer in time",
+            )
+        }
     }
 
     pub(crate) fn no_user_mounting() -> Self {

@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::address::{ShareAddress, percent_encode};
-use crate::connector::{Cancel, Connected, Login, ShareConnector, Support};
+use crate::connector::{Cancel, Connected, Login, ShareConnector, Support, undo_interrupted};
 use crate::error::{ShareError, ShareErrorKind};
 use crate::process::{self, Session, Spawner, ToolCommand};
 
@@ -172,7 +172,9 @@ impl ShareConnector for MacConnector {
                 made: false,
             });
         }
-        let root = self.mount(share, login, &folder, cancel)?;
+        let root = self
+            .mount(share, login, &folder, cancel)
+            .map_err(|error| undo_interrupted(self, share, error))?;
         Ok(Connected { root, made: true })
     }
 
@@ -494,6 +496,41 @@ mod tests {
         assert_eq!(command.args, [root.as_os_str().to_owned()]);
         assert!(!rig.mounted.load(Ordering::SeqCst));
         assert!(!root.exists(), "the empty mount folder is removed");
+    }
+
+    #[test]
+    fn a_stopped_mount_is_unmounted_again() {
+        let mounted = Arc::new(AtomicBool::new(false));
+        let rig = rig(
+            vec![
+                vec![
+                    Step::Out("Password:"),
+                    Step::Read,
+                    mount_on(&mounted),
+                    Step::Hang,
+                ],
+                vec![Step::Exit(0)],
+            ],
+            Arc::clone(&mounted),
+        );
+        let cancel = Cancel::new();
+        let stopper = cancel.clone();
+        let flag = Arc::clone(&mounted);
+        let watcher = std::thread::spawn(move || {
+            while !flag.load(Ordering::SeqCst) {
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+            stopper.cancel();
+        });
+        let error = rig
+            .connector
+            .connect(&share(), &login("alex"), &cancel)
+            .unwrap_err();
+        watcher.join().unwrap();
+        assert_eq!(error.kind(), ShareErrorKind::Cancelled);
+        let commands = rig.spawner.commands();
+        assert_eq!(commands.len(), 2, "{commands:?}");
+        assert_eq!(commands[1].program, PathBuf::from(UMOUNT));
     }
 
     #[test]

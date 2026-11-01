@@ -26,7 +26,7 @@ use base64::Engine as _;
 use serde::Deserialize;
 
 use crate::address::ShareAddress;
-use crate::connector::{Cancel, Connected, Login, ShareConnector, Support};
+use crate::connector::{Cancel, Connected, Login, ShareConnector, Support, undo_interrupted};
 use crate::error::{ShareError, ShareErrorKind};
 use crate::process::{self, Spawner, ToolCommand};
 
@@ -282,7 +282,9 @@ impl ShareConnector for WindowsConnector {
         if self.is_connected(share, cancel)? {
             return Ok(Connected { root, made: false });
         }
-        let result = self.map_connection(share, login, cancel)?;
+        let result = self
+            .map_connection(share, login, cancel)
+            .map_err(|error| undo_interrupted(self, share, error))?;
         if result.ok {
             Ok(Connected { root, made: true })
         } else {
@@ -577,6 +579,34 @@ mod tests {
         assert!(PRELUDE.contains("Get-DevicelessMapping | Where-Object"));
         assert!(!CHECK.contains("Get-SmbMapping") && !DISCONNECT.contains("Get-SmbMapping"));
         assert!(DISCONNECT.contains("Get-DevicelessMapping"));
+    }
+
+    #[test]
+    fn a_stopped_connect_disconnects_exactly_that_share_again() {
+        let (connector, spawner) = connector(vec![
+            vec![Step::Out(NOT_MAPPED), Step::Exit(0)],
+            vec![Step::Read, Step::Hang],
+            vec![
+                Step::Out("{\"ok\":true,\"code\":0,\"message\":\"\",\"connected\":false}"),
+                Step::Exit(0),
+            ],
+        ]);
+        let error = connector
+            .connect(
+                &share(),
+                &login(),
+                &Cancel::with_limit(Duration::from_millis(500)),
+            )
+            .unwrap_err();
+        assert!(error.is_interrupted());
+        let commands = spawner.commands();
+        assert_eq!(commands.len(), 3, "{commands:?}");
+        assert!(decoded(&commands[2]).contains("[CineVaultShare]::Disconnect("));
+        assert!(
+            commands[2]
+                .env
+                .contains(&(REMOTE_VAR.into(), r"\\nas\movies".into()))
+        );
     }
 
     #[test]

@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::address::ShareAddress;
-use crate::connector::{Cancel, Connected, Login, ShareConnector, Support};
+use crate::connector::{Cancel, Connected, Login, ShareConnector, Support, undo_interrupted};
 use crate::error::{ShareError, ShareErrorKind};
 use crate::process::{self, Session, Spawner, ToolCommand};
 
@@ -167,7 +167,9 @@ impl ShareConnector for LinuxConnector {
         if let Some(root) = self.local_root(share, cancel)? {
             return Ok(Connected { root, made: false });
         }
-        let made = self.mount(share, login, cancel)?;
+        let made = self
+            .mount(share, login, cancel)
+            .map_err(|error| undo_interrupted(self, share, error))?;
         let root = self.local_root(share, cancel)?.ok_or_else(|| {
             ShareError::new(
                 ShareErrorKind::NoUserMounting,
@@ -541,6 +543,33 @@ mod tests {
             .connect(&share(), &login("alex"), &Cancel::new())
             .unwrap();
         assert!(!connected.made);
+    }
+
+    #[test]
+    fn a_stopped_mount_unmounts_exactly_that_share_again() {
+        let (connector, spawner) = connector(vec![
+            not_mounted(),
+            vec![
+                Step::Out("User [me]: "),
+                Step::Read,
+                Step::Out("Password: "),
+                Step::Read,
+                Step::Hang,
+            ],
+            mounted(),
+            vec![Step::Exit(0)],
+        ]);
+        let error = connector
+            .connect(
+                &share(),
+                &login("alex"),
+                &Cancel::with_limit(Duration::from_millis(800)),
+            )
+            .unwrap_err();
+        assert!(error.is_interrupted());
+        let commands = spawner.commands();
+        assert_eq!(commands.len(), 4, "{commands:?}");
+        assert_eq!(args(&commands[3]), ["mount", "-u", "smb://nas/movies/"]);
     }
 
     #[test]

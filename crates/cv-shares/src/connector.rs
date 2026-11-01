@@ -28,7 +28,8 @@ pub trait ShareConnector: Send + Sync {
     /// Connects `share` with `login` and returns the folder its files appear in, and whether this
     /// call made the connection. A share that is already connected (by the user, or earlier) is
     /// not connected again and comes back with [`Connected::made`] false: `login` is not checked
-    /// then.
+    /// then. A connect stopped by `cancel` or by its time limit disconnects exactly that share
+    /// again, as it was not connected before.
     ///
     /// # Errors
     /// A [`ShareError`] whose kind says why; also when the system cannot say whether the share is
@@ -71,6 +72,25 @@ pub trait ShareConnector: Send + Sync {
 pub struct Connected {
     pub root: PathBuf,
     pub made: bool,
+}
+
+/// How long the clean-up after a stopped connect may take.
+const UNDO_LIMIT: Duration = Duration::from_secs(30);
+
+/// After a connect of `share` (not connected before it) failed with `error`: when the tool was
+/// stopped before it ended, the system may have connected the share anyway, with no row to show
+/// for it, so that one share is disconnected again, best effort. Returns `error`.
+pub(crate) fn undo_interrupted(
+    connector: &dyn ShareConnector,
+    share: &ShareAddress,
+    error: ShareError,
+) -> ShareError {
+    if error.is_interrupted()
+        && let Err(undo) = connector.disconnect(share, &Cancel::with_limit(UNDO_LIMIT))
+    {
+        tracing::info!(share = %share, kind = undo.kind().code(), "a stopped connect could not be undone");
+    }
+    error
 }
 
 /// A share password. `Debug` and `Display` never show it.

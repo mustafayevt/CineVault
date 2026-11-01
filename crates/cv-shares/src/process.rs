@@ -331,10 +331,7 @@ impl Session {
         if Instant::now() >= self.deadline {
             self.process.kill();
             self.ended = Some(-1);
-            return Err(ShareError::new(
-                ShareErrorKind::Unreachable,
-                "the server did not answer in time",
-            ));
+            return Err(ShareError::timed_out());
         }
         Ok(())
     }
@@ -657,6 +654,7 @@ mod tests {
         cancel.cancel();
         let error = session.finish().unwrap_err();
         assert_eq!(error.kind(), ShareErrorKind::Cancelled);
+        assert!(error.is_interrupted());
         assert!(spawner.killed());
     }
 
@@ -666,6 +664,7 @@ mod tests {
         let cancel = Cancel::with_limit(Duration::from_millis(30));
         let error = run(&spawner, &command(), None, &cancel, Duration::from_secs(5)).unwrap_err();
         assert_eq!(error.kind(), ShareErrorKind::Unreachable);
+        assert!(error.is_interrupted());
         assert!(spawner.killed());
     }
 

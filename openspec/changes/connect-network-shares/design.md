@@ -83,6 +83,8 @@ CineVault never disconnects or unmounts a connection the user made (their drive 
 
 A share that is already connected when the page connects it is used as it is: the system did not check the login then (connecting again would only fail with 1219 on Windows). So a new share keeps no password (`remember` off, nothing in memory) and asks for one if that connection ends; a known share keeps the login it had; neither claims the connection. On Windows only a connection without a drive letter counts (D2): with just the user's drive letter in place, CineVault makes its own connection without one, and only that one is ever cancelled; the drive letter stays.
 
+A connect stopped by Esc or by its time limit disconnects exactly that share again (it was not connected before the attempt), as the system may have finished connecting after the tool was stopped.
+
 ### D10. Browser mode: connected on the host by the installer
 
 The server never mounts. The share commands are desktop-only and answer `not_applicable` from the server's dispatcher; the browser's "Network share…" shows the explanation with the installer command for the server's OS (`curl -fsSL https://mustafayevt.github.io/CineVault/install.sh | sh`, choosing "Change which movie and TV folders CineVault may use"; on Windows with Docker Desktop, `irm https://mustafayevt.github.io/CineVault/install.ps1 | iex`).

@@ -129,10 +129,7 @@ impl FakeConnector {
                 return Err(ShareError::cancelled());
             }
             if cancel.timed_out() {
-                return Err(ShareError::new(
-                    ShareErrorKind::Unreachable,
-                    "the server did not answer in time",
-                ));
+                return Err(ShareError::timed_out());
             }
             std::thread::sleep(Duration::from_millis(2));
         }
