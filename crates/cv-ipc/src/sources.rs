@@ -395,8 +395,8 @@ pub struct RemapSourceDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct SourceCommandError {
     /// Stable code: `empty`, `not_absolute`, `invalid_characters`, `system_folder`,
-    /// `already_added`, `inside_existing`, `contains_existing`, `unchanged`, `unknown_source`,
-    /// `not_reachable`, `bad_order`, `label_taken`, `label_empty` or `storage`.
+    /// `already_added`, `same_folder`, `inside_existing`, `contains_existing`, `unchanged`,
+    /// `unknown_source`, `not_reachable`, `bad_order`, `label_taken`, `label_empty` or `storage`.
     pub code: String,
     /// Plain sentence for the user.
     pub message: String,

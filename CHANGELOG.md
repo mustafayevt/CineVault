@@ -34,6 +34,15 @@ What changed in each version of CineVault, newest first, in plain words. The app
 ### Added
 
 - Network shares: add a library folder from a NAS with its user name and password (Settings › Library folders › Network share…). CineVault keeps the password in your system's credential store and reconnects at start; the server installers set shares up for browser mode.
+### Added
+
+- Copies: if you have the same movie twice (say a 4K and a 1080p download), the Copies filter shows them, Compare puts them side by side, and Keep this one deletes the other the usual way. Keep both, and Rename gives each its own name, like '- 2160p' and '- 1080p'. When two copies may be one file reached two ways (a drive and its network share), Compare does not offer to delete either.
+
+### Changed
+
+- A library folder that is already in your library under another path (a network share, a mapped drive or a link) can no longer be added a second time.
+- The Delete confirmation shows each title's folder under its name, so two titles with the same name can be told apart.
+- One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item and Shift+Delete are gone, and a permanent delete asks Yes or No instead of making you type DELETE.
 
 ## [1.3.0] - 2026-10-31
 

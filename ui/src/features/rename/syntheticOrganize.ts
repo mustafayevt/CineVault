@@ -40,6 +40,10 @@ interface SampleMovie {
   locked?: boolean;
   /** The video details are not read yet: held back from the rename. */
   held?: boolean;
+  /** One of several copies of a film; `label` is what keeps its names apart from the twin's. */
+  copy?: { nth: number; of: number; label: string };
+  /** Part of the sample only when a request names it (`?ids=12,13,14`), not under Everything. */
+  selectedOnly?: boolean;
 }
 
 const NFO_ART = (artwork: number, subtitles = 0, trailers = 0): CompanionsDto => ({
@@ -167,6 +171,43 @@ function initialMovies(): SampleMovie[] {
       videoFormat: "2160p",
       tmdb: 76341,
       held: true,
+    }),
+    // Two copies of one film, and a movie of its own: the copies get a label each.
+    movie({
+      id: "12",
+      folder: "Example.Movie.2020.2160p.BluRay.DV",
+      title: "Example Movie",
+      year: 2020,
+      videoFormat: "2160p",
+      hdr: "DV",
+      audioCodec: "TrueHD Atmos",
+      channels: "7.1",
+      tmdb: 1000001,
+      companions: NFO_ART(3, 2),
+      copy: { nth: 1, of: 2, label: "2160p DV" },
+      selectedOnly: true,
+    }),
+    movie({
+      id: "13",
+      folder: "Example Movie (2020) 2160p HDR10 WEB",
+      title: "Example Movie",
+      year: 2020,
+      videoFormat: "2160p",
+      mediaSource: "WEB-DL",
+      hdr: "HDR10",
+      tmdb: 1000001,
+      companions: NFO_ART(2),
+      copy: { nth: 2, of: 2, label: "2160p HDR10" },
+      selectedOnly: true,
+    }),
+    movie({
+      id: "14",
+      folder: "Another.Film.2018.1080p.BluRay.x264",
+      title: "Another Film",
+      year: 2018,
+      tmdb: 1000002,
+      companions: NFO_ART(3, 0, 1),
+      selectedOnly: true,
     }),
     movie({
       id: "8",
@@ -405,6 +446,7 @@ function showRow(show: SampleShow): PreviewRowDto {
     trashed: 0,
     companions: { nfo: 0, artwork: 0, subtitles: 0, trailers: 0, other: 0 },
     files,
+    copy: null,
   };
 }
 
@@ -439,7 +481,7 @@ export function createSyntheticOrganizeBackend(): OrganizeBackend {
     const selected =
       request.scope.kind === "selection"
         ? new Set(request.scope.ids)
-        : new Set(movies.map((m) => m.id));
+        : new Set(movies.filter((m) => m.selectedOnly !== true).map((m) => m.id));
     const choices = new Map(request.choices.map((c) => [c.id, c]));
     const rows: PreviewRowDto[] = [];
     const counts = {
@@ -459,8 +501,10 @@ export function createSyntheticOrganizeBackend(): OrganizeBackend {
           return [];
         }
         const choice = choices.get(m.id);
-        let folder = render(request.patterns.movie_folder, m);
-        const file = render(request.patterns.movie_file, m);
+        // A copy whose names would clash with its twin's gets its label after the name.
+        const label = m.copy?.label === undefined ? "" : ` - ${m.copy.label}`;
+        let folder = render(request.patterns.movie_folder, m) + label;
+        const file = render(request.patterns.movie_file, m) + label;
         if (choice?.kind === "edit" && choice.folder !== null) folder = choice.folder;
         if (folder === m.folder) {
           counts.tidy += 1;
@@ -544,6 +588,7 @@ export function createSyntheticOrganizeBackend(): OrganizeBackend {
         moves,
         trashed: 0,
         companions: m.companions,
+        copy: m.copy ?? null,
         files: [
           { kind: "video", from: `${m.folder}/${m.file}`, to: [`${folder}/${file}.mkv`] },
           ...(m.companions.nfo > 0

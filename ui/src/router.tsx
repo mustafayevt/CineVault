@@ -13,6 +13,7 @@ import { HistoryPage } from "./features/history/HistoryPage";
 import { ReleaseNotesPage } from "./features/changelog/ReleaseNotesPage";
 import { LibraryPage } from "./features/library/LibraryPage";
 import { MovieEditPage, ShowEditPage } from "./features/edit/EditDetailsPage";
+import { ComparePage } from "./features/copies/ComparePage";
 import { MoviePage } from "./features/movie/MoviePage";
 import { ShowPage } from "./features/show/ShowPage";
 import { FirstRunGate } from "./features/onboarding/FirstRunGate";
@@ -76,6 +77,12 @@ const movieRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/movies/$movieId",
   component: MoviePage,
+});
+
+const movieCopiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/movies/$movieId/copies",
+  component: ComparePage,
 });
 
 const movieEditRoute = createRoute({
@@ -249,6 +256,7 @@ const routeTree = rootRoute.addChildren([
   libraryRoute,
   movieRoute,
   movieEditRoute,
+  movieCopiesRoute,
   showEditRoute,
   showRoute,
   scrapeRoute,

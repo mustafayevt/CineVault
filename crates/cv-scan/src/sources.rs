@@ -50,6 +50,12 @@ pub enum SourceError {
     },
     #[error("{path} is already a library folder.")]
     AlreadyAdded { path: String },
+    /// The folder is an existing library folder reached another way: through a network share of
+    /// it, a mapped drive, a link or a substituted drive letter.
+    #[error(
+        "{path} is the library folder {existing} reached another way (a network share, mapped drive or link). Each folder can be in the library once."
+    )]
+    SameAsExisting { path: String, existing: String },
     #[error("{path} is already covered by the library folder {existing}.")]
     InsideExisting { path: String, existing: String },
     #[error(
@@ -75,6 +81,7 @@ impl SourceError {
             Self::InvalidCharacters(_) => "invalid_characters",
             Self::SystemFolder { .. } | Self::InsideSystemFolder { .. } => "system_folder",
             Self::AlreadyAdded { .. } => "already_added",
+            Self::SameAsExisting { .. } => "same_folder",
             Self::InsideExisting { .. } => "inside_existing",
             Self::ContainsExisting { .. } => "contains_existing",
             Self::Unchanged { .. } => "unchanged",
@@ -538,9 +545,11 @@ impl SourceGuard {
     }
 
     /// [`Self::check`], and also refuses a folder that only reaches a system folder through a
-    /// symbolic link, junction, mapped drive or short (8.3) name. Only meaningful when this
-    /// guard's style is the style of the running system; folders that do not exist are checked
-    /// by their text only.
+    /// symbolic link, junction, mapped drive or short (8.3) name, and a folder that is, lies
+    /// inside or contains an existing source reached another way (`D:\Cinema` and the network
+    /// share of it, a mapped drive, a link or a substituted drive letter). Only meaningful when
+    /// this guard's style is the style of the running system; folders that do not exist are
+    /// checked by their text only.
     ///
     /// # Errors
     /// As [`Self::check`].
@@ -551,20 +560,57 @@ impl SourceGuard {
         ignore_id: Option<i64>,
     ) -> Result<String, SourceError> {
         let path = self.check(raw, existing, ignore_id)?;
-        if self.style == PathStyle::current()
-            && let Some(real) = resolve_links(&path)
+        if self.style != PathStyle::current() {
+            return Ok(path);
+        }
+        if let Some(real) = resolve_links(Path::new(&path))
             && let Ok(parsed) = self.style.parse(&real)
             && let Some(hit) = self.system.describe(&parsed)
         {
             return Err(hit.into_error(path));
         }
+        let new = Path::new(&path);
+        if !new.is_dir() {
+            return Ok(path);
+        }
+        for other in existing.iter().filter(|e| Some(e.id) != ignore_id) {
+            let old = Path::new(&other.path);
+            // A source that cannot be reached now cannot be compared; the text check stands.
+            if !old.is_dir() {
+                continue;
+            }
+            let existing = other.path.clone();
+            if self.one_folder(new, old) {
+                return Err(SourceError::SameAsExisting { path, existing });
+            }
+            if new.ancestors().skip(1).any(|up| self.one_folder(up, old)) {
+                return Err(SourceError::InsideExisting { path, existing });
+            }
+            if old.ancestors().skip(1).any(|up| self.one_folder(up, new)) {
+                return Err(SourceError::ContainsExisting { path, existing });
+            }
+        }
         Ok(path)
+    }
+
+    /// Whether two existing folders are one folder: the file system says so, or both resolve to
+    /// the same location once links are followed.
+    fn one_folder(&self, a: &Path, b: &Path) -> bool {
+        if same_file::is_same_file(a, b).unwrap_or(false) {
+            return true;
+        }
+        let folded = |path: &Path| {
+            resolve_links(path)
+                .and_then(|real| self.style.parse(&real).ok())
+                .map(|parsed| parsed.folded())
+        };
+        folded(a).is_some_and(|real| Some(real) == folded(b))
     }
 }
 
 /// The real location of `path` with links resolved, or `None` when it does not exist.
-fn resolve_links(path: &str) -> Option<String> {
-    let real = std::fs::canonicalize(Path::new(path)).ok()?;
+fn resolve_links(path: &Path) -> Option<String> {
+    let real = std::fs::canonicalize(path).ok()?;
     Some(real.to_string_lossy().into_owned())
 }
 

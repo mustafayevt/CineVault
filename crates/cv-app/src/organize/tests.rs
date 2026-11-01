@@ -14,6 +14,7 @@ use tempfile::TempDir;
 
 use super::*;
 
+mod copies;
 mod faults;
 
 struct Lib {
@@ -93,6 +94,20 @@ impl Lib {
                 .push(MediaFile::new(kind, item.core.path.clone(), name));
         }
         self.db.write(move |tx| insert_item(tx, &item)).unwrap()
+    }
+
+    /// Makes `id` another film than the movies of the same title and year (another TMDB ID), so
+    /// it is not a copy of them.
+    fn another_film(&self, id: ItemId) {
+        self.db
+            .write(move |tx| {
+                tx.execute(
+                    "UPDATE ext_id SET value = ?1 WHERE item_id = ?2 AND provider = 'tmdb'",
+                    rusqlite::params![format!("9{}", id.0), id.0],
+                )?;
+                Ok(())
+            })
+            .unwrap();
     }
 
     fn request(&self, scope: Scope) -> PreviewRequest {
@@ -762,6 +777,7 @@ fn two_folders_that_collide_are_blocked_until_kept_as_versions() {
     let lib = Lib::new();
     let a = lib.movie("Les.Miserables.2012.REPACK", "a", "Les Misérables", 2012);
     let b = lib.movie("Les Miserables 2012 1080p", "b", "Les Misérables", 2012);
+    lib.another_film(b);
     let request = lib.request(Scope::Everything);
 
     let preview = lib.service.preview(&request).unwrap();
@@ -854,6 +870,7 @@ fn skip_and_edit_resolve_a_conflict_too() {
     let lib = Lib::new();
     let a = lib.movie("one", "a", "Twin", 2000);
     let b = lib.movie("two", "b", "Twin", 2000);
+    lib.another_film(b);
     let mut request = lib.request(Scope::Everything);
     request.choices.insert(a.0.to_string(), Choice::Skip);
 

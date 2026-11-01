@@ -19,6 +19,7 @@ export function TitleContextMenu({ actions }: { actions: TitleActionSet }) {
           {index > 0 && <MenuSeparator />}
           {group.map((id) => {
             const action = actions[id];
+            if (action.hidden === true) return null;
             return (
               <MenuItem
                 key={id}

@@ -446,6 +446,36 @@ fn needs_review_is_uncertain_plus_not_matched() {
 }
 
 #[test]
+fn copies_are_counted_for_movies_only() {
+    let lab = Lab::new();
+    let mut ids = Vec::new();
+    for folder in ["D:/Movies/a", "D:/Movies/b"] {
+        let mut item = Item::movie("Example Movie");
+        item.core.year = 2020;
+        item.core.ids.set("tmdb", "7");
+        item.core.media_files.push(MediaFile::new(
+            MediaFileType::Video,
+            folder,
+            "Example Movie.mkv",
+        ));
+        ids.push(lab.db.write(move |tx| insert_item(tx, &item)).unwrap());
+    }
+    lab.movie("Alone", Some("8"), "tmdb");
+
+    assert_eq!(lab.counts().copies, 2);
+    assert_eq!(
+        lifecycle_counts(&lab.db, ItemKind::Show, "p", 0)
+            .unwrap()
+            .copies,
+        0
+    );
+    lab.db
+        .write(move |tx| cv_db::repo::copies::keep_set(tx, &ids, 1))
+        .unwrap();
+    assert_eq!(lab.counts().copies, 0, "a kept group is not counted");
+}
+
+#[test]
 fn locked_missing_and_checking_titles_are_counted_and_a_locked_one_is_never_pending() {
     let lab = Lab::new();
     let locked = lab.movie("Locked", Some("1"), "tmdb");

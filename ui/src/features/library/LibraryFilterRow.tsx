@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, TriangleAlert, X } from "lucide-react";
+import { ChevronDown, Copy, TriangleAlert, X } from "lucide-react";
 
 import { Chip } from "../../components/Chip";
 import { Menu, MenuRadioGroup, MenuRadioItem } from "../../components/Menu";
@@ -176,6 +176,18 @@ export function LibraryFilterRow({
           ))}
         </MenuRadioGroup>
       </Menu>
+
+      {kind === "movies" && (filters.copies || (data?.copies ?? 0) > 0) && (
+        <Chip
+          active={filters.copies}
+          icon={Copy}
+          count={format.number(data?.copies ?? 0)}
+          onClick={() => onChange({ copies: !filters.copies })}
+          data-testid="copies-chip"
+        >
+          {t("copies.chip")}
+        </Chip>
+      )}
 
       {text !== "" && (
         <Chip

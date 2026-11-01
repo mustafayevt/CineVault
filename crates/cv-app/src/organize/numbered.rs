@@ -68,6 +68,7 @@ mod tests {
             trashed: 0,
             companions: CompanionCounts::default(),
             files: Vec::new(),
+            copy: None,
         }
     }
 

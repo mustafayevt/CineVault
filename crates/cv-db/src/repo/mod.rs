@@ -37,6 +37,8 @@
 //! - [`lifecycle`]: the facts and grouped counts behind the title lifecycle (stage and flags).
 //! - [`library_ops`]: the reads behind change data source, remove from library and delete with files:
 //!   a title's tree of items, its files, and whether its folder is shared.
+//! - [`copies`]: the groups of copies of a movie (the same film more than once), computed on read,
+//!   and the "keep both" decisions.
 //! - [`library_review`]: the missing/duplicate review: which rows are missing, offline or duplicates,
 //!   the "keep" decision, and re-pointing a title whose files were moved by hand.
 //! - [`ratings`]: ratings per source with their scales, and the user rating, which no update or
@@ -58,6 +60,7 @@ pub mod artwork_refs;
 pub mod availability;
 mod children;
 mod codec;
+pub mod copies;
 pub mod data_sources;
 pub mod date_added;
 pub mod drive_facts;
@@ -92,6 +95,8 @@ pub mod torrent_indexers;
 pub mod torrent_landing;
 pub mod watched;
 
+#[cfg(test)]
+mod copies_list_tests;
 #[cfg(test)]
 mod data_sources_tests;
 #[cfg(test)]
@@ -131,8 +136,8 @@ pub use locks::{
     apply_scrape, field_locks, field_locks_of, set_field_lock, set_field_locks, set_item_locked,
 };
 pub use query::{
-    Cursor, CursorValue, Direction, ItemQuery, ItemSummary, Page, SortField, SortKey, SourceGroup,
-    count_items, list_items, list_items_at, source_groups,
+    CopyMember, Cursor, CursorValue, Direction, ItemQuery, ItemSummary, Page, SortField, SortKey,
+    SourceGroup, count_items, list_items, list_items_at, source_groups,
 };
 pub use ratings::{
     get_ratings, get_user_rating, rating_fetch_candidates, remove_rating, set_user_rating,

@@ -1,5 +1,14 @@
 import { syntheticLifecycle, syntheticLifecycleCounts } from "../lifecycle/syntheticLifecycle";
 import type { SyntheticLifecycleInput } from "../lifecycle/syntheticLifecycle";
+import {
+  copiesVersion,
+  copyFixtureAt,
+  copyGroupAt,
+  copyGroupKeptAt,
+  copyGroupSizeAt,
+  copyRankAt,
+  openCopiesAmong,
+} from "../copies/syntheticCopies";
 import { currentPreferredSource } from "../ratings/preference";
 import { DEFAULT_PREFERRED_SOURCE, pickRating, toNativeScale } from "../ratings/ratingSources";
 import type { SourceRating } from "../ratings/ratingSources";
@@ -105,6 +114,7 @@ function lifecycleInput(card: LibraryCard, index: number, show: boolean): Synthe
     unmatched: card.unmatched,
     needsReview: card.needs_review,
     show,
+    renamed: !show && copyFixtureAt(index) !== undefined,
   };
 }
 
@@ -128,6 +138,8 @@ export function syntheticCard(index: number): LibraryCard {
     file_name: `${title.replaceAll(" ", ".")}.${1960 + (h % 66)}.2160p.mkv`,
     resolution: unmatched ? null : (RESOLUTIONS[h % RESOLUTIONS.length] ?? null),
     hdr: unmatched ? null : (HDR[h % HDR.length] ?? null),
+    copies: 0,
+    copies_total: 0,
     poster: hasPoster
       ? {
           key: (h.toString(16) + mix(h).toString(16)).padEnd(32, "0").slice(0, 32),
@@ -136,6 +148,29 @@ export function syntheticCard(index: number): LibraryCard {
         }
       : null,
   };
+  const copy = copyFixtureAt(index);
+  if (copy !== undefined) {
+    // One of the pairs of copies: a matched, scraped movie with its own facts.
+    const size = copyGroupSizeAt(index);
+    const fixed: LibraryCard = {
+      ...card,
+      title: copy.title,
+      original_title: "",
+      year: copy.year,
+      is_new: false,
+      unmatched: false,
+      needs_review: false,
+      file_name: copy.file,
+      resolution: copy.resolution,
+      hdr: copy.hdrCard,
+      copies: size,
+      copies_total: size,
+    };
+    return {
+      ...fixed,
+      lifecycle: syntheticLifecycle(lifecycleInput(fixed, index, false)),
+    };
+  }
   const lifecycle = syntheticLifecycle(lifecycleInput(card, index, false));
   // The REVIEW marker follows the lifecycle, as the backend's does.
   return { ...card, lifecycle, needs_review: lifecycle.in_review };
@@ -282,7 +317,31 @@ export function syntheticRow(index: number, kind: LibraryKind = "movies"): Libra
     missing_movies: kind === "collections" ? h % 3 : 0,
     aired_status: show ? (STATUSES[h % STATUSES.length] ?? "unknown") : "unknown",
   };
-  return withPreferredRating(row, DEFAULT_PREFERRED_SOURCE);
+  const copy = copyFixtureAt(index);
+  if (copy === undefined || show) return withPreferredRating(row, DEFAULT_PREFERRED_SOURCE);
+  return withPreferredRating(
+    {
+      ...row,
+      path: copy.folder,
+      source_label: copy.sourceLabel,
+      filename: copy.file,
+      media_source: copy.source,
+      width: copy.width,
+      height: copy.height,
+      video_bitrate_kbps: copy.bitrateKbps,
+      hdr_formats: copy.hdrFormats,
+      file_size: copy.sizeBytes,
+      total_file_size: copy.sizeBytes + 90_000_000,
+      audio_codec: copy.audioCodec,
+      audio_channels: copy.audioChannels,
+      runtime_minutes: copy.durationMinutes,
+      video_in_3d: false,
+      movie_set: null,
+      edition: "",
+      note: "",
+    },
+    DEFAULT_PREFERRED_SOURCE,
+  );
 }
 
 const inRange = (value: number | null, min: number | null, max: number | null): boolean =>
@@ -320,6 +379,10 @@ function matchesChip(row: LibraryRow, chip: LibraryChip): boolean {
     }
     case "locked":
       matches = row.locked;
+      break;
+    case "copies":
+      // Movies in groups the user has not kept.
+      matches = row.card.copies > 0;
       break;
     case "year":
       matches = row.card.year > 0 && inRange(row.card.year, chip.min, chip.max);
@@ -746,6 +809,24 @@ function compare(a: LibraryRow, b: LibraryRow, query: LibraryQuery): number {
   return collator.compare(a.card.title, b.card.title) || Number(a.card.id) - Number(b.card.id);
 }
 
+/**
+ * The Copies filter's order: the groups in the order of their first copy, the copies of each film
+ * together with the best first.
+ */
+function togetherByGroup(rows: readonly LibraryRow[]): LibraryRow[] {
+  const groupOf = (row: LibraryRow) => copyGroupAt(Number(row.card.id) - 1);
+  const firstSeen = new Map<number, number>();
+  rows.forEach((row, position) => {
+    const group = groupOf(row);
+    if (!firstSeen.has(group)) firstSeen.set(group, position);
+  });
+  return [...rows].sort(
+    (a, b) =>
+      (firstSeen.get(groupOf(a)) ?? 0) - (firstSeen.get(groupOf(b)) ?? 0) ||
+      copyRankAt(Number(a.card.id) - 1) - copyRankAt(Number(b.card.id) - 1),
+  );
+}
+
 function totalFor(kind: LibraryKind, count: number): number {
   if (kind === "movies") return count;
   return Math.ceil(count / (kind === "shows" ? 8 : 12));
@@ -753,9 +834,10 @@ function totalFor(kind: LibraryKind, count: number): number {
 
 /** The pipeline counts of the first `count` fixture movies, or of the first `count` shows. */
 export function syntheticPipelineCounts(count: number, show: boolean) {
-  return syntheticLifecycleCounts(count, (index) =>
+  const counts = syntheticLifecycleCounts(count, (index) =>
     lifecycleInput(syntheticCard(index), index, show),
   );
+  return { ...counts, copies: show ? 0 : openCopiesAmong(count) };
 }
 
 function syntheticNeedsReview(count: number, show: boolean): number {
@@ -784,12 +866,13 @@ export function createSyntheticBackend(count: number): LibraryBackend {
       query.facets ?? [],
       preferred,
       watchedVersion,
+      copiesVersion(),
     ]);
     let rows = ordered.get(cacheKey);
     if (rows === undefined) {
       const words = foldForSearch(query.search).split(" ").filter(Boolean);
       rows = Array.from({ length: totalFor(query.kind, count) }, (_, i) =>
-        withWatched(withPreferredRating(syntheticRow(i, query.kind), preferred)),
+        withCopies(withWatched(withPreferredRating(syntheticRow(i, query.kind), preferred))),
       ).filter(
         (row) =>
           matchesText(row, words) &&
@@ -797,9 +880,16 @@ export function createSyntheticBackend(count: number): LibraryBackend {
           (query.facets ?? []).every((facet) => matchesFacet(row, facet)),
       );
       rows.sort((a, b) => compare(a, b, query));
+      if (query.filters.some((chip) => chip.field === "copies" && !chip.negated)) {
+        rows = togetherByGroup(rows);
+      }
       ordered.set(cacheKey, rows);
     }
     return rows;
+  };
+  const withCopies = (row: LibraryRow): LibraryRow => {
+    const index = Number(row.card.id) - 1;
+    return copyGroupKeptAt(index) ? { ...row, card: { ...row.card, copies: 0 } } : row;
   };
   const withWatched = (row: LibraryRow): LibraryRow => {
     const flag = watched.get(row.card.id);

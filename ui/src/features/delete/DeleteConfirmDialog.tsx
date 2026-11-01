@@ -6,6 +6,7 @@ import type { KeyboardEvent } from "react";
 import { Button } from "../../components/Button";
 import { Checkbox } from "../../components/Checkbox";
 import { Dialog } from "../../components/Dialog";
+import { PathText } from "../../components/PathText";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
@@ -16,7 +17,7 @@ import { useSetting, useSettingsStore } from "../settings/settingsStore";
 import { binName } from "../shell/binName";
 import { detectPlatform } from "../shell/platform";
 import { deleteToBin, useDeleteStore } from "./deleteActions";
-import type { DeleteTarget } from "./deleteActions";
+import type { DeleteOptions, DeleteTarget } from "./deleteActions";
 
 /** How many titles the list names; the rest are counted. */
 const LISTED = 5;
@@ -41,6 +42,7 @@ export function DeleteConfirmDialog() {
       key={request.targets.map((target) => target.id).join(",")}
       targets={request.targets}
       onDone={request.onDone}
+      toastAction={request.toastAction}
       onClose={close}
     />
   );
@@ -59,10 +61,12 @@ function bodyOf(mode: DeletedMode, count: number, folder: string): string {
 function Confirmation({
   targets,
   onDone,
+  toastAction,
   onClose,
 }: {
   targets: readonly DeleteTarget[];
   onDone: (() => void) | undefined;
+  toastAction: DeleteOptions["toastAction"];
   onClose: () => void;
 }) {
   const format = useFormat();
@@ -89,7 +93,7 @@ function Confirmation({
   const confirm = () => {
     if (dontAsk) useSettingsStore.getState().set("delete.confirm", false);
     onClose();
-    void deleteToBin(targets, { onDone });
+    void deleteToBin(targets, { onDone, toastAction });
   };
   // Enter on the "Don't ask again" box deletes too, as it does on the Delete button.
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -164,7 +168,15 @@ function Confirmation({
                   key={row.id}
                   className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-solid border-line-row px-3.5 py-2 first:border-t-0"
                 >
-                  <span className="truncate text-text">{nameOf(row)}</span>
+                  <div className="min-w-0">
+                    <div className="truncate text-text">{nameOf(row)}</div>
+                    {row.folder !== "" && (
+                      <PathText
+                        path={row.folder}
+                        className="cv-selectable font-mono text-(length:--fs-12) text-text-muted"
+                      />
+                    )}
+                  </div>
                   <span className="text-right text-text-2 tabular-nums">
                     {row.bytes === null ? t("common.unknownSize") : format.size(row.bytes)}
                   </span>

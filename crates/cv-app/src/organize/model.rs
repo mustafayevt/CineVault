@@ -123,6 +123,18 @@ pub struct FileChange {
     pub to: Vec<String>,
 }
 
+/// A movie that is one of several copies of a film, in the Rename preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CopyNote {
+    /// Its place among the copies, by library id, from 1.
+    pub nth: u32,
+    /// How many copies the film has.
+    pub of: u32,
+    /// The label ` - <label>` the planner added to its names so the copies keep different names;
+    /// empty when its names need none.
+    pub label: String,
+}
+
 /// One item of the diff list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreviewRow {
@@ -148,6 +160,8 @@ pub struct PreviewRow {
     /// Every file the item moves, copies or trashes (the video, its companions, a show's
     /// episodes), in plan order. Files that stay where they are, as they are, are left out.
     pub files: Vec<FileChange>,
+    /// Set for a movie that has copies in the library.
+    pub copy: Option<CopyNote>,
 }
 
 /// What a conflict is.

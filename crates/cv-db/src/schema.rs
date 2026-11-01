@@ -57,6 +57,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "network_share_connected_by_us",
         sql: include_str!("migrations/105_network_share_connected_by_us.sql"),
     },
+    Migration {
+        version: 106,
+        name: "copies_kept",
+        sql: include_str!("migrations/106_copies_kept.sql"),
+    },
 ];
 
 /// The schema version of this build: the last migration, or [`BASE_VERSION`] when there is none.
@@ -102,6 +107,7 @@ pub const TABLES: &[&str] = &[
     "history_entry",
     "history_title",
     "network_share",
+    "copies_kept",
 ];
 
 /// Every table of the current schema ([`TABLES`]).
@@ -146,6 +152,8 @@ pub(crate) fn apply_all(
 ) -> DbResult<u32> {
     // Migration 101 fills the search keys with these functions.
     crate::repo::search::register_functions(conn)?;
+    // A connection that is only migrated (a test library in memory) reads copies too.
+    crate::repo::copies::register_functions(conn)?;
     let before = current_version(conn)?;
     let newest = latest(migrations);
     if before > newest {
