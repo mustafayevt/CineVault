@@ -13,6 +13,10 @@ pub struct Meta {
     pub len: u64,
     /// Modification time, epoch milliseconds.
     pub modified_ms: i64,
+    /// A symbolic link or a junction. The other fields are then those of what it points at (of
+    /// the link itself when that is gone). What it points at is not part of the folder it sits
+    /// in: a link is never entered, copied or followed to remove anything.
+    pub is_link: bool,
 }
 
 /// The operations of the executor. Every path is absolute. `rename` must be atomic and fail with
@@ -114,17 +118,27 @@ fn millis(time: SystemTime) -> i64 {
 
 impl Fs for StdFs {
     fn meta(&self, path: &Path) -> io::Result<Option<Meta>> {
-        match fs::metadata(Self::native(path)) {
-            Ok(m) => Ok(Some(Meta {
-                is_dir: m.is_dir(),
-                len: m.len(),
-                modified_ms: m.modified().map(millis).unwrap_or(0),
-            })),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        let native = Self::native(path);
+        let own = match fs::symlink_metadata(&native) {
+            Ok(m) => m,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
             // A path through a file (`a.mkv\b`) is not there either.
-            Err(e) if e.kind() == io::ErrorKind::NotADirectory => Ok(None),
-            Err(e) => Err(e),
-        }
+            Err(e) if e.kind() == io::ErrorKind::NotADirectory => return Ok(None),
+            Err(e) => return Err(e),
+        };
+        // On Windows a junction counts as a link too.
+        let is_link = own.file_type().is_symlink();
+        let m = if is_link {
+            fs::metadata(&native).unwrap_or(own)
+        } else {
+            own
+        };
+        Ok(Some(Meta {
+            is_dir: m.is_dir(),
+            len: m.len(),
+            modified_ms: m.modified().map(millis).unwrap_or(0),
+            is_link,
+        }))
     }
 
     fn create_dir_all(&self, path: &Path) -> io::Result<()> {
