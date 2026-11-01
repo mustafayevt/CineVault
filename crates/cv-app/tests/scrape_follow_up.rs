@@ -522,13 +522,22 @@ async fn the_artwork_step_is_one_job_named_in_plain_words() {
     rig.start_scrape(second, "1").await;
     rig.follow_ups_done().await;
 
-    let jobs: Vec<_> = rig
-        .lab
-        .manager
-        .list()
-        .into_iter()
-        .filter(|job| job.name.starts_with("Downloading artwork"))
-        .collect();
+    // The follow-up returns once the work is done; the job manager records the end a moment later.
+    let artwork_jobs = || -> Vec<_> {
+        rig.lab
+            .manager
+            .list()
+            .into_iter()
+            .filter(|job| job.name.starts_with("Downloading artwork"))
+            .collect()
+    };
+    for _ in 0..300 {
+        if artwork_jobs().iter().all(|job| job.state.is_terminal()) {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+    }
+    let jobs = artwork_jobs();
     assert_eq!(
         jobs.len(),
         1,
