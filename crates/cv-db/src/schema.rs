@@ -141,6 +141,8 @@ pub(crate) fn apply_all(
 ) -> DbResult<u32> {
     // Migration 101 fills the search keys with these functions.
     crate::repo::search::register_functions(conn)?;
+    // A connection that is only migrated (a test library in memory) reads copies too.
+    crate::repo::copies::register_functions(conn)?;
     let before = current_version(conn)?;
     let newest = latest(migrations);
     if before > newest {

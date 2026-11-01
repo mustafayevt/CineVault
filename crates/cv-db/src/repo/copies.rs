@@ -53,13 +53,28 @@ struct Candidate {
 
 /// Every group of copies in the library, ordered by their oldest member, with its kept state.
 pub fn copy_groups(conn: &Connection) -> DbResult<Vec<CopyGroup>> {
+    // Only movies that share a key with another one can be copies: SQLite narrows the library to
+    // them in one pass (every list page reads the groups), and the links are made below. The
+    // keys fold case the way the links do, so no pair is lost.
     let mut stmt = conn.prepare_cached(
-        "SELECT i.id, t.value, m.value, i.title, i.year, i.edition FROM item i \
-         LEFT JOIN ext_id t ON t.item_id = i.id AND t.provider = ?1 \
-         LEFT JOIN ext_id m ON m.item_id = i.id AND m.provider = ?2 \
-         WHERE i.kind = 'movie' AND i.availability = 'online' AND i.trashed_entry IS NULL \
-           AND EXISTS (SELECT 1 FROM media_file f WHERE f.item_id = i.id AND f.kind = 'video') \
-         ORDER BY i.id",
+        "WITH e AS MATERIALIZED ( \
+           SELECT i.id, t.value AS tmdb, m.value AS imdb, fold_copy_key(i.title) AS title, \
+                  i.year, fold_copy_key(i.edition) AS edition \
+           FROM item i \
+           LEFT JOIN ext_id t ON t.item_id = i.id AND t.provider = ?1 \
+           LEFT JOIN ext_id m ON m.item_id = i.id AND m.provider = ?2 \
+           WHERE i.kind = 'movie' AND i.availability = 'online' AND i.trashed_entry IS NULL \
+             AND EXISTS (SELECT 1 FROM media_file f WHERE f.item_id = i.id AND f.kind = 'video')) \
+         SELECT id, tmdb, imdb, title, year, edition FROM e \
+         WHERE (edition, tmdb) IN (SELECT edition, tmdb FROM e WHERE tmdb IS NOT NULL \
+                                   GROUP BY edition, tmdb HAVING count(*) > 1) \
+            OR (edition, imdb) IN (SELECT edition, imdb FROM e WHERE imdb IS NOT NULL \
+                                   GROUP BY edition, imdb HAVING count(*) > 1) \
+            OR (edition, title, year) IN ( \
+                 SELECT edition, title, year FROM e WHERE year > 0 AND title <> '' \
+                 GROUP BY edition, title, year \
+                 HAVING count(*) > 1 AND sum(tmdb IS NULL AND imdb IS NULL) > 0) \
+         ORDER BY id",
     )?;
     let candidates = stmt
         .query_map(params![id_key::TMDB, id_key::IMDB], |r| {
@@ -67,9 +82,9 @@ pub fn copy_groups(conn: &Connection) -> DbResult<Vec<CopyGroup>> {
                 id: ItemId(r.get(0)?),
                 tmdb: r.get(1)?,
                 imdb: r.get(2)?,
-                title: fold(&r.get::<_, String>(3)?),
+                title: r.get(3)?,
                 year: r.get(4)?,
-                edition: fold(&r.get::<_, String>(5)?),
+                edition: r.get(5)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -168,6 +183,17 @@ pub fn remove_kept_set(conn: &Connection, set: KeptSetId) -> DbResult<()> {
 /// Text compared without regard to case and surrounding spaces.
 fn fold(text: &str) -> String {
     text.trim().to_lowercase()
+}
+
+/// Registers `fold_copy_key(text)`, the SQL form of [`fold`], on a connection.
+pub(crate) fn register_functions(conn: &Connection) -> rusqlite::Result<()> {
+    use rusqlite::functions::FunctionFlags;
+    conn.create_scalar_function(
+        "fold_copy_key",
+        1,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        |ctx| Ok(fold(&ctx.get::<String>(0)?)),
+    )
 }
 
 /// Links the candidates by the copy rules and returns the groups of two or more.
