@@ -347,7 +347,8 @@ fn no_file_holds_the_password_whether_remembered_or_not() {
 
 #[test]
 fn a_short_password_never_shows_in_a_formatted_error() {
-    let short = "pw4";
+    // A symbol keeps it from turning up by chance in a random temp folder name.
+    let short = "p#4";
     let rig = rig();
     rig.share_with(&[]);
     let attempt = request(r"\\nas\movies\Films", short, true);
