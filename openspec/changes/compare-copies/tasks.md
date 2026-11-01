@@ -3,7 +3,7 @@
 - [x] 1.1 Migration after `104` adding `copies_kept (set_id, item_id, kept_ms)` with the cascade on `item`. Verified by `cargo test -p cv-db` (the migration tests: a fresh library and an upgraded one both have the table, and removing an item removes its rows).
 - [x] 1.2 `cv_db::repo::copies::copy_groups`: online, not deleted movies with a video, linked by a shared TMDB or IMDb ID, or by title and known year when one has neither ID, and only within the same edition; transitive. Verified by `cargo test -p cv-db --lib copies` (shared ID, unscraped title and year, different IDs, unknown year, Extended vs Theatrical, edition case, offline, missing, deleted, shows ignored, a chain of three) and a test over 5,000 generated movies that stays one query.
 - [x] 1.3 `keep_set`, `remove_kept_set` and the kept test (all current members in one kept set). Verified by `cargo test -p cv-db --lib copies` (kept group closed, a new member reopens it, a member leaving keeps it kept, ask again reopens it).
-- [ ] 1.4 Update the comment in `library_review::duplicate_groups` to say that rows which both have their files are copies (`movie-copies`), and check the review is unchanged. Verified by `cargo test -p cv-db --lib library_review`.
+- [x] 1.4 Update the comment in `library_review::duplicate_groups` to say that rows which both have their files are copies (`movie-copies`), and check the review is unchanged. Verified by `cargo test -p cv-db --lib library_review`.
 
 ## 2. Copies service and best quality
 

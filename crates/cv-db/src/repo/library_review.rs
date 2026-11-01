@@ -158,7 +158,8 @@ fn duplicate_groups(conn: &Connection) -> DbResult<Vec<Vec<ItemId>>> {
     }
     // Movies or shows with the same title and year where one of the rows has lost its files: a
     // title that was moved or renamed outside the app and then found again as a new row looks
-    // like this. Two rows that both have their files are two editions, not a duplicate.
+    // like this. Two rows that both have their files are copies of a movie, not a duplicate:
+    // `super::copies` finds those (`movie-copies`), and the review leaves them alone.
     {
         let mut stmt = conn.prepare(
             "SELECT id, kind, lower(trim(title)), year, availability FROM item              WHERE kind IN ('movie', 'show') AND year > 0 AND trim(title) <> '' \
@@ -372,6 +373,41 @@ mod tests {
         conn.pragma_update(None, "foreign_keys", true).unwrap();
         crate::schema::migrate(&mut conn).unwrap();
         conn
+    }
+
+    #[test]
+    fn copies_that_both_have_their_files_are_left_to_the_copies() {
+        let conn = memory_db();
+        let mut ids = Vec::new();
+        for folder in ["D:/Movies/dl-1", "D:/Movies/dl-2"] {
+            let mut movie = Item::movie("Example Movie");
+            movie.core.year = 2020;
+            movie.core.path = folder.into();
+            movie.core.ids.set(cv_domain::id_key::TMDB, "1");
+            movie.core.media_files.push(cv_domain::MediaFile::new(
+                cv_domain::MediaFileType::Video,
+                folder,
+                "Example Movie.mkv",
+            ));
+            ids.push(insert_item(&conn, &movie).unwrap());
+        }
+        assert!(review_candidates(&conn).unwrap().is_empty());
+        assert_eq!(
+            crate::repo::copies::copy_groups(&conn).unwrap()[0].members,
+            ids
+        );
+
+        // Once one has lost its files it is the review's again, and no longer a copy.
+        conn.execute(
+            "UPDATE item SET availability = 'missing' WHERE id = ?1",
+            [ids[1].0],
+        )
+        .unwrap();
+        let candidates = review_candidates(&conn).unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].id, ids[1]);
+        assert_eq!(candidates[0].duplicate_of, Some(ids[0]));
+        assert!(crate::repo::copies::copy_groups(&conn).unwrap().is_empty());
     }
 
     #[test]
