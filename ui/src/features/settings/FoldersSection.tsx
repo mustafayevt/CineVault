@@ -14,6 +14,7 @@ import { cx } from "../../lib/cx";
 import { addLibraryFolders, reloadFolders } from "../library-sources/addFolders";
 import { currentSourcesBackend } from "../library-sources/sourcesBackend";
 import type { LibrarySource, SourceKind } from "../library-sources/sourcesBackend";
+import { NetworkShareButton } from "../shares/NetworkShareButton";
 import { currentOnboardingBackend } from "../onboarding/onboardingBackend";
 import { useFolderDrop } from "../onboarding/useFolderDrop";
 import { runRescan } from "../scan/scanActions";
@@ -156,9 +157,7 @@ function AddRow({ kind, over, onBrowse, onShare }: AddRowProps) {
       <Button icon={Plus} onClick={onBrowse}>
         {t("settingsPage.folders.add")}
       </Button>
-      <Button icon={Network} onClick={onShare}>
-        {t("settingsPage.folders.addShare")}
-      </Button>
+      <NetworkShareButton onOpen={onShare}>{t("settingsPage.folders.addShare")}</NetworkShareButton>
       <span className="ml-1 text-(length:--fs-12) text-text-muted">
         {t("settingsPage.folders.drop")}
       </span>

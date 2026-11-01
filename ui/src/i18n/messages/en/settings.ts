@@ -749,6 +749,11 @@ export const settings = {
   "networkShare.copy": "Copy",
   "networkShare.copied": "Copied",
   "networkShare.copyCommand": "Copy the command",
+  "networkShare.browser.label": "Network shares in a browser",
+  "networkShare.browser.title": "Network shares are connected on the server",
+  "networkShare.browser.body":
+    "The server can't connect a share by itself, so its installer does. Run the installer on the server again and choose “Change which movie and TV folders CineVault may use”; it asks for the share's user and password.",
+  "networkShare.browser.then": "Then add the folder with Add folder….",
   "settingsPage.torrents.title": "Torrent sources",
   "settingsPage.torrents.sources.hint": "The sites Torrent search asks",
   "settingsPage.appearance.title": "Appearance",

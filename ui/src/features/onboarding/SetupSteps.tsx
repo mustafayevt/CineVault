@@ -1,4 +1,4 @@
-import { Check, Folder, Network, Plus, X } from "lucide-react";
+import { Check, Folder, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode, Ref } from "react";
 
@@ -11,6 +11,7 @@ import { Tag } from "../../components/Tag";
 import { t } from "../../i18n/catalog";
 import type { MessageKey } from "../../i18n/catalog";
 import { cx } from "../../lib/cx";
+import { NetworkShareButton } from "../shares/NetworkShareButton";
 import { KeyField } from "../providers/KeyField";
 import type { ProviderCredentials } from "../providers/providersBackend";
 import type { ProviderKeys } from "../providers/useProviderKeys";
@@ -199,9 +200,7 @@ export function FoldersStep({
         <Button icon={Plus} onClick={onBrowse}>
           {t("setup.folders.add")}
         </Button>
-        <Button icon={Network} onClick={onShare}>
-          {t("setup.folders.addShare")}
-        </Button>
+        <NetworkShareButton onOpen={onShare}>{t("setup.folders.addShare")}</NetworkShareButton>
         <span className="text-text-muted">{t("setup.folders.drop")}</span>
       </div>
     </>
