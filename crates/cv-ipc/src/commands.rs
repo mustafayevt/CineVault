@@ -319,6 +319,11 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["ids"],
     },
     CommandInfo {
+        name: "keep_copy",
+        module: "copies",
+        args: &["keep", "others"],
+    },
+    CommandInfo {
         name: "keep_review_rows",
         module: "library_ops",
         args: &["ids"],

@@ -21,6 +21,7 @@ import { createSyntheticHistoryBackend } from "../history/syntheticHistory";
 import { setLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import { createSyntheticLibraryOpsBackend } from "../library-ops/syntheticLibraryOps";
 import { useSettingsStore } from "../settings/settingsStore";
+import { useNotificationStore } from "../notifications/notificationStore";
 import { handleEscape } from "../shell/escStack";
 import { useToastStore } from "../toasts/toastStore";
 import { ComparePage } from "./ComparePage";
@@ -84,6 +85,7 @@ function backend(page: Comparison | null, over: Partial<CopiesBackend> = {}) {
     copiesOf: vi.fn(() => Promise.resolve(null)),
     compare: vi.fn(() => Promise.resolve(page)),
     keepAll: vi.fn(() => Promise.resolve()),
+    keepCopy: vi.fn((_keep: string, others: readonly string[]) => Promise.resolve([...others])),
     askAgain: vi.fn(() => Promise.resolve()),
     labelToDrop: vi.fn(() => Promise.resolve<string | null>(null)),
     ...over,
@@ -339,6 +341,69 @@ describe("the Compare copies page", () => {
 });
 
 describe("Keep this one", () => {
+  it("deletes only the copies the backend confirmed as they are now", async () => {
+    const user = userEvent.setup();
+    const { deleteTitles } = spiedHistory();
+    useSettingsStore.setState({ values: { "delete.confirm": false }, status: "ready" });
+    // The page is stale: copy 3 left the group meanwhile, and the backend leaves it out.
+    const copies = backend(
+      { copies: [disc, web, third], kept: false, look_same: false, same_file: false },
+      { keepCopy: vi.fn(() => Promise.resolve(["2"])) },
+    );
+    await renderPage();
+    const [first] = (await cards()) as [HTMLElement];
+
+    await user.click(within(first).getByRole("button", { name: /^Keep this one/ }));
+
+    expect(copies.keepCopy).toHaveBeenCalledWith("1", ["2", "3"]);
+    await waitFor(() => expect(deleteTitles).toHaveBeenCalledWith(["2"]));
+  });
+
+  it("deletes nothing and says why when the backend refuses", async () => {
+    const user = userEvent.setup();
+    const { deleteTitles, eraseTitles } = spiedHistory();
+    useSettingsStore.setState({ values: { "delete.confirm": false }, status: "ready" });
+    useNotificationStore.getState().clear();
+    const why =
+      "The copy to keep is no longer in the library or cannot be reached, so nothing was deleted.";
+    backend(
+      { copies: [disc, web], kept: false, look_same: false, same_file: false },
+      { keepCopy: vi.fn(() => Promise.reject(new Error(why))) },
+    );
+    await renderPage();
+    const [first] = (await cards()) as [HTMLElement];
+
+    await user.click(within(first).getByRole("button", { name: /^Keep this one/ }));
+
+    await waitFor(() =>
+      expect(useNotificationStore.getState().items[0]).toMatchObject({
+        severity: "error",
+        title: "Nothing was deleted",
+        detail: why,
+      }),
+    );
+    expect(deleteTitles).not.toHaveBeenCalled();
+    expect(eraseTitles).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("lets no other card start a second Keep this one while the first waits", async () => {
+    const user = userEvent.setup();
+    spiedHistory();
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
+    await renderPage();
+    const [first, second] = (await cards()) as [HTMLElement, HTMLElement];
+
+    await user.click(within(first).getByRole("button", { name: /^Keep this one/ }));
+    await screen.findByRole("dialog", { name: /^Delete “Example Movie \(2020\)”\?$/ });
+
+    // The open confirmation hides the page from assistive technology; the buttons wait.
+    const keepOf = (card: HTMLElement) =>
+      within(card).getByRole("button", { name: /^Keep this one/, hidden: true });
+    expect(keepOf(first)).toBeDisabled();
+    expect(keepOf(second)).toBeDisabled();
+  });
+
   it("asks first, then deletes only the other copy with the usual Delete and offers Undo", async () => {
     const user = userEvent.setup();
     const { deleteTitles, eraseTitles } = spiedHistory();

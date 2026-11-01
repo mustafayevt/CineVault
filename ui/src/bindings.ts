@@ -684,6 +684,11 @@ export const commands = {
 } | null, LibraryCommandError>(__TAURI_INVOKE("compare_copies", { id })),
 	/**  "Keep both" / "Keep all": the user keeps every one of `ids` as copies. No file changes. */
 	keepAllCopies: (ids: string[]) => typedError<null, LibraryCommandError>(__TAURI_INVOKE("keep_all_copies", { ids })),
+	/**
+	 *  "Keep this one", checked before anything is deleted: the copies the delete may take, or a
+	 *  refusal with a plain message. Deletes nothing itself.
+	 */
+	keepCopy: (keep: string, others: string[]) => typedError<string[], LibraryCommandError>(__TAURI_INVOKE("keep_copy", { keep, others })),
 	/**  "Ask again": the movie's group counts as copies again. Also the Undo of "Keep both". */
 	askAgainCopies: (id: string) => typedError<null, LibraryCommandError>(__TAURI_INVOKE("ask_again_copies", { id })),
 	/**
@@ -2315,7 +2320,10 @@ export type LibraryChipFieldDto = "watched" | "new" |
 
 /**  Why a library command did not answer. */
 export type LibraryCommandError = {
-	/**  Stable code: `storage`, `bad_cursor` or `bad_filter`. */
+	/**
+	 *  Stable code: `storage`, `bad_cursor` or `bad_filter`; "Keep this one" also refuses with
+	 *  `nothing_to_delete`, `keep_gone`, `copies_changed` or `same_file`.
+	 */
 	code: string,
 	/**  Plain sentence for the user. */
 	message: string,

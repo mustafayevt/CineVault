@@ -217,6 +217,19 @@ export function createSyntheticCopies(): CopiesBackend {
       version += 1;
       return Promise.resolve();
     },
+    keepCopy: (keep, others) => {
+      const group = BY_ID.get(keep)?.group;
+      const ids = [...new Set(others)];
+      return group !== undefined &&
+        ids.length > 0 &&
+        ids.every((id) => id !== keep && BY_ID.get(id)?.group === group)
+        ? Promise.resolve(ids)
+        : Promise.reject(
+            new Error(
+              "The copies changed since this page was opened, so nothing was deleted. Look at them again.",
+            ),
+          );
+    },
     askAgain: (id) => {
       const group = BY_ID.get(id)?.group;
       if (group !== undefined) kept.delete(group);

@@ -27,24 +27,37 @@ export interface KeepOutcome {
 }
 
 /**
- * "Keep this one" (spec `movie-copies`): deletes every other copy with the existing Delete, so it
- * follows Settings › Deleted files with the same confirmation, toast, History entry and Undo. The
- * kept copy is not touched. When the kept copy carries a copy label in its names, the toast also
- * offers to drop it; that opens the Rename preview and renames nothing by itself.
+ * "Keep this one" (spec `movie-copies`): asks the backend which other copies may go, checked
+ * against the library as it is now (the page may be stale, or another window may have deleted a
+ * copy), then deletes exactly those with the existing Delete, so it follows Settings › Deleted
+ * files with the same confirmation, toast, History entry and Undo. A refusal deletes nothing and
+ * says why. The kept copy is not touched. When the kept copy carries a copy label in its names,
+ * the toast also offers to drop it; that opens the Rename preview and renames nothing by itself.
  */
 export async function keepThisOne(
   page: Comparison,
   keepId: string,
   outcome: KeepOutcome,
 ): Promise<void> {
-  const targets: DeleteTarget[] = page.copies
-    .filter((copy) => copy.id !== keepId)
+  const backend = currentCopiesBackend();
+  const others = page.copies.filter((copy) => copy.id !== keepId);
+  let confirmed: readonly string[];
+  try {
+    confirmed = await backend.keepCopy(
+      keepId,
+      others.map((copy) => copy.id),
+    );
+  } catch (error) {
+    notify({ severity: "error", title: t("copies.keep.refused"), detail: messageOf(error) });
+    await refreshCopies();
+    return;
+  }
+  const targets: DeleteTarget[] = others
+    .filter((copy) => confirmed.includes(copy.id))
     .map((copy) => ({ id: copy.id, title: copyName(copy) }));
   // Asked before anything moves: the label is a property of the kept copy's names, not of the
   // delete. A failed read just leaves the offer out.
-  const label = await currentCopiesBackend()
-    .labelToDrop(keepId)
-    .catch(() => null);
+  const label = await backend.labelToDrop(keepId).catch(() => null);
   requestDelete(targets, {
     onDone: outcome.done,
     ...(label === null || label === ""

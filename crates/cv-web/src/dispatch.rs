@@ -508,6 +508,14 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
                 .map_err(command_error)
                 .and_then(to_value)
         }
+        "keep_copy" => {
+            let keep: String = arg(args, "keep")?;
+            let others: Vec<String> = arg(args, "others")?;
+            cv_ipc::copies::keep_copy(library, keep, others)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
         "ask_again_copies" => {
             let id: String = arg(args, "id")?;
             cv_ipc::copies::ask_again_copies(library, id)

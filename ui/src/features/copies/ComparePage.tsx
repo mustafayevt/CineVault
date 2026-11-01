@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useState } from "react";
 import { AlertTriangle, Award, Check, Copy, HardDrive, Network } from "lucide-react";
 
 import { Button } from "../../components/Button";
@@ -11,6 +12,7 @@ import { Tooltip } from "../../components/Tooltip";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
+import { useDeleteStore } from "../delete/deleteActions";
 import { runtimeLabel } from "../detail/detailFormat";
 import { CachedImage } from "../images/CachedImage";
 import { isImageKey } from "../images/imageUrl";
@@ -104,10 +106,13 @@ function CopyCard({
   index,
   count,
   onKeep,
+  busy,
 }: {
   card: Card;
   index: number;
   count: number;
+  /** A Keep this one is running: every card waits for it. */
+  busy: boolean;
   /** `null` when the page offers no Keep this one (the copies may be one file). */
   onKeep: (() => void) | null;
 }) {
@@ -173,6 +178,7 @@ function CopyCard({
             size="lg"
             className="w-full"
             aria-label={t("copies.keep.aria", { title: copyName(copy), summary: card.heading })}
+            disabled={busy}
             onClick={onKeep}
           >
             {t("copies.keep")}
@@ -211,8 +217,21 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
   const poster = subject.data?.poster ?? null;
   const count = page.copies.length;
 
-  const keep = (keepId: string) => {
-    void keepThisOne(page, keepId, {
+  // One Keep this one at a time: from the click until its confirmation is answered and its
+  // delete has run, every card waits.
+  const [checking, setChecking] = useState(false);
+  const deleting = useDeleteStore(
+    (state) =>
+      state.confirm !== null ||
+      state.request !== null ||
+      page.copies.some((copy) => state.hidden.has(copy.id)),
+  );
+  const busy = checking || deleting;
+
+  const keep = async (keepId: string) => {
+    if (busy) return;
+    setChecking(true);
+    await keepThisOne(page, keepId, {
       // The opened copy is kept: back to where the page was opened from. The opened copy is the
       // one that goes: its own page is gone, so the kept copy's page opens in its place.
       done: () => {
@@ -220,7 +239,7 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
         else void navigate({ to: "/movies/$movieId", params: { movieId: keepId }, replace: true });
       },
       rename: () => void navigate({ to: "/rename", search: { ids: keepId } as never }),
-    });
+    }).finally(() => setChecking(false));
   };
 
   const both = async () => {
@@ -316,7 +335,8 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
               card={card}
               index={index}
               count={count}
-              onKeep={page.same_file ? null : () => keep(card.copy.id)}
+              busy={busy}
+              onKeep={page.same_file ? null : () => void keep(card.copy.id)}
             />
           ))}
         </div>

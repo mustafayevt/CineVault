@@ -25,6 +25,12 @@ export interface CopiesBackend {
   compare: (id: string) => Promise<Comparison | null>;
   /** "Keep both": records that the user keeps every one of `ids`. No file changes. */
   keepAll: (ids: readonly string[]) => Promise<void>;
+  /**
+   * "Keep this one", checked against the library as it is now: the ids of `others` the delete may
+   * take. Rejects with a plain message when the kept copy is gone or offline, one of `others` is
+   * no longer a copy in its group, or two copies may be one file. Deletes nothing itself.
+   */
+  keepCopy: (keep: string, others: readonly string[]) => Promise<string[]>;
   /** "Ask again": the movie's group counts as copies again. Also the Undo of Keep both. */
   askAgain: (id: string) => Promise<void>;
   /** The copy label (`2160p`, `copy 2`) the kept movie could drop from its names, or `null`. */
@@ -46,6 +52,7 @@ export const tauriCopiesBackend: CopiesBackend = {
   keepAll: async (ids) => {
     unwrap(await commands.keepAllCopies([...ids]));
   },
+  keepCopy: async (keep, others) => unwrap(await commands.keepCopy(keep, [...others])),
   askAgain: async (id) => {
     unwrap(await commands.askAgainCopies(id));
   },

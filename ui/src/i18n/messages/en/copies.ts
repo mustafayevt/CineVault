@@ -78,6 +78,7 @@ export const copies = {
   "copies.better": "Better",
   "copies.keep": "Keep this one",
   "copies.keep.aria": "Keep this one: {title}, {summary}",
+  "copies.keep.refused": "Nothing was deleted",
 
   // Keep both, Ask again
   "copies.keepBoth": "Keep both",

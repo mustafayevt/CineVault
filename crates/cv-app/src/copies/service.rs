@@ -84,6 +84,41 @@ pub struct Comparison {
     pub same_file: bool,
 }
 
+/// Why "Keep this one" may not delete the other copies. Nothing was deleted.
+#[derive(Debug, thiserror::Error)]
+pub enum KeepCopyError {
+    #[error("Choose the copy to keep and at least one other copy.")]
+    NothingToDelete,
+    #[error(
+        "The copy to keep is no longer in the library or cannot be reached, so nothing was deleted."
+    )]
+    KeepGone,
+    #[error(
+        "The copies changed since this page was opened, so nothing was deleted. Look at them again."
+    )]
+    Changed,
+    #[error(
+        "These may be the same file reached through two library folders. CineVault won't delete either from here; check the folders under Settings › Library folders."
+    )]
+    SameFile,
+    #[error(transparent)]
+    Db(#[from] DbError),
+}
+
+impl KeepCopyError {
+    /// A stable code for the UI.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::NothingToDelete => "nothing_to_delete",
+            Self::KeepGone => "keep_gone",
+            Self::Changed => "copies_changed",
+            Self::SameFile => "same_file",
+            Self::Db(_) => "storage",
+        }
+    }
+}
+
 /// The source of a copy as the compare rows and the copy labels name it: `BluRay`, `WEB-DL`,
 /// `WEBRip`, `HDTV`, `DVD`, else the library's own name; empty when unknown.
 #[must_use]
@@ -242,6 +277,47 @@ impl CopiesService {
             look_same,
             same_file,
         }))
+    }
+
+    /// "Keep this one", checked against the library as it is now, before anything is deleted:
+    /// `keep` must still be a copy that has its files, every one of `others` must be a copy in
+    /// its group, and no two copies of the group may be one file. Returns the copies the delete
+    /// may take (`others` without repeats); the caller deletes exactly those. Deletes nothing
+    /// itself. Blocking.
+    ///
+    /// # Errors
+    /// The [`KeepCopyError`] that says why nothing may be deleted, or the library cannot be read.
+    pub fn keep_copy(&self, keep: ItemId, others: &[ItemId]) -> Result<Vec<ItemId>, KeepCopyError> {
+        let mut confirmed: Vec<ItemId> = Vec::with_capacity(others.len());
+        for id in others {
+            if !confirmed.contains(id) {
+                confirmed.push(*id);
+            }
+        }
+        if confirmed.is_empty() || confirmed.contains(&keep) {
+            return Err(KeepCopyError::NothingToDelete);
+        }
+        let group = self.group_of(keep)?.ok_or(KeepCopyError::KeepGone)?;
+        if !confirmed.iter().all(|id| group.members.contains(id)) {
+            return Err(KeepCopyError::Changed);
+        }
+        let members = group.members;
+        let items = self.db.read(move |conn| {
+            let mut items = Vec::with_capacity(members.len());
+            for id in &members {
+                items.extend(cv_db::repo::get_item(conn, *id)?);
+            }
+            Ok(items)
+        })?;
+        if may_share_a_file(&items).contains(&true) {
+            return Err(KeepCopyError::SameFile);
+        }
+        tracing::info!(
+            keep = keep.0,
+            others = confirmed.len(),
+            "keep this one checked"
+        );
+        Ok(confirmed)
     }
 
     /// "Keep both" / "Keep all": records that the user keeps every one of `ids` as copies.
@@ -653,5 +729,75 @@ mod tests {
         std::fs::remove_file(lab.dir.path().join("media/b/Example Movie b.mkv")).unwrap();
 
         assert!(lab.service.compare(a).unwrap().unwrap().same_file);
+    }
+
+    fn set(lab: &Lab, sql: &'static str, id: ItemId) {
+        lab.db
+            .write(move |tx| Ok(tx.execute(sql, [id.0]).map(|_| ())?))
+            .unwrap();
+    }
+
+    #[test]
+    fn keep_this_one_confirms_the_other_copies_of_the_group() {
+        let lab = Lab::new();
+        let a = lab.copy("a", 1920, MediaSource::WebDl, ("AAC", 6));
+        let b = lab.copy("b", 3840, MediaSource::Bluray, ("AAC", 6));
+        let c = lab.copy("c", 1280, MediaSource::WebDl, ("AAC", 2));
+
+        assert_eq!(lab.service.keep_copy(b, &[a, c, a]).unwrap(), vec![a, c]);
+        // A page opened before a third copy was found deletes only what it showed.
+        assert_eq!(lab.service.keep_copy(b, &[a]).unwrap(), vec![a]);
+        // A kept group still offers Keep this one.
+        lab.service.keep_all(&[a, b, c]).unwrap();
+        assert_eq!(lab.service.keep_copy(a, &[b]).unwrap(), vec![b]);
+    }
+
+    #[test]
+    fn keep_this_one_refuses_what_it_cannot_be_sure_of() {
+        let lab = Lab::new();
+        let a = lab.copy("a", 1920, MediaSource::WebDl, ("AAC", 6));
+        let b = lab.copy("b", 3840, MediaSource::Bluray, ("AAC", 6));
+        let c = lab.copy("c", 1280, MediaSource::WebDl, ("AAC", 2));
+        let mut other = Item::movie("Another Example");
+        other.core.ids.set("tmdb", "2");
+        let other = lab.db.write(move |tx| insert_item(tx, &other)).unwrap();
+        let code = |result: Result<Vec<ItemId>, KeepCopyError>| result.unwrap_err().code();
+
+        assert_eq!(code(lab.service.keep_copy(a, &[])), "nothing_to_delete");
+        assert_eq!(code(lab.service.keep_copy(a, &[a, b])), "nothing_to_delete");
+        // A movie that is not a copy of this film.
+        assert_eq!(
+            code(lab.service.keep_copy(a, &[b, other])),
+            "copies_changed"
+        );
+
+        // Another window already deleted the copy this one keeps: deleting the rest would leave
+        // no copy at all.
+        set(&lab, "UPDATE item SET trashed_entry = 7 WHERE id = ?1", a);
+        assert_eq!(code(lab.service.keep_copy(a, &[b, c])), "keep_gone");
+        // ... or a copy this page still shows.
+        assert_eq!(code(lab.service.keep_copy(b, &[a, c])), "copies_changed");
+        set(
+            &lab,
+            "UPDATE item SET trashed_entry = NULL WHERE id = ?1",
+            a,
+        );
+
+        // The kept copy's drive is offline.
+        set(
+            &lab,
+            "UPDATE item SET availability = 'offline' WHERE id = ?1",
+            b,
+        );
+        assert_eq!(code(lab.service.keep_copy(b, &[a, c])), "keep_gone");
+        set(
+            &lab,
+            "UPDATE item SET availability = 'online' WHERE id = ?1",
+            b,
+        );
+
+        // Two of the copies may be one file.
+        std::fs::remove_file(lab.dir.path().join("media/c/Example Movie c.mkv")).unwrap();
+        assert_eq!(code(lab.service.keep_copy(a, &[b])), "same_file");
     }
 }

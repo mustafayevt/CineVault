@@ -749,7 +749,8 @@ pub struct LibrarySizeTotalDto {
 /// Why a library command did not answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct LibraryCommandError {
-    /// Stable code: `storage`, `bad_cursor` or `bad_filter`.
+    /// Stable code: `storage`, `bad_cursor` or `bad_filter`; "Keep this one" also refuses with
+    /// `nothing_to_delete`, `keep_gone`, `copies_changed` or `same_file`.
     pub code: String,
     /// Plain sentence for the user.
     pub message: String,

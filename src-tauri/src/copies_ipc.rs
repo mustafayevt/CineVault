@@ -40,6 +40,18 @@ pub async fn keep_all_copies(
     cv_ipc::copies::keep_all_copies(&library, ids).await
 }
 
+/// "Keep this one", checked before anything is deleted: the copies the delete may take, or a
+/// refusal with a plain message. Deletes nothing itself.
+#[tauri::command]
+#[specta::specta]
+pub async fn keep_copy(
+    library: State<'_, LibraryState>,
+    keep: String,
+    others: Vec<String>,
+) -> Result<Vec<String>, LibraryCommandError> {
+    cv_ipc::copies::keep_copy(&library, keep, others).await
+}
+
 /// "Ask again": the movie's group counts as copies again. Also the Undo of "Keep both".
 #[tauri::command]
 #[specta::specta]

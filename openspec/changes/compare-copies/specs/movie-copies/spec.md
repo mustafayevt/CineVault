@@ -184,6 +184,17 @@ Each card SHALL offer "Keep this one", which deletes every other copy of the gro
 - **WHEN** `D:\Movies\Mixed` holds `Example Movie (2020).1080p.mkv` and `Example Movie (2020).2160p.mkv` as two copies, and the user keeps the 2160p one
 - **THEN** only the 1080p video and the files named after it are deleted
 
+### Requirement: Keep this one checks the copies again
+Before anything is deleted, "Keep this one" SHALL check the group as the library holds it now and SHALL delete nothing, saying why, when the kept copy is no longer in the library or cannot be reached, when one of the copies to delete is no longer a copy in its group, or when two copies may be one file. It SHALL delete only the copies that check confirmed. While one "Keep this one" is running, no card SHALL start another.
+
+#### Scenario: Deleted in another window
+- **WHEN** the Compare copies page of Example Movie (2020) is open in two windows, the user keeps the 2160p copy in the first and then chooses "Keep this one" on the 1080p copy in the second
+- **THEN** nothing is deleted and the second window says that the copy to keep is no longer in the library
+
+#### Scenario: Two clicks
+- **WHEN** the user chooses "Keep this one" on one card and, while the confirmation is open, tries "Keep this one" on another card
+- **THEN** the other card's button is disabled
+
 ### Requirement: Keep both
 Each group SHALL offer "Keep both" ("Keep all" for three or more copies), which records the decision in the library database. A kept group SHALL leave the Copies count and lose its badges, the page SHALL close, and the decision SHALL be confirmed with an Undo toast. No file SHALL change.
 

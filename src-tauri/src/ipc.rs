@@ -298,6 +298,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             crate::copies_ipc::copies_of,
             crate::copies_ipc::compare_copies,
             crate::copies_ipc::keep_all_copies,
+            crate::copies_ipc::keep_copy,
             crate::copies_ipc::ask_again_copies,
             crate::organize_ipc::copy_label_to_drop,
             crate::lifecycle_ipc::lifecycle_counts,

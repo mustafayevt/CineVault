@@ -21,6 +21,7 @@
 ## 4. Commands
 
 - [x] 4.1 Typed `tauri-specta` commands for `copies_of`, `compare_copies`, `keep_all_copies`, `ask_again_copies` and `copy_label_to_drop` (the label a kept copy could drop, from `plan_plain`), the same routes in `cv-web`, and `ui/src/bindings.ts` regenerated. Verified by `cargo test -p cinevault-app` (`generated_bindings_are_up_to_date`) and the `cv-web` route tests.
+- [x] 4.2 `keep_copy(keep, others)` in `CopiesService`, `cv-ipc`, `src-tauri` and `cv-web`: reads the group again and refuses (kept copy gone or offline, another copy not in its group, copies that may be one file) or returns the copies the delete may take; bindings regenerated. Verified by `cargo test -p cv-app --lib copies` (confirmed copies, a stale page, a copy deleted in another window, an offline kept copy, maybe one file) and `cargo test -p cinevault-app`.
 
 ## 5. Library and Movie page
 
@@ -37,6 +38,7 @@
 - [x] 6.4 After Keep this one, the toast's "Rename to drop the '- <label>' label?" when the kept copy carries a label that no longer clashes, opening the Rename preview for that movie. Verified by `bun run test` (offered for "- copy 2" and "- 2160p", absent for a plain name, opens the preview with the plain name, renames nothing by itself).
 - [x] 6.5 `CHANGELOG.md` line under the unreleased version and `bun run site:changelog`; README and landing page wording; screenshots in `.github/assets/` and `site/img/` (dark and light) showing the chip, the Compare copies page and a labelled Rename preview. Verified by `bun run site:changelog -- --check` and the refreshed images.
 - [x] 6.6 The page offers no "Keep this one" and explains why when the copies may be one file. Verified by `bun run test` (`compare.test.tsx`).
+- [x] 6.7 Keep this one asks `keep_copy` first, deletes only the confirmed copies, says why on a refusal, and disables every card's button while one runs. Verified by `bun run test` (`compare.test.tsx`).
 
 ## 7. Integration
 

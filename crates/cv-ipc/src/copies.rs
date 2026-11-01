@@ -2,10 +2,11 @@
 //! and the "Keep both" decision.
 //!
 //! The groups, the best-quality mark and the decisions live in `cv_app::copies`; this module
-//! converts to the DTOs the screens read. "Keep this one" has no command of its own: the page
-//! sends the other copies to the existing delete, which follows Settings › Deleted files.
+//! converts to the DTOs the screens read. "Keep this one" first asks [`keep_copy`], which checks
+//! the group as it is now, then sends only the copies it confirmed to the existing delete, which
+//! follows Settings › Deleted files.
 
-use cv_app::copies::{CopiesService, CopyMedia, CopyRow};
+use cv_app::copies::{CopiesService, CopyMedia, CopyRow, KeepCopyError};
 use cv_app::organize::OrganizeService;
 use cv_db::repo::copies::CopyGroup;
 use cv_domain::ItemId;
@@ -171,6 +172,32 @@ pub async fn keep_all_copies(
     blocking(move || {
         copies.keep_all(&ids)?;
         Ok(())
+    })
+    .await
+}
+
+/// "Keep this one", checked before anything is deleted: the copies of `others` the delete may
+/// take, or a refusal with a plain message when `keep` is gone or offline, one of `others` is not
+/// a copy in its group, or two copies may be one file. Deletes nothing itself.
+pub async fn keep_copy(
+    library: &LibraryState,
+    keep: String,
+    others: Vec<String>,
+) -> Result<Vec<String>, LibraryCommandError> {
+    let keep = parse_id(&keep)?;
+    let others = ids_of(&others)?;
+    let copies = service(library)?;
+    blocking(move || {
+        copies
+            .keep_copy(keep, &others)
+            .map(|ids| ids.iter().map(|id| id.0.to_string()).collect())
+            .map_err(|error| match error {
+                KeepCopyError::Db(error) => error.into(),
+                refused => LibraryCommandError {
+                    code: refused.code().to_owned(),
+                    message: refused.to_string(),
+                },
+            })
     })
     .await
 }
