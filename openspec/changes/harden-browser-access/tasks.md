@@ -17,7 +17,7 @@
 
 ## 4. Origin and framing
 
-- [ ] 4.1 Keep `origin_matches` as it is and add tests for an invoke without `Origin` (runs with the token, 403 without it) and with a foreign `Origin` (403). Verified by `cargo test -p cv-web`.
+- [x] 4.1 Keep `origin_matches` as it is and add tests for an invoke without `Origin` (runs with the token, 403 without it) and with a foreign `Origin` (403). Verified by `cargo test -p cv-web`.
 - [ ] 4.2 Add the response layer that sets `X-Frame-Options: DENY` and `frame-ancestors 'none'`, merging it into `MEDIA_CSP`. Verified by router tests on the shell, the sign-in page, the welcome page, an image, a media range and a 404, each with both headers and a single CSP header.
 
 ## 5. Sessions kept across restarts

@@ -665,6 +665,58 @@ async fn the_embedded_interface_is_served_with_the_session_token() {
     services.shutdown();
 }
 
+/// An invoke without `Origin` (a client that is not a browser) is judged by the CSRF token alone;
+/// one with a foreign `Origin` is refused even with the token.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn origin_and_token_protect_the_commands() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    set_password(&state);
+    let (cookie, csrf) = signed_in(&state).await;
+    let body = serde_json::json!({ "cmd": "library_counts", "args": {}, "client": "t" });
+    let send = |headers: Vec<(&'static str, String)>| {
+        let state = state.clone();
+        let body = body.clone();
+        async move {
+            let headers: Vec<(&str, &str)> = headers
+                .iter()
+                .map(|(name, value)| (*name, value.as_str()))
+                .collect();
+            call(
+                &state,
+                "POST",
+                "/api/invoke",
+                "192.168.1.30",
+                &headers,
+                Some(body),
+            )
+            .await
+        }
+    };
+    let with_token = send(vec![
+        ("cookie", cookie.clone()),
+        ("x-cinevault-csrf", csrf.clone()),
+    ])
+    .await;
+    assert_eq!(with_token.status, StatusCode::OK);
+    assert!(
+        with_token.body.contains("\"ok\":true"),
+        "{}",
+        with_token.body
+    );
+    let without_token = send(vec![("cookie", cookie.clone())]).await;
+    assert_eq!(without_token.status, StatusCode::FORBIDDEN);
+    let foreign = send(vec![
+        ("cookie", cookie.clone()),
+        ("x-cinevault-csrf", csrf.clone()),
+        ("origin", "https://evil.example".to_owned()),
+    ])
+    .await;
+    assert_eq!(foreign.status, StatusCode::FORBIDDEN);
+    services.shutdown();
+}
+
 const FORWARDING_HEADERS: [&str; 7] = [
     "forwarded",
     "x-forwarded-for",
