@@ -37,7 +37,7 @@
 - [x] 6.2 `install.sh --docker`: on Linux reuse the host mount and bind it with `rslave`; on macOS create the CIFS volume through the Docker Engine API with the body on standard input. Verified by self-tests for the generated bind and JSON body, and a manual run on Linux and on a Mac with Docker Desktop (needs a person): the container sees the share at `/media/<name>`, a rename succeeds, and no `docker` command line holds the password.
 - [x] 6.3 `install.ps1`: accept share addresses, read the password with `Read-Host -AsSecureString`, create the CIFS volume through the `docker_engine` pipe, mount it at `/media/<name>`. Verified by a `-SelfTest` switch for parsing and the JSON body, and a manual run with Docker Desktop on Windows (needs a person).
 - [x] 6.4 Remove the mounts, credentials files and volumes of shares dropped by "Change folders" and by uninstall, using `rmdir` only after `mountpoint -q` says not mounted. Verified by self-tests of the removal plan and the manual runs of 6.1 to 6.3 repeated with a share dropped.
-- [ ] 6.5 Document shares in the README server guide and `docker-compose.yml` (commented CIFS volume with `.env` values, the manual systemd mount). Verified by `bun run check:scripts` and by following the compose example once against a test share (needs a person).
+- [x] 6.5 Document shares in the README server guide and `docker-compose.yml` (commented CIFS volume with `.env` values, the manual systemd mount). Verified by `bun run check:scripts` and by following the compose example once against a test share (needs a person).
 
 ## 7. Integration checks
 

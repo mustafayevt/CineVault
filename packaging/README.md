@@ -9,7 +9,8 @@ still **beta**. Your files stay where they are; CineVault only uses the folders 
 - [First visit](#first-visit): password, folders, TMDB key
 - [Everyday use](#everyday-use): start, stop, update, forgotten password, logs, uninstall
 - [Install by hand](#install-by-hand-with-docker) with `docker run` or Docker Compose
-- [NAS](#nas-unraid-synology-truenas), [Linux packages by hand](#linux-packages-by-hand)
+- [NAS](#nas-unraid-synology-truenas), [library folders on a NAS](#library-folders-on-a-nas),
+  [Linux packages by hand](#linux-packages-by-hand)
 - [Troubleshooting](#troubleshooting), [For maintainers](#for-maintainers)
 
 **Not there yet in the beta:** the server is built for 64-bit Intel and AMD computers only (no ARM,
@@ -97,6 +98,8 @@ $env:CINEVAULT_YES = '1'; $env:CINEVAULT_MEDIA = 'D:\Movies;E:\TV'; irm https://
 & ([scriptblock]::Create((irm https://mustafayevt.github.io/CineVault/install.ps1))) uninstall
 ```
 
+A share in `CINEVAULT_MEDIA` (`//nas/movies`) also needs `CINEVAULT_SHARE_USER` and
+`CINEVAULT_SHARE_PASSWORD_FILE` ([Library folders on a NAS](#library-folders-on-a-nas)).
 Also: `CINEVAULT_PORT` (default 8787; the next free port is used when it is taken),
 `CINEVAULT_NO_BROWSER=1`, `CINEVAULT_VERSION` (Linux packages: a release instead of the latest),
 and for Docker `CINEVAULT_DIR` (default `~/cinevault`, on Windows `%USERPROFILE%\CineVault`) and
@@ -270,6 +273,124 @@ docker compose down                               # remove (data stays in ./data
 
 Keep the data folder on a local disk or the NAS's own volume, not a network share mounted from
 elsewhere: the library database does not work reliably over SMB or NFS.
+
+## Library folders on a NAS
+
+Your movies are on a NAS share that needs its own user name and password, and CineVault runs on
+another computer? The server cannot connect a share by itself (it runs as an ordinary account, or
+in a container), so the installer connects it on the computer CineVault runs on:
+
+1. Run the install command again and choose **2  Change which movie and TV folders CineVault may
+   use** (or give the share during the first install).
+2. Type the share where it asks for a folder: `//nas/movies`, `\\nas\movies` or `smb://nas/movies`,
+   with a folder inside it if you like (`//nas/movies/Films`).
+3. Type the share's user (`DOMAIN\name` works too) and its password. The password is not shown, and
+   it never appears in a command line or in the installer's output.
+
+The installer connects the share once to check the login and the folder (SMB 3.0 first, then 2.1
+for older NAS units) and says plainly what is wrong: a wrong user name or password, a server that
+cannot be reached, a share that does not exist, or a folder that is not on it. Then it sets the
+share up so it comes back after a restart:
+
+- **Linux:** the share is mounted at `/mnt/<server>-<share>`, for example `/mnt/nas-movies`, by a
+  systemd mount unit, and its login is kept in `/etc/cinevault/shares/nas-movies.cred`, which only
+  root can read. It asks before installing `cifs-utils`. In CineVault choose **Add folder…** and
+  pick `/mnt/nas-movies/Films`. If the NAS is off when the computer starts, CineVault starts anyway
+  and the share's folders read offline, with their titles kept; once the NAS is on, mount it again
+  with `sudo systemctl start /mnt/nas-movies`.
+- **Docker on Linux (`--docker`):** the same mount on the computer, passed into the container as
+  `/media/movies` (pick `/media/movies/Films` in CineVault). The password stays in the root-only
+  file, not in Docker, and a share mounted after the container started still appears inside it.
+- **Docker Desktop (Windows and macOS):** Docker Desktop cannot see the shares your computer is
+  connected to, so the installer makes a CIFS volume, `cinevault-nas-movies`, that the container
+  sees as `/media/movies`. It is created through Docker's own API, so the password never appears in
+  a command line, but Docker keeps it in the volume's options, which anyone who may use Docker on
+  that computer can read (`docker volume inspect`). If the NAS is off when the container starts,
+  Docker restarts the container until the share can be mounted. Docker resolves the NAS name
+  itself; if it cannot (a `.local` name, for example), type the NAS's IP address instead.
+
+When "Change folders" drops a share, or you remove CineVault, the installer removes its mount, its
+login file and its volume. It never deletes anything on the NAS, and a mount folder is removed only
+once it is no longer mounted.
+
+Without questions, give the user in `CINEVAULT_SHARE_USER` and the password in a file named by
+`CINEVAULT_SHARE_PASSWORD_FILE` (its first line; keep the password out of environment variables):
+
+```sh
+curl -fsSL https://mustafayevt.github.io/CineVault/install.sh | CINEVAULT_YES=1 CINEVAULT_MEDIA="//nas/movies/Films;/srv/tv" CINEVAULT_SHARE_USER=alex CINEVAULT_SHARE_PASSWORD_FILE=$HOME/nas-password sh
+```
+
+<details>
+<summary>With Docker Compose</summary>
+
+[`docker-compose.yml`](../docker-compose.yml) has a commented CIFS volume for a share. Uncomment
+the `nas-movies` lines, change `//nas/movies` and `addr=nas` to your NAS and share, and keep the
+login in an `.env` file beside it that only you can read (`chmod 600 .env`):
+
+```sh
+NAS_USER=alex
+NAS_PASSWORD='your password'
+PUID=1000
+PGID=1000
+```
+
+Single quotes keep a `$` in the password as it is; write a comma in it twice (`,,`). Docker keeps
+the login in the volume's options. Docker creates the volume once: after changing the login, run
+`docker compose down`, `docker volume rm <folder>_nas-movies` (removing the volume leaves the files
+on the NAS alone) and `docker compose up -d`. On a Linux host you can mount the share on the host
+instead (below) and bind it like any folder: `- /mnt/nas-movies:/media/movies:rslave`.
+
+</details>
+
+<details>
+<summary>Mount a share by hand on Linux (systemd)</summary>
+
+This is what the installer does. Install `cifs-utils` (`sudo apt install cifs-utils` or
+`sudo dnf install cifs-utils`), then make the login file, which only root can read, and type the two
+lines `username=alex` and `password=…` into it:
+
+```sh
+sudo install -d -m 0700 /etc/cinevault/shares
+sudo install -m 0600 /dev/null /etc/cinevault/shares/nas-movies.cred
+sudoedit /etc/cinevault/shares/nas-movies.cred
+```
+
+The mount unit's name must match its folder: for `/mnt/nas-movies` it is `mnt-nas\x2dmovies.mount`
+(`systemd-escape --path --suffix=mount /mnt/nas-movies` prints it). Create it with
+`sudoedit '/etc/systemd/system/mnt-nas\x2dmovies.mount'`, with `uid` and `gid` set to the account the
+service runs as (`id -u`, `id -g`):
+
+```ini
+[Unit]
+Description=NAS share //nas/movies
+Wants=network-online.target
+After=network-online.target
+
+[Mount]
+What=//nas/movies
+Where=/mnt/nas-movies
+Type=cifs
+Options=credentials=/etc/cinevault/shares/nas-movies.cred,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,iocharset=utf8,vers=3.0,_netdev,nofail
+TimeoutSec=30
+
+[Install]
+WantedBy=remote-fs.target
+```
+
+Start it with `sudo systemctl daemon-reload` and `sudo systemctl enable --now 'mnt-nas\x2dmovies.mount'`
+(use `vers=2.1` for an older NAS). Then, with `sudo systemctl edit cinevault-server`, let the
+service want the mount without depending on it, and add the folder to its folder roots:
+
+```ini
+[Unit]
+Wants=mnt-nas\x2dmovies.mount
+After=mnt-nas\x2dmovies.mount
+
+[Service]
+Environment="CINEVAULT_WEB_ROOTS=/mnt/nas-movies/Films"
+```
+
+</details>
 
 ## Linux packages by hand
 

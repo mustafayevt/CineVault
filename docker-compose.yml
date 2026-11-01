@@ -30,6 +30,9 @@ services:
       # Add one line per folder.
       - /path/to/movies:/media/movies
       # - /path/to/tv:/media/tv
+      # A NAS share with its own user and password: uncomment this line and the "nas-movies"
+      # volume at the end of this file.
+      # - nas-movies:/media/nas-movies
     secrets:
       - cinevault_key
     restart: unless-stopped
@@ -38,3 +41,20 @@ services:
 secrets:
   cinevault_key:
     file: ./secret.key
+
+# The NAS share as a CIFS volume. Change //nas/movies and addr=nas to your NAS and share, and keep
+# the login in a .env file beside this one that only you can read (chmod 600 .env):
+#   NAS_USER=alex
+#   NAS_PASSWORD='your password'   (single quotes keep a $ as it is; write a comma twice)
+#   PUID=1000
+#   PGID=1000
+# Docker keeps the login in the volume's options. Use vers=2.1 for an older NAS. After changing the
+# login: docker compose down, docker volume rm <this folder's name>_nas-movies (the files on the
+# NAS are left alone), docker compose up -d.
+# volumes:
+#   nas-movies:
+#     driver: local
+#     driver_opts:
+#       type: cifs
+#       device: "//nas/movies"
+#       o: "addr=nas,username=${NAS_USER},password=${NAS_PASSWORD},uid=${PUID:-1000},gid=${PGID:-1000},file_mode=0664,dir_mode=0775,vers=3.0"
