@@ -533,3 +533,66 @@ fn connecting_again_brings_the_folders_back_and_a_wrong_password_is_recorded() {
         "unknown_share"
     );
 }
+
+// ---- offline reasons -------------------------------------------------------------------------
+
+#[test]
+fn failure_codes_read_as_the_reasons_of_the_folder_row() {
+    let reasons = [
+        (
+            "wrong_login",
+            OfflineReason::WrongPassword,
+            "Wrong password",
+        ),
+        (
+            "unreachable",
+            OfflineReason::Unreachable,
+            "Server not reachable",
+        ),
+        (
+            "share_not_found",
+            OfflineReason::ShareNotFound,
+            "Share not found",
+        ),
+        (
+            PASSWORD_NEEDED,
+            OfflineReason::PasswordNeeded,
+            "Password needed",
+        ),
+        (
+            "account_locked",
+            OfflineReason::NotConnected,
+            "Not connected",
+        ),
+        (
+            "something new",
+            OfflineReason::NotConnected,
+            "Not connected",
+        ),
+    ];
+    for (code, reason, label) in reasons {
+        assert_eq!(OfflineReason::from_code(code), reason, "{code}");
+        assert_eq!(reason.label(), label);
+    }
+}
+
+#[test]
+fn a_folder_of_a_share_that_did_not_connect_says_why() {
+    let rig = rig();
+    let movies = add(&rig, "nas", "movies", false);
+    let (service, _fake) = restarted(&rig);
+    let events = record_hand_overs(&service);
+    service.reconnect_at_start();
+    wait_for(&events, 1);
+
+    assert_eq!(
+        service.folder_state(&movies.source.path),
+        Some(ShareState::Failed(OfflineReason::PasswordNeeded))
+    );
+    assert_eq!(service.folder_state(&text(rig.dir.path())), None);
+}
+
+#[test]
+fn the_mount_folder_of_the_macos_connector_is_the_one_folder_health_checks() {
+    assert_eq!(cv_shares::MAC_MOUNT_FOLDER, paths::MAC_SHARE_MOUNTS);
+}

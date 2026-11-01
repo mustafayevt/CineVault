@@ -26,6 +26,14 @@
 //! its row and its folders are handed to the after-connect hook, which scans them. A share whose
 //! password is not remembered cannot connect by itself and records [`PASSWORD_NEEDED`].
 //!
+//! # Offline, never missing
+//!
+//! A library folder on a share whose last connect failed and that does not answer is offline in
+//! the folder health check at once, with the [`OfflineReason`] ("Wrong password", "Server not
+//! reachable", "Share not found", "Password needed"). Its titles keep everything: a scan of a
+//! folder that cannot be read marks them offline, never missing, and on macOS an empty share
+//! mount folder does not pass for the share (`cv_fs::paths::drive_is_mounted`).
+//!
 //! Connecting writes, moves and deletes nothing on the share. A share this service connected for
 //! a folder that could not be added is disconnected again.
 
@@ -63,6 +71,59 @@ pub type AfterConnect = Arc<dyn Fn(Vec<i64>) + Send + Sync>;
 pub enum ShareState {
     /// Its share is being connected at start: the folder keeps its last known state until then.
     Connecting,
+    /// Its share's last connect failed: a folder that does not answer is offline for this reason.
+    Failed(OfflineReason),
+}
+
+/// Why the folders of a share are offline, as the Library folders row says it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OfflineReason {
+    WrongPassword,
+    Unreachable,
+    ShareNotFound,
+    PasswordNeeded,
+    /// Any other failure (a locked account, another user connected, the system's own message).
+    NotConnected,
+}
+
+impl OfflineReason {
+    /// The reason of a failure code stored on a share's row (`network_share.last_error`).
+    #[must_use]
+    pub fn from_code(code: &str) -> Self {
+        if code == PASSWORD_NEEDED {
+            return Self::PasswordNeeded;
+        }
+        match ShareErrorKind::parse(code) {
+            Some(ShareErrorKind::WrongLogin) => Self::WrongPassword,
+            Some(ShareErrorKind::Unreachable) => Self::Unreachable,
+            Some(ShareErrorKind::ShareNotFound) => Self::ShareNotFound,
+            _ => Self::NotConnected,
+        }
+    }
+
+    /// A stable code for the interface.
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::WrongPassword => "wrong_password",
+            Self::Unreachable => "unreachable",
+            Self::ShareNotFound => "share_not_found",
+            Self::PasswordNeeded => PASSWORD_NEEDED,
+            Self::NotConnected => "not_connected",
+        }
+    }
+
+    /// The words of the folder row: "offline · Wrong password".
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::WrongPassword => "Wrong password",
+            Self::Unreachable => "Server not reachable",
+            Self::ShareNotFound => "Share not found",
+            Self::PasswordNeeded => "Password needed",
+            Self::NotConnected => "Not connected",
+        }
+    }
 }
 
 /// The credential-store account of a share's remembered password.
@@ -487,18 +548,17 @@ impl NetworkShareService {
     }
 
     /// What the shares say about the library folder at `path`: [`ShareState::Connecting`] while
-    /// its share is being connected at start, else nothing.
+    /// its share is being connected at start, [`ShareState::Failed`] after its last connect
+    /// failed, else nothing.
     #[must_use]
     pub fn folder_state(&self, path: &str) -> Option<ShareState> {
-        let connecting = locked(&self.connecting).clone();
-        if connecting.is_empty() {
-            return None;
-        }
         let shares = self.list().ok()?;
         let share = rows::share_holding(&shares, path, paths::CASE_SENSITIVE)?;
-        connecting
-            .contains(&share.id)
-            .then_some(ShareState::Connecting)
+        if locked(&self.connecting).contains(&share.id) {
+            return Some(ShareState::Connecting);
+        }
+        let code = share.last_error.as_deref()?;
+        Some(ShareState::Failed(OfflineReason::from_code(code)))
     }
 
     /// Keeps a share's password: in the credential store when `remember`, else in this process.

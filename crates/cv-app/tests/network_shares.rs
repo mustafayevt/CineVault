@@ -1,6 +1,7 @@
 //! Network shares at start, through the booted app services: a remembered share is connected
 //! before its folders are probed and scanned, so its titles never read offline on the way, while
-//! the folders on other drives are scanned at once.
+//! the folders on other drives are scanned at once; a share that does not connect is offline
+//! with its reason, and its titles stay, offline, never missing.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -8,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use cv_app::data_location::{DataLocation, LocationInputs};
-use cv_app::network_shares::secret_account;
+use cv_app::network_shares::{OfflineReason, secret_account};
 use cv_app::scanning::SourceState;
 use cv_app::secrets::SecretStore;
 use cv_app::services::{AppServices, BootOptions};
@@ -131,8 +132,25 @@ fn until(what: &str, mut check: impl FnMut() -> bool) {
     }
 }
 
-#[test]
-fn a_remembered_share_connects_before_its_titles_are_checked_and_other_folders_do_not_wait() {
+/// A library with a local folder and a folder on the remembered share `\\nas\movies`, both scanned
+/// in a first session, and the share's files moved aside as after a restart of the computer.
+struct Library {
+    temp: TempDir,
+    shares: PathBuf,
+    aside: PathBuf,
+    secrets: Arc<SecretStore>,
+}
+
+fn connector(shares: &Path, aside: Option<PathBuf>, pause: Duration) -> Arc<Appearing> {
+    Arc::new(Appearing {
+        fake: FakeConnector::new(shares),
+        aside,
+        pause,
+        connected: AtomicBool::new(false),
+    })
+}
+
+fn scanned_then_restarted() -> Library {
     let temp = TempDir::new().unwrap();
     let local = temp.path().join("local");
     let shares = temp.path().join("shares");
@@ -141,60 +159,70 @@ fn a_remembered_share_connects_before_its_titles_are_checked_and_other_folders_d
     put(&share_root.join("Films/Heat (1995)/Heat (1995).mkv"));
     let secrets = Arc::new(SecretStore::in_memory());
 
-    // First session: both folders are scanned and their titles are online.
-    {
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        let connector = Arc::new(Appearing {
-            fake: FakeConnector::new(&shares),
-            aside: None,
-            pause: Duration::ZERO,
-            connected: AtomicBool::new(false),
-        });
-        let services = boot(temp.path(), &secrets, connector);
-        let (local_path, films) = (
-            local.to_string_lossy().into_owned(),
-            share_root.join("Films").to_string_lossy().into_owned(),
-        );
-        let root = share_root.to_string_lossy().into_owned();
-        let id = services
-            .db()
-            .write(move |tx| {
-                insert_source(tx, SourceKind::Movie, &local_path)?;
-                insert_source(tx, SourceKind::Movie, &films)?;
-                insert_share(
-                    tx,
-                    &NewNetworkShare {
-                        server: "nas",
-                        share: "movies",
-                        user: "alex",
-                        local_root: &root,
-                        remember: true,
-                    },
-                )
-                .map(|share| share.id)
-            })
-            .unwrap();
-        secrets.set(&secret_account(id), PASSWORD).unwrap();
-        runtime.block_on(async { services.start() });
-        until("the first scans", || {
-            settled(&services, 1)
-                && availability(&services, "Heat").as_deref() == Some("online")
-                && availability(&services, "Alien").as_deref() == Some("online")
-        });
-        services.shutdown();
-    }
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let services = boot(
+        temp.path(),
+        &secrets,
+        connector(&shares, None, Duration::ZERO),
+    );
+    let (local_path, films) = (
+        local.to_string_lossy().into_owned(),
+        share_root.join("Films").to_string_lossy().into_owned(),
+    );
+    let root = share_root.to_string_lossy().into_owned();
+    let id = services
+        .db()
+        .write(move |tx| {
+            insert_source(tx, SourceKind::Movie, &local_path)?;
+            insert_source(tx, SourceKind::Movie, &films)?;
+            insert_share(
+                tx,
+                &NewNetworkShare {
+                    server: "nas",
+                    share: "movies",
+                    user: "alex",
+                    local_root: &root,
+                    remember: true,
+                },
+            )
+            .map(|share| share.id)
+        })
+        .unwrap();
+    secrets.set(&secret_account(id), PASSWORD).unwrap();
+    runtime.block_on(async { services.start() });
+    until("the first scans", || {
+        settled(&services, 1)
+            && availability(&services, "Heat").as_deref() == Some("online")
+            && availability(&services, "Alien").as_deref() == Some("online")
+    });
+    services.shutdown();
+    drop(services);
 
     // The computer restarted: the share is not connected, its files are not there.
     let aside = temp.path().join("aside");
     std::fs::rename(&share_root, &aside).unwrap();
+    Library {
+        temp,
+        shares,
+        aside,
+        secrets,
+    }
+}
+
+#[test]
+fn a_remembered_share_connects_before_its_titles_are_checked_and_other_folders_do_not_wait() {
+    let library = scanned_then_restarted();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let connector = Arc::new(Appearing {
-        fake: FakeConnector::new(&shares),
-        aside: Some(aside),
-        pause: Duration::from_millis(800),
-        connected: AtomicBool::new(false),
-    });
-    let services = boot(temp.path(), &secrets, Arc::clone(&connector));
+    let connector = connector(
+        &library.shares,
+        Some(library.aside.clone()),
+        Duration::from_millis(800),
+    );
+    let services = boot(
+        library.temp.path(),
+        &library.secrets,
+        Arc::clone(&connector),
+    );
     runtime.block_on(async { services.start() });
 
     // The local folder's scan starts at once, while the share is still connecting.
@@ -213,7 +241,7 @@ fn a_remembered_share_connects_before_its_titles_are_checked_and_other_folders_d
     assert!(
         health
             .iter()
-            .all(|folder| folder.state == SourceState::Online),
+            .all(|folder| folder.state == SourceState::Online && folder.reason.is_none()),
         "{health:?}"
     );
 
@@ -227,5 +255,48 @@ fn a_remembered_share_connects_before_its_titles_are_checked_and_other_folders_d
         "{seen:?}"
     );
     assert_eq!(availability(&services, "Heat").as_deref(), Some("online"));
+    services.shutdown();
+}
+
+#[test]
+fn a_share_that_does_not_connect_is_offline_with_its_reason_and_its_titles_are_never_missing() {
+    let library = scanned_then_restarted();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let connector = connector(&library.shares, None, Duration::ZERO);
+    let movies = ShareAddress::new("nas", "movies").unwrap();
+    connector.fake.fail_connect(
+        &movies,
+        Some(ShareError::new(ShareErrorKind::WrongLogin, "logon failure")),
+    );
+    let services = boot(
+        library.temp.path(),
+        &library.secrets,
+        Arc::clone(&connector),
+    );
+    runtime.block_on(async { services.start() });
+
+    until("both scans", || settled(&services, 2));
+    let share = &services.shares().list().unwrap()[0];
+    assert_eq!(share.last_error.as_deref(), Some("wrong_login"));
+    let health = services.scan().source_health().unwrap();
+    let films = health
+        .iter()
+        .find(|folder| folder.source.path.contains("Films"))
+        .unwrap();
+    assert_eq!(films.state, SourceState::Offline);
+    assert_eq!(films.reason, Some(OfflineReason::WrongPassword));
+    assert_eq!(
+        films.reason.map(OfflineReason::label),
+        Some("Wrong password")
+    );
+    let local = health
+        .iter()
+        .find(|folder| folder.source.path.contains("local"))
+        .unwrap();
+    assert_eq!((local.state, local.reason), (SourceState::Online, None));
+
+    // The scan of the folder that cannot be read keeps the title, offline.
+    assert_eq!(availability(&services, "Heat").as_deref(), Some("offline"));
+    assert_eq!(availability(&services, "Alien").as_deref(), Some("online"));
     services.shutdown();
 }

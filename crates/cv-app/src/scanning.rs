@@ -68,7 +68,7 @@ use crate::media_info::{
     default_parallelism as media_parallelism, reload_titles, submit_media_info, submit_named,
     tools_reader_source,
 };
-use crate::network_shares::{NetworkShareService, ShareState};
+use crate::network_shares::{NetworkShareService, OfflineReason, ShareState};
 use crate::notices::{AppNotice, NoticeHub, NoticeLevel};
 
 /// Setting: clear the NEW flag of every title when a data-source update starts, so only what
@@ -210,6 +210,8 @@ pub struct SourceHealth {
     pub source: DataSource,
     pub state: SourceState,
     pub counts: SourceCounts,
+    /// Why an offline folder on a network share is offline ("Wrong password", …).
+    pub reason: Option<OfflineReason>,
 }
 
 #[derive(Default)]
@@ -955,15 +957,22 @@ impl ScanService {
                 let counts = self.db.read(|conn| source_counts(conn, &source.path))?;
                 let seen = memory.entry(source.path.clone()).or_default();
                 let share = shares.as_ref().and_then(|s| s.folder_state(&source.path));
-                let state = match share {
+                let (state, reason) = match share {
+                    _ if answer == Some(true) => (seen.state(answer, &counts), None),
                     // Its share is still connecting at start: not there yet is not gone.
-                    Some(ShareState::Connecting) if answer != Some(true) => seen.guess(&counts),
-                    _ => seen.state(answer, &counts),
+                    Some(ShareState::Connecting) => (seen.guess(&counts), None),
+                    // Its share did not connect: offline at once, saying why.
+                    Some(ShareState::Failed(reason)) => {
+                        seen.state(Some(false), &counts);
+                        (SourceState::Offline, Some(reason))
+                    }
+                    None => (seen.state(answer, &counts), None),
                 };
                 Ok(SourceHealth {
                     source,
                     state,
                     counts,
+                    reason,
                 })
             })
             .collect::<Result<_, DbError>>()?;

@@ -215,11 +215,37 @@ fn unescape_octal(text: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// The folder below the home folder that CineVault mounts network shares in on macOS:
+/// `~/CineVault Shares/<server>/<share>`.
+pub const MAC_SHARE_MOUNTS: &str = "CineVault Shares";
+
+/// The mount folder `<home>/CineVault Shares/<server>/<share>` that `path` is or lies in, judged
+/// by the path alone; `None` for any other path. Names compare with this platform's case rule.
+#[must_use]
+pub fn share_mount_folder(path: &str, home: &str) -> Option<String> {
+    let mounts = Path::new(home).join(MAC_SHARE_MOUNTS);
+    let depth = mounts.components().count() + 2;
+    let parts: Vec<_> = Path::new(path).components().collect();
+    let folder: std::path::PathBuf = parts.get(..depth)?.iter().collect();
+    is_within(&folder, &mounts).then(|| folder.to_string_lossy().into_owned())
+}
+
+/// Whether the share that holds `path` is mounted, when `path` is in a share mount folder below
+/// `home` ([`share_mount_folder`]): an empty mount folder must not pass for the share. True for
+/// any other path.
+#[cfg(unix)]
+#[must_use]
+pub fn share_is_mounted(path: &Path, home: &Path) -> bool {
+    share_mount_folder(&path.to_string_lossy(), &home.to_string_lossy())
+        .is_none_or(|folder| is_mount_point(Path::new(&folder)))
+}
+
 /// Whether the drive that holds `path` is really there. On Linux a path under `/media`,
 /// `/run/media` or `/mnt` belongs to a mount point (see [`linux_mount_root`]); when the drive is
 /// unplugged that folder stays behind on the system drive and must not pass for the drive
-/// ([`mount_root_answers`]). True for any other path (the system drive is always there).
-/// Always true off Linux.
+/// ([`mount_root_answers`]). On macOS a path in a share mount folder of CineVault's
+/// ([`share_mount_folder`]) needs its share mounted there ([`share_is_mounted`]). True for any
+/// other path (the system drive is always there), and always on Windows.
 #[must_use]
 pub fn drive_is_mounted(path: &Path) -> bool {
     #[cfg(target_os = "linux")]
@@ -227,7 +253,11 @@ pub fn drive_is_mounted(path: &Path) -> bool {
         let root = linux_mount_root(&path.to_string_lossy());
         root == "/" || mount_root_answers(Path::new(&root))
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("HOME").is_none_or(|home| share_is_mounted(path, Path::new(&home)))
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         let _ = path;
         true
@@ -453,6 +483,44 @@ UUID=5678 /mnt/Backup\\040Disk ext4 nofail 0 2
         assert!(drive_is_mounted(Path::new(r"D:\Movies")));
         let unplugged = Path::new("/mnt/cinevault-test-drive-that-is-not-there/Movies");
         assert_eq!(drive_is_mounted(unplugged), !cfg!(target_os = "linux"));
+    }
+
+    #[test]
+    fn a_path_in_a_share_mount_folder_names_that_folder() {
+        let home = std::env::temp_dir().join("home");
+        let home = home.to_string_lossy();
+        let folder = |path: &Path| share_mount_folder(&path.to_string_lossy(), &home);
+        let mounts = Path::new(home.as_ref()).join(MAC_SHARE_MOUNTS);
+        let movies = mounts.join("nas").join("movies");
+        let expected = Some(movies.to_string_lossy().into_owned());
+        assert_eq!(folder(&movies), expected);
+        assert_eq!(folder(&movies.join("Films").join("Heat (1995)")), expected);
+        assert_eq!(folder(&mounts.join("nas")), None, "the server folder alone");
+        assert_eq!(folder(&mounts), None);
+        assert_eq!(folder(&Path::new(home.as_ref()).join("Movies")), None);
+        let sibling = Path::new(home.as_ref())
+            .join("CineVault Shares2")
+            .join("nas")
+            .join("a");
+        assert_eq!(folder(&sibling), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_empty_share_mount_folder_does_not_pass_for_the_share() {
+        let home = tempfile::tempdir().expect("temp dir");
+        let films = home
+            .path()
+            .join(MAC_SHARE_MOUNTS)
+            .join("nas")
+            .join("movies")
+            .join("Films");
+        std::fs::create_dir_all(&films).expect("mount folder");
+        // Nothing is mounted on `nas/movies`: its folders do not answer.
+        assert!(!share_is_mounted(&films, home.path()));
+        assert!(!share_is_mounted(films.parent().unwrap(), home.path()));
+        // Folders elsewhere in the home folder are there.
+        assert!(share_is_mounted(&home.path().join("Movies"), home.path()));
     }
 
     #[test]
