@@ -612,6 +612,10 @@ impl<F: Fs> Fs for FaultFs<F> {
         self.gate(Op::List, path, None)?;
         self.inner.list_dir(path)
     }
+
+    fn sync_dir(&self, path: &Path) {
+        self.inner.sync_dir(path);
+    }
 }
 
 #[cfg(test)]

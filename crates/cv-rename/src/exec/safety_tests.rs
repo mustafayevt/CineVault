@@ -178,6 +178,8 @@ impl Fs for CaseSensitiveFs {
         names.sort();
         Ok(names)
     }
+
+    fn sync_dir(&self, _: &Path) {}
 }
 
 const ROOT: &str = "/mem/ds";
@@ -302,6 +304,9 @@ impl Fs for SecondHalfFails {
     }
     fn list_dir(&self, path: &Path) -> io::Result<Vec<String>> {
         self.inner.list_dir(path)
+    }
+    fn sync_dir(&self, path: &Path) {
+        self.inner.sync_dir(path);
     }
 }
 
