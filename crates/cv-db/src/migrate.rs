@@ -16,15 +16,17 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::Connection;
 
+use crate::backup;
 use crate::error::{DbError, DbResult};
 use crate::header::{self, LibraryFile};
 use crate::schema::{self, Migration};
 
 /// Folder (relative to the database's folder) that holds pre-migration snapshots.
 ///
-/// Kept apart from the rolling daily backups so their retention never prunes it.
+/// Kept apart from the daily backups in `backups/` ([`crate::backup`]): their retention removes
+/// only files named `library-YYYY-MM-DD.db` and never looks into this folder.
 pub const PRE_MIGRATION_DIR: &str = "backups/pre-migration";
 
 /// What the migration runner did.
@@ -115,30 +117,11 @@ fn snapshot(conn: &Connection, db_path: &Path, version: u32) -> DbResult<PathBuf
     let result = conn
         .execute("VACUUM INTO ?1", [target.to_string_lossy().as_ref()])
         .map_err(|e| DbError::Backup(format!("cannot write {}: {e}", target.display())))
-        .and_then(|_| verify(&target, version));
+        .and_then(|_| backup::verify(&target, version));
     if let Err(e) = result {
         let _ = std::fs::remove_file(&target);
         return Err(e);
     }
     tracing::info!(backup = %target.display(), version, "pre-migration backup written");
     Ok(target)
-}
-
-/// The copy must open, pass SQLite's integrity check and carry the version it was taken at.
-fn verify(copy: &Path, version: u32) -> DbResult<()> {
-    let unreadable =
-        |e: rusqlite::Error| DbError::Backup(format!("{} is unreadable: {e}", copy.display()));
-    let conn =
-        Connection::open_with_flags(copy, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(unreadable)?;
-    let integrity: String = conn
-        .pragma_query_value(None, "integrity_check", |r| r.get(0))
-        .map_err(unreadable)?;
-    let found = schema::current_version(&conn).map_err(|e| DbError::Backup(e.to_string()))?;
-    if integrity != "ok" || found != version {
-        return Err(DbError::Backup(format!(
-            "{} failed verification (integrity `{integrity}`, version {found})",
-            copy.display()
-        )));
-    }
-    Ok(())
 }

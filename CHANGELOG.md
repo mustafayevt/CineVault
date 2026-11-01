@@ -15,6 +15,9 @@ What changed in each version of CineVault, newest first, in plain words. The app
 ### Changed
 
 - IMDb is no longer read from its web site, which kept asking for a human check. IMDb data comes through OMDb with your OMDb key, and IMDb ratings as before.
+### Added
+
+- CineVault keeps a checked backup of your library every day (the last seven), so History and Undo can be brought back; it tells you if backups keep failing.
 
 ## [1.3.0] - 2026-10-31
 

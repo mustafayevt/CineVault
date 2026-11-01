@@ -1247,6 +1247,7 @@ dependencies = [
 name = "cv-db"
 version = "1.3.0"
 dependencies = [
+ "chrono",
  "cv-domain",
  "cv-fs",
  "rusqlite",

@@ -173,6 +173,22 @@ docker exec -it -u cinevault cinevault cinevault-server passwd
 Or clear it and choose a new one on the welcome page: add `--reset` after `passwd` (for Docker,
 without `-it`), restart CineVault as in the table and open the page.
 
+**Daily backups.** While it runs, CineVault keeps a checked copy of the library every day in the
+data folder's `backups` folder (`/srv/cinevault/backups`, or `backups` in the Docker `data` folder),
+as `library-YYYY-MM-DD.db`, and keeps the last seven. If backups keep failing for three days, the
+notification centre says so. To bring one back:
+
+1. Stop CineVault: `sudo systemctl stop cinevault-server` or `docker stop cinevault`.
+2. In the data folder, rename `library.db` to `library-before-restore.db`, and move
+   `library.db-wal` and `library.db-shm` aside if they are there.
+3. Copy `backups/library-YYYY-MM-DD.db` to the data folder as `library.db`, owned by the same user
+   as the other files (`sudo cp -p` on Linux; the container fixes the owner of `/data` at start).
+4. Start CineVault again.
+
+The library, History and Undo go back to that day. Files renamed or moved after it are found again
+by the next scan, but those changes cannot be undone from CineVault. Swap the files the same way to
+go back.
+
 **Back up** the library together with its key (`/srv/cinevault` and
 `/etc/cinevault/cinevault.key`, or the Docker `data` folder and `secret.key`), ideally while
 CineVault is stopped. Without the key your saved provider keys cannot be read again; you would just
