@@ -14,6 +14,10 @@ serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+cv-fs.workspace = true
+dirs.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 
