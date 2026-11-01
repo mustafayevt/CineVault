@@ -1,6 +1,7 @@
 //! The app services booted on a temporary data folder: one shared library, the
-//! settings notice, daily backups, the thumbnail cache, persisted jobs resumed on launch, jobs
-//! paused on quit, and failures routed to the notification centre.
+//! settings notice, the daily library backup (written after the first check, stopped on quit),
+//! the thumbnail cache, persisted jobs resumed on launch, jobs paused on quit, and failures
+//! routed to the notification centre.
 
 mod support;
 
@@ -8,6 +9,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use cv_app::backups::BackupSchedule;
 use cv_app::data_location::{DataLocation, LocationInputs};
 use cv_app::local_library::LOCAL_IMPORT_JOB;
 use cv_app::matching::batch::{BatchMode, MATCH_JOB_KIND, plan_batch};
@@ -247,6 +249,38 @@ async fn job_failures_reach_the_notification_centre() {
     // One finished job gives one notice.
     tokio::time::sleep(Duration::from_millis(300)).await;
     assert_eq!(seen.lock().unwrap().len(), 1);
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_booted_data_folder_gets_a_daily_backup() {
+    let temp = TempDir::new().unwrap();
+    let schedule = BackupSchedule {
+        first_check: Duration::from_millis(50),
+        every: Duration::from_secs(60 * 60),
+    };
+    let services =
+        AppServices::boot(options(temp.path()).with_backup_schedule(schedule)).expect("boot");
+    let backups = services.location().root().join(cv_db::backup::BACKUPS_DIR);
+    let daily = |dir: &Path| -> Vec<String> {
+        std::fs::read_dir(dir)
+            .map(|rd| {
+                rd.filter_map(|e| e.ok()?.file_name().into_string().ok())
+                    .filter(|name| cv_db::backup::is_daily_name(name))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    services.start();
+
+    let name = until("the daily backup", || daily(&backups).pop()).await;
+    let today = cv_db::backup::file_name(chrono::Local::now().date_naive());
+    assert_eq!(name, today);
+    let copy = cv_db::Database::open(backups.join(&name)).expect("the backup opens as a library");
+    assert_eq!(
+        copy.schema_version().unwrap(),
+        services.db().schema_version().unwrap()
+    );
     services.shutdown();
 }
 

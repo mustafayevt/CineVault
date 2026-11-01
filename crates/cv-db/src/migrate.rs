@@ -25,7 +25,8 @@ use crate::schema::{self, Migration};
 
 /// Folder (relative to the database's folder) that holds pre-migration snapshots.
 ///
-/// Kept apart from the rolling daily backups so their retention never prunes it.
+/// Kept apart from the daily backups in `backups/` ([`crate::backup`]): their retention removes
+/// only files named `library-YYYY-MM-DD.db` and never looks into this folder.
 pub const PRE_MIGRATION_DIR: &str = "backups/pre-migration";
 
 /// What the migration runner did.
