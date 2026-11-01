@@ -116,6 +116,8 @@ async fn shutdown(state: WebState, stopping: Arc<tokio::sync::Notify>) {
     stopping.notify_one();
     // Dropping every stream ends the SSE responses, so axum can finish its graceful shutdown.
     state.streams.close_all();
+    // The browsers stay signed in for the next start.
+    state.auth.flush();
     state.services.shutdown();
 }
 
@@ -176,6 +178,7 @@ pub fn passwd(arguments: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     // Run as root (`sudo`, or `docker exec` without `-u`), the new file would belong to root with
     // mode 0600 and the server, which runs as the data folder's owner, could not read it.
     auth::give_to_folder_owner(&path, location.root());
+    auth::give_to_folder_owner(&location.root().join(auth::SESSIONS_FILE), location.root());
     println!("Password set. Open the server in a browser and sign in.");
     Ok(())
 }
