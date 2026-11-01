@@ -41,9 +41,9 @@
 
 ## 7. Integration checks
 
-- [ ] 7.1 Full checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, the UI suite and build, `openspec validate connect-network-shares --strict`. Verified by the commands passing.
+- [x] 7.1 Full checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, the UI suite and build, `openspec validate connect-network-shares --strict`. Verified by the commands passing.
 - [ ] 7.2 End-to-end on Windows with a throwaway data folder and a real SMB share (needs a person): connect with Remember on, scan, rename one title and undo it, restart the computer and see the titles online, change the NAS password and see "Wrong password" with "Connect…", reconnect, remove the last folder and confirm the credential is gone from Credential Manager, and search the log folder for the password. Verified by the recorded results and screenshots.
-- [ ] 7.3 Data-safety review of the forget and mount-folder cleanup paths (no recursive delete, no delete while mounted) and of every place a password passes. Verified by the review notes in the pull request and a test for each finding.
+- [x] 7.3 Data-safety review of the forget and mount-folder cleanup paths (no recursive delete, no delete while mounted) and of every place a password passes. Verified by the review notes in the pull request and a test for each finding.
 
 ## Workflow follow-up
 

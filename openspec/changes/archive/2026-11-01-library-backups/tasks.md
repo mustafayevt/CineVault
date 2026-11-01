@@ -17,5 +17,5 @@
 
 ## 4. Integration checks
 
-- [ ] 4.1 Full checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo test -p cv-compat`, `openspec validate library-backups --strict`. Verified by the commands passing.
+- [x] 4.1 Full checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo test -p cv-compat`, `openspec validate library-backups --strict`. Verified by the commands passing.
 - [ ] 4.2 Real run with a throwaway data folder on Windows (desktop app) and Linux (headless server): a backup appears about a minute after start, the app stays responsive during it, killing the process mid-copy leaves only a `.partial` that the next start removes, and restoring a backup by the documented steps opens that library. Needs a person for the desktop run. Verified by the recorded results.

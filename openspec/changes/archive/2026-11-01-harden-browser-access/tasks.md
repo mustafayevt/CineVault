@@ -29,5 +29,5 @@
 ## 6. Documentation and integration
 
 - [x] 6.1 `packaging/README.md`: the trusted-proxy paragraph says a proxied request is outside the home network unless listed, and how to set a tool path in `settings.json` while the server is stopped; `CHANGELOG.md` lines under the unreleased version and `bun run site:changelog`. Verified by `bun run site:changelog -- --check`.
-- [ ] 6.2 Full checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, the UI suite and build, `openspec validate harden-browser-access --strict`. Verified by the commands passing.
+- [x] 6.2 Full checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, the UI suite and build, `openspec validate harden-browser-access --strict`. Verified by the commands passing.
 - [ ] 6.3 Real run with a throwaway data folder: the headless server behind a local reverse proxy without and with `CINEVAULT_WEB_TRUST_PROXY` (setup refused, then allowed), restart with a signed-in curl session (still signed in), `set_setting` for the update channel refused, headers checked with curl; and on Windows, the desktop app's Browser access survives a quit and start with a signed-in headless browser. Needs a person for the desktop part. Verified by the recorded results.
