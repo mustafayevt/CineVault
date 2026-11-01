@@ -9,6 +9,7 @@ pub mod automation;
 pub mod caches;
 pub mod changes;
 pub mod collections;
+pub mod copies;
 pub mod curation;
 pub mod data_location;
 pub mod data_sources;
