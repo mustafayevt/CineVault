@@ -37,6 +37,8 @@ const MAX_SESSIONS: usize = 32;
 const MAX_FAILURES: usize = 5;
 const MAX_GLOBAL_FAILURES: usize = 100;
 const FAILURE_WINDOW: Duration = Duration::from_secs(60);
+/// Password checks that may run at once, whatever the rate of attempts.
+const MAX_CHECKS: usize = 2;
 /// How long a reset PIN is valid.
 pub const PIN_LIFETIME: Duration = Duration::from_secs(15 * 60);
 /// Wrong PINs before the PIN is void.
@@ -157,6 +159,8 @@ pub struct Auth {
     sessions: Mutex<HashMap<String, Session>>,
     setup_claim: Mutex<Option<(String, Instant)>>,
     failures: Mutex<Failures>,
+    /// Permits for the password checks, which run on blocking threads.
+    checks: tokio::sync::Semaphore,
     reset: Mutex<ResetState>,
 }
 
@@ -176,8 +180,10 @@ impl Failures {
             .retain(|at| now.duration_since(*at) <= FAILURE_WINDOW);
     }
 
-    fn blocked(&self, client: &str) -> bool {
-        self.global.len() >= MAX_GLOBAL_FAILURES
+    /// The address's own limit, and the global ceiling for an address outside the home network,
+    /// so a flood from the internet cannot lock the owner out at home.
+    fn blocked(&self, client: &str, home: bool) -> bool {
+        (!home && self.global.len() >= MAX_GLOBAL_FAILURES)
             || self
                 .per_client
                 .get(client)
@@ -192,8 +198,12 @@ impl Failures {
         self.global.push(now);
     }
 
-    fn clear(&mut self, client: &str) {
+    /// A right password: the address starts afresh and its provisional failure is taken back.
+    fn clear(&mut self, client: &str, at: Instant) {
         self.per_client.remove(client);
+        if let Some(position) = self.global.iter().position(|recorded| *recorded == at) {
+            self.global.remove(position);
+        }
     }
 }
 
@@ -213,6 +223,16 @@ fn hash_password(password: &str) -> Result<AuthFile, AuthError> {
     Ok(AuthFile {
         version: VERSION,
         hash,
+    })
+}
+
+/// Whether `password` matches the PHC string `hash`. Argon2 is slow on purpose; call it off the
+/// async workers.
+fn verify_hash(hash: &str, password: &str) -> bool {
+    PasswordHash::new(hash).is_ok_and(|parsed| {
+        Argon2::default()
+            .verify_password(password.as_bytes(), &parsed)
+            .is_ok()
     })
 }
 
@@ -259,6 +279,7 @@ impl Auth {
             sessions: Mutex::new(HashMap::new()),
             setup_claim: Mutex::new(None),
             failures: Mutex::new(Failures::default()),
+            checks: tokio::sync::Semaphore::new(MAX_CHECKS),
             reset: Mutex::new(ResetState::default()),
         })
     }
@@ -378,7 +399,7 @@ impl Auth {
 
     /// Changes the password from a signed-in session. The current password is required; the
     /// caller ends every other session.
-    pub fn change_password(
+    pub async fn change_password(
         &self,
         current: &str,
         password: &str,
@@ -388,55 +409,67 @@ impl Auth {
         if self.current().is_none() {
             return Err(AuthError::NoPassword);
         }
-        if !self.check_password(current) {
+        if !self.check_password(current).await {
             return Err(AuthError::WrongPassword);
         }
         self.write(hash_password(password)?)
     }
 
     /// Checks a password without starting a session (for a sensitive confirmation).
-    pub fn check_password(&self, password: &str) -> bool {
-        let file = self.current();
-        let Some(file) = file else {
+    pub async fn check_password(&self, password: &str) -> bool {
+        let Some(file) = self.current() else {
             return false;
         };
-        let Ok(parsed) = PasswordHash::new(&file.hash) else {
-            return false;
-        };
-        Argon2::default()
-            .verify_password(password.as_bytes(), &parsed)
-            .is_ok()
+        self.check_hash(file.hash, password).await.unwrap_or(false)
     }
 
-    /// Checks a password and starts a session, with the five-a-minute limit and a global
-    /// ceiling. The check, the verification and the record happen under one lock, so concurrent
-    /// attempts cannot slip past the limit together.
-    pub fn login(
+    /// The same check on this thread, for the command line, which has nothing else to run.
+    pub fn check_password_blocking(&self, password: &str) -> bool {
+        self.current()
+            .is_some_and(|file| verify_hash(&file.hash, password))
+    }
+
+    /// Runs one password check on a blocking thread, at most [`MAX_CHECKS`] at a time.
+    async fn check_hash(&self, hash: String, password: &str) -> Result<bool, AuthError> {
+        let _permit = self
+            .checks
+            .acquire()
+            .await
+            .map_err(|error| AuthError::Hash(error.to_string()))?;
+        let password = password.to_owned();
+        tokio::task::spawn_blocking(move || verify_hash(&hash, &password))
+            .await
+            .map_err(|error| AuthError::Hash(error.to_string()))
+    }
+
+    /// Checks a password and starts a session, with the five-a-minute limit per address and,
+    /// outside the home network, the global ceiling. The attempt is recorded as a failure before
+    /// the check and taken back when the password is right, so concurrent attempts cannot slip
+    /// past the limit together, and the failures lock is not held while the check runs.
+    pub async fn login(
         &self,
         password: &str,
         client: &str,
         agent: &str,
+        home: bool,
     ) -> Result<(String, Session), AuthError> {
-        let file = self.current();
-        let Some(file) = file else {
+        let Some(file) = self.current() else {
             return Err(AuthError::NoPassword);
         };
-        let parsed = PasswordHash::new(&file.hash).map_err(|_| AuthError::Damaged)?;
-        let now = Instant::now();
-        let mut failures = Self::lock(&self.failures);
-        failures.prune(now);
-        if failures.blocked(client) {
-            return Err(AuthError::TooManyAttempts);
-        }
-        if Argon2::default()
-            .verify_password(password.as_bytes(), &parsed)
-            .is_err()
+        PasswordHash::new(&file.hash).map_err(|_| AuthError::Damaged)?;
+        let at = Instant::now();
         {
-            failures.record(client, now);
+            let mut failures = Self::lock(&self.failures);
+            failures.prune(at);
+            if failures.blocked(client, home) {
+                return Err(AuthError::TooManyAttempts);
+            }
+            failures.record(client, at);
+        }
+        if !self.check_hash(file.hash, password).await? {
             return Err(AuthError::WrongPassword);
         }
-        failures.clear(client);
-        drop(failures);
+        Self::lock(&self.failures).clear(client, at);
         Ok(self.create_session(client, agent))
     }
 
@@ -1100,45 +1133,136 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn the_password_is_hashed_and_signs_in() {
+    #[tokio::test]
+    async fn the_password_is_hashed_and_signs_in() {
         let (dir, auth) = with_password();
         assert!(!auth.needs_setup());
         let saved = std::fs::read_to_string(dir.path().join(AUTH_FILE)).unwrap();
         assert!(saved.contains("$argon2"));
         assert!(!saved.contains(GOOD));
-        let (again, session) = auth.login(GOOD, "127.0.0.1", "Edge").unwrap();
+        let (again, session) = auth.login(GOOD, "127.0.0.1", "Edge", true).await.unwrap();
         assert!(auth.session(&again).is_some());
         assert!(!session.csrf.is_empty());
         assert_ne!(session.handle, again);
     }
 
-    #[test]
-    fn a_wrong_password_is_refused_and_rate_limited() {
+    #[tokio::test]
+    async fn a_wrong_password_is_refused_and_rate_limited() {
         let (_dir, auth) = with_password();
         for _ in 0..5 {
             assert!(matches!(
-                auth.login("wrong password", "127.0.0.1", ""),
+                auth.login("wrong password", "127.0.0.1", "", true).await,
                 Err(AuthError::WrongPassword)
             ));
         }
         assert!(matches!(
-            auth.login(GOOD, "127.0.0.1", ""),
+            auth.login(GOOD, "127.0.0.1", "", true).await,
             Err(AuthError::TooManyAttempts)
         ));
     }
 
+    #[tokio::test]
+    async fn a_right_password_after_four_wrong_ones_signs_in() {
+        let (_dir, auth) = with_password();
+        for _ in 0..4 {
+            assert!(
+                auth.login("wrong password", "203.0.113.7", "", false)
+                    .await
+                    .is_err()
+            );
+        }
+        assert!(auth.login(GOOD, "203.0.113.7", "", false).await.is_ok());
+        // The address starts afresh.
+        assert!(Auth::lock(&auth.failures).per_client.is_empty());
+    }
+
+    /// A flood from many public addresses reaches the global ceiling. The owner at home still
+    /// signs in; a new public address is refused without a check.
+    #[tokio::test]
+    async fn a_flood_from_the_internet_does_not_lock_out_the_home_network() {
+        let (_dir, auth) = with_password();
+        {
+            let now = Instant::now();
+            let mut failures = Auth::lock(&auth.failures);
+            for n in 0..MAX_GLOBAL_FAILURES {
+                failures.record(&format!("198.51.100.{}", n % 250), now);
+            }
+        }
+        assert!(auth.login(GOOD, "192.168.1.30", "", true).await.is_ok());
+        assert!(matches!(
+            auth.login(GOOD, "203.0.113.7", "", false).await,
+            Err(AuthError::TooManyAttempts)
+        ));
+    }
+
+    /// Ten wrong attempts at once from one address: five are checked, the rest refused.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_attempts_cannot_slip_past_the_limit() {
+        let (_dir, auth) = with_password();
+        let auth = std::sync::Arc::new(auth);
+        let mut attempts = tokio::task::JoinSet::new();
+        for _ in 0..10 {
+            let auth = std::sync::Arc::clone(&auth);
+            attempts
+                .spawn(async move { auth.login("wrong password", "203.0.113.7", "", false).await });
+        }
+        let (mut checked, mut refused) = (0, 0);
+        while let Some(result) = attempts.join_next().await {
+            match result.unwrap() {
+                Err(AuthError::WrongPassword) => checked += 1,
+                Err(AuthError::TooManyAttempts) => refused += 1,
+                other => panic!("unexpected {:?}", other.map(|_| ())),
+            }
+        }
+        assert_eq!((checked, refused), (MAX_FAILURES, 10 - MAX_FAILURES));
+    }
+
+    /// While a check waits or runs, another address is answered: the failures lock is not held.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn the_failures_lock_is_free_during_a_check() {
+        let (_dir, auth) = with_password();
+        let auth = std::sync::Arc::new(auth);
+        {
+            let now = Instant::now();
+            let mut failures = Auth::lock(&auth.failures);
+            for _ in 0..MAX_FAILURES {
+                failures.record("203.0.113.9", now);
+            }
+        }
+        // Every check permit is taken, so the next check waits.
+        let held = auth.checks.acquire_many(MAX_CHECKS as u32).await.unwrap();
+        let waiting = tokio::spawn({
+            let auth = std::sync::Arc::clone(&auth);
+            async move { auth.login(GOOD, "192.168.1.30", "", true).await }
+        });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let other = tokio::time::timeout(
+            Duration::from_secs(2),
+            auth.login(GOOD, "203.0.113.9", "", false),
+        )
+        .await
+        .expect("another address is answered while a check is pending");
+        assert!(matches!(other, Err(AuthError::TooManyAttempts)));
+        assert!(!waiting.is_finished());
+        drop(held);
+        assert!(waiting.await.unwrap().is_ok());
+    }
+
     /// `cinevault-server passwd` writes the file while the server runs; the running server
     /// accepts the new password at once and refuses the old one.
-    #[test]
-    fn a_password_set_on_the_command_line_works_without_a_restart() {
+    #[tokio::test]
+    async fn a_password_set_on_the_command_line_works_without_a_restart() {
         let (dir, auth) = with_password();
         let command_line = Auth::open(dir.path()).unwrap();
         command_line
             .set_password_unattended("the second long password")
             .unwrap();
-        assert!(auth.login("the second long password", "a", "").is_ok());
-        assert!(auth.login(GOOD, "b", "").is_err());
+        assert!(
+            auth.login("the second long password", "a", "", true)
+                .await
+                .is_ok()
+        );
+        assert!(auth.login(GOOD, "b", "", true).await.is_err());
     }
 
     #[test]
@@ -1149,20 +1273,26 @@ mod tests {
         }
     }
 
-    #[test]
-    fn sign_out_ends_the_session() {
+    #[tokio::test]
+    async fn sign_out_ends_the_session() {
         let (_dir, auth) = with_password();
-        let (id, _) = auth.login(GOOD, "a", "").unwrap();
+        let (id, _) = auth.login(GOOD, "a", "", true).await.unwrap();
         auth.logout(&id);
         assert!(auth.session(&id).is_none());
     }
 
-    #[test]
-    fn sessions_are_listed_and_signed_out_by_handle() {
+    #[tokio::test]
+    async fn sessions_are_listed_and_signed_out_by_handle() {
         let (_dir, auth) = with_password();
         auth.logout_all_except(None);
-        let (first, one) = auth.login(GOOD, "192.168.1.30", "Phone browser").unwrap();
-        let (second, _) = auth.login(GOOD, "192.168.1.31", "TV browser").unwrap();
+        let (first, one) = auth
+            .login(GOOD, "192.168.1.30", "Phone browser", true)
+            .await
+            .unwrap();
+        let (second, _) = auth
+            .login(GOOD, "192.168.1.31", "TV browser", true)
+            .await
+            .unwrap();
         let list = auth.sessions();
         assert_eq!(list.len(), 2);
         assert!(
@@ -1195,10 +1325,10 @@ mod tests {
         assert!(matches!(Auth::open(dir.path()), Err(AuthError::Damaged)));
     }
 
-    #[test]
-    fn a_reset_pin_is_written_to_a_file_and_signs_everyone_else_out() {
+    #[tokio::test]
+    async fn a_reset_pin_is_written_to_a_file_and_signs_everyone_else_out() {
         let (dir, auth) = with_password();
-        let (old, _) = auth.login(GOOD, "a", "").unwrap();
+        let (old, _) = auth.login(GOOD, "a", "", true).await.unwrap();
         let started = auth.start_reset().unwrap();
         assert!(started.created);
         assert_eq!(started.path, dir.path().join(PIN_FILE));
@@ -1217,8 +1347,12 @@ mod tests {
         assert!(auth.session(&id).is_some());
         assert!(auth.session(&old).is_none());
         assert!(!dir.path().join(PIN_FILE).exists());
-        assert!(auth.login("a brand new password", "c", "").is_ok());
-        assert!(auth.login(GOOD, "d", "").is_err());
+        assert!(
+            auth.login("a brand new password", "c", "", true)
+                .await
+                .is_ok()
+        );
+        assert!(auth.login(GOOD, "d", "", true).await.is_err());
         // The PIN works once.
         assert!(matches!(
             auth.finish_reset(
@@ -1279,8 +1413,8 @@ mod tests {
         assert!(auth.start_reset_at(later).unwrap().created);
     }
 
-    #[test]
-    fn an_expired_pin_is_refused_and_its_file_deleted() {
+    #[tokio::test]
+    async fn an_expired_pin_is_refused_and_its_file_deleted() {
         let (dir, auth) = with_password();
         let now = Instant::now();
         auth.start_reset_at(now).unwrap();
@@ -1298,7 +1432,7 @@ mod tests {
             Err(AuthError::NoPin)
         ));
         assert!(!dir.path().join(PIN_FILE).exists());
-        assert!(auth.login(GOOD, "a", "").is_ok());
+        assert!(auth.login(GOOD, "a", "", true).await.is_ok());
     }
 
     #[test]
@@ -1384,6 +1518,6 @@ mod tests {
         );
         assert_eq!(file_meta.uid(), folder_meta.uid());
         assert_eq!(file_meta.gid(), folder_meta.gid());
-        assert!(auth.check_password("a long enough password"));
+        assert!(auth.check_password_blocking("a long enough password"));
     }
 }

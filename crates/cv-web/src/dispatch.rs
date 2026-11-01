@@ -1343,7 +1343,7 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             let intent: String = arg(args, "intent")?;
             let password: String = arg(args, "password")?;
             if !DeleteGuard::enabled(&state.services)
-                || !state.auth.check_password(&password)
+                || !state.auth.check_password(&password).await
                 || !state.delete_guard.consume(&intent, &ids)
             {
                 return Err(json!({

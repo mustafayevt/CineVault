@@ -347,9 +347,11 @@ async fn login(
     Json(body): Json<PasswordBody>,
 ) -> Response {
     let client = client_ip(&headers, peer.ip(), &state.trust_proxy).to_string();
+    let home = from_home_network(&state, &headers, peer.ip());
     match state
         .auth
-        .login(&body.password, &client, &user_agent(&headers))
+        .login(&body.password, &client, &user_agent(&headers), home)
+        .await
     {
         Ok((id, _)) => {
             let mut response = Json(json!({ "ok": true })).into_response();
@@ -585,6 +587,7 @@ async fn server_password(
     match state
         .auth
         .change_password(&body.current, &body.password, &body.confirm)
+        .await
     {
         Ok(()) => {
             state.auth.logout_all_except(Some(&session_id));
@@ -697,7 +700,7 @@ async fn delete_intent(
         )
             .into_response();
     }
-    if !state.auth.check_password(&body.password) {
+    if !state.auth.check_password(&body.password).await {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "message": "That password is not right." })),
@@ -733,7 +736,7 @@ async fn delete_erase(
         )
             .into_response();
     }
-    if !state.auth.check_password(&body.password) {
+    if !state.auth.check_password(&body.password).await {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "message": "That password is not right." })),

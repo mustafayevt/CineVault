@@ -163,7 +163,7 @@ pub fn passwd(arguments: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let auth = auth::Auth::open(location.root())?;
     if auth.has_password() {
         let current = rpassword::prompt_password("Current password: ")?;
-        if !auth.check_password(&current) {
+        if !auth.check_password_blocking(&current) {
             return Err("That password is not right.".into());
         }
     }

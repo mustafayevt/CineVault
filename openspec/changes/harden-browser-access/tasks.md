@@ -13,7 +13,7 @@
 
 ## 3. Sign-in limits
 
-- [ ] 3.1 Make `Auth::login` and `check_password` async: provisional failure recorded under the lock, a two-permit semaphore, Argon2 in `spawn_blocking`, the record cleared on success; the global ceiling applies only outside the home network. Verified by `auth` tests: five failures block an address; 100 public failures do not block a home-network sign-in but block a new public address; ten concurrent wrong attempts from one address leave at most five checked; a right password after four wrong ones signs in; the failures lock is not held during the check (a second address is answered while a check runs).
+- [x] 3.1 Make `Auth::login` and `check_password` async: provisional failure recorded under the lock, a two-permit semaphore, Argon2 in `spawn_blocking`, the record cleared on success; the global ceiling applies only outside the home network. Verified by `auth` tests: five failures block an address; 100 public failures do not block a home-network sign-in but block a new public address; ten concurrent wrong attempts from one address leave at most five checked; a right password after four wrong ones signs in; the failures lock is not held during the check (a second address is answered while a check runs).
 
 ## 4. Origin and framing
 
