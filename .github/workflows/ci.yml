@@ -104,6 +104,16 @@ jobs:
       - name: Changelog self-test
         run: node scripts/changelog.mjs --self-test
 
+      - name: Server installer self-test
+        if: runner.os == 'Linux'
+        run: sh scripts/install/install.sh --self-test
+
+      - name: Windows installer self-test
+        if: runner.os == 'Windows'
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install/install.ps1 -SelfTest
+          pwsh -NoProfile -File scripts/install/install.ps1 -SelfTest
+
       - name: Site changelog is current
         run: bun run site:changelog -- --check
 

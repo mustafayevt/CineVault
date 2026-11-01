@@ -101,7 +101,8 @@ The installer asks for your movie and TV folders, starts CineVault and opens
 Keep it on your home network or behind a VPN; never forward its port to the internet. Not in the
 beta yet: ARM computers (Raspberry Pi, ARM NAS) and "Open in Kodi".
 **[The full guide](packaging/README.md)** covers each step, the commands to stop, start and update it,
-a forgotten password, backups, installing by hand with Docker or the packages, and troubleshooting.
+a forgotten password, backups, installing by hand with Docker or the packages,
+[library folders on a NAS](packaging/README.md#library-folders-on-a-nas) and troubleshooting.
 
 The desktop app and the server can share a data folder, but only one may open it at a time. The
 server holds a `library-owner.json` lock; the desktop app refuses that folder and the `cinevault`
