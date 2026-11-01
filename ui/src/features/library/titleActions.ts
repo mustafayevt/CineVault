@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Copy,
   Eye,
   EyeOff,
   FileSearch,
@@ -23,6 +24,7 @@ export type TitleActionId =
   | "open"
   | "play"
   | "open-folder"
+  | "compare-copies"
   | "rename"
   | "scrape"
   | "artwork"
@@ -75,6 +77,13 @@ export const TITLE_ACTIONS: Readonly<Record<TitleActionId, TitleActionDef>> = {
     icon: FolderOpen,
     short: "title.action.openFolder",
     full: "title.action.openFolder",
+    single: true,
+  },
+  "compare-copies": {
+    id: "compare-copies",
+    icon: Copy,
+    short: "copies.act.compare",
+    full: "copies.act.compare",
     single: true,
   },
   rename: {
@@ -163,7 +172,7 @@ export const MORE_ORDER: readonly TitleActionId[] = [
 
 /** The right-click menu: groups divided by a separator. Every action of the bar and More is here. */
 export const MENU_GROUPS: readonly (readonly TitleActionId[])[] = [
-  ["open", "play", "open-folder"],
+  ["open", "play", "open-folder", "compare-copies"],
   [
     "rename",
     "scrape",

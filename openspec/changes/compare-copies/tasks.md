@@ -25,8 +25,8 @@
 
 - [x] 5.1 The "Copies <n>" chip after Problems for movies, shown while the count is above zero or it is on, wired to the list filter, with its English message. Verified by `bun run test` (chip shown and hidden, TV shows without it, the list filtered, "No titles match" after the last group is resolved) and `bun run lint` and `bun run typecheck`.
 - [x] 5.2 The "<n> copies" poster badge for open groups. Verified by `bun run test` (badge on both copies, gone after Keep both) and `bun run shots -- --routes /library`.
-- [ ] 5.3 The Movie page line "You have <n> copies · Compare". Verified by `bun run test` (line shown for kept and open groups, absent without copies) and `bun run check:facts`.
-- [ ] 5.4 "Compare <n> copies" in the title right-click menu with the title actions, single movie with copies only. Verified by `bun run test` (`titleActions.test.tsx`: shown for a movie with two copies, absent for several titles and for a movie without copies, opens the page).
+- [x] 5.3 The Movie page line "You have <n> copies · Compare". Verified by `bun run test` (line shown for kept and open groups, absent without copies) and `bun run check:facts`.
+- [x] 5.4 "Compare <n> copies" in the title right-click menu with the title actions, single movie with copies only. Verified by `bun run test` (`titleActions.test.tsx`: shown for a movie with two copies, absent for several titles and for a movie without copies, opens the page).
 
 ## 6. Compare copies page
 

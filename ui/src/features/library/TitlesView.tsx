@@ -97,6 +97,7 @@ export function TitlesView({ type, text, onClearText }: TitlesViewProps) {
           title: known?.title ?? "",
           folder: known?.folder ?? "",
           filesMissing: known?.filesMissing ?? false,
+          copies: known?.copies ?? 0,
         };
       }),
     [selection.selected, listing.seen, type],

@@ -22,6 +22,8 @@ export interface TitleTarget {
   folder: string;
   /** The files cannot be reached (the Missing flag: missing or offline). */
   filesMissing: boolean;
+  /** The copies of the movie in its group, kept or not; 0 or absent when it has none. */
+  copies?: number | undefined;
 }
 
 /** One action ready to render in the selection bar, the right-click menu or More. */
@@ -35,6 +37,8 @@ export interface ResolvedTitleAction {
   onSelect: () => void;
   /** Why it cannot run now; the control stays reachable and says so. */
   disabledReason?: string | undefined;
+  /** The menu leaves it out (Compare for a title without copies). */
+  hidden?: boolean;
 }
 
 export type TitleActionSet = Readonly<Record<TitleActionId, ResolvedTitleAction>>;
@@ -103,6 +107,13 @@ export function useLibraryActions(targets: readonly TitleTarget[]): TitleActionS
         },
         disabledReason: needOne ?? (single?.folder === "" ? t("title.openFolder.none") : undefined),
       },
+      "compare-copies": {
+        onSelect: () => {
+          if (single !== undefined)
+            void navigate({ to: "/movies/$movieId/copies", params: { movieId: single.id } });
+        },
+        disabledReason: needOne,
+      },
       rename: {
         onSelect: () => void navigate({ to: "/rename", search: { ids: ids.join(",") } as never }),
         disabledReason: none,
@@ -157,16 +168,20 @@ export function useLibraryActions(targets: readonly TitleTarget[]): TitleActionS
       },
     };
 
+    const copies = single?.kind === "movie" ? (single.copies ?? 0) : 0;
     const entries = IDS.map((id): [TitleActionId, ResolvedTitleAction] => {
       const def = TITLE_ACTIONS[id];
+      // Compare is named for the copies of the film, not for the selection.
+      const compare = id === "compare-copies";
       return [
         id,
         {
           def,
           id,
-          short: shortLabel(id),
-          label: fullLabel(id, count),
+          short: compare ? t("copies.act.compare", { count: copies }) : shortLabel(id),
+          label: compare ? t("copies.act.compare", { count: copies }) : fullLabel(id, count),
           ...run[id],
+          ...(compare && copies === 0 ? { hidden: true } : {}),
         },
       ];
     });

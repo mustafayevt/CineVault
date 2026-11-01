@@ -22,6 +22,8 @@ export interface SeenTitle {
   title: string;
   folder: string;
   filesMissing: boolean;
+  /** The copies in the movie's group, kept or not. */
+  copies: number;
 }
 
 /** What a view needs of the titles it lists. */
@@ -253,6 +255,7 @@ export function useLibraryListing(
         title: cardTitle(row.card),
         folder: row.path,
         filesMissing: problemOf(row.card) === "missing",
+        copies: row.card.copies_total,
       });
     for (const row of merged ?? []) visit(row);
     for (const row of headItems ?? []) visit(row);

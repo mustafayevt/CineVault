@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { CopiesLine } from "../copies/CopiesLine";
 import { useRememberOpened } from "../search/recents";
 import { useClearNewOnOpen } from "../curation/newFlagActions";
 import { displayTitle, usePreferOriginalTitle } from "../library/displayTitle";
@@ -140,6 +141,7 @@ function MovieView({ detail }: { detail: MovieDetail }) {
             <p className="cv-plot">{detail.plot}</p>
           )}
           <MovieFacts detail={detail} format={format} />
+          <CopiesLine movieId={detail.id} />
           <MovieTags tags={detail.tags} />
           <CastSection credits={detail.credits} />
         </div>
