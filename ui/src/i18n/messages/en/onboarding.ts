@@ -56,7 +56,8 @@ export const onboarding = {
   "setup.ratings.intro":
     "All are optional. Each key adds ratings or artwork to your titles, and any can be added later in Settings.",
   "setup.ratings.optional": "Optional",
-  "setup.ratings.omdb": "Adds IMDb, Rotten Tomatoes and Metacritic ratings",
+  "setup.ratings.omdb":
+    "Adds IMDb data to Scrape, and IMDb, Rotten Tomatoes and Metacritic ratings",
   "setup.ratings.mdblist": "Adds Letterboxd and more ratings",
   "setup.ratings.fanart": "Adds more artwork",
   "setup.ratings.tvdb": "Adds TV artwork and episode data",

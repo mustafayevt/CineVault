@@ -303,8 +303,6 @@ export const commands = {
 	testProviderCredentials: (provider: string, drafts: CredentialDraft[]) => typedError<CredentialTestResult, ProviderCommandError>(__TAURI_INVOKE("test_provider_credentials", { provider, drafts })),
 	/**  The credits About shows: every provider's required notice, marked when the provider is in use. */
 	listProviderAttributions: () => typedError<ProviderAttributionDto[], ProviderCommandError>(__TAURI_INVOKE("list_provider_attributions")),
-	/**  Fetches the IMDb Top 250 chart and stores each title's position. */
-	fetchImdbTop250: (list: Top250ListDto) => typedError<Top250ReportDto, RatingsCommandError>(__TAURI_INVOKE("fetch_imdb_top250", { list })),
 	/**
 	 *  Opens the title's page on a rating source's site (a click on a rating of the ratings strip)
 	 *  in the default browser. Only `http` and `https` addresses are opened.
@@ -3262,7 +3260,7 @@ export type RatingSweepSummaryDto = {
 
 /**  Why a ratings command did not finish. */
 export type RatingsCommandError = {
-	/**  Stable code: `storage`, `format_changed` or `request`. */
+	/**  Stable code: `storage`, `not_found`, `invalid_address` or `failed`. */
 	code: string,
 	/**  Plain sentence for the user. */
 	message: string,
@@ -3900,23 +3898,6 @@ export type ToolStatusDto = {
 	downloaded: boolean,
 	license: string,
 	homepage: string,
-};
-
-/**  Which chart to fetch. */
-export type Top250ListDto = "movies" | "shows";
-
-/**  What storing a chart did. */
-export type Top250ReportDto = {
-	/**  Titles of the library that are on the chart now. */
-	ranked: number,
-	/**  Of those, how many got a new position. */
-	changed: number,
-	/**  Titles that were on the chart before and are not any more. */
-	cleared: number,
-	/**  Titles left alone because they are locked. */
-	locked: number,
-	/**  Chart entries the library does not have. */
-	not_in_library: number,
 };
 
 /**  Why a Torrent search command did not run. */

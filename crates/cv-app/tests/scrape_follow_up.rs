@@ -124,16 +124,17 @@ impl MetadataProvider for OfdbLike {
     }
 }
 
-/// An artwork provider that knows titles by their IMDb ID only.
+/// An artwork provider that knows titles by their IMDb ID only, posing as Fanart.tv, whose key the
+/// rig sets.
 struct ByImdb;
 
 #[async_trait]
 impl Provider for ByImdb {
     fn id(&self) -> &'static str {
-        "imdb"
+        "fanart"
     }
     fn name(&self) -> &'static str {
-        "IMDb"
+        "Fanart.tv"
     }
 }
 
@@ -146,7 +147,7 @@ impl ArtworkProvider for ByImdb {
         _options: &RequestOptions,
     ) -> Result<Vec<ArtworkCandidate>, ProviderError> {
         if ids.get("imdb") != Some("tt0082096") {
-            return Err(ProviderError::NotFound("IMDb".to_owned()));
+            return Err(ProviderError::NotFound("Fanart.tv".to_owned()));
         }
         Ok(vec![ArtworkCandidate {
             kind: MediaFileType::Poster,
@@ -160,16 +161,16 @@ impl ArtworkProvider for ByImdb {
     }
 }
 
-/// An artwork provider with a poster, a fanart and a banner for the same title.
+/// [`ByImdb`] with a poster, a fanart and a banner for the same title.
 struct Gallery;
 
 #[async_trait]
 impl Provider for Gallery {
     fn id(&self) -> &'static str {
-        "imdb"
+        "fanart"
     }
     fn name(&self) -> &'static str {
-        "IMDb"
+        "Fanart.tv"
     }
 }
 
@@ -182,7 +183,7 @@ impl ArtworkProvider for Gallery {
         _options: &RequestOptions,
     ) -> Result<Vec<ArtworkCandidate>, ProviderError> {
         if ids.get("imdb") != Some("tt0082096") {
-            return Err(ProviderError::NotFound("IMDb".to_owned()));
+            return Err(ProviderError::NotFound("Fanart.tv".to_owned()));
         }
         let candidate = |kind, url: &str, width, height| ArtworkCandidate {
             kind,
@@ -222,10 +223,10 @@ struct SlowByImdb(std::time::Duration);
 #[async_trait]
 impl Provider for SlowByImdb {
     fn id(&self) -> &'static str {
-        "imdb"
+        "fanart"
     }
     fn name(&self) -> &'static str {
-        "IMDb"
+        "Fanart.tv"
     }
 }
 
@@ -264,6 +265,7 @@ fn rig_with(artwork_provider: Arc<dyn ArtworkProvider>) -> Rig {
     let providers = Arc::new(ProviderCredentialsService::with_resolver(
         resolver, registry,
     ));
+    providers.set("fanart", "api_key", "a-key").unwrap();
     let settings = Arc::new(SettingsService::in_memory(""));
     let matching = MatchService::new(
         Arc::clone(&lab.db),

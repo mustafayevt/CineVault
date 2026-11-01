@@ -141,10 +141,10 @@ fn rig() -> Rig {
             Duration::ZERO,
         ),
     }));
-    // Needs no key, cannot be reached.
+    // With its keys, cannot be reached.
     registry.register_artwork(Arc::new(Mock {
-        id: "imdb",
-        name: "IMDb",
+        id: "mpdb",
+        name: "MPDb.tv",
         offers: POSTER_ART,
         script: Script::Unreachable,
     }));
@@ -161,6 +161,9 @@ fn rig() -> Rig {
     ));
     providers.set("tmdb", "api_key", "key-one").unwrap();
     providers.set("fanart", "api_key", "key-two").unwrap();
+    for field in ["api_key", "username", "subscription_key"] {
+        providers.set("mpdb", field, "key-three").unwrap();
+    }
     let settings = Arc::new(SettingsService::in_memory(""));
     let fetcher = Arc::new(StaticFetcher::new());
     for (n, url) in [
@@ -305,13 +308,13 @@ async fn quick_providers_answer_before_the_slow_one_and_a_failure_can_be_retried
             .iter()
             .map(|p| p.key.as_str())
             .collect::<Vec<_>>(),
-        ["tmdb", "fanart", "imdb", "tvdb"]
+        ["tmdb", "fanart", "mpdb", "tvdb"]
     );
     let seen = kinds(&events.lock().unwrap());
-    // The providers run side by side, so a quick one can answer (here imdb failing at once)
+    // The providers run side by side, so a quick one can answer (here mpdb failing at once)
     // before the last one has announced itself: every provider announces itself, and before it
     // answers, but the order among the announcements is not fixed.
-    for provider in ["tmdb", "fanart", "imdb", "tvdb"] {
+    for provider in ["tmdb", "fanart", "mpdb", "tvdb"] {
         let started = seen
             .iter()
             .position(|kind| *kind == format!("started {provider}"))
@@ -328,7 +331,7 @@ async fn quick_providers_answer_before_the_slow_one_and_a_failure_can_be_retried
     assert_eq!(seen[seen.len() - 2], "results tmdb 2", "{seen:?}");
     assert_eq!(seen[seen.len() - 1], "done");
     assert!(seen.contains(&"results fanart 1".to_owned()), "{seen:?}");
-    assert!(seen.contains(&"failed imdb retryable=true".to_owned()));
+    assert!(seen.contains(&"failed mpdb retryable=true".to_owned()));
     assert!(seen.contains(&"needs-key tvdb".to_owned()));
 
     // Its candidates carry a thumbnail key in the image cache.
@@ -346,14 +349,14 @@ async fn quick_providers_answer_before_the_slow_one_and_a_failure_can_be_retried
 
     // Retrying the failed provider asks that one only.
     events.lock().unwrap().clear();
-    assert_eq!(registry.retry("s1", "imdb"), RetryOutcome::Started);
+    assert_eq!(registry.retry("s1", "mpdb"), RetryOutcome::Started);
     until("second done", || {
         events.lock().unwrap().last() == Some(&ProviderEvent::Done)
     })
     .await;
     assert_eq!(
         kinds(&events.lock().unwrap()),
-        ["started imdb", "failed imdb retryable=true", "done"]
+        ["started mpdb", "failed mpdb retryable=true", "done"]
     );
 }
 

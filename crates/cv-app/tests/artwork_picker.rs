@@ -33,13 +33,13 @@ fn jpeg(seed: u8, width: u32, height: u32) -> Vec<u8> {
     out.into_inner()
 }
 
-/// An artwork provider with a fixed gallery, under a key that needs no credentials.
+/// An artwork provider with a fixed gallery, posing as Fanart.tv, whose key the rig sets.
 struct Gallery;
 
 #[async_trait]
 impl Provider for Gallery {
     fn id(&self) -> &'static str {
-        "imdb"
+        "fanart"
     }
     fn name(&self) -> &'static str {
         "Gallery"
@@ -122,6 +122,7 @@ fn rig() -> Rig {
     let providers = Arc::new(ProviderCredentialsService::with_resolver(
         resolver, registry,
     ));
+    providers.set("fanart", "api_key", "a-key").unwrap();
     let settings = Arc::new(SettingsService::in_memory(""));
     let fetcher = Arc::new(StaticFetcher::new());
     fetcher.insert("https://img.test/p-ja.jpg", jpeg(1, 80, 120));
@@ -194,7 +195,7 @@ async fn the_picker_lists_the_candidates_best_fit_first_with_their_thumbnails_ca
             options.providers[0].key.as_str(),
             options.providers[0].name.as_str()
         ),
-        ("imdb", "Gallery")
+        ("fanart", "Gallery")
     );
     assert!(options.unreachable.is_empty());
     // The English poster fits the settings and goes first even though the provider scores the

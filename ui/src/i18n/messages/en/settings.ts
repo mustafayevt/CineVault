@@ -605,7 +605,8 @@ export const settings = {
   "settingsPage.providers.tmdb": "TMDB key",
   "settingsPage.providers.tmdb.hint": "Needed for Scrape.",
   "settingsPage.providers.omdb": "OMDb key",
-  "settingsPage.providers.omdb.hint": "Adds IMDb, Rotten Tomatoes and Metacritic ratings.",
+  "settingsPage.providers.omdb.hint":
+    "Adds IMDb data to Scrape, and IMDb, Rotten Tomatoes and Metacritic ratings.",
   "settingsPage.providers.mdblist": "MDBList key",
   "settingsPage.providers.mdblist.hint": "Adds Letterboxd and more ratings.",
   "settingsPage.providers.fanart": "Fanart.tv key",

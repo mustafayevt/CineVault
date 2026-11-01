@@ -12,6 +12,9 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Rename to another drive: a folder that holds a link to another folder is no longer moved, so files outside the title can't be touched; move such a title by hand.
 - Rename to another drive: the copy is written to the disk before the original is removed, so a power cut during a rename can no longer lose the file.
 - Docker: the container starts faster with a large library and keeps the groups your NAS folders need.
+### Changed
+
+- IMDb is no longer read from its web site, which kept asking for a human check. IMDb data comes through OMDb with your OMDb key, and IMDb ratings as before.
 
 ## [1.3.0] - 2026-10-31
 

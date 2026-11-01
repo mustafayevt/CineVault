@@ -147,7 +147,8 @@ fn rating_sources(resolver: &CredentialResolver) -> RatingSources {
     }
 }
 
-/// An artwork provider whose images are files on disk (`file:` addresses).
+/// An artwork provider whose images are files on disk (`file:` addresses), posing as Fanart.tv,
+/// whose key the rig sets.
 struct Gallery {
     poster: String,
 }
@@ -155,7 +156,7 @@ struct Gallery {
 #[async_trait]
 impl Provider for Gallery {
     fn id(&self) -> &'static str {
-        "imdb"
+        "fanart"
     }
     fn name(&self) -> &'static str {
         "Gallery"
@@ -262,6 +263,7 @@ impl Rig {
             poster: file_url(&poster),
         }));
         let providers = ProviderCredentialsService::with_resolver(resolver.clone(), registry);
+        providers.set("fanart", "api_key", "a-key").unwrap();
         let mut options =
             BootOptions::new(location(temp.path()), Arc::new(SecretStore::in_memory()))
                 .with_providers(providers);

@@ -37,13 +37,13 @@ fn jpeg(seed: u8) -> Vec<u8> {
     out.into_inner()
 }
 
-/// An artwork provider with a fixed gallery, under a key that needs no credentials.
+/// An artwork provider with a fixed gallery, posing as Fanart.tv, whose key the rig sets.
 struct Gallery;
 
 #[async_trait]
 impl Provider for Gallery {
     fn id(&self) -> &'static str {
-        "imdb"
+        "fanart"
     }
     fn name(&self) -> &'static str {
         "Gallery"
@@ -94,6 +94,7 @@ fn rig() -> Rig {
     let providers = Arc::new(ProviderCredentialsService::with_resolver(
         resolver, registry,
     ));
+    providers.set("fanart", "api_key", "a-key").unwrap();
     let settings = Arc::new(SettingsService::in_memory(""));
     let matching = MatchService::new(
         Arc::clone(&lab.db),

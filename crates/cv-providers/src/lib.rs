@@ -10,8 +10,6 @@
 //! * [`tmdb`] is the TMDB provider: the most complete implementation of the provider traits.
 //! * [`tvdb`] is the TheTVDB provider: key plus optional subscriber PIN, every episode ordering
 //!   and artwork.
-//! * [`imdb`] is the IMDb provider: titles read from the website's `__NEXT_DATA__` JSON. It is
-//!   best-effort, and a page it cannot read fails with a "page format changed" error.
 //! * [`omdb`], [`trakt`], [`tvmaze`] and [`moviemeter`] are four more metadata providers: OMDb
 //!   (IMDb ID in, details and IMDb, Metacritic and Rotten Tomatoes ratings out), Trakt (public
 //!   metadata with the app's client ID; the OAuth sync is separate), TVmaze (TV shows with
@@ -33,7 +31,7 @@
 //!   dataset, skipping the sources that have no credentials, and holds the fetch settings.
 //! * [`artwork`] is what the artwork providers share: size buckets, the provider-side pre-sort
 //!   and gathering the candidates of several providers. [`fanart`] is the Fanart.tv provider
-//!   (artwork only); TMDB, TheTVDB, IMDb, MPDb.tv and OFDb offer artwork too.
+//!   (artwork only); TMDB, TheTVDB, MPDb.tv and OFDb offer artwork too.
 //! * [`registry`] collects the provider implementations so Settings can test their credentials.
 
 pub mod anidb;
@@ -49,7 +47,6 @@ pub mod fanart;
 pub mod fernsehserien;
 mod german;
 pub mod http;
-pub mod imdb;
 pub mod kodi;
 mod markup;
 pub mod model;
@@ -84,7 +81,6 @@ pub use fallback::{FallbackChain, FallbackScrape, FallbackSearch};
 pub use fanart::FanartProvider;
 pub use fernsehserien::FernsehserienProvider;
 pub use http::{HttpClient, HttpRequest, HttpResponse};
-pub use imdb::{ImdbProvider, Top250Entry, Top250List, Top250Source};
 pub use kodi::{KodiCatalogue, KodiProvider};
 pub use moviemeter::MovieMeterProvider;
 pub use mpdb::MpdbProvider;

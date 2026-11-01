@@ -480,7 +480,7 @@ export function syntheticMovieDetail(now: number = Date.now()): MovieDetail {
       },
       {
         name: "Teaser",
-        provider: "imdb",
+        provider: "trakt",
         quality: "1080p",
         language: "en",
         url: "https://example.test/teaser",
