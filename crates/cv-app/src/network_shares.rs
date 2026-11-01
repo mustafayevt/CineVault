@@ -67,6 +67,7 @@ use cv_shares::{
 };
 
 use crate::data_sources::{DataSourceError, DataSourceService};
+use crate::onboarding::{SuggestedKind, analyze_folder};
 use crate::redact;
 use crate::secrets::{SecretError, SecretStore};
 
@@ -166,11 +167,12 @@ pub fn secret_account(id: i64) -> String {
 }
 
 /// What the Network share page sends: the address with an optional folder inside the share, the
-/// library type of that folder, the login, and whether to remember the password.
+/// library type of that folder (`None`: what the folder holds decides, as for "Add folder…"), the
+/// login, and whether to remember the password.
 #[derive(Debug, Clone)]
 pub struct ConnectRequest {
     pub address: Address,
-    pub kind: SourceKind,
+    pub kind: Option<SourceKind>,
     pub login: Login,
     pub remember: bool,
 }
@@ -279,6 +281,13 @@ impl NetworkShareService {
         }
     }
 
+    /// Whether this computer can connect shares for CineVault at all (a Linux desktop without
+    /// user-level share mounting cannot).
+    #[must_use]
+    pub fn support(&self) -> cv_shares::Support {
+        self.connector.support()
+    }
+
     /// Asks `busy` before forgetting a share, and waits while it says work is running.
     pub fn set_busy(&self, busy: Busy) {
         *locked(&self.busy) = Some(busy);
@@ -341,9 +350,8 @@ impl NetworkShareService {
         request: &ConnectRequest,
     ) -> Result<ShareAdded, ShareConnectError> {
         let folder = folder_in_share(root, &request.address.folder)?;
-        let path = self
-            .sources
-            .check_new(request.kind, &folder.to_string_lossy())?;
+        let kind = request.kind.unwrap_or_else(|| detect_kind(&folder));
+        let path = self.sources.check_new(kind, &folder.to_string_lossy())?;
         let is_new = known.is_none();
         let share = self.keep_login(
             known,
@@ -352,7 +360,7 @@ impl NetworkShareService {
             &request.login,
             request.remember,
         )?;
-        match self.sources.add(request.kind, &path) {
+        match self.sources.add(kind, &path) {
             Ok(source) => {
                 tracing::info!(share = %request.address.share, user = %share.user, "network share folder added");
                 Ok(ShareAdded { share, source })
@@ -603,8 +611,19 @@ impl NetworkShareService {
     /// failed, else nothing.
     #[must_use]
     pub fn folder_state(&self, path: &str) -> Option<ShareState> {
+        self.state_of(&self.share_of(path)?)
+    }
+
+    /// The share the library folder at `path` is on, if CineVault connected one for it.
+    #[must_use]
+    pub fn share_of(&self, path: &str) -> Option<NetworkShare> {
         let shares = self.list().ok()?;
-        let share = rows::share_holding(&shares, path, paths::CASE_SENSITIVE)?;
+        rows::share_holding(&shares, path, paths::CASE_SENSITIVE).cloned()
+    }
+
+    /// What `share` says about its folders (see [`Self::folder_state`]).
+    #[must_use]
+    pub fn state_of(&self, share: &NetworkShare) -> Option<ShareState> {
         if locked(&self.connecting).contains(&share.id) {
             return Some(ShareState::Connecting);
         }
@@ -806,6 +825,14 @@ fn mount_check() -> MountCheck {
     #[cfg(not(unix))]
     {
         Arc::new(|_| false)
+    }
+}
+
+/// The library a folder suits, from what it holds; movies when it cannot be read or is mixed.
+fn detect_kind(folder: &Path) -> SourceKind {
+    match analyze_folder(folder).map(|found| found.suggested) {
+        Ok(SuggestedKind::Tv) => SourceKind::Tv,
+        _ => SourceKind::Movie,
     }
 }
 

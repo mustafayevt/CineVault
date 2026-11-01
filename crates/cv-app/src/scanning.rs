@@ -49,6 +49,7 @@ use cv_artwork::thumb_job::{build_after, default_parallelism as thumb_parallelis
 use cv_db::repo::clear_all_new;
 use cv_db::repo::data_sources::{get_source, list_sources};
 use cv_db::repo::media_info::{SourceCounts, pending_media_info, source_counts};
+use cv_db::repo::network_shares::NetworkShare;
 use cv_db::{Database, DbError};
 use cv_domain::{DataSource, ItemId, SourceKind};
 use cv_jobs::{JobManager, StoreError};
@@ -212,6 +213,8 @@ pub struct SourceHealth {
     pub counts: SourceCounts,
     /// Why an offline folder on a network share is offline ("Wrong password", …).
     pub reason: Option<OfflineReason>,
+    /// The network share the folder is on, when CineVault connected one for it.
+    pub share: Option<NetworkShare>,
 }
 
 #[derive(Default)]
@@ -956,8 +959,12 @@ impl ScanService {
             .map(|(source, answer)| {
                 let counts = self.db.read(|conn| source_counts(conn, &source.path))?;
                 let seen = memory.entry(source.path.clone()).or_default();
-                let share = shares.as_ref().and_then(|s| s.folder_state(&source.path));
-                let (state, reason) = match share {
+                let share = shares.as_ref().and_then(|s| s.share_of(&source.path));
+                let held = share
+                    .as_ref()
+                    .zip(shares.as_ref())
+                    .and_then(|(share, s)| s.state_of(share));
+                let (state, reason) = match held {
                     _ if answer == Some(true) => (seen.state(answer, &counts), None),
                     // Its share is still connecting at start: not there yet is not gone.
                     Some(ShareState::Connecting) => (seen.guess(&counts), None),
@@ -973,6 +980,7 @@ impl ScanService {
                     state,
                     counts,
                     reason,
+                    share,
                 })
             })
             .collect::<Result<_, DbError>>()?;

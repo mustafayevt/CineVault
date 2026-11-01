@@ -1292,6 +1292,7 @@ dependencies = [
  "cv-providers",
  "cv-rename",
  "cv-scan",
+ "cv-shares",
  "cv-template",
  "cv-torrent",
  "image",

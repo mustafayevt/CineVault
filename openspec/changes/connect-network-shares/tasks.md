@@ -21,7 +21,7 @@
 
 ## 4. Commands
 
-- [ ] 4.1 Add the share commands in `cv-ipc` and `src-tauri` (capabilities of this OS, connect and add, connect again, cancel, list shares with their state), with an input type whose `Debug` hides the password; regenerate `ui/src/bindings.ts`. Verified by `cargo test -p cinevault-app` (bindings up to date) and a test that the logged command input holds no password.
+- [x] 4.1 Add the share commands in `cv-ipc` and `src-tauri` (capabilities of this OS, connect and add, connect again, cancel, list shares with their state), with an input type whose `Debug` hides the password; regenerate `ui/src/bindings.ts`. Verified by `cargo test -p cinevault-app` (bindings up to date) and a test that the logged command input holds no password.
 - [x] 4.2 Answer the share commands with `not_applicable` in `cv-web`'s dispatcher. Verified by `cargo test -p cv-web` (parity test and a request for each command).
 
 ## 5. Interface

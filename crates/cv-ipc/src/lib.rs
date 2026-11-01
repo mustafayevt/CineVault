@@ -43,6 +43,7 @@ pub mod scan;
 pub mod scrape_preview;
 pub mod scrape_stream;
 pub mod settings;
+pub mod shares;
 pub mod sink;
 pub mod sources;
 pub mod tools;

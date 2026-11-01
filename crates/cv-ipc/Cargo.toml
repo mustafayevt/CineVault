@@ -19,6 +19,7 @@ cv-nfo.workspace = true
 cv-providers.workspace = true
 cv-rename.workspace = true
 cv-scan.workspace = true
+cv-shares.workspace = true
 cv-template.workspace = true
 cv-torrent.workspace = true
 serde.workspace = true

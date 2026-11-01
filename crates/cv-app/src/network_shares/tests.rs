@@ -89,7 +89,7 @@ fn movies() -> cv_shares::ShareAddress {
 fn request(address: &str, password: &str, remember: bool) -> ConnectRequest {
     ConnectRequest {
         address: Address::parse(address).unwrap(),
-        kind: SourceKind::Movie,
+        kind: Some(SourceKind::Movie),
         login: Login::new("alex", Password::new(password).unwrap()).unwrap(),
         remember,
     }
@@ -292,7 +292,7 @@ fn no_file_holds_the_password_whether_remembered_or_not() {
         .connect_and_add(&request(r"\\nas\movies\Films", kept, true), &Cancel::new())
         .unwrap();
     let mut tv = request(r"\\nas\series", unsaved, false);
-    tv.kind = SourceKind::Tv;
+    tv.kind = Some(SourceKind::Tv);
     rig.service.connect_and_add(&tv, &Cancel::new()).unwrap();
 
     for secret in [kept, unsaved] {
@@ -774,4 +774,31 @@ fn only_empty_mount_folders_of_no_share_are_removed_and_never_while_mounted() {
             .any(|call| matches!(call, FakeCall::Disconnect(share) if share.share() != "busy")),
         "only a mounted folder is unmounted"
     );
+}
+
+#[test]
+fn a_folder_without_a_chosen_type_is_added_as_what_it_holds() {
+    let rig = rig();
+    let root = rig.share_with(&["Films", "Shows/Severance/Season 1"]);
+    std::fs::write(
+        root.join("Shows/Severance/Season 1/Severance - S01E01.mkv"),
+        b"x",
+    )
+    .unwrap();
+    let ask = |address: &str| ConnectRequest {
+        kind: None,
+        ..request(address, PASSWORD, true)
+    };
+
+    let shows = rig
+        .service
+        .connect_and_add(&ask(r"\\nas\movies\Shows"), &Cancel::new())
+        .unwrap();
+    let films = rig
+        .service
+        .connect_and_add(&ask(r"\\nas\movies\Films"), &Cancel::new())
+        .unwrap();
+
+    assert_eq!(shows.source.kind, SourceKind::Tv);
+    assert_eq!(films.source.kind, SourceKind::Movie);
 }
