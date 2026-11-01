@@ -2,6 +2,19 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.1] - unreleased
+
+### Changed
+
+- Browsers stay signed in when the server restarts or the desktop app updates. Switching Browser access off, changing its port, signing out or choosing a new password still signs them out.
+
+### Security
+
+- A browser can no longer change the update channel, the update signing key, a tool's path or the video player. These are changed at the computer that runs CineVault; on a server, a tool's path goes in `settings.json` while CineVault is stopped. The custom trash folder and the collection folder must be inside the folders the server may browse.
+- A request that comes through a reverse proxy or tunnel is treated as outside your home network unless the proxy is listed in `CINEVAULT_WEB_TRUST_PROXY`, so a stranger cannot reach the welcome page or a password reset through it, and "Only devices on my home network" refuses it.
+- A flood of wrong passwords from the internet no longer stops you from signing in from your home network, and checking passwords no longer slows the server for everyone else.
+- No other website can show CineVault inside a frame.
+
 ## [1.3.0] - 2026-10-31
 
 ### Added
