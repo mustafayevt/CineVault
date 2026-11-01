@@ -13,7 +13,7 @@
 
 ## 3. Documentation
 
-- [ ] 3.1 Add a "Backups" section to `README.md` and the restore steps to `packaging/README.md` (data folder in the container, `docker stop` first); add a `CHANGELOG.md` line under the unreleased version and run `bun run site:changelog`. Verified by `bun run site:changelog -- --check` and by following the steps once on a throwaway data folder.
+- [x] 3.1 Add a "Backups" section to `README.md` and the restore steps to `packaging/README.md` (data folder in the container, `docker stop` first); add a `CHANGELOG.md` line under the unreleased version and run `bun run site:changelog`. Verified by `bun run site:changelog -- --check` and by following the steps once on a throwaway data folder.
 
 ## 4. Integration checks
 
