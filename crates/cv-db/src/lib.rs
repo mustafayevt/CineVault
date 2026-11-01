@@ -11,7 +11,7 @@
 //! reads the file header ([`header`]) and refuses a file of an earlier or a newer build untouched,
 //! then upgrades the file: a verified backup goes to `backups/pre-migration/`, then all pending
 //! migrations run in one transaction, so a failure leaves the file untouched. [`backup`] writes
-//! the verified daily copies into `backups/`.
+//! the verified daily copies into `backups/` and keeps the newest seven.
 //! [`repo`] holds the repositories on top of it: item CRUD, composable filters and sorts with
 //! keyset paging, and the full-text index.
 

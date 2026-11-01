@@ -9,7 +9,8 @@
 //! 4. and only then renamed to its final name in one step.
 //!
 //! Any failure removes the partial file, so a file with a backup's name always holds a complete,
-//! checked copy. The library file itself is only read.
+//! checked copy. The library file itself is only read. [`prune`] then keeps the newest seven
+//! daily files; it never touches `pre-migration/` or any other name.
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -23,6 +24,9 @@ use crate::schema;
 
 /// Folder (relative to the database's folder) that holds the daily backups.
 pub const BACKUPS_DIR: &str = "backups";
+
+/// How many daily backups are kept.
+pub const KEEP: usize = 7;
 
 const PREFIX: &str = "library-";
 const SUFFIX: &str = ".db";
@@ -173,6 +177,28 @@ fn copy(db_path: &Path, to: &Path) -> DbResult<()> {
     conn.execute("VACUUM INTO ?1", [to.to_string_lossy().as_ref()])
         .map_err(|e| DbError::Backup(format!("cannot write {}: {e}", to.display())))?;
     Ok(())
+}
+
+/// Keeps the newest `keep` daily backups in `dir` and removes the older ones. Only files named
+/// exactly `library-YYYY-MM-DD.db` count; folders such as `pre-migration`, partial files and any
+/// other name are never touched. A file that cannot be removed is logged and tried again next
+/// time. Returns how many were removed.
+///
+/// # Errors
+/// The folder cannot be read.
+pub fn prune(dir: &Path, keep: usize) -> DbResult<usize> {
+    let files = daily_files(dir)?;
+    let old = files.len().saturating_sub(keep);
+    let mut removed = 0;
+    for path in &files[..old] {
+        match cv_fs::remove_own_file(path) {
+            Ok(()) => removed += 1,
+            Err(error) => {
+                tracing::warn!(%error, path = %path.display(), "cannot remove an old backup");
+            }
+        }
+    }
+    Ok(removed)
 }
 
 /// The copy must open, pass SQLite's integrity check and carry the schema `version`.

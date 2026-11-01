@@ -1,5 +1,5 @@
-//! Tests of the daily backups: a verified copy under the day's name, and nothing left behind by
-//! a failure.
+//! Tests of the daily backups: a verified copy under the day's name, nothing left behind by a
+//! failure, and retention that touches only the exact daily names.
 
 use std::path::Path;
 
@@ -7,7 +7,8 @@ use chrono::NaiveDate;
 use rusqlite::Connection;
 use tempfile::TempDir;
 
-use crate::backup;
+use crate::backup::{self, KEEP};
+use crate::migrate::PRE_MIGRATION_DIR;
 use crate::{Database, DbError, SCHEMA_VERSION, schema};
 
 fn day(d: u32) -> NaiveDate {
@@ -151,8 +152,36 @@ fn verification_needs_the_same_version() {
 }
 
 #[test]
+fn pruning_keeps_the_newest_seven_and_everything_else() {
+    let dir = tempfile::tempdir().unwrap();
+    let backups = dir.path().join(backup::BACKUPS_DIR);
+    let pre_migration = dir.path().join(PRE_MIGRATION_DIR);
+    std::fs::create_dir_all(&pre_migration).unwrap();
+    std::fs::write(pre_migration.join("library-2026-10-01.db"), b"snapshot").unwrap();
+    for d in 1..=9 {
+        std::fs::write(backups.join(backup::file_name(day(d))), b"copy").unwrap();
+    }
+    std::fs::write(backups.join("library-2026-10-01.db.partial"), b"half").unwrap();
+    std::fs::write(backups.join("library-before-restore.db"), b"mine").unwrap();
+
+    assert_eq!(backup::prune(&backups, KEEP).unwrap(), 2);
+    let mut expected: Vec<String> = (3..=9).map(|d| backup::file_name(day(d))).collect();
+    expected.extend([
+        "library-2026-10-01.db.partial".to_owned(),
+        "library-before-restore.db".to_owned(),
+        "pre-migration".to_owned(),
+    ]);
+    expected.sort();
+    assert_eq!(names(&backups), expected);
+    assert_eq!(names(&pre_migration), ["library-2026-10-01.db"]);
+    // Nothing more to remove.
+    assert_eq!(backup::prune(&backups, KEEP).unwrap(), 0);
+}
+
+#[test]
 fn a_missing_folder_has_no_backup() {
     let dir = tempfile::tempdir().unwrap();
     let backups = dir.path().join("backups");
     assert_eq!(backup::newest(&backups).unwrap(), None);
+    assert_eq!(backup::prune(&backups, KEEP).unwrap(), 0);
 }
