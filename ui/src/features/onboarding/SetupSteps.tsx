@@ -1,4 +1,4 @@
-import { Check, Folder, Plus, X } from "lucide-react";
+import { Check, Folder, Network, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode, Ref } from "react";
 
@@ -73,7 +73,7 @@ interface StepHeadingProps {
 }
 
 /** The title and the sentence under it, at the top of the card of every step. */
-function StepHeading({ title, children, headingRef }: StepHeadingProps) {
+export function StepHeading({ title, children, headingRef }: StepHeadingProps) {
   return (
     <div className="px-6 pt-[22px] pb-4">
       <h1
@@ -151,6 +151,7 @@ interface FoldersStepProps {
   over: boolean;
   headingRef: Ref<HTMLHeadingElement>;
   onBrowse: () => void;
+  onShare: () => void;
   onKind: (path: string, kind: SourceKind) => void;
   onRemove: (path: string) => void;
 }
@@ -161,6 +162,7 @@ export function FoldersStep({
   over,
   headingRef,
   onBrowse,
+  onShare,
   onKind,
   onRemove,
 }: FoldersStepProps) {
@@ -196,6 +198,9 @@ export function FoldersStep({
       >
         <Button icon={Plus} onClick={onBrowse}>
           {t("setup.folders.add")}
+        </Button>
+        <Button icon={Network} onClick={onShare}>
+          {t("setup.folders.addShare")}
         </Button>
         <span className="text-text-muted">{t("setup.folders.drop")}</span>
       </div>

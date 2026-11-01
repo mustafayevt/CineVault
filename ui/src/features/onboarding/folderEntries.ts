@@ -21,11 +21,21 @@ export interface FolderEntry {
   error: string | null;
   /** Added to the library already (a later step failed and the user came back). */
   added: boolean;
+  /** The library folder of a folder on a network share, which is added when it connects; else `null`. */
+  sourceId: number | null;
 }
 
 /** A folder that is being looked into. */
 export function lookingEntry(path: string): FolderEntry {
-  return { path, status: "looking", found: null, kind: "movie", error: null, added: false };
+  return {
+    path,
+    status: "looking",
+    found: null,
+    kind: "movie",
+    error: null,
+    added: false,
+    sourceId: null,
+  };
 }
 
 /** A folder that could not be read. */
@@ -48,6 +58,7 @@ export function readyEntry(analysis: FolderAnalysis): FolderEntry {
     kind: analysis.suggested === "tv" ? "tv" : "movie",
     error: null,
     added: false,
+    sourceId: null,
   };
 }
 

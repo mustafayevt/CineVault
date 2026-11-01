@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +11,7 @@ import { setOrganizeBackend } from "../rename/organizeBackend";
 import { createSyntheticOrganizeBackend } from "../rename/syntheticOrganize";
 import { setScanBackend } from "../scan/scanBackend";
 import type { ScanBackend } from "../scan/scanBackend";
+import { setSharesBackend } from "../shares/sharesBackend";
 import { settleSettingSaves, useSettingsStore } from "../settings/settingsStore";
 import { OnboardingPage, ONBOARDING_DONE_KEY } from "./OnboardingPage";
 import { setOnboardingBackend, syntheticNameExample } from "./onboardingBackend";
@@ -86,6 +88,7 @@ afterEach(() => {
   setScanBackend(null);
   setProvidersBackend(null);
   setOrganizeBackend(null);
+  setSharesBackend(null);
 });
 
 beforeEach(() => {
@@ -132,6 +135,50 @@ describe("the first-run setup", () => {
     );
     await user.click(screen.getByRole("button", { name: "Remove E:\\TV" }));
     expect(screen.queryByRole("group", { name: "E:\\TV holds" })).toBeNull();
+  });
+
+  it("adds a folder on a network share from the Folders step, which lists it like any folder", async () => {
+    const user = userEvent.setup();
+    backends([]);
+    const path = "\\\\nas\\movies\\TV";
+    FOLDERS[path] = analysis(path, "tv", 18);
+    const connect = vi.fn(() =>
+      Promise.resolve({
+        share: { id: 1, address: "\\\\nas\\movies", user: "alex", remember: true, reason: null },
+        source: { id: 7, kind: "tv" as const, path, label: "TV", position: 0 },
+      }),
+    );
+    setSharesBackend({
+      support: () => Promise.resolve({ supported: true, system: "windows", mount_base: null }),
+      connect,
+      connectAgain: () => Promise.reject(new Error("no")),
+      cancel: () => Promise.resolve(false),
+      list: () => Promise.resolve([]),
+    });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <OnboardingPage onFinished={() => undefined} windowApi={null} />
+      </QueryClientProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: "Network share…" }));
+    await heading("Connect a network share");
+    expect(screen.queryByRole("button", { name: "Skip setup" })).toBeNull();
+    await user.type(await screen.findByLabelText("Address"), "\\\\nas\\movies\\TV");
+    await user.type(screen.getByLabelText("User"), "alex");
+    await user.type(screen.getByLabelText("Password"), "pw");
+    await user.click(screen.getByRole("button", { name: "Connect and add" }));
+
+    const holds = await screen.findByRole("group", { name: `${path} holds` });
+    expect(connect).toHaveBeenCalledWith(expect.objectContaining({ kind: null }));
+    expect(await screen.findByText("18 videos found · looks like TV shows")).toBeVisible();
+    expect(within(holds).getByRole("button", { name: "TV shows" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Continue" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("finishes the minimal setup: a folder, a key that works, no ratings keys, the suggested naming", async () => {

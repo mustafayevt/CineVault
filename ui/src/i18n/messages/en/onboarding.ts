@@ -34,6 +34,7 @@ export const onboarding = {
   "setup.folders.remove": "Remove {path}",
   "setup.folders.add": "Add folder…",
   "setup.folders.drop": "or drop folders here",
+  "setup.folders.addShare": "Network share…",
   "setup.folders.unreadable": "{path} could not be read.",
   "setup.folders.stillLooking": "CineVault is still looking inside a folder.",
   "setup.folders.overlap": "A folder lies inside another one of the same type. Remove one of them.",
