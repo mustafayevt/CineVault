@@ -82,7 +82,7 @@ The poster card of a movie in an open copy group SHALL show a small "<n> copies"
 - **THEN** both posters show "2 copies", and after "Keep both" neither does
 
 ### Requirement: Copies line on the Movie page
-The Movie page header of a movie with copies, kept or not, SHALL show "You have <n> copies · Compare" after the meta line, where Compare opens the Compare copies page. The line SHALL NOT push the plot, the facts or the Technical card's first rows below the first screen.
+The Movie page header of a movie with copies, kept or not, SHALL show "You have <n> copies · Compare" under the facts, where Compare opens the Compare copies page. The line SHALL NOT push the plot, the facts or the Technical card's first rows below the first screen.
 
 #### Scenario: Copies line
 - **WHEN** the Movie page of Example Movie (2020) opens at 1366×768 and the library holds two copies of it
@@ -104,7 +104,7 @@ For a movie with copies, kept or not, the title right-click menu SHALL also offe
 - **THEN** the menu has no Compare entry
 
 ### Requirement: Compare copies page
-The Compare copies page (`/movies/<id>/copies`) SHALL show every copy of the movie's group side by side, one card each, with its poster, title and year, and these rows: Resolution, HDR, Audio, Source, Size, Video bitrate and Folder. The movie's own copy SHALL be first. It SHALL be a page like the other pickers: Esc and the back button return to where the user came from.
+The Compare copies page (`/movies/<id>/copies`) SHALL show every copy of the movie's group side by side under a header with the movie's poster, one card each, and these rows: Resolution, HDR, Audio, Source, Video bitrate, Length, Size and Folder. The movie's own copy SHALL be first. It SHALL be a page like the other pickers: Esc and the back button return to where the user came from.
 
 #### Scenario: Two copies
 - **WHEN** the user opens Compare copies for a 1080p WEB-DL copy and a 2160p BluRay copy of Example Movie (2020)
@@ -115,7 +115,7 @@ The Compare copies page (`/movies/<id>/copies`) SHALL show every copy of the mov
 - **THEN** it says "This movie has no other copies" with a link back to the Movie page
 
 ### Requirement: What the compare rows show
-Resolution SHALL show the resolution label, HDR the HDR formats or "SDR", Audio the codec and channels of the track the title leads with, Source the media source ("Unknown" when none), Size the copy's size by the library's size rule, Video bitrate in Mb/s and Folder the copy's folder path. A copy whose media info has not been read SHALL show "Not read yet" in its media rows.
+Resolution SHALL show the resolution label, HDR the HDR formats or "SDR", Audio the codec and channels of the track the title leads with, Source the media source ("Unknown" when none), Video bitrate in Mb/s, Length the running time, Size the copy's size by the library's size rule, with how much smaller it is on every copy but the largest, and Folder the copy's folder path. A copy whose media info has not been read SHALL show "Not read yet" in its media rows.
 
 #### Scenario: Audio and HDR rows
 - **WHEN** a copy's video is 2160p with Dolby Vision and HDR10 and its lead track is TrueHD Atmos 7.1
@@ -152,7 +152,7 @@ Each card SHALL offer "Keep this one", which deletes every other copy of the gro
 
 #### Scenario: Deleted files go to the Recycle Bin
 - **WHEN** Deleted files is the Recycle Bin and the user chooses "Keep this one" on the 2160p copy of Example Movie (2020)
-- **THEN** the 1080p copy's files go to the Recycle Bin, a toast with Undo says so, and the Movie page of the 2160p copy opens
+- **THEN** the 1080p copy's files go to the Recycle Bin, a toast with Undo says so, and the app returns to where the page was opened from, or opens the 2160p copy's Movie page when the page was opened from the deleted copy
 
 #### Scenario: Deleted files is Delete permanently
 - **WHEN** Deleted files is Delete permanently and the user chooses "Keep this one"
@@ -163,7 +163,7 @@ Each card SHALL offer "Keep this one", which deletes every other copy of the gro
 - **THEN** only the 1080p video and the files named after it are deleted
 
 ### Requirement: Keep both
-Each group SHALL offer "Keep both" ("Keep all" for three or more copies), which records the decision in the library database. A kept group SHALL leave the Copies count and lose its badges, and the decision SHALL be confirmed with an Undo toast. No file SHALL change.
+Each group SHALL offer "Keep both" ("Keep all" for three or more copies), which records the decision in the library database. A kept group SHALL leave the Copies count and lose its badges, the page SHALL close, and the decision SHALL be confirmed with an Undo toast. No file SHALL change.
 
 #### Scenario: Keep both
 - **WHEN** the user chooses "Keep both" for the two copies of Example Movie (2020)
