@@ -163,6 +163,7 @@ EOF_MEDIA
 # CINEVAULT_SHARE_PASSWORD_FILE), kept in a shell variable and written only to the standard input
 # of the program that stores it, so it never appears in a command line or in this script's output.
 SHARE_DIR=/etc/cinevault/shares
+UNIT_DIR=/etc/systemd/system
 SHARE_MARK="# Written by the CineVault installer"
 SHARES=""   # Linux: the shares checked in this run, one "key|server|share|SMB version" per line
 SH_USER=""
@@ -202,6 +203,14 @@ parse_share() { # parse_share address -> S_SERVER, S_SHARE, S_SUB (a folder insi
 
 unit_name() { # unit_name key -> the systemd mount unit for /mnt/<key>, as systemd-escape --path names it
     printf 'mnt-%s.mount' "$(printf '%s' "$1" | sed 's/-/\\x2d/g')"
+}
+
+own_unit() { # own_unit file -> whether the installer wrote that mount unit (it starts with SHARE_MARK)
+    grep -q "^$SHARE_MARK" "$1" 2>/dev/null
+}
+
+hand_written() { # hand_written key -> whether a mount unit of that name exists that the installer did not write
+    [ -f "$UNIT_DIR/$(unit_name "$1")" ] && ! own_unit "$UNIT_DIR/$(unit_name "$1")"
 }
 
 unit_text() { # unit_text key server share version uid gid -> the mount unit
@@ -266,16 +275,32 @@ share_error() { # share_error "mount output" -> why //S_SERVER/S_SHARE could not
     esac
 }
 
+TTY_SAVED=""   # the terminal settings while a password is being read, to put back however the script ends
+
+restore_tty() { # shows typed text again if a password question was cut short
+    if [ -n "$TTY_SAVED" ]; then
+        { stty "$TTY_SAVED" </dev/tty; } 2>/dev/null || true
+        TTY_SAVED=""
+        { printf '\n' >/dev/tty; } 2>/dev/null || true
+    fi
+}
+
 ask_secret() { # ask_secret "Question" -> SH_PW, read from the terminal without showing it
     has_tty || die "No terminal to ask for the password on. Set CINEVAULT_SHARE_USER and CINEVAULT_SHARE_PASSWORD_FILE."
     printf '%s: ' "$1" >/dev/tty
-    tty_saved=$(stty -g </dev/tty)
-    trap 'stty "$tty_saved" </dev/tty; printf "\n" >/dev/tty; exit 130' INT TERM
+    TTY_SAVED=$(stty -g </dev/tty)
+    # Echo comes back on Ctrl+C, a closed terminal, Ctrl+\ and kill, and on any other way out (the
+    # EXIT trap calls restore_tty too).
+    trap 'restore_tty; exit 129' HUP
+    trap 'restore_tty; exit 130' INT
+    trap 'restore_tty; exit 131' QUIT
+    trap 'restore_tty; exit 143' TERM
     stty -echo </dev/tty
     SH_PW=""
     IFS= read -r SH_PW </dev/tty || true
-    stty "$tty_saved" </dev/tty
-    trap - INT TERM
+    stty "$TTY_SAVED" </dev/tty
+    TTY_SAVED=""
+    trap - HUP INT QUIT TERM
     printf '\n' >/dev/tty
 }
 
@@ -393,7 +418,11 @@ host_share() { # mounts //S_SERVER/S_SHARE (or reuses its mount) and adds its fo
     need_root
     need_cifs
     mnt=/mnt/$S_KEY
-    unit_file=/etc/systemd/system/$(unit_name "$S_KEY")
+    unit_file=$UNIT_DIR/$(unit_name "$S_KEY")
+    if hand_written "$S_KEY"; then
+        say "  $unit_file was not written by the installer, so it is left as it is. Give the folder it mounts instead of the share address."
+        return 1
+    fi
     if [ -f "$unit_file" ] && ! mountpoint -q "$mnt"; then as_root systemctl start "$(unit_name "$S_KEY")" >/dev/null 2>&1 || true; fi
     if mountpoint -q "$mnt"; then
         if ! grep -q "^$SHARE_MARK" "$unit_file" 2>/dev/null; then
@@ -413,9 +442,13 @@ shares_apply() { # shares_apply uid gid: writes and starts the mount units of th
     step "Mounting the network shares"
     list=$SHARES
     while IFS='|' read -r key server share vers; do
+        # Never over a unit someone wrote by hand.
+        if hand_written "$key"; then
+            die "$UNIT_DIR/$(unit_name "$key") was not written by the installer, so it was not replaced. Remove or rename it, or give the folder it mounts instead of //$server/$share."
+        fi
         # shellcheck disable=SC2016 # expanded by the inner shell
         unit_text "$key" "$server" "$share" "$vers" "$1" "$2" |
-            as_root sh -c 'umask 022; cat > "$1.new" && mv -f "$1.new" "$1"' sh "/etc/systemd/system/$(unit_name "$key")"
+            as_root sh -c 'umask 022; cat > "$1.new" && mv -f "$1.new" "$1"' sh "$UNIT_DIR/$(unit_name "$key")"
     done <<EOF_UNITS
 $list
 EOF_UNITS
@@ -438,14 +471,14 @@ share_units_of() { # share_units_of "folders" -> the installer's mount units the
         case "$f" in /mnt/?*) ;; *) continue ;; esac
         key=${f#/mnt/}
         key=${key%%/*}
-        if grep -q "^$SHARE_MARK" "/etc/systemd/system/$(unit_name "$key")" 2>/dev/null; then unit_name "$key"; echo; fi
+        if own_unit "$UNIT_DIR/$(unit_name "$key")"; then unit_name "$key"; echo; fi
     done | sort -u | paste -sd ' ' -
 }
 
 share_keys() { # the shares the installer set up on this computer, one key per line (needs root)
     {
-        for f in /etc/systemd/system/mnt-*.mount; do
-            if grep -q "^$SHARE_MARK" "$f" 2>/dev/null; then sed -n 's#^Where=/mnt/##p' "$f"; fi
+        for f in "$UNIT_DIR"/mnt-*.mount; do
+            if own_unit "$f"; then sed -n 's#^Where=/mnt/##p' "$f"; fi
         done
         if as_root test -d "$SHARE_DIR"; then as_root ls -1 "$SHARE_DIR" | sed -n -e 's/\.cred$//p' -e 's/\.new$//p'; fi
     } | sort -u
@@ -464,11 +497,22 @@ share_remove() { # share_remove key: stops and removes the mount unit and the lo
     key=$1
     mnt=/mnt/$key
     unit=$(unit_name "$key")
-    what=$(sed -n 's/^What=//p' "/etc/systemd/system/$unit" 2>/dev/null)
+    unit_file=$UNIT_DIR/$unit
+    if hand_written "$key"; then
+        say "$unit_file was not written by the installer, so it and what it mounts at $mnt were left as they are."
+        return 0
+    fi
+    if [ ! -f "$unit_file" ]; then
+        # No unit of the installer: whatever is mounted at $mnt was mounted by someone else.
+        as_root rm -f "$SHARE_DIR/$key.cred" "$SHARE_DIR/$key.new"
+        if [ -d "$mnt" ] && ! mountpoint -q "$mnt"; then as_root rmdir "$mnt" 2>/dev/null || true; fi
+        return 0
+    fi
+    what=$(sed -n 's/^What=//p' "$unit_file" 2>/dev/null)
     [ -n "$what" ] || what=$mnt
-    if [ -f "/etc/systemd/system/$unit" ]; then as_root systemctl disable --now --quiet "$unit" 2>/dev/null || true; fi
+    as_root systemctl disable --now --quiet "$unit" 2>/dev/null || true
     if mountpoint -q "$mnt"; then as_root umount "$mnt" 2>/dev/null || true; fi
-    as_root rm -f "/etc/systemd/system/$unit" "$SHARE_DIR/$key.cred" "$SHARE_DIR/$key.new"
+    as_root rm -f "$unit_file" "$SHARE_DIR/$key.cred" "$SHARE_DIR/$key.new"
     # The folder is removed with rmdir, and only once it is no longer mounted: an unmount that
     # failed can never lead to deleting files on the share.
     if mountpoint -q "$mnt"; then
@@ -480,7 +524,7 @@ share_remove() { # share_remove key: stops and removes the mount unit and the lo
 }
 
 shares_cleanup() { # shares_cleanup "folders in use": removes the shares none of them is on
-    if [ ! -d "$SHARE_DIR" ] && ! grep -qs "^$SHARE_MARK" /etc/systemd/system/mnt-*.mount; then return 0; fi
+    if [ ! -d "$SHARE_DIR" ] && ! grep -qs "^$SHARE_MARK" "$UNIT_DIR"/mnt-*.mount; then return 0; fi
     need_root
     unused=$(shares_unused "$(share_keys)" "$1")
     [ -n "$unused" ] || return 0
@@ -603,7 +647,7 @@ n_download() { # sets VERSION, KIND and PKG (a verified file in a temporary fold
         *) file="cinevault-server-${VERSION}-linux-amd64.tar.gz" ;;
     esac
     TMP=$(mktemp -d)
-    trap 'rc=$?; rm -rf "$TMP"; [ "$rc" -eq 0 ] || echo "The installer stopped (error $rc) at the step shown above." >&2' EXIT
+    trap 'rc=$?; restore_tty; rm -rf "$TMP"; [ "$rc" -eq 0 ] || echo "The installer stopped (error $rc) at the step shown above." >&2' EXIT
     chmod 755 "$TMP"
     base="https://github.com/$REPO/releases/download/v$VERSION"
     step "Downloading CineVault $VERSION ($file)"
@@ -1225,10 +1269,43 @@ nas-movies2"
     expect "removal plan: uninstall removes all" "$(shares_unused "$keys" "")" "$keys"
     expect "removal plan: nothing set up" "$(shares_unused "" "/mnt/nas-movies")" ""
 
+    # Removing a share touches only mount units the installer wrote.
+    st_dir=$(mktemp -d)
+    (
+        UNIT_DIR=$st_dir/units
+        SHARE_DIR=$st_dir/shares
+        mkdir -p "$UNIT_DIR" "$SHARE_DIR"
+        as_root() { printf '%s\n' "$*" >>"$st_dir/ran"; }
+        mountpoint() { return 1; }
+        say() { :; }
+        unit_text nas-movies nas movies 3.0 1000 1000 >"$UNIT_DIR/$(unit_name nas-movies)"
+        printf '[Mount]\nWhat=//nas/tv\nWhere=/mnt/nas-tv\n' >"$UNIT_DIR/$(unit_name nas-tv)"
+        : >"$st_dir/ran"
+        expect "own unit" "$(if own_unit "$UNIT_DIR/$(unit_name nas-movies)"; then echo yes; else echo no; fi)" yes
+        expect "hand-written unit" "$(if hand_written nas-tv; then echo yes; else echo no; fi)" yes
+        expect "missing unit is not hand-written" "$(if hand_written nas-x; then echo yes; else echo no; fi)" no
+        expect "share keys skip a hand-written unit" "$(share_keys)" nas-movies
+        : >"$st_dir/ran"
+        share_remove nas-tv
+        expect "a hand-written unit is left alone" "$(cat "$st_dir/ran")" ""
+        share_remove nas-movies
+        expect "the installer's unit is stopped and removed" "$(grep -cF "disable --now --quiet $(unit_name nas-movies)" "$st_dir/ran")" 1
+        expect "nothing done to the hand-written unit" "$(grep -cF "$(unit_name nas-tv)" "$st_dir/ran")" 0
+        expect "a hand-written unit stops the run" "$( (SHARES="nas-tv|nas|tv|3.0"; step() { :; }; die() { echo stopped; exit 1; }; shares_apply 1000 1000) )" stopped
+        exit "$fails"
+    ) || fails=$((fails + $?))
+    rm -rf "$st_dir"
+
+    TTY_SAVED=""
+    restore_tty
+    expect "restore_tty does nothing when no password is being read" "$TTY_SAVED" ""
+
     if [ "$fails" -eq 0 ]; then echo "install.sh self-test passed"; else echo "install.sh self-test: $fails failed"; exit 1; fi
 }
 if [ -n "$SELF_TEST" ]; then self_test; exit 0; fi
 
 # The whole script is read before anything runs, and no command it starts can read the rest of the
-# script from standard input (questions are read from the terminal).
+# script from standard input (questions are read from the terminal). However it ends, a password
+# question cut short never leaves the terminal without echo.
+trap 'restore_tty' EXIT
 main </dev/null
