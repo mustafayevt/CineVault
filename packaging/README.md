@@ -412,8 +412,11 @@ by the Deploy site workflow.
 
 The container keeps its data in `/data` and the library folders under `/media`. Its entrypoint
 ([`entrypoint.sh`](entrypoint.sh)) maps the image's `cinevault` user to `PUID`/`PGID` (default 1000),
-makes `/data` belong to it and replaces itself with the server as that user through `setpriv`, so
-no root process is left. Media folders are not re-owned. Starting with `--user` works too, but then
+makes `/data` belong to it (only when its top folder has another owner, so a large thumbnail cache
+does not slow every start) and replaces itself with the server as that user through `setpriv`, so
+no root process is left. Supplementary groups the container is started with (`--group-add 100`, or
+`group_add` in Compose) are kept, except group 0, for NAS folders that only a group can reach.
+Media folders are not re-owned. Starting with `--user` works too, but then
 `PUID`/`PGID` must match it. The image checks `http://127.0.0.1:8787/healthz` every 30 seconds and
 stops the server with `SIGINT`, the signal it uses for a clean shutdown.
 

@@ -2,6 +2,12 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.1] - unreleased
+
+### Fixed
+
+- Docker: the container starts faster with a large library and keeps the groups your NAS folders need.
+
 ## [1.3.0] - 2026-10-31
 
 ### Added
