@@ -7,7 +7,7 @@ use cv_shares::fake::{FakeCall, FakeConnector};
 use tempfile::TempDir;
 
 use super::*;
-use crate::secrets::SecretBackend;
+use crate::secrets::{MemoryBackend, SecretBackend};
 
 const PASSWORD: &str = "Example-Pass-42";
 
@@ -23,6 +23,43 @@ impl SecretBackend for NoKeyring {
     }
     fn delete(&self, _account: &str) -> Result<bool, SecretError> {
         Err(SecretError::NoKeyring)
+    }
+}
+
+/// A credential store that keeps passwords but answers every delete with `error`.
+struct FailingDelete(MemoryBackend, fn() -> SecretError);
+
+impl SecretBackend for FailingDelete {
+    fn set(&self, account: &str, value: &str) -> Result<(), SecretError> {
+        self.0.set(account, value)
+    }
+    fn get(&self, account: &str) -> Result<Option<String>, SecretError> {
+        self.0.get(account)
+    }
+    fn delete(&self, _account: &str) -> Result<bool, SecretError> {
+        Err((self.1)())
+    }
+}
+
+/// A credential store that runs a hook (set later) on every delete.
+#[derive(Default)]
+struct DeleteHook(
+    MemoryBackend,
+    Arc<std::sync::OnceLock<Box<dyn Fn() + Send + Sync>>>,
+);
+
+impl SecretBackend for DeleteHook {
+    fn set(&self, account: &str, value: &str) -> Result<(), SecretError> {
+        self.0.set(account, value)
+    }
+    fn get(&self, account: &str) -> Result<Option<String>, SecretError> {
+        self.0.get(account)
+    }
+    fn delete(&self, account: &str) -> Result<bool, SecretError> {
+        if let Some(hook) = self.1.get() {
+            hook();
+        }
+        self.0.delete(account)
     }
 }
 
@@ -979,4 +1016,98 @@ fn at_start_a_share_is_ours_only_when_this_start_or_an_earlier_one_connected_it(
         !row(&service, found.share.id).connected_by_us,
         "still the user's"
     );
+}
+
+// ---- forgetting, safely ----------------------------------------------------------------------
+
+#[test]
+fn a_share_is_forgotten_when_the_credential_store_is_not_there() {
+    for error in [(|| SecretError::NoKeyring) as fn() -> SecretError, || {
+        SecretError::Unavailable("locked".into())
+    }] {
+        let rig = rig_with(SecretStore::with_backend(FailingDelete(
+            MemoryBackend::default(),
+            error,
+        )));
+        let films = add(&rig, "nas", "movies", true);
+        remove_folder(&rig, films.source.id);
+        assert_eq!(rig.service.sweep(Duration::ZERO), 1);
+        assert!(rig.service.list().unwrap().is_empty());
+        assert_eq!(disconnects(&rig.fake), 1);
+    }
+}
+
+#[test]
+fn a_password_that_cannot_be_deleted_keeps_the_share_and_nothing_is_disconnected() {
+    let rig = rig_with(SecretStore::with_backend(FailingDelete(
+        MemoryBackend::default(),
+        || SecretError::Store("denied".into()),
+    )));
+    let films = add(&rig, "nas", "movies", true);
+    remove_folder(&rig, films.source.id);
+
+    for _ in 0..3 {
+        assert_eq!(rig.service.sweep(Duration::ZERO), 0);
+    }
+    assert_eq!(rig.service.list().unwrap().len(), 1);
+    assert_eq!(
+        disconnects(&rig.fake),
+        0,
+        "never disconnected while the share stays"
+    );
+}
+
+#[test]
+fn a_share_without_a_remembered_password_never_asks_the_credential_store() {
+    let rig = rig_with(SecretStore::with_backend(FailingDelete(
+        MemoryBackend::default(),
+        || SecretError::Store("must not be asked".into()),
+    )));
+    let films = add(&rig, "nas", "movies", false);
+    remove_folder(&rig, films.source.id);
+    assert_eq!(rig.service.sweep(Duration::ZERO), 1);
+    assert!(rig.service.list().unwrap().is_empty());
+}
+
+#[test]
+fn a_forgotten_share_is_disconnected_once_whatever_the_sweeps() {
+    let rig = rig();
+    let films = add(&rig, "nas", "movies", true);
+    remove_folder(&rig, films.source.id);
+    rig.fake.fail_disconnect(
+        &movies(),
+        Some(ShareError::new(ShareErrorKind::InUse, "files are open")),
+    );
+    assert_eq!(rig.service.sweep(Duration::ZERO), 1);
+    for _ in 0..3 {
+        assert_eq!(rig.service.sweep(Duration::ZERO), 0);
+    }
+    assert_eq!(disconnects(&rig.fake), 1);
+}
+
+#[test]
+fn a_folder_added_while_a_share_is_forgotten_keeps_the_share() {
+    let hook = Arc::new(std::sync::OnceLock::<Box<dyn Fn() + Send + Sync>>::new());
+    let rig = rig_with(SecretStore::with_backend(DeleteHook(
+        MemoryBackend::default(),
+        Arc::clone(&hook),
+    )));
+    let films = add(&rig, "nas", "movies", true);
+    remove_folder(&rig, films.source.id);
+    // "Add folder…" on the share lands between the first check and the removal.
+    let guard = SourceGuard::new(
+        PathStyle::current(),
+        SystemFolders::new(PathStyle::current()),
+    );
+    let sources = DataSourceService::new(Arc::clone(&rig.db), guard);
+    let path = films.source.path.clone();
+    let _ = hook.set(Box::new(move || {
+        let _ = sources.add(SourceKind::Movie, &path);
+    }));
+
+    assert_eq!(rig.service.sweep(Duration::ZERO), 0);
+    let kept = row(&rig.service, films.share.id);
+    assert_eq!(kept.unused_since_ms, None);
+    assert!(!kept.remember, "its password is gone, so it asks for one");
+    assert_eq!(disconnects(&rig.fake), 0);
 }

@@ -787,8 +787,13 @@ impl NetworkShareService {
         due.iter().filter(|share| self.forget(share)).count()
     }
 
-    /// Disconnects a share if CineVault made its connection, deletes its password and its row.
+    /// Deletes a share's password and its row, then ends its connection if CineVault made it.
     /// Returns whether it was forgotten.
+    ///
+    /// The row goes before the disconnect, so a share is disconnected at most once, and a
+    /// connection the user made is never touched. A credential store that is not there holds no
+    /// password; any other failure to delete it keeps the share for a later try, before anything
+    /// was disconnected.
     fn forget(&self, share: &NetworkShare) -> bool {
         // A folder added on it since it was marked keeps it.
         if self
@@ -797,24 +802,53 @@ impl NetworkShareService {
         {
             return false;
         }
-        // Never a connection the user made.
-        if share.connected_by_us
-            && let Ok(address) = address_of(share)
-        {
-            self.disconnect_quietly(&address);
-        }
-        if let Err(error) = self.secrets.delete(&secret_account(share.id)) {
-            tracing::warn!(%error, "the password of an unused network share could not be deleted; trying later");
-            return false;
+        if share.remember {
+            match self.secrets.delete(&secret_account(share.id)) {
+                Ok(_) | Err(SecretError::NoKeyring | SecretError::Unavailable(_)) => {}
+                Err(error) => {
+                    tracing::warn!(%error, "the password of an unused network share could not be deleted; trying later");
+                    return false;
+                }
+            }
         }
         locked(&self.unsaved).remove(&share.id);
         redact::release_secret(&memory_owner(share.id));
-        let id = share.id;
-        match self.db.write(move |tx| rows::delete_share(tx, id)) {
-            Ok(_) => {
-                tracing::info!(server = %share.server, share = %share.share, "unused network share forgotten");
+        let (id, root) = (share.id, share.local_root.clone());
+        // The check for folders and the removal in one transaction: a folder added meanwhile keeps
+        // the share (now asking for its password, which is gone).
+        let removed = self.db.write(move |tx| {
+            let Some(row) = rows::get_share(tx, id)? else {
+                return Ok(None);
+            };
+            let used = cv_db::repo::data_sources::list_sources(tx, None)?
+                .iter()
+                .any(|s| paths::is_within_with(&s.path, &root, paths::CASE_SENSITIVE));
+            if used || row.unused_since_ms.is_none() {
+                if row.remember {
+                    rows::update_share(
+                        tx,
+                        &NetworkShare {
+                            remember: false,
+                            ..row
+                        },
+                    )?;
+                }
+                return Ok(None);
+            }
+            rows::delete_share(tx, id)?;
+            Ok(Some(row))
+        });
+        match removed {
+            Ok(Some(row)) => {
+                if row.connected_by_us
+                    && let Ok(address) = address_of(&row)
+                {
+                    self.disconnect_quietly(&address);
+                }
+                tracing::info!(server = %row.server, share = %row.share, "unused network share forgotten");
                 true
             }
+            Ok(None) => false,
             Err(error) => {
                 tracing::warn!(%error, "an unused network share could not be removed");
                 false

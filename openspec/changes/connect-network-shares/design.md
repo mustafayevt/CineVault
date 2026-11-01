@@ -75,7 +75,7 @@ Health: a folder below a share whose last connect failed reads offline with the 
 
 ### D9. Forgetting a share
 
-Removing a folder sets `unused_since_ms` on its share when no other folder remains below it; Undo (re-adding the folder) clears it. A sweep runs one minute after the removal (longer than any Undo toast) and at every start: for each unused share, it waits until no job (scan, rename, move, artwork or NFO write) has a path below the share, then disconnects (only a connection CineVault made, D13), deletes the credential and the row. When disconnecting fails because files are open (a player), the row and the credential are still deleted and the OS connection ends at sign-out.
+Removing a folder sets `unused_since_ms` on its share when no other folder remains below it; Undo (re-adding the folder) clears it. A sweep runs one minute after the removal (longer than any Undo toast) and at every start: for each unused share, it waits until no job (scan, rename, move, artwork or NFO write) has a path below the share, then deletes the credential (only for a remembered password; a credential store that is not there holds none, and any other failure keeps the share for the next sweep, before anything is disconnected), then the row (checking in the same transaction that no folder came back), and only then disconnects, and only a connection CineVault made (D13). So a share is disconnected at most once. When disconnecting fails because files are open (a player), the share is still forgotten and the OS connection ends at sign-out.
 
 ### D13. Never the user's own connection
 
