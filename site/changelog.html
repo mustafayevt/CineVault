@@ -52,26 +52,32 @@
       <h1>What's new in CineVault</h1>
       <p class="section-lede">What changed in each version, newest first.</p>
     </header>
-    <article class="log-entry" id="v1.3.1">
-      <div class="log-meta"><h2>1.3.1</h2><span class="pill">Coming next</span></div>
+    <article class="log-entry" id="v1.4.0">
+      <div class="log-meta"><h2>1.4.0</h2><span class="pill">Coming next</span></div>
       <div class="log-body">
+<h3>Added</h3>
+<ul>
+<li>Network shares: add a library folder from a NAS with its user name and password (Settings › Library folders › Network share…). CineVault keeps the password in your system's credential store, reconnects at start, and says why a share is offline (&quot;Wrong password&quot;, &quot;Server not reachable&quot;) with Connect… to fix it. It never disconnects a connection you made yourself. The server installers set shares up for browser mode.</li>
+<li>Copies: if you have the same movie twice (say a 4K and a 1080p download), the Copies filter shows them, Compare puts them side by side, and Keep this one deletes the other the usual way. Keep both, and Rename gives each its own name, like &quot;- 2160p&quot; and &quot;- 1080p&quot;. When two copies may be one file reached two ways (a drive and its network share), Compare does not offer to delete either.</li>
+<li>CineVault keeps a checked backup of your library every day (the last seven), so History and Undo can be brought back, and tells you if backups keep failing.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li>One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item is gone, Shift+Delete does the same as Delete, and a permanent delete asks Yes or No instead of making you type DELETE.</li>
+<li>The Delete confirmation shows each title's folder under its name, so two titles with the same name can be told apart.</li>
+<li>A library folder that is already in your library under another path (a network share, a mapped drive or a link) can no longer be added a second time.</li>
+<li>IMDb is no longer read from its web site, which kept asking for a human check. IMDb IDs come with every TMDB match, IMDb ratings from IMDb's own ratings file, and with an OMDb key OMDb adds IMDb data to Scrape.</li>
+<li>Browsers stay signed in when the server restarts or the desktop app updates. Switching Browser access off, changing its port, signing out or choosing a new password still signs them out.</li>
+</ul>
 <h3>Fixed</h3>
 <ul>
 <li>Linux and browser mode: titles on a network share mounted at a folder such as <code>/media/nas</code>, or in a Docker install, no longer show as missing. They are available again, and Rename and Move work on them.</li>
 <li>Scrape: a title whose name already ends in its year, such as <code>Example Movie (2003)</code>, is no longer searched with the year twice, which found nothing.</li>
-<li>Linux installer: updating with the server tarball no longer ends with a list of &quot;Permission denied&quot; messages about its temporary folder.</li>
-<li>Rename to another drive: a folder that holds a link to another folder is no longer moved, so files outside the title can't be touched; move such a title by hand.</li>
 <li>Rename to another drive: the copy is written to the disk before the original is removed, so a power cut during a rename can no longer lose the file.</li>
+<li>Rename to another drive: a folder that holds a link to another folder is no longer moved, so files outside the title can't be touched; move such a title by hand.</li>
+<li>Linux installer: updating with the server tarball no longer ends with a list of &quot;Permission denied&quot; messages about its temporary folder.</li>
+<li>Windows Docker installer: Update, Change folders and Remove show the right data folder again.</li>
 <li>Docker: the container starts faster with a large library and keeps the groups your NAS folders need.</li>
-<h3>Changed</h3>
-<ul>
-<li>IMDb is no longer read from its web site, which kept asking for a human check. IMDb data comes through OMDb with your OMDb key, and IMDb ratings as before.</li>
-<h3>Added</h3>
-<ul>
-<li>CineVault keeps a checked backup of your library every day (the last seven), so History and Undo can be brought back; it tells you if backups keep failing.</li>
-<h3>Changed</h3>
-<ul>
-<li>Browsers stay signed in when the server restarts or the desktop app updates. Switching Browser access off, changing its port, signing out or choosing a new password still signs them out.</li>
 </ul>
 <h3>Security</h3>
 <ul>
@@ -79,21 +85,6 @@
 <li>A request that comes through a reverse proxy or tunnel is treated as outside your home network unless the proxy is listed in <code>CINEVAULT_WEB_TRUST_PROXY</code>, so a stranger cannot reach the welcome page or a password reset through it, and &quot;Only devices on my home network&quot; refuses it.</li>
 <li>A flood of wrong passwords from the internet no longer stops you from signing in from your home network, and checking passwords no longer slows the server for everyone else.</li>
 <li>No other website can show CineVault inside a frame.</li>
-<h3>Changed</h3>
-<ul>
-<li>One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item and Shift+Delete are gone, and a permanent delete asks Yes or No instead of making you type DELETE.</li>
-<h3>Added</h3>
-<ul>
-<li>Network shares: add a library folder from a NAS with its user name and password (Settings › Library folders › Network share…). CineVault keeps the password in your system's credential store and reconnects at start; the server installers set shares up for browser mode.</li>
-<h3>Added</h3>
-<ul>
-<li>Copies: if you have the same movie twice (say a 4K and a 1080p download), the Copies filter shows them, Compare puts them side by side, and Keep this one deletes the other the usual way. Keep both, and Rename gives each its own name, like '- 2160p' and '- 1080p'. When two copies may be one file reached two ways (a drive and its network share), Compare does not offer to delete either.</li>
-</ul>
-<h3>Changed</h3>
-<ul>
-<li>A library folder that is already in your library under another path (a network share, a mapped drive or a link) can no longer be added a second time.</li>
-<li>The Delete confirmation shows each title's folder under its name, so two titles with the same name can be told apart.</li>
-<li>One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item and Shift+Delete are gone, and a permanent delete asks Yes or No instead of making you type DELETE.</li>
 </ul>
       </div>
     </article>
