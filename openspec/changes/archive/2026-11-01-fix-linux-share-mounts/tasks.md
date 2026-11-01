@@ -4,4 +4,4 @@
 
 ## 2. Integration
 
-- [ ] 2.1 The issue's setup on Linux (a separate file system mounted at `/media/nas` as the library folder, beside a control folder on `/srv`): every title is online after two scans and the movie page shows no missing notice, where 1.3.0 marked them all missing. `CHANGELOG.md` under `## [1.3.1] - unreleased` and `bun run site:changelog`; `cargo fmt --all`, `cargo lint`, `cargo test --workspace`, `openspec validate fix-linux-share-mounts --strict`. Verified by those commands and CI.
+- [x] 2.1 The issue's setup on Linux (a separate file system mounted at `/media/nas` as the library folder, beside a control folder on `/srv`): every title is online after two scans and the movie page shows no missing notice, where 1.3.0 marked them all missing. `CHANGELOG.md` under `## [1.3.1] - unreleased` and `bun run site:changelog`; `cargo fmt --all`, `cargo lint`, `cargo test --workspace`, `openspec validate fix-linux-share-mounts --strict`. Verified by those commands and CI.

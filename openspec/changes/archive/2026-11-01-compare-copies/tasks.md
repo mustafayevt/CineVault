@@ -45,8 +45,8 @@
 
 ## 7. Integration
 
-- [ ] 7.1 Full checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo test -p cv-compat`, and in `ui/` `bun run lint`, `bun run typecheck`, `bun run test`, `bun run format:check`, `bun run build`; `openspec validate compare-copies --strict` and `openspec validate --specs --strict`. Verified by those commands and CI.
-- [ ] 7.2 Data-safety review of Keep this one and labelled renames: interrupted delete, interrupted labelled rename with Resume and Roll back, Undo after a partial send, copies in one shared folder, a copy on an offline drive; each finding covered by a test. Verified by the review notes and the added tests.
+- [x] 7.1 Full checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo test -p cv-compat`, and in `ui/` `bun run lint`, `bun run typecheck`, `bun run test`, `bun run format:check`, `bun run build`; `openspec validate compare-copies --strict` and `openspec validate --specs --strict`. Verified by those commands and CI.
+- [x] 7.2 Data-safety review of Keep this one and labelled renames: interrupted delete, interrupted labelled rename with Resume and Roll back, Undo after a partial send, copies in one shared folder, a copy on an offline drive; each finding covered by a test. Verified by the review notes and the added tests.
 - [ ] 7.3 Human check in the desktop app with a library holding two real copies of one film on two drives: chip, badge, page, Keep this one with Undo, Keep both and a later third copy reopening the group, Rename of both copies with their labels and Undo, and the drop-the-label offer after Keep this one. Needs the owner's machine. Verified by the owner.
 
 ## Workflow follow-up
