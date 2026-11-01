@@ -799,21 +799,128 @@ d_mount_name() { # a short, safe name under /media for a host folder
     [ -n "$base" ] || base=media
     candidate=$base
     n=2
-    while printf '%s\n' "$BINDS" | grep -q ":/media/$candidate\$"; do
+    while printf '%s\n' "$BINDS" | grep -q ":/media/$candidate\(:.*\)\{0,1\}\$"; do
         candidate="$base-$n"
         n=$((n + 1))
     done
     printf '%s' "$candidate"
 }
 
+share_of() { # share_of folder -> //server/share when it is a share mount or volume the installer made
+    case "$1" in
+        /mnt/?*)
+            u=/etc/systemd/system/$(unit_name "${1#/mnt/}")
+            if grep -q "^$SHARE_MARK" "$u" 2>/dev/null; then sed -n 's/^What=//p' "$u"; fi ;;
+        /*) ;;
+        *) $DOCKER volume inspect -f '{{index .Labels "cinevault.share"}}' "$1" 2>/dev/null || true ;;
+    esac
+}
+
+share_bind() { # share_bind folder share -> the -v value for a library folder (share: "" or //server/share)
+    if [ -z "$2" ]; then
+        printf '%s:/media/%s' "$1" "$(d_mount_name "$1")"
+    else
+        # A share is named after itself (/media/movies). The host mount is bound with rslave, so a
+        # share mounted after the container started still appears inside it.
+        case "$1" in
+            /*) printf '%s:/media/%s:rslave' "$1" "$(d_mount_name "${2##*/}")" ;;
+            *) printf '%s:/media/%s' "$1" "$(d_mount_name "${2##*/}")" ;;
+        esac
+    fi
+}
+
 d_media_binds() { # adds one /media/<name> bind per MEDIA folder to BINDS
     list=$MEDIA
     while IFS= read -r f; do
         [ -z "$f" ] || BINDS="$BINDS
-$f:/media/$(d_mount_name "$f")"
+$(share_bind "$f" "$(share_of "$f")")"
     done <<EOF_BINDS
 $list
 EOF_BINDS
+}
+
+d_ids() { # D_UID and D_GID: the account the container's files belong to (PUID and PGID)
+    D_UID=$(printf '%s\n' "${ENVS:-}" | sed -n 's/^PUID=//p')
+    D_GID=$(printf '%s\n' "${ENVS:-}" | sed -n 's/^PGID=//p')
+    if [ -z "$D_UID" ]; then
+        D_UID=$(id -u)
+        D_GID=$(id -g)
+        if [ "$D_UID" -eq 0 ]; then D_UID="${SUDO_UID:-1000}"; D_GID="${SUDO_GID:-1000}"; fi
+    fi
+    D_GID=${D_GID:-$D_UID}
+}
+
+# Docker Desktop (macOS): the Mac's own share connections are not visible inside Docker's virtual
+# machine, so the share becomes a CIFS volume. It is created through the Docker Engine API with the
+# body on standard input, so the password never appears in a docker command line.
+d_have_image() { $DOCKER image inspect "$IMAGE" >/dev/null 2>&1 || d_pull; }
+
+d_api() { # d_api METHOD PATH: sends standard input to the Docker Engine API; prints the reply, fails unless 2xx
+    host=${DOCKER_HOST:-$($DOCKER context inspect -f '{{.Endpoints.docker.Host}}' 2>/dev/null || true)}
+    case "$host" in unix://*) sock=${host#unix://} ;; *) sock=/var/run/docker.sock ;; esac
+    reply=$(curl -sS --unix-socket "$sock" -X "$1" -H 'Content-Type: application/json' --data-binary @- \
+        -w '\n%{http_code}' "http://localhost$2") || return 1
+    printf '%s\n' "$reply" | sed '$d'
+    case "$(printf '%s\n' "$reply" | tail -n 1)" in 2??) return 0 ;; *) return 1 ;; esac
+}
+
+d_volume_test() { # d_volume_test volume: mounts it in a throwaway container; TEST_KIND says why it failed
+    TEST_OUT=""
+    TEST_KIND=ok
+    rc=0
+    TEST_OUT=$($DOCKER run --rm -v "$1:/m" --entrypoint test "$IMAGE" -d "/m${S_SUB:+/$S_SUB}" 2>&1) || rc=$?
+    if [ "$rc" -eq 0 ]; then return 0; fi
+    if [ "$rc" -eq 1 ]; then TEST_KIND=folder; else TEST_KIND=$(share_kind "$TEST_OUT"); fi
+    return 1
+}
+
+d_free_volume() { # d_free_volume name -> name, or name-2, name-3... when it is taken
+    vname=$1
+    n=2
+    while $DOCKER volume inspect "$vname" >/dev/null 2>&1; do vname="$1-$n"; n=$((n + 1)); done
+    printf '%s' "$vname"
+}
+
+d_share_volume() { # a CIFS volume for //S_SERVER/S_SHARE, checked in a throwaway container
+    d_have_image
+    vol=$($DOCKER volume ls -q --filter "label=cinevault.key=$S_KEY" | head -n 1)
+    if [ -n "$vol" ]; then
+        if d_volume_test "$vol"; then
+            say "  //$S_SERVER/$S_SHARE is the volume $vol already, with the login saved before."
+            media_line "$vol"
+            return 0
+        fi
+        if [ "$TEST_KIND" = folder ]; then say "  $S_SUB was not found on //$S_SERVER/$S_SHARE."; return 1; fi
+        say "  The volume $vol no longer mounts. $(share_error "$TEST_OUT")"
+    fi
+    tries=0
+    while :; do
+        ask_login
+        vol=$(d_free_volume "cinevault-$S_KEY")
+        # SMB 3.0 first; some older NAS units only speak 2.1.
+        for vers in 3.0 2.1; do
+            if ! reply=$(vol_body "$vol" "$S_SERVER" "$S_SHARE" "$SH_USER" "$SH_PW" "$vers" "$D_UID" "$D_GID" |
+                d_api POST /volumes/create); then
+                SH_PW=""
+                die "Docker could not make the volume $vol: $(printf '%s' "$reply" | share_mask)"
+            fi
+            if d_volume_test "$vol"; then break; fi
+            $DOCKER volume rm "$vol" >/dev/null 2>&1 || true
+            [ "$TEST_KIND" = other ] || break
+        done
+        SH_PW=""
+        case "$TEST_KIND" in
+            ok)
+                say "  //$S_SERVER/$S_SHARE is the volume $vol. Docker keeps its login in the volume's options,"
+                say "  which anyone who may use Docker on this Mac can read."
+                media_line "$vol"
+                return 0 ;;
+            folder) say "  $S_SUB was not found on //$S_SERVER/$S_SHARE."; return 1 ;;
+        esac
+        say "  $(share_error "$TEST_OUT")"
+        tries=$((tries + 1))
+        if [ "$TEST_KIND" != login ] || [ -n "$YES" ] || [ -n "${CINEVAULT_SHARE_PASSWORD_FILE:-}" ] || [ "$tries" -ge 3 ]; then return 1; fi
+    done
 }
 
 d_run() { # runs the container from BINDS, ENVS (newline-separated lists) and PORT
@@ -835,7 +942,12 @@ d_pull() {
 d_logs() { $DOCKER logs --tail 20 "$NAME"; }
 
 d_finish() {
-    lines=$(printf '%s\n' "$BINDS" | sed -n 's#^\(.*\):\(/media/[^:]*\).*$#  \2    (your folder \1)#p')
+    lines=$(printf '%s\n' "$BINDS" | sed -n 's#^\(.*\):\(/media/[^:]*\).*$#\1:\2#p' | while IFS= read -r b; do
+        src=${b%:/media/*}
+        share=$(share_of "$src")
+        if [ -n "$share" ]; then printf '  %s    (the network share %s; its folders are inside)\n' "${b#"$src":}" "$share"
+        else printf '  %s    (your folder %s)\n' "${b#"$src":}" "$src"; fi
+    done)
     finish "$1" "docker restart cinevault" "$lines"
 }
 
@@ -867,7 +979,9 @@ d_folders() {
     say "CineVault now sees these folders:"
     printf '%s\n' "$BINDS" | grep ':/media/' | sed 's/^/  /' || true
     BINDS=$(printf '%s\n' "$BINDS" | grep -v ':/media/' || true)
+    d_ids
     ask_media
+    [ "$OS" = Darwin ] || shares_apply "$D_UID" "$D_GID"
     d_media_binds
     d_recreate
 }
@@ -894,7 +1008,10 @@ d_uninstall() {
 
 d_install() {
     say "CineVault browser mode (beta) installer, with Docker"
+    ENVS=""
+    d_ids
     ask_media
+    [ "$OS" = Darwin ] || shares_apply "$D_UID" "$D_GID"
     step "Where CineVault keeps its own data"
     dir=$(ask "Data folder (library, settings, password)" "${CINEVAULT_DIR:-$HOME/cinevault}")
     case "$dir" in "~"*) dir="$HOME${dir#\~}" ;; esac
@@ -909,10 +1026,8 @@ d_install() {
 $key:/run/secrets/cinevault_key:ro"
     d_media_binds
 
-    uid=$(id -u); gid=$(id -g)
-    if [ "$uid" -eq 0 ]; then uid="${SUDO_UID:-1000}"; gid="${SUDO_GID:-1000}"; fi
-    ENVS="PUID=$uid
-PGID=$gid
+    ENVS="PUID=$D_UID
+PGID=$D_GID
 CINEVAULT_SECRET_KEY_FILE=/run/secrets/cinevault_key"
     pick_port
     d_pull
@@ -1010,6 +1125,24 @@ domain=WORK"
         "//nas/movies could not be mounted: mount error(95): Operation not supported"
     expect "retry with SMB 2.1 after" "$(share_kind 'mount error(95): Operation not supported')" other
     expect "no retry after a wrong login" "$(share_kind 'mount error(13): Permission denied')" login
+
+    expect "volume body" "$(vol_body cinevault-nas-movies nas movies 'WORK\alex' 'a,b"c\d' 3.0 501 20)" \
+        '{"Name":"cinevault-nas-movies","Driver":"local","DriverOpts":{"type":"cifs","device":"//nas/movies","o":"addr=nas,username=alex,domain=WORK,password=a,,b\"c\\d,uid=501,gid=20,file_mode=0664,dir_mode=0775,vers=3.0"},"Labels":{"cinevault.share":"//nas/movies","cinevault.key":"nas-movies"}}'
+    expect "volume body, share with a space" "$(vol_body cinevault-nas-media-library nas 'Media Library' alex pw 2.1 1000 1000)" \
+        '{"Name":"cinevault-nas-media-library","Driver":"local","DriverOpts":{"type":"cifs","device":"//nas/Media Library","o":"addr=nas,username=alex,password=pw,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,vers=2.1"},"Labels":{"cinevault.share":"//nas/Media Library","cinevault.key":"nas-media-library"}}'
+    expect "password masked" "$(echo 'data: addr=nas,username=alex,password=se,,cret,uid=501,gid=20: permission denied' | share_mask)" \
+        'data: addr=nas,username=alex,password=********,uid=501,gid=20: permission denied'
+    expect "docker wrong login" "$(share_kind "failed to mount local volume: mount //nas/movies:/var/lib/docker/volumes/v/_data, data: addr=nas: permission denied")" login
+    expect "docker no share" "$(share_kind "failed to mount local volume: mount //nas/x:/var/lib/docker/volumes/v/_data: no such file or directory")" missing
+
+    BINDS=""
+    expect "bind of a host share mount" "$(share_bind /mnt/nas-movies //nas/movies)" /mnt/nas-movies:/media/movies:rslave
+    expect "bind of a share volume" "$(share_bind cinevault-nas-movies //nas/movies)" cinevault-nas-movies:/media/movies
+    expect "bind of a share with a space" "$(share_bind cinevault-nas-media-library '//nas/Media Library')" "cinevault-nas-media-library:/media/Media-Library"
+    expect "bind of a local folder" "$(share_bind /srv/films "")" /srv/films:/media/films
+    BINDS="/mnt/nas-movies:/media/movies:rslave"
+    expect "second share named movies" "$(share_bind cinevault-other-movies //other/movies)" cinevault-other-movies:/media/movies-2
+    BINDS=""
 
     if [ "$fails" -eq 0 ]; then echo "install.sh self-test passed"; else echo "install.sh self-test: $fails failed"; exit 1; fi
 }
