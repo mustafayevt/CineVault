@@ -17,7 +17,7 @@ The sidebar SHALL list each drive that holds a library folder with its name, a t
 - **THEN** the sidebar shows that drive greyed with "Offline"
 
 ### Requirement: Which drive a folder is on
-A library folder SHALL belong to the volume that holds it: a Windows drive letter, a network share, a macOS mount point or a Linux mount point (such as `/media/<user>/<name>`, `/run/media/<user>/<name>`, `/mnt/<name>` or `/`). Two folders on one volume SHALL be one drive with two folders. A Linux drive with no volume label SHALL be named after its mount point's last part. A drive SHALL be online when at least one of its library folders answers the health check, and every folder that answers SHALL record when it was last seen. On Linux a library folder below `/media/<user>/<name>`, `/run/media/<user>/<name>` or `/mnt/<name>` SHALL NOT answer while that folder exists but is not a mount point (the drive is unmounted).
+A library folder SHALL belong to the volume that holds it: a Windows drive letter, a network share, a macOS mount point or a Linux mount point (such as `/media/<user>/<name>`, `/run/media/<user>/<name>`, `/mnt/<name>` or `/`). On Linux the mount point of a folder below `/media`, `/run/media` or `/mnt` SHALL be the deepest folder from `/media/<name>`, `/run/media/<user>` or `/mnt/<name>` down to `/media/<user>/<name>`, `/run/media/<user>/<name>` or `/mnt/<name>` that the system's mount list names, and that usual mount point when the list names none of them. A folder on a share connected by CineVault SHALL belong to that share, named like `\\nas\movies`, wherever the share is mounted. Two folders on one volume SHALL be one drive with two folders. A Linux drive with no volume label SHALL be named after its mount point's last part. A drive SHALL be online when at least one of its library folders answers the health check, and every folder that answers SHALL record when it was last seen. On Linux a library folder SHALL NOT answer while its mount point exists but is not mounted (the drive is unmounted).
 
 #### Scenario: Two folders on one drive
 - **WHEN** `E:\Movies` and `E:\TV` are library folders
@@ -27,9 +27,17 @@ A library folder SHALL belong to the volume that holds it: a Windows drive lette
 - **WHEN** `/media/alex/Films/Movies` and `/media/alex/Films/TV` are library folders on Linux
 - **THEN** one drive "Films" is listed with both folders
 
+#### Scenario: A share mounted higher up
+- **WHEN** a network share is mounted at `/media/nas`, `/media/nas` is a library folder and it holds the folder `/media/nas/Example Movie (2001)` with its video file
+- **THEN** the title is online, scans keep it online, and Rename and Move offer it
+
 #### Scenario: Unmounted Linux disk
 - **WHEN** the disk mounted at `/mnt/films` is unmounted, leaving the empty folder `/mnt/films`, and `/mnt/films` is a library folder
 - **THEN** the drive is offline, its titles keep their state, and a scan does not mark them missing
+
+#### Scenario: Share mounted by CineVault on macOS
+- **WHEN** CineVault mounts the share `movies` of the server `nas` on macOS and its folders `Films` and `Series` are library folders
+- **THEN** one drive `\\nas\movies` is listed with both folders
 
 ### Requirement: Low space rule
 A drive SHALL count as low when less than 5% of it or less than 50 GB is free (either is enough). An offline drive SHALL NOT be judged.
@@ -88,17 +96,6 @@ Each online drive card SHALL show, when not empty, "Trash folder" with the bytes
 #### Scenario: Only recorded bin items
 - **WHEN** the Recycle Bin also holds files the user deleted elsewhere
 - **THEN** only the items History recorded with the bin's id are counted, and nothing else in the bin is listed or touched
-
-### Requirement: Empty a drive's trash
-A drive card with trash SHALL offer "Empty…", and the Drives page menu "Empty all trash folders…". Both SHALL open the typed DELETE confirmation listing each trash-folder batch and bin item with its size, with the button "Empty for good". Confirming SHALL erase only top entries of a `.deletedByCineVault` folder (never the custom folder's other contents; links removed, never followed) and only the recorded bin items, then refresh the drives and History.
-
-#### Scenario: Empty D:
-- **WHEN** the user chooses Empty… on D:, types DELETE and confirms
-- **THEN** D:'s trash folder batches and the items CineVault sent to the Recycle Bin from D: are erased, the toast says "Emptied the trash: <size> freed", and the delete entries of those files show why their Undo is off
-
-#### Scenario: Wrong word
-- **WHEN** the field holds "delete"
-- **THEN** "Empty for good" stays disabled and nothing is erased
 
 ### Requirement: Move to with space before and after
 "Move to…" in the Library selection bar, the right-click menu, the title page header ("Move") and the Drives selection bar SHALL open the same menu: "Move N titles · <size> to", then each other library folder of the same type as a row with its drive's name, the folder's label and the drive's free space on the first line, the folder's path on the second line shortened in the middle with the whole path as its tooltip, and a used-space bar with "→ <free after> free after"; and below the rows how much the source drive frees. A destination that cannot take the titles SHALL stay in the list, reachable with the arrow keys, show the reason on its row in the warning colour, and ignore choosing. Only the list SHALL scroll, vertically, when it does not fit the window. A press outside the menu SHALL close it and still reach what was pressed; pressing the control that opened it SHALL close it; Esc SHALL close it and keep the selection. Nothing SHALL touch the disk until the user chooses a destination.
@@ -215,8 +212,19 @@ Every finished move SHALL be one History entry. Its Undo (from the toast or Hist
 - **THEN** the files are copied back to D: and verified, the library points at D:, and the copies on E: go to the Recycle Bin
 
 ### Requirement: Recovery waits for an unmounted Linux drive
-On Linux, recovering an interrupted rename or move batch SHALL treat a drive as reachable only when its mount root (`/media/<user>/<name>`, `/run/media/<user>/<name>`, `/mnt/<name>`, or `/` for other paths) is a mount point. A batch on an unmounted drive SHALL wait until the drive is back, as for a disconnected drive on Windows.
+On Linux, recovering an interrupted rename or move batch SHALL treat a drive as reachable only when its mount point (as found under "Which drive a folder is on", or `/` for other paths) is mounted. A batch on an unmounted drive SHALL wait until the drive is back, as for a disconnected drive on Windows.
 
 #### Scenario: Batch on an unmounted disk
 - **WHEN** CineVault starts after a rename batch on `/media/alex/Films` was interrupted and that disk is not mounted
 - **THEN** the batch is left waiting, nothing is written below `/media/alex/Films`, and it is settled once the disk is mounted again
+
+### Requirement: Empty trash folders with a Yes or No
+A drive card with trash SHALL offer "Empty…", and the Drives page menu "Empty all trash folders…". Both SHALL open a Yes or No confirmation listing each trash-folder batch and bin item with its size, with the buttons "Cancel" and "Empty for good". Confirming SHALL erase only top entries of a `.deletedByCineVault` folder (never the custom folder's other contents; links removed, never followed) and only the recorded bin items, then refresh the drives and History.
+
+#### Scenario: Empty D:
+- **WHEN** the user chooses Empty… on D: and confirms with "Empty for good"
+- **THEN** D:'s trash folder batches and the items CineVault sent to the Recycle Bin from D: are erased, the toast says "Emptied the trash: <size> freed", and the delete entries of those files show why their Undo is off
+
+#### Scenario: Cancelled
+- **WHEN** the user chooses Empty… on D: and then Cancel or Esc
+- **THEN** nothing is erased

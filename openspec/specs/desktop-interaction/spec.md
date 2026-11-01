@@ -40,7 +40,7 @@ Interface text (labels, buttons, headings, nav, chips, menus) SHALL NOT be selec
 - **THEN** the app's title menu opens and the browser's own menu does not
 
 ### Requirement: Browser keys are off
-In the desktop app, reload (F5, Ctrl+R, Ctrl+Shift+R), print (Ctrl+P), view source (Ctrl+U), browser find (Ctrl+G, F3), the browser's refresh, search, home, stop and favourites keys and, in release builds, the developer tools keys (F12, Ctrl+Shift+I, J and C) SHALL do nothing of their own. Ctrl+F (⌘F on macOS) SHALL focus the title-bar library search and select its text. The browser's zoom SHALL stay off; the zoom keys drive the app zoom defined in `app-shell`. In a browser, the page SHALL take Ctrl+F for the library search, Esc, Delete, Shift+Delete and the arrow keys, and SHALL leave reload, the browser's zoom and the browser's own developer tools to the browser; a reload SHALL keep the page's filters and scroll in the address and the stored view state.
+In the desktop app, reload (F5, Ctrl+R, Ctrl+Shift+R), print (Ctrl+P), view source (Ctrl+U), browser find (Ctrl+G, F3), the browser's refresh, search, home, stop and favourites keys and, in release builds, the developer tools keys (F12, Ctrl+Shift+I, J and C) SHALL do nothing of their own. Ctrl+F (⌘F on macOS) SHALL focus the title-bar library search and select its text. The browser's zoom SHALL stay off; the zoom keys drive the app zoom defined in `app-shell`. In a browser, the page SHALL take Ctrl+F for the library search, Esc, Delete and the arrow keys, and SHALL leave reload, the browser's zoom and the browser's own developer tools to the browser; a reload SHALL keep the page's filters and scroll in the address and the stored view state.
 
 #### Scenario: F5 in a release build
 - **WHEN** the user presses F5 on the Rename page in the desktop app
@@ -55,7 +55,7 @@ In the desktop app, reload (F5, Ctrl+R, Ctrl+Shift+R), print (Ctrl+P), view sour
 - **THEN** the page reloads and returns with the same filters and scroll position
 
 ### Requirement: No single-key shortcuts
-Keyboard shortcuts SHALL be Ctrl or Alt chords (⌘ or ⌥ on macOS), Delete, Shift+Delete, Esc, F2, Enter and the arrow keys only. A plain letter or digit key SHALL never trigger an action, so typing can never change the library by accident. F2 SHALL rename the selected titles, Ctrl+A SHALL select all in the focused list, and Ctrl+Z SHALL undo the most recent action whose toast offers Undo.
+Keyboard shortcuts SHALL be Ctrl or Alt chords (⌘ or ⌥ on macOS), Delete, Esc, F2, Enter and the arrow keys only. A plain letter or digit key SHALL never trigger an action, so typing can never change the library by accident. F2 SHALL rename the selected titles, Ctrl+A SHALL select all in the focused list, and Ctrl+Z SHALL undo the most recent action whose toast offers Undo.
 
 #### Scenario: Typing a letter on the Library
 - **WHEN** a title is selected in the Library and the user presses "r"
@@ -70,7 +70,7 @@ Posters, table rows, episode rows, files, drives and artwork tiles SHALL have th
 
 #### Scenario: Right-click inside a selection
 - **WHEN** four movies are selected and the user right-clicks one of them
-- **THEN** the menu acts on all four, with items such as "Rename 4 titles", "Scrape 4 titles", "Move to…", "Delete to Recycle Bin" and "Delete permanently…"
+- **THEN** the menu acts on all four, with items such as "Rename 4 titles", "Scrape 4 titles", "Move to…" and "Delete"
 
 #### Scenario: Keyboard opens the menu
 - **WHEN** a table row has focus and the user presses Shift+F10
@@ -99,11 +99,15 @@ In every multi-select grid and table, a click SHALL select one item, Ctrl-click 
 - **THEN** every title of that drive is selected
 
 ### Requirement: Delete keys
-In the Library and Drives lists, Delete SHALL start Delete to Recycle Bin for the selection and Shift+Delete SHALL open the permanent-delete confirmation, as defined by `title-deletion`. Neither key SHALL act on titles while focus is in a text field.
+In the Library and Drives lists, Delete SHALL delete the selection as Settings › Deleted files says, as defined by `title-deletion`. Shift+Delete SHALL do the same as Delete; there is no separate permanent-delete key. Neither key SHALL act on titles while focus is in a text field.
 
 #### Scenario: Delete key in a search field
 - **WHEN** the library search has focus and the user presses Delete
 - **THEN** a character of the search text is deleted and no title is touched
+
+#### Scenario: Shift+Delete is Delete
+- **WHEN** a title is selected, Deleted files is "Recycle Bin" and the user presses Shift+Delete
+- **THEN** the title goes to the Recycle Bin with Undo, as with Delete, and nothing is erased
 
 ### Requirement: Drag and drop where it is natural
 Picture files SHALL be droppable onto the artwork picker's drop targets in the desktop app and chosen or dropped on the upload control in a browser. Folders SHALL be droppable onto the first-run Folders step and onto Settings › Library folders in the desktop app. In a browser a dropped folder SHALL NOT be accepted, because the browser provides no absolute path, and the page SHALL say "Use Add folder…". While something droppable is dragged over the window, the drop target SHALL show that it accepts the drop; a drop outside a target SHALL change nothing.

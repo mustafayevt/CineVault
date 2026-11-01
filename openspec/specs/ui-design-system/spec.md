@@ -167,7 +167,7 @@ A poster SHALL carry at most one stage badge in its corner: a check for Scraped 
 - **THEN** its poster shows the check badge, and hovering it says "Scraped"
 
 ### Requirement: One verb glossary
-User-facing text SHALL use one vocabulary on buttons, menus, toasts and History: Scan, Scrape and Rename, the stages New, Scraped and Renamed, and Artwork…, Move to…, Rewrite NFO, Delete to Recycle Bin (Trash on macOS) and Delete permanently…. Scrape on a scraped title SHALL open the match picker with the current match first. `ui/src/i18n/verbs.test.ts` SHALL fail when a catalogue message contains Identify, Enrich, Rescrape, Scrape again, Change match, Organize or Search & scrape.
+User-facing text SHALL use one vocabulary on buttons, menus, toasts and History: Scan, Scrape and Rename, the stages New, Scraped and Renamed, and Artwork…, Move to…, Rewrite NFO and Delete. Scrape on a scraped title SHALL open the match picker with the current match first. `ui/src/i18n/verbs.test.ts` SHALL fail when a catalogue message contains Identify, Enrich, Rescrape, Scrape again, Change match, Organize or Search & scrape.
 
 #### Scenario: Banned verb in a message
 - **WHEN** a catalogue message reads "Rescrape 3 titles"

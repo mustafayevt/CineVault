@@ -36,7 +36,7 @@ Where the system bin cannot take a path (a network share, a mapped network drive
 - **THEN** its folder goes to `/mnt/nas/movies/.deletedByCineVault/<batch>/` and the toast says "Deleted <title> to the library folder's trash folder", with Undo
 
 ### Requirement: Where deleted files go
-Settings › Deleted files (`files.deleted-mode`, written atomically) SHALL choose where Delete, a move's originals, rename leftovers and artwork or NFO files replaced by an artwork or match change go: "Recycle Bin" (`bin`, the default), "Trash folder on each drive" (`folder`), "Custom trash folder…" (`custom`) or "Delete permanently" (`erase`). An unknown value SHALL count as "Recycle Bin". Shift+Delete SHALL stay a permanent delete whatever the choice.
+Settings › Deleted files (`files.deleted-mode`, written atomically) SHALL choose where Delete, a move's originals, rename leftovers and artwork or NFO files replaced by an artwork or match change go: "Recycle Bin" (`bin`, the default), "Trash folder on each drive" (`folder`), "Custom trash folder…" (`custom`) or "Delete permanently" (`erase`). An unknown value SHALL count as "Recycle Bin". There SHALL be one Delete, and it SHALL follow this choice: no menu, button or key offers a permanent delete of its own.
 
 #### Scenario: Recycle Bin choice
 - **WHEN** the choice is "Recycle Bin"
@@ -62,14 +62,14 @@ With "Custom trash folder…" and a folder chosen with "Choose folder…" (`file
 - **THEN** the section says "Choose a folder; until then files go to each drive's trash folder." and files go there
 
 ### Requirement: Delete permanently as the choice
-Choosing "Delete permanently" SHALL first ask for the typed DELETE confirmation ("Erase deleted files at once?") and SHALL show the red warning "Deleted and replaced files are erased at once. Undo can't bring them back." With it on, a Delete SHALL be a permanent delete without Undo, and renames and moves SHALL stay undoable (a rename without its erased leftovers, a move by copying back). In a browser, permanent delete SHALL be off unless it is enabled in Settings › Server, and a bin/trash delete SHALL show no dialog in either surface.
+Choosing "Delete permanently" SHALL first ask "Erase deleted files at once?" with "Cancel" and "Erase at once", and SHALL show the red warning "Deleted and replaced files are erased at once. Undo can't bring them back." With it on, a Delete SHALL be a permanent delete without Undo, and renames and moves SHALL stay undoable (a rename without its erased leftovers, a move by copying back). In a browser, permanent delete SHALL be off unless it is enabled in Settings › Server, and a bin/trash delete SHALL show no permanent-delete dialog in either surface.
 
 #### Scenario: Cancelled confirmation
 - **WHEN** the user picks "Delete permanently" and cancels the confirmation
 - **THEN** the choice stays as it was
 
 #### Scenario: Delete with the choice on
-- **WHEN** the choice is "Delete permanently" and the user deletes a title in the desktop app
+- **WHEN** the choice is "Delete permanently" and the user deletes a title in the desktop app and confirms
 - **THEN** its files are erased, the toast says "Erased <title>: Deleted files are set to Delete permanently", and a match or artwork entry whose replaced files were erased has no Undo
 
 #### Scenario: Move with the choice on
@@ -82,7 +82,7 @@ Choosing "Delete permanently" SHALL first ask for the typed DELETE confirmation 
 
 #### Scenario: Bin delete
 - **WHEN** the user deletes a title to the configured bin or trash folder
-- **THEN** no confirmation dialog is shown and the delete is undoable
+- **THEN** no permanent-delete dialog is shown and the delete is undoable
 
 ### Requirement: Empty trash folders automatically
 Settings › Deleted files SHALL offer "Empty trash folders automatically" (`files.auto-empty-days`) with "Off" (the default), "After 7 days", "After 30 days" and "After 90 days". When on, at start-up and then once a day, CineVault SHALL erase each batch of its own trash folders (the custom folder's included) whose newest file is older than the chosen days, and SHALL never touch the system Recycle Bin or Trash.
@@ -101,29 +101,6 @@ Each Delete SHALL be one History entry. Undo (from the toast or Restore in Histo
 #### Scenario: Old path taken
 - **WHEN** a new folder with the same name was created at the old path
 - **THEN** Restore leaves both the new folder and the bin untouched and reports that something is at that path
-
-### Requirement: Shift+Delete asks for a typed confirmation
-Shift+Delete and "Delete permanently…" SHALL open the one confirmation dialog: "Delete N titles permanently?", a line saying the folders and files are erased and that "This skips the Recycle Bin and cannot be undone", the list "What will be erased" with each title's path and size, a field for DELETE, and "Cancel", "Send to Recycle Bin instead" and "Delete permanently". The last SHALL stay disabled until the field holds exactly DELETE. In a browser the dialog SHALL also ask for the current password, and the server SHALL mint a one-time intent bound to the listed item IDs before the request is sent; a missing, reused, expired or mismatched intent, or a wrong password, SHALL be refused before any file is touched.
-
-#### Scenario: Confirm button stays off
-- **WHEN** the dialog is open and the user has typed "delet"
-- **THEN** "Delete permanently" is disabled, and the backend also refuses any word but DELETE
-
-#### Scenario: Shared folder in the list
-- **WHEN** a listed title shares its folder or sits in a library folder's root
-- **THEN** its row says "Only its own files in this shared folder" or "Only its own files; the library folder stays"
-
-#### Scenario: Change of mind
-- **WHEN** the user clicks "Send to Recycle Bin instead"
-- **THEN** the titles are deleted as with Delete, and the dialog closes
-
-#### Scenario: Browser confirmation
-- **WHEN** a browser confirms a permanent delete of two titles
-- **THEN** it sends DELETE, the current password and the server's one-time intent, and the two titles are erased
-
-#### Scenario: Replayed intent
-- **WHEN** the same intent is sent again
-- **THEN** the server refuses it and no file is touched
 
 ### Requirement: Permanent delete erases only what it listed
 Confirming a permanent delete SHALL write its History entry first with every path it is about to erase, then erase the titles one by one, file by file, with short retries for files another program holds. It SHALL refuse a path outside its library folder and a path that is or holds a library folder's root. In a browser it SHALL also check the one-time intent and the password before the History entry is written. Only titles erased whole SHALL leave the library, and the entry SHALL list what was erased and what was left.
@@ -213,3 +190,29 @@ The files a delete takes by name SHALL count in the preview's files and size of 
 #### Scenario: Undo
 - **WHEN** the user undoes the delete of a title whose subtitle went with it by name
 - **THEN** the subtitle is back at its old path with the video
+
+### Requirement: A permanent delete asks Yes or No
+A Delete while Settings › Deleted files is "Delete permanently" SHALL open the one confirmation dialog: "Delete N titles permanently?", a line saying the folders and files are erased and that "This cannot be undone", the list "What will be erased" with each title's path and size, and the buttons "Cancel" and "Delete permanently". There SHALL be nothing to type. Esc and Cancel SHALL erase nothing.
+
+#### Scenario: Confirm
+- **WHEN** the dialog lists two titles and the user clicks "Delete permanently"
+- **THEN** the two titles are erased
+
+#### Scenario: Cancel
+- **WHEN** the dialog is open and the user presses Esc
+- **THEN** the dialog closes and nothing is erased
+
+#### Scenario: Shared folder in the list
+- **WHEN** a listed title shares its folder or sits in a library folder's root
+- **THEN** its row says "Only its own files in this shared folder" or "Only its own files; the library folder stays"
+
+### Requirement: A browser permanent delete needs the password
+In a browser the permanent-delete dialog SHALL also ask for the current password, and the server SHALL mint a one-time intent bound to the listed item IDs before the request is sent. A missing, reused, expired or mismatched intent, or a wrong password, SHALL be refused before any file is touched.
+
+#### Scenario: Browser confirmation
+- **WHEN** a browser confirms a permanent delete of two titles
+- **THEN** it sends the current password and the server's one-time intent, and the two titles are erased
+
+#### Scenario: Replayed intent
+- **WHEN** the same intent is sent again
+- **THEN** the server refuses it and no file is touched

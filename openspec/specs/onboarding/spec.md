@@ -28,7 +28,7 @@ In the desktop app, the setup SHALL show four numbered steps, Folders, TMDB key,
 - **THEN** no drag region or window buttons are shown, and the four steps and their footer are the same
 
 ### Requirement: Folders step
-The Folders step SHALL list each added folder with its full path, what was found ("146 videos found", or "found so far" when the look stopped early) and a Movies | TV shows switch set from the detected type, with Remove, and SHALL offer "Add folder…". In the desktop app it SHALL accept folders dropped on the window; in a browser a dropped folder SHALL NOT be accepted, because a browser provides no absolute path, and the page SHALL say "Use Add folder…". A folder that cannot be read SHALL say so on its row. A folder that cannot be written SHALL say "This folder is not writable by the server." Two folders of the same type where one lies inside the other SHALL be flagged, and Continue SHALL stay disabled until one is removed.
+The Folders step SHALL list each added folder with its full path, what was found ("146 videos found", or "found so far" when the look stopped early) and a Movies | TV shows switch set from the detected type, with Remove, and SHALL offer "Add folder…" and "Network share…". In the desktop app it SHALL accept folders dropped on the window; in a browser a dropped folder SHALL NOT be accepted, because a browser provides no absolute path, and the page SHALL say "Use Add folder…". A folder that cannot be read SHALL say so on its row. A folder that cannot be written SHALL say "This folder is not writable by the server." Two folders of the same type where one lies inside the other SHALL be flagged, and Continue SHALL stay disabled until one is removed.
 
 #### Scenario: Detected type
 - **WHEN** the user adds `E:\TV`, whose videos are named like `S01E01`
@@ -41,6 +41,10 @@ The Folders step SHALL list each added folder with its full path, what was found
 #### Scenario: Read-only folder in a browser
 - **WHEN** a browser adds a folder the server cannot write
 - **THEN** the row says "This folder is not writable by the server." and Continue stays disabled
+
+#### Scenario: Network share during setup
+- **WHEN** the user chooses "Network share…" in the Folders step and connects `\\nas\movies` with Folder `TV`
+- **THEN** the step lists `\\nas\movies\TV` with what was found and the detected type, as for a folder from "Add folder…"
 
 ### Requirement: Folder type detection
 Each added folder SHALL be analysed by walking it up to 6 levels deep and at most 30,000 entries, honouring the scanner's skip rules. A video SHALL count as a TV episode when its name carries an episode marker (such as `S01E02` or `1x02`), when it sits in a season folder (such as `Season 2` or `Specials`), or when it belongs to a numbered series in one folder. The user's choice on the folder's switch SHALL win over the detected type.
@@ -68,7 +72,7 @@ The TMDB key step SHALL explain that titles, posters and plots come from TMDB an
 - **THEN** the Scrape page later says "Add your TMDB key to start scraping"
 
 ### Requirement: Ratings keys step
-The Ratings keys step ("Add your optional keys") SHALL offer the optional OMDb key ("Adds IMDb, Rotten Tomatoes and Metacritic ratings"), MDBList key, Fanart.tv key ("Adds more artwork") and TheTVDB key ("Adds TV artwork and episode data"), each marked Optional with Test, and SHALL say all of them can be added later in Settings.
+The Ratings keys step ("Add your optional keys") SHALL offer the optional OMDb key ("Adds IMDb data to Scrape, and IMDb, Rotten Tomatoes and Metacritic ratings"), MDBList key, Fanart.tv key ("Adds more artwork") and TheTVDB key ("Adds TV artwork and episode data"), each marked Optional with Test, and SHALL say all of them can be added later in Settings.
 
 #### Scenario: Ratings keys skipped
 - **WHEN** the user presses "Skip this step" on the Ratings keys step

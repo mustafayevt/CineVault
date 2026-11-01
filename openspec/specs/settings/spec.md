@@ -50,7 +50,7 @@ The Naming section SHALL hold the Movie folder, Movie file and TV episode templa
 - **THEN** the example under the field shows the new folder name, and no folder on disk changes
 
 ### Requirement: Library folders section
-The Library folders section SHALL list every library folder with its full path, how many titles or shows it holds and whether it is watched for changes or offline, a Movies | TV shows switch and Remove, and SHALL offer "Add folder…" and accept folders dropped on the window. Removing a folder SHALL keep its titles in the library as offline and confirm with an Undo toast. Scanning these folders is defined by `library-scanning`.
+The Library folders section SHALL list every library folder with its full path, how many titles or shows it holds and whether it is watched for changes or offline, a Movies | TV shows switch and Remove, and SHALL offer "Add folder…" and "Network share…" and accept folders dropped on the window. Removing a folder SHALL keep its titles in the library as offline and confirm with an Undo toast. Scanning these folders is defined by `library-scanning`; connecting shares is defined by `network-shares`.
 
 #### Scenario: Remove a folder
 - **WHEN** the user removes `D:\Movies`, which holds 120 titles
@@ -59,6 +59,10 @@ The Library folders section SHALL list every library folder with its full path, 
 #### Scenario: Add a folder
 - **WHEN** the user chooses "Add folder…" and picks `E:\Movies`
 - **THEN** the folder is listed and a toast says "Added 1 folder"
+
+#### Scenario: Add a network share
+- **WHEN** the user chooses "Network share…" and connects `\\nas\movies`
+- **THEN** the share's folder is listed and a toast says "Added 1 folder"
 
 ### Requirement: Deleted files section
 The Deleted files section SHALL hold where deleted and replaced files go ("Recycle Bin", the default; "Trash folder on each drive"; "Custom trash folder…"; "Delete permanently"), the custom trash folder with "Choose folder…", and "Empty trash folders automatically" (Off, the default, or after 7, 30 or 90 days). Choosing "Delete permanently" SHALL first ask "Erase deleted files at once?" and change nothing unless confirmed. The behaviour of each choice is defined by `title-deletion`.
@@ -139,7 +143,7 @@ Some settings SHALL have no control on the Settings page and follow the same sto
 - **THEN** `shell.sidebar` is saved in `settings.json`
 
 ### Requirement: Settings in a browser
-When Settings is served to a browser, the controls that only make sense on the desktop SHALL be hidden or shown as not applicable with a sentence: the video player choice and custom player command, app zoom and window size, "Match Windows"/"Match macOS", install-on-close, the update check and "Check now", the Recycle Bin/Trash destination and custom trash folder when the server's deleted-files destination is `.deletedByCineVault`, and the indexer manager and own-Jackett addresses that point at the client's loopback. The Server section SHALL show the address and port (read-only), the running version, the session lifetime, "Change password", "Sign out every session", "Allow permanent delete", the Kodi connection and the trusted-proxy state. File-operation labels SHALL follow the server's operating system, while text size, date format and theme SHALL follow the client's settings.
+When Settings is served to a browser, the controls that only make sense on the desktop SHALL be hidden or shown as not applicable with a sentence: the video player choice and custom player command, app zoom and window size, "Match Windows"/"Match macOS", install-on-close, the update check and "Check now", the Recycle Bin/Trash destination and custom trash folder when the server's deleted-files destination is `.deletedByCineVault`, and the indexer manager and own-Jackett addresses that point at the client's loopback. The update channel, the update signing key and the tools' paths SHALL have no control in a browser, since the server refuses them from a browser, and the tools' downloads SHALL stay available. The Server section SHALL show the address and port (read-only), the running version, the session lifetime, "Change password", "Sign out every session", "Allow permanent delete", the Kodi connection and the trusted-proxy state. File-operation labels SHALL follow the server's operating system, while text size, date format and theme SHALL follow the client's settings.
 
 #### Scenario: Browser providers
 - **WHEN** the user opens Settings in a browser
@@ -152,6 +156,10 @@ When Settings is served to a browser, the controls that only make sense on the d
 #### Scenario: Client appearance
 - **WHEN** the client's browser prefers a light theme
 - **THEN** the interface follows the client's theme choice, not the server's
+
+#### Scenario: Tool paths in a browser
+- **WHEN** the user opens Settings in a browser
+- **THEN** there is no control that changes a tool's path, the update channel or the update signing key, and the first-run setup still downloads the tools
 
 ### Requirement: Browser access section
 The desktop app's Settings page SHALL have a Browser access section, shown only in the desktop app, with a "Browser access" switch that is off by default and cannot be turned on until a password exists, and the password: "Create password" (a new password and its confirmation, at least 12 characters) when none exists, otherwise "Change password", which signs every browser out. Its values SHALL be kept in the data folder's `browser-access.json`, written atomically, so a browser cannot change them.
