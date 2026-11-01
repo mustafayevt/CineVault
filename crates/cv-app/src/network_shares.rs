@@ -125,6 +125,8 @@ pub enum OfflineReason {
     Unreachable,
     ShareNotFound,
     PasswordNeeded,
+    /// Windows still holds a sign-in to the server with the earlier password; a restart ends it.
+    NeedsRestart,
     /// Any other failure (a locked account, another user connected, the system's own message).
     NotConnected,
 }
@@ -140,6 +142,7 @@ impl OfflineReason {
             Some(ShareErrorKind::WrongLogin) => Self::WrongPassword,
             Some(ShareErrorKind::Unreachable) => Self::Unreachable,
             Some(ShareErrorKind::ShareNotFound) => Self::ShareNotFound,
+            Some(ShareErrorKind::SessionInUse) => Self::NeedsRestart,
             _ => Self::NotConnected,
         }
     }
@@ -152,6 +155,7 @@ impl OfflineReason {
             Self::Unreachable => "unreachable",
             Self::ShareNotFound => "share_not_found",
             Self::PasswordNeeded => PASSWORD_NEEDED,
+            Self::NeedsRestart => "needs_restart",
             Self::NotConnected => "not_connected",
         }
     }
@@ -164,6 +168,7 @@ impl OfflineReason {
             Self::Unreachable => "Server not reachable",
             Self::ShareNotFound => "Share not found",
             Self::PasswordNeeded => "Password needed",
+            Self::NeedsRestart => "Needs a restart",
             Self::NotConnected => "Not connected",
         }
     }

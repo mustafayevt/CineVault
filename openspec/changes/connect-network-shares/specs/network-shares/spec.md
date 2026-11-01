@@ -27,7 +27,7 @@ A folder on a connected share SHALL be added with the same rules, type detection
 - **THEN** the folder is not added and the page shows the usual "already covered" message
 
 ### Requirement: Connection errors in plain words
-When a share cannot be connected, the Network share page SHALL keep what was typed and say why next to the field concerned: a wrong user name or password, a server that cannot be reached, a share that does not exist on the server, or, on Windows, a connection to the same server under another user. Any other failure SHALL be shown with the system's own message.
+When a share cannot be connected, the Network share page SHALL keep what was typed and say why next to the field concerned: a wrong user name or password, a server that cannot be reached, a share that does not exist on the server, or, on Windows, a connection to the same server under another user or a sign-in that Windows still holds from an earlier connection. Any other failure SHALL be shown with the system's own message.
 
 #### Scenario: Wrong password
 - **WHEN** the user connects with a wrong password
@@ -36,6 +36,10 @@ When a share cannot be connected, the Network share page SHALL keep what was typ
 #### Scenario: Server unreachable
 - **WHEN** the server `nas` does not answer
 - **THEN** the Address field says that `nas` could not be reached and to check the name and that it is switched on
+
+#### Scenario: Windows still signed in to the server
+- **WHEN** on Windows the user connects with a new password to a server that CineVault disconnected earlier, Windows refuses with error 1219, and no connection to that server is visible to the user (with or without a drive letter)
+- **THEN** the page says "Windows is still signed in to nas with the earlier password." and to restart CineVault, or sign out of Windows and back in, then connect again; it does not say another user is connected, and no connection to the server is cancelled to get past it
 
 ### Requirement: Where a share folder lives
 On Windows a share folder SHALL keep its network path (`\\nas\movies\Films`) and no drive letter SHALL be assigned. On macOS the share SHALL be mounted in a folder of CineVault's own mount folder, and on a Linux desktop in the desktop's own place for user-mounted shares; the library folder's path SHALL be the folder inside that mount.
@@ -88,7 +92,7 @@ When the app starts, it SHALL connect every remembered share that is not already
 - **THEN** the share is connected, its titles are online, and none of them showed as offline first
 
 ### Requirement: Offline share folders say why
-A library folder on a share that cannot be connected SHALL read offline, never Missing, and its titles SHALL keep everything they have. Its row in Settings › Library folders SHALL add the reason ("Wrong password", "Server not reachable", "Share not found", "Password needed") and offer "Connect…".
+A library folder on a share that cannot be connected SHALL read offline, never Missing, and its titles SHALL keep everything they have. Its row in Settings › Library folders SHALL add the reason ("Wrong password", "Server not reachable", "Share not found", "Password needed", "Needs a restart") and offer "Connect…".
 
 #### Scenario: Password changed on the NAS
 - **WHEN** the NAS password for `alex` was changed and CineVault starts

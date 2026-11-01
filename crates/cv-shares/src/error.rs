@@ -15,6 +15,10 @@ pub enum ShareErrorKind {
     FolderNotFound,
     /// Windows is already connected to this server as another user (error 1219).
     OtherUserConnected,
+    /// Windows still holds its sign-in to this server from an earlier connection, with the
+    /// earlier password (error 1219 with no connection to the server in sight): a restart or a
+    /// Windows sign-out ends it.
+    SessionInUse,
     /// The server locked the account.
     AccountLocked,
     /// Files on the share are open, so it cannot be disconnected now.
@@ -38,6 +42,7 @@ impl ShareErrorKind {
             Self::ShareNotFound => "share_not_found",
             Self::FolderNotFound => "folder_not_found",
             Self::OtherUserConnected => "other_user_connected",
+            Self::SessionInUse => "session_in_use",
             Self::AccountLocked => "account_locked",
             Self::InUse => "in_use",
             Self::NoUserMounting => "no_user_mounting",
@@ -55,6 +60,7 @@ impl ShareErrorKind {
             Self::ShareNotFound,
             Self::FolderNotFound,
             Self::OtherUserConnected,
+            Self::SessionInUse,
             Self::AccountLocked,
             Self::InUse,
             Self::NoUserMounting,
@@ -155,6 +161,9 @@ impl fmt::Display for ShareError {
             ShareErrorKind::OtherUserConnected => {
                 "Windows is already connected to this server as another user."
             }
+            ShareErrorKind::SessionInUse => {
+                "Windows is still signed in to this server with the earlier password. Restart CineVault (or sign out of Windows and back in), then connect again."
+            }
             ShareErrorKind::AccountLocked => "The server has locked this account.",
             ShareErrorKind::InUse => "Files on the share are open.",
             ShareErrorKind::NoUserMounting => {
@@ -186,6 +195,7 @@ mod tests {
             ShareErrorKind::ShareNotFound,
             ShareErrorKind::FolderNotFound,
             ShareErrorKind::OtherUserConnected,
+            ShareErrorKind::SessionInUse,
             ShareErrorKind::AccountLocked,
             ShareErrorKind::InUse,
             ShareErrorKind::NoUserMounting,

@@ -309,6 +309,20 @@ describe("what the page says when a share does not connect", () => {
     expect(within(banner).getByText(/Windows allows one login per server/)).toBeVisible();
   });
 
+  it("tells a leftover Windows session from another user and says to restart", async () => {
+    await refused("session_in_use");
+    const banner = screen.getByRole("alert");
+    expect(
+      within(banner).getByText("Windows is still signed in to nas with the earlier password."),
+    ).toBeVisible();
+    expect(
+      within(banner).getByText(
+        "Restart CineVault (or sign out of Windows and back in), then connect again.",
+      ),
+    ).toBeVisible();
+    expect(within(banner).queryByText(/another user/)).toBeNull();
+  });
+
   it("shows the folder rules' refusal and the system's own message in a banner", async () => {
     await refused("inside_existing", "\\\\nas\\movies\\Films", "Films is inside D:\\Movies.");
     expect(

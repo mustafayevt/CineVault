@@ -702,6 +702,7 @@ export const settings = {
   "networkShare.reason.unreachable": "Server not reachable",
   "networkShare.reason.share_not_found": "Share not found",
   "networkShare.reason.password_needed": "Password needed",
+  "networkShare.reason.needs_restart": "Needs a restart",
   "networkShare.reason.not_connected": "Not connected",
   "networkShare.address": "Address",
   "networkShare.address.placeholder": "\\\\nas\\movies",
@@ -734,6 +735,10 @@ export const settings = {
   "networkShare.error.otherUser": "Windows is already connected to {server} as another user.",
   "networkShare.error.otherUserBody":
     "Windows allows one login per server. Disconnect the other connection in File Explorer, then connect again.",
+  "networkShare.error.sessionInUse":
+    "Windows is still signed in to {server} with the earlier password.",
+  "networkShare.error.sessionInUseBody":
+    "Restart CineVault (or sign out of Windows and back in), then connect again.",
   "networkShare.error.noKeyring":
     "No system keyring is running, so the password can't be remembered.",
   "networkShare.error.noKeyringBody":

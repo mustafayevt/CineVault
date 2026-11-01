@@ -602,6 +602,11 @@ fn failure_codes_read_as_the_reasons_of_the_folder_row() {
             "Password needed",
         ),
         (
+            "session_in_use",
+            OfflineReason::NeedsRestart,
+            "Needs a restart",
+        ),
+        (
             "account_locked",
             OfflineReason::NotConnected,
             "Not connected",

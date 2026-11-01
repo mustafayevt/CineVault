@@ -64,6 +64,12 @@ function Get-DevicelessMapping {
     Get-SmbMapping -RemotePath $env:CINEVAULT_SHARE_REMOTE -ErrorAction SilentlyContinue |
         Where-Object { -not $_.LocalPath }
 }
+function Get-ServerMapping {
+    $server = $env:CINEVAULT_SHARE_REMOTE.TrimStart('\').Split('\')[0]
+    $prefix = '\\' + $server + '\'
+    Get-SmbMapping -ErrorAction SilentlyContinue |
+        Where-Object { ([string]$_.RemotePath).StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase) }
+}
 function Test-Mapped {
     return [bool](Get-DevicelessMapping | Where-Object { $_.Status -eq 'OK' })
 }
@@ -147,6 +153,17 @@ try {
 const CHECK: &str = r"
 try {
     Write-Result $true 0 '' (Test-Mapped)
+} catch {
+    Write-Result $false (Get-Win32Code $_) $_.Exception.Message $false
+}
+";
+
+/// Whether the user can see any connection to the share's server, with or without a drive letter,
+/// to any of its shares. Asked when Windows refuses with 1219: with none in sight, the refusal
+/// comes from a sign-in session Windows keeps for a while after a disconnect.
+const SERVER_CHECK: &str = r"
+try {
+    Write-Result $true 0 '' ([bool](Get-ServerMapping))
 } catch {
     Write-Result $false (Get-Win32Code $_) $_.Exception.Message $false
 }
@@ -241,6 +258,38 @@ impl WindowsConnector {
         )
     }
 
+    /// Whether any connection to `share`'s server is visible to the user.
+    fn server_is_mapped(&self, share: &ShareAddress, cancel: &Cancel) -> Result<bool, ShareError> {
+        let result = self.run(
+            &self.command(&[SERVER_CHECK], share, None),
+            None,
+            cancel,
+            CHECK_LIMIT,
+            str::to_owned,
+        )?;
+        if result.ok {
+            Ok(result.connected)
+        } else {
+            Err(error_for(result.code, result.message.unwrap_or_default()))
+        }
+    }
+
+    /// The error of a refused connect. Windows answers 1219 ("another user") also when its own
+    /// sign-in session to the server outlives the connection CineVault ended; with no connection
+    /// to the server in sight, no other user is connected, and the reason is the session.
+    fn refusal(
+        &self,
+        share: &ShareAddress,
+        code: i64,
+        message: String,
+        cancel: &Cancel,
+    ) -> ShareError {
+        if code == 1219 && matches!(self.server_is_mapped(share, cancel), Ok(false)) {
+            return ShareError::new(ShareErrorKind::SessionInUse, message.trim()).with_code(code);
+        }
+        error_for(code, message)
+    }
+
     fn run(
         &self,
         command: &ToolCommand,
@@ -291,7 +340,7 @@ impl ShareConnector for WindowsConnector {
             let message = login
                 .password()
                 .scrub(result.message.as_deref().unwrap_or_default());
-            Err(error_for(result.code, message))
+            Err(self.refusal(share, result.code, message, cancel))
         }
     }
 
@@ -530,6 +579,100 @@ mod tests {
         assert_eq!(other.to_string(), "Access is denied. (error 5)");
     }
 
+    /// The scripts of a connect that Windows refuses with 1219, then the answer to "is any
+    /// connection to the server visible?" (`mapped`).
+    fn refused_1219(mapped: &'static str) -> Vec<Vec<Step>> {
+        vec![
+            vec![Step::Out(NOT_MAPPED), Step::Exit(0)],
+            vec![
+                Step::Read,
+                Step::Out(
+                    "{\"ok\":false,\"code\":1219,\"message\":\"Multiple connections to a server or shared resource by the same user are not allowed.\",\"connected\":false}\n",
+                ),
+                Step::Exit(0),
+            ],
+            vec![Step::Out(mapped), Step::Exit(0)],
+        ]
+    }
+
+    #[test]
+    fn a_1219_with_no_connection_to_the_server_in_sight_is_the_windows_session() {
+        let (connector, spawner) = connector(refused_1219(NOT_MAPPED));
+        let error = connector
+            .connect(&share(), &login(), &Cancel::new())
+            .unwrap_err();
+        assert_eq!(error.kind(), ShareErrorKind::SessionInUse);
+        assert_eq!(error.code(), Some(1219));
+        let commands = spawner.commands();
+        assert_eq!(commands.len(), 3, "{commands:?}");
+        // The question is about the server, not the share: a connection with or without a drive
+        // letter, to any share of it. Nothing is cancelled to find out.
+        let script = decoded(&commands[2]);
+        assert!(script.contains("Get-ServerMapping"));
+        let query = &PRELUDE[PRELUDE.find("function Get-ServerMapping").unwrap()..];
+        let query = &query[..query.find("function Test-Mapped").unwrap()];
+        assert!(
+            query.contains("Get-SmbMapping -ErrorAction"),
+            "all mappings: {query}"
+        );
+        assert!(query.contains("StartsWith($prefix"), "{query}");
+        assert!(!query.contains("LocalPath"), "drive letters count: {query}");
+        assert!(!script.contains("[CineVaultShare]::Disconnect("));
+        assert!(!script.contains("Remove-SmbMapping"));
+        assert!(
+            commands[2]
+                .env
+                .contains(&(REMOTE_VAR.into(), r"\\nas\movies".into()))
+        );
+        assert_eq!(spawner.input(), format!("{SECRET}\n"), "only the connect");
+    }
+
+    #[test]
+    fn a_1219_with_a_connection_to_the_server_in_sight_is_another_user() {
+        let mapped = "{\"ok\":true,\"code\":0,\"message\":\"\",\"connected\":true}\n";
+        let (connector, _) = connector(refused_1219(mapped));
+        let error = connector
+            .connect(&share(), &login(), &Cancel::new())
+            .unwrap_err();
+        assert_eq!(error.kind(), ShareErrorKind::OtherUserConnected);
+        assert_eq!(error.code(), Some(1219));
+    }
+
+    #[test]
+    fn a_1219_stays_another_user_when_the_server_cannot_be_asked() {
+        let mut scripts = refused_1219(NOT_MAPPED);
+        scripts[2] = vec![Step::Err("blocked\n"), Step::Exit(1)];
+        let (connector, _) = connector(scripts);
+        let error = connector
+            .connect(&share(), &login(), &Cancel::new())
+            .unwrap_err();
+        assert_eq!(error.kind(), ShareErrorKind::OtherUserConnected);
+    }
+
+    #[test]
+    fn other_refusals_do_not_ask_about_the_server() {
+        let (connector, spawner) = connector(vec![
+            vec![Step::Out(NOT_MAPPED), Step::Exit(0)],
+            vec![
+                Step::Read,
+                Step::Out("{\"ok\":false,\"code\":1326,\"message\":\"no\",\"connected\":false}\n"),
+                Step::Exit(0),
+            ],
+        ]);
+        let error = connector
+            .connect(&share(), &login(), &Cancel::new())
+            .unwrap_err();
+        assert_eq!(error.kind(), ShareErrorKind::WrongLogin);
+        assert_eq!(spawner.commands().len(), 2);
+    }
+
+    #[test]
+    fn the_session_message_names_the_way_out() {
+        let text = ShareError::new(ShareErrorKind::SessionInUse, "x").to_string();
+        assert!(text.contains("still signed in"), "{text}");
+        assert!(text.contains("Restart CineVault"), "{text}");
+    }
+
     #[test]
     fn powershell_without_a_result_line_gives_its_last_words() {
         let (connector, _) = connector(vec![vec![
@@ -622,7 +765,7 @@ mod tests {
 
     #[test]
     fn the_scripts_read_their_inputs_from_the_environment_only() {
-        for script in [CONNECT, CHECK, DISCONNECT] {
+        for script in [CONNECT, CHECK, SERVER_CHECK, DISCONNECT] {
             let text = format!("{PRELUDE}{NATIVE}{script}");
             assert!(!text.contains("{0}") && !text.contains("$args"), "{script}");
         }

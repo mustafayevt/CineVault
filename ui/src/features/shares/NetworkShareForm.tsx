@@ -79,6 +79,12 @@ function problemOf(error: unknown, address: ShareAddress | null): ShareProblem |
         title: t("networkShare.error.otherUser", { server }),
         body: t("networkShare.error.otherUserBody"),
       };
+    case "session_in_use":
+      return {
+        field: "banner",
+        title: t("networkShare.error.sessionInUse", { server }),
+        body: t("networkShare.error.sessionInUseBody"),
+      };
     case "no_keyring":
       return {
         field: "banner",

@@ -94,9 +94,9 @@ impl Drop for Attempt<'_> {
 pub struct ShareCommandError {
     /// Stable code: `invalid_address`, `invalid_user`, `invalid_password`, `wrong_login`,
     /// `unreachable`, `share_not_found`, `folder_not_found`, `other_user_connected`,
-    /// `account_locked`, `in_use`, `no_user_mounting`, `cancelled`, `other`, the folder rules'
-    /// codes (`already_added`, `inside_existing`, …), `no_keyring`, `credential_store`,
-    /// `unknown_share`, `busy` or `storage`.
+    /// `session_in_use`, `account_locked`, `in_use`, `no_user_mounting`, `cancelled`, `other`, the
+    /// folder rules' codes (`already_added`, `inside_existing`, …), `no_keyring`,
+    /// `credential_store`, `unknown_share`, `busy` or `storage`.
     pub code: String,
     /// Plain sentence for the user; the system's own message for `other`.
     pub message: String,
@@ -175,6 +175,8 @@ pub enum OfflineReasonDto {
     Unreachable,
     ShareNotFound,
     PasswordNeeded,
+    /// Windows still holds a sign-in to the server with the earlier password.
+    NeedsRestart,
     /// Any other failure: another user connected, a locked account, the system's own message.
     NotConnected,
 }
@@ -186,6 +188,7 @@ impl From<OfflineReason> for OfflineReasonDto {
             OfflineReason::Unreachable => Self::Unreachable,
             OfflineReason::ShareNotFound => Self::ShareNotFound,
             OfflineReason::PasswordNeeded => Self::PasswordNeeded,
+            OfflineReason::NeedsRestart => Self::NeedsRestart,
             OfflineReason::NotConnected => Self::NotConnected,
         }
     }
