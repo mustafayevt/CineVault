@@ -9,7 +9,7 @@
 
 - [x] 2.1 The best-quality rank as a pure function over resolution label, best HDR format, lead audio track (channels, then codec rank) and video bitrate, with no mark on a tie or on an unread top copy. Verified by `cargo test -p cv-app --lib copies::rank` (the spec's scenarios and each step of the order).
 - [x] 2.2 `CopiesService`: `counts` (added to `LifecycleCounts` as `copies`), `group_of`, `compare` (the rows of "What the compare rows show", "Not read yet" when media info is missing, the opened copy first), `keep_all` and `ask_again`. Verified by `cargo test -p cv-app --lib copies` and `cargo test -p cv-app --lib lifecycle`.
-- [ ] 2.3 The Library list query takes `copies = true` (open groups only, copies together, best first, groups in the chosen sort) and its rows carry the open group size. Verified by `cargo test -p cv-db --lib` list tests for the filter, its combination with Drive and search, and the order.
+- [x] 2.3 The Library list query takes `copies = true` (open groups only, copies together, best first, groups in the chosen sort) and its rows carry the open group size. Verified by `cargo test -p cv-db --lib` list tests for the filter, its combination with Drive and search, and the order.
 
 ## 3. Copy labels in Rename
 

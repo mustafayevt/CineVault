@@ -9,6 +9,7 @@
 //! `item (kind, title COLLATE NOCASE, id)` index and stops after `limit` matches.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use cv_domain::{ItemId, ItemKind, RatingPreference};
 use rusqlite::types::Value;
@@ -229,6 +230,9 @@ pub enum SortField {
     /// 0 for an item whose title, original title or English title holds every word of
     /// [`ItemQuery::title_match`], 1 for the others. Only [`ItemQuery::title_first`] adds it.
     TitleMatch,
+    /// The place of a movie in the Copies filter: its group's first position in the chosen sort,
+    /// then its rank inside the group. Only [`ItemQuery::copies`] adds it.
+    CopyGroup,
 }
 
 impl SortField {
@@ -360,8 +364,9 @@ impl SortField {
                 false,
             ),
             Self::AiredStatus => ("item.aired_status", false),
-            // Built per query by `list_items_inner`: it needs the words searched for.
-            Self::TitleMatch => ("0", false),
+            // Built per query by `list_items_inner`: it needs the words searched for, or the
+            // order of the copies.
+            Self::TitleMatch | Self::CopyGroup => ("0", false),
         }
     }
 }
@@ -434,6 +439,20 @@ pub struct ItemQuery {
     /// by their plot, people, tags or file names, ahead of the sort.
     #[serde(default)]
     pub title_first: bool,
+    /// The Copies filter: only these movies, the copies of each film together in their rank
+    /// order, the groups in the order of their first copy under [`ItemQuery::sort`].
+    #[serde(default)]
+    pub copies: Option<Vec<CopyMember>>,
+}
+
+/// A movie of the Copies filter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CopyMember {
+    pub id: ItemId,
+    /// The group it belongs to (any id that is the same for every copy of the film).
+    pub group: ItemId,
+    /// Its place inside the group, best first from 0.
+    pub rank: u32,
 }
 
 /// The sort rank of a title's pipeline stage: 0 New, 1 Scraped, 2 Renamed. `profile_key` names the
@@ -466,7 +485,15 @@ impl ItemQuery {
             profile_key: String::new(),
             title_match: String::new(),
             title_first: false,
+            copies: None,
         }
+    }
+
+    /// Lists only `members`, the Copies filter.
+    #[must_use]
+    pub fn copies(mut self, members: Vec<CopyMember>) -> Self {
+        self.copies = Some(members);
+        self
     }
 
     /// Lists the items whose titles hold every word of `text` before the others.
@@ -595,6 +622,13 @@ pub struct ItemSummary {
     pub availability: String,
     pub top250: u32,
     pub season_number: Option<u32>,
+    /// The number of copies of a movie whose group the user has not kept (the poster badge),
+    /// else 0.
+    #[serde(default)]
+    pub copies: u8,
+    /// The number of copies in the movie's group, kept or not, else 0.
+    #[serde(default)]
+    pub copies_total: u8,
 }
 
 impl ItemSummary {
@@ -631,8 +665,32 @@ impl ItemSummary {
             availability: row.get("availability")?,
             top250: to_u32(row.get("top250")?),
             season_number: row.get::<_, Option<i64>>("season_number")?.map(to_u32),
+            copies: 0,
+            copies_total: 0,
         })
     }
+}
+
+/// Puts the size of each movie's copy group on its row, from one read of the groups.
+pub(crate) fn fill_copies(conn: &Connection, items: &mut [ItemSummary]) -> DbResult<()> {
+    if !items.iter().any(|i| i.kind == ItemKind::Movie) {
+        return Ok(());
+    }
+    let mut sizes: HashMap<ItemId, (u8, u8)> = HashMap::new();
+    for group in super::copies::copy_groups(conn)? {
+        let size = u8::try_from(group.members.len()).unwrap_or(u8::MAX);
+        let open = if group.is_open() { size } else { 0 };
+        for id in group.members {
+            sizes.insert(id, (open, size));
+        }
+    }
+    for item in items {
+        if let Some(&(open, total)) = sizes.get(&item.id) {
+            item.copies = open;
+            item.copies_total = total;
+        }
+    }
+    Ok(())
 }
 
 /// Writes `WHERE item.kind = ? AND (filter)` into `sql`.
@@ -647,6 +705,13 @@ fn write_where(sql: &mut Sql, query: &ItemQuery) -> DbResult<()> {
             " AND (SELECT COUNT(*) FROM item c WHERE c.parent_id = item.id \
              AND c.kind = 'movie') >= {MIN_OWNED_IN_COLLECTION}"
         ));
+    }
+    if let Some(members) = &query.copies {
+        sql.push(" AND item.id IN (SELECT value FROM json_each(");
+        sql.bind(serde_json::to_string(
+            &members.iter().map(|m| m.id.0).collect::<Vec<_>>(),
+        )?);
+        sql.push("))");
     }
     sql.push(" AND ");
     query.filter.write(sql)?;
@@ -733,8 +798,61 @@ fn list_items_inner(
     offset: usize,
     limit: usize,
 ) -> DbResult<Page> {
+    let position = match &query.copies {
+        Some(members) => copies_position_sql(conn, query, members)?,
+        None => None,
+    };
+    let mut page = list_sorted(conn, query, position.as_deref(), after, offset, limit)?;
+    fill_copies(conn, &mut page.items)?;
+    Ok(page)
+}
+
+/// The place of each movie of the Copies filter, as SQL over `item.id`: the groups in the order
+/// their first copy has in the chosen sort, each group's copies together in their rank order.
+/// `None` when none of them is listed.
+fn copies_position_sql(
+    conn: &Connection,
+    query: &ItemQuery,
+    members: &[CopyMember],
+) -> DbResult<Option<String>> {
+    let sorted = list_sorted(conn, query, None, None, 0, members.len())?.items;
+    let of: HashMap<ItemId, &CopyMember> = members.iter().map(|m| (m.id, m)).collect();
+    let mut first_seen: HashMap<ItemId, usize> = HashMap::new();
+    let mut places: Vec<(usize, u32, ItemId)> = Vec::with_capacity(sorted.len());
+    for item in &sorted {
+        let Some(member) = of.get(&item.id) else {
+            continue;
+        };
+        let next = first_seen.len();
+        let group = *first_seen.entry(member.group).or_insert(next);
+        places.push((group, member.rank, item.id));
+    }
+    places.sort();
+    if places.is_empty() {
+        return Ok(None);
+    }
+    // Only ids, which are integers, are written into the text.
+    let mut sql = String::from("(CASE item.id");
+    for (place, (_, _, id)) in places.iter().enumerate() {
+        sql.push_str(&format!(" WHEN {} THEN {place}", id.0));
+    }
+    sql.push_str(" END)");
+    Ok(Some(sql))
+}
+
+fn list_sorted(
+    conn: &Connection,
+    query: &ItemQuery,
+    position: Option<&str>,
+    after: Option<&Cursor>,
+    offset: usize,
+    limit: usize,
+) -> DbResult<Page> {
     let limit = limit.max(1);
-    let keys = query.keys();
+    let mut keys = query.keys();
+    if position.is_some() {
+        keys.insert(0, SortKey::asc(SortField::CopyGroup));
+    }
     let exprs: Vec<(Cow<'static, str>, bool)> = keys
         .iter()
         .map(|k| match k.field {
@@ -742,6 +860,7 @@ fn list_items_inner(
                 Cow::Owned(super::search::rank_sql(&query.title_match)),
                 false,
             ),
+            SortField::CopyGroup => (Cow::Owned(position.unwrap_or("0").to_owned()), false),
             field => field.expression(&query.rating, &query.profile_key),
         })
         .collect();

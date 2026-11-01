@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use cv_db::repo::CopyMember;
 use cv_db::repo::copies::{
     CopyGroup, KeptSetId, copy_groups, copy_sizes, keep_set, remove_kept_set,
 };
@@ -119,6 +120,41 @@ impl CopiesService {
     /// The library cannot be read.
     pub fn counts(&self) -> Result<u32, DbError> {
         Ok(open_count(&self.groups()?))
+    }
+
+    /// The movies of the Copies filter: every open group, its copies ranked best first (unread
+    /// copies last, ties by id). Blocking.
+    ///
+    /// # Errors
+    /// The library cannot be read.
+    pub fn listing(&self) -> Result<Vec<CopyMember>, DbError> {
+        let open: Vec<CopyGroup> = self
+            .groups()?
+            .into_iter()
+            .filter(CopyGroup::is_open)
+            .collect();
+        self.db.read(move |conn| {
+            let mut members = Vec::new();
+            for group in open {
+                let mut ranked = Vec::with_capacity(group.members.len());
+                for id in &group.members {
+                    let item = cv_db::repo::get_item(conn, *id)?;
+                    ranked.push((item.as_ref().and_then(quality), *id));
+                }
+                ranked.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+                members.extend(
+                    ranked
+                        .into_iter()
+                        .enumerate()
+                        .map(|(rank, (_, id))| CopyMember {
+                            id,
+                            group: group.id(),
+                            rank: u32::try_from(rank).unwrap_or(u32::MAX),
+                        }),
+                );
+            }
+            Ok(members)
+        })
     }
 
     /// The group `id` belongs to, kept or not; `None` when it has no copy. Blocking.
@@ -387,6 +423,22 @@ mod tests {
         lab.service.keep_all(&[b, a]).unwrap();
         lab.service.ask_again(a).unwrap();
         assert_eq!(lab.service.counts().unwrap(), 2);
+    }
+
+    #[test]
+    fn the_listing_ranks_each_open_group_best_first() {
+        let lab = Lab::new();
+        let unread = lab.copy("D:/Movies/a", 0, MediaSource::Unknown, ("", 0));
+        let hd = lab.copy("D:/Movies/b", 1920, MediaSource::WebDl, ("AAC", 6));
+        let uhd = lab.copy("D:/Movies/c", 3840, MediaSource::Bluray, ("AAC", 6));
+
+        let members = lab.service.listing().unwrap();
+        let order: Vec<(ItemId, u32)> = members.iter().map(|m| (m.id, m.rank)).collect();
+        assert_eq!(order, vec![(uhd, 0), (hd, 1), (unread, 2)]);
+        assert!(members.iter().all(|m| m.group == unread));
+
+        lab.service.keep_all(&[unread, hd, uhd]).unwrap();
+        assert!(lab.service.listing().unwrap().is_empty());
     }
 
     #[test]

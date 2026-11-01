@@ -95,6 +95,8 @@ pub mod torrent_landing;
 pub mod watched;
 
 #[cfg(test)]
+mod copies_list_tests;
+#[cfg(test)]
 mod data_sources_tests;
 #[cfg(test)]
 mod fingerprint_tests;
@@ -133,8 +135,8 @@ pub use locks::{
     apply_scrape, field_locks, field_locks_of, set_field_lock, set_field_locks, set_item_locked,
 };
 pub use query::{
-    Cursor, CursorValue, Direction, ItemQuery, ItemSummary, Page, SortField, SortKey, SourceGroup,
-    count_items, list_items, list_items_at, source_groups,
+    CopyMember, Cursor, CursorValue, Direction, ItemQuery, ItemSummary, Page, SortField, SortKey,
+    SourceGroup, count_items, list_items, list_items_at, source_groups,
 };
 pub use ratings::{
     get_ratings, get_user_rating, rating_fetch_candidates, remove_rating, set_user_rating,
