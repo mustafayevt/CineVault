@@ -75,7 +75,8 @@ pub fn retry_deferred_recovery(db: Arc<Database>, report: &RecoveryReport) {
 
 /// The root of the volume `path` is on: `D:\`, `\\server\share\`, `/Volumes/<name>` on macOS,
 /// `/media/<user>/<name>`, `/run/media/<user>/<name>` or `/mnt/<name>` for a Linux mount point
-/// (found by the path alone, so a drive that is unplugged still has a root), otherwise `/`.
+/// (found by the path when the mount list names nothing higher up, such as a share at
+/// `/media/nas`, so a drive that is unplugged still has a root), otherwise `/`.
 fn volume_root(path: &Path) -> PathBuf {
     let mut components = path.components();
     match components.next() {

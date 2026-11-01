@@ -98,21 +98,57 @@ fn within_keys(path: &str, folder: &str) -> bool {
     path.starts_with(&prefix)
 }
 
-/// The mount point that a Linux path under `/media`, `/run/media` or `/mnt` is expected to sit on,
-/// judged by the path alone: `/media/<user>/<name>`, `/run/media/<user>/<name>` or `/mnt/<name>`.
-/// Any other path, or one without the name component, gives `/`.
-///
-/// This is a pure text rule. Use [`is_mount_point`] to check the disk.
+/// The mount point that a Linux path under `/media`, `/run/media` or `/mnt` sits on, judged by
+/// the path and the system's mount list (`/proc/self/mountinfo`; none off Linux). See
+/// [`linux_mount_root_with`]. Use [`is_mount_point`] to check the disk.
 #[must_use]
 pub fn linux_mount_root(path: &str) -> String {
+    let mountinfo = if cfg!(target_os = "linux") {
+        std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default()
+    } else {
+        String::new()
+    };
+    linux_mount_root_with(path, &mountinfo)
+}
+
+/// The mount point that a Linux path under `/media`, `/run/media` or `/mnt` sits on, given the
+/// text of `/proc/self/mountinfo`:
+///
+/// * a folder the mount list names between the top folder and the usual mount point is the
+///   mount point, the deepest one first: a share mounted at `/media/nas`, or a folder a container
+///   binds at `/media/movies`, holds everything below it;
+/// * otherwise the usual mount point, judged by the path alone: `/media/<user>/<name>`,
+///   `/run/media/<user>/<name>` or `/mnt/<name>`, where an unplugged drive leaves its folder.
+///
+/// Any other path, or a path above the usual mount point that the mount list does not name,
+/// gives `/`. Pure, so it is tested on every platform.
+#[must_use]
+pub fn linux_mount_root_with(path: &str, mountinfo: &str) -> String {
     let parts: Vec<&str> = path.split('/').filter(|part| !part.is_empty()).collect();
-    let kept = match parts.as_slice() {
-        ["media", _, _, ..] => 3,
-        ["run", "media", _, _, ..] => 4,
-        ["mnt", _, ..] => 2,
+    // How deep the shallowest possible mount point and the usual one sit.
+    let (shallowest, usual) = match parts.as_slice() {
+        ["media", _, ..] => (2, 3),
+        ["run", "media", _, ..] => (3, 4),
+        ["mnt", _, ..] => (2, 2),
         _ => return "/".to_owned(),
     };
-    format!("/{}", parts[..kept].join("/"))
+    let folder = |depth: usize| format!("/{}", parts[..depth].join("/"));
+    (shallowest..=usual.min(parts.len()))
+        .rev()
+        .map(folder)
+        .find(|candidate| listed_points(mountinfo, 4).any(|point| point == *candidate))
+        .or_else(|| (parts.len() >= usual).then(|| folder(usual)))
+        .unwrap_or_else(|| "/".to_owned())
+}
+
+/// The folders that field `field` of each line of a mount list or `fstab` names, decoded and
+/// without a trailing `/`. Comment lines are skipped.
+fn listed_points(text: &str, field: usize) -> impl Iterator<Item = String> + '_ {
+    text.lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(move |line| line.split_whitespace().nth(field))
+        .map(|point| unescape_octal(point).trim_end_matches('/').to_owned())
 }
 
 /// Whether `path` is the root of a file system: `/`, or a folder on another device than its
@@ -163,13 +199,8 @@ pub fn mount_root_answers(root: &Path) -> bool {
 #[must_use]
 pub fn mount_root_answers_with(root: &str, is_dir: bool, mountinfo: &str, fstab: &str) -> bool {
     let root = root.trim_end_matches('/');
-    let names_root = |text: &str, field: usize| {
-        text.lines()
-            .map(str::trim)
-            .filter(|line| !line.starts_with('#'))
-            .filter_map(|line| line.split_whitespace().nth(field))
-            .any(|point| unescape_octal(point).trim_end_matches('/') == root)
-    };
+    let names_root =
+        |text: &str, field: usize| listed_points(text, field).any(|point| point == root);
     if !is_dir {
         return false;
     }
@@ -322,6 +353,43 @@ mod tests {
         assert_eq!(linux_mount_root("/run/media/alex"), "/");
         assert_eq!(linux_mount_root(r"D:\Movies"), "/");
         assert_eq!(linux_mount_root(""), "/");
+    }
+
+    #[test]
+    fn a_drive_mounted_higher_up_holds_the_path() {
+        const MOUNTS: &str = "\
+28 1 8:2 / / rw,relatime shared:1 - ext4 /dev/sda2 rw
+50 28 0:52 / /media/nas rw,relatime shared:30 - cifs //nas/media rw
+51 28 8:2 /srv/films /media/movies rw,relatime - ext4 /dev/sda2 rw
+52 28 0:53 / /run/media/alex rw,relatime - nfs4 nas:/export rw
+53 28 8:17 / /media/alex/My\\040Disk rw,relatime - exfat /dev/sdb1 rw
+";
+        // A share mounted at `/media/nas`, and a folder a container binds at `/media/movies`.
+        assert_eq!(
+            linux_mount_root_with("/media/nas/Heat (1995)/Heat (1995).mkv", MOUNTS),
+            "/media/nas"
+        );
+        assert_eq!(linux_mount_root_with("/media/nas", MOUNTS), "/media/nas");
+        assert_eq!(
+            linux_mount_root_with("/media/movies/Heat (1995)", MOUNTS),
+            "/media/movies"
+        );
+        assert_eq!(
+            linux_mount_root_with("/run/media/alex/Films/TV", MOUNTS),
+            "/run/media/alex"
+        );
+        // The usual mount point still wins where it is mounted, and where nothing is.
+        assert_eq!(
+            linux_mount_root_with("/media/alex/My Disk/Movies", MOUNTS),
+            "/media/alex/My Disk"
+        );
+        assert_eq!(
+            linux_mount_root_with("/media/bob/Films/Movies", MOUNTS),
+            "/media/bob/Films"
+        );
+        assert_eq!(linux_mount_root_with("/media/bob", MOUNTS), "/");
+        assert_eq!(linux_mount_root_with("/mnt/nas/Movies", MOUNTS), "/mnt/nas");
+        assert_eq!(linux_mount_root_with("/home/alex/Movies", MOUNTS), "/");
     }
 
     #[cfg(unix)]
