@@ -5,15 +5,15 @@ Lets the user add library folders that live on an SMB network share needing its 
 ## ADDED Requirements
 
 ### Requirement: Connect a network share
-In the desktop app, "Network share…" SHALL open the Network share page with the fields Server (a name such as `nas` or an address), Share, Folder inside the share (optional), User, Password and "Remember the password", which is on by default. Pasting `\\nas\movies\Films` or `smb://nas/movies/Films` into Server SHALL fill Server, Share and Folder. "Connect and add" SHALL connect the share with that login and add the folder as a library folder.
+In the desktop app, "Network share…" SHALL open the Network share page with the fields Address, User, Password and "Remember the password", which is on by default. Address SHALL take `\\server\share`, optionally followed by a folder inside the share, in the `\\nas\movies\Films` or `smb://nas/movies/Films` form, and the page SHALL show the library folder it gives. "Connect and add" SHALL connect the share with that login and add the folder as a library folder.
 
 #### Scenario: Share added
-- **WHEN** the user enters Server `nas`, Share `movies`, Folder `Films`, User `alex` and the right password, and presses "Connect and add"
+- **WHEN** the user enters the Address `\\nas\movies\Films`, User `alex` and the right password, and presses "Connect and add"
 - **THEN** the share is connected, the folder is listed in Settings › Library folders, and a scan of it starts
 
 #### Scenario: Pasted address
-- **WHEN** the user pastes `smb://nas/movies/Films` into Server
-- **THEN** Server reads `nas`, Share reads `movies` and Folder reads `Films`
+- **WHEN** the user pastes `smb://nas/movies/Films` into Address
+- **THEN** the page shows the library folder `\\nas\movies\Films` on Windows, and "Connect and add" connects the share `movies` on `nas`
 
 ### Requirement: Share folder added like any folder
 A folder on a connected share SHALL be added with the same rules, type detection and messages as a folder chosen with "Add folder…". When the folder inside the share does not exist or cannot be read, nothing SHALL be added and the page SHALL say so.
@@ -35,7 +35,7 @@ When a share cannot be connected, the Network share page SHALL keep what was typ
 
 #### Scenario: Server unreachable
 - **WHEN** the server `nas` does not answer
-- **THEN** the Server field says that `nas` could not be reached and to check the name and that it is switched on
+- **THEN** the Address field says that `nas` could not be reached and to check the name and that it is switched on
 
 ### Requirement: Where a share folder lives
 On Windows a share folder SHALL keep its network path (`\\nas\movies\Films`) and no drive letter SHALL be assigned. On macOS the share SHALL be mounted in a folder of CineVault's own mount folder, and on a Linux desktop in the desktop's own place for user-mounted shares; the library folder's path SHALL be the folder inside that mount.
@@ -95,7 +95,7 @@ A library folder on a share that cannot be connected SHALL read offline, never M
 - **THEN** the folder row reads "offline · Wrong password · 120 titles kept" with "Connect…", and no title is marked Missing
 
 ### Requirement: Connect again
-"Connect…" SHALL open the Network share page for that share with Server and Share fixed and User filled in, asking for the password. Connecting SHALL bring every library folder of that share online and scan them.
+"Connect…" SHALL open the Network share page for that share with the Address fixed and User filled in, asking for the password. Connecting SHALL bring every library folder of that share online and scan them.
 
 #### Scenario: Password entered again
 - **WHEN** the user chooses "Connect…" on an offline share folder and enters the new password
