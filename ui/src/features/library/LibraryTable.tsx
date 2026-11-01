@@ -1,8 +1,10 @@
+import { Copy } from "lucide-react";
 import { useMemo } from "react";
 import type { KeyboardEvent } from "react";
 
 import { Checkbox } from "../../components/Checkbox";
 import { FileSize } from "../../components/FileSize";
+import { Icon } from "../../components/Icon";
 import { QualityBadge } from "../../components/QualityBadge";
 import { Skeleton } from "../../components/Skeleton";
 import { StageTag } from "../../components/StageTag";
@@ -187,6 +189,16 @@ export function LibraryTable({
                 )}
               </span>
               <span className="truncate font-(weight:--fw-500)">{name}</span>
+              {row.card.copies > 0 && (
+                <span
+                  role="img"
+                  aria-label={t("copies.table.count", { count: row.card.copies })}
+                  className="inline-flex shrink-0 items-center gap-1 text-(length:--fs-12) text-text-muted tabular-nums"
+                >
+                  <Icon icon={Copy} size={12} />
+                  {row.card.copies}
+                </span>
+              )}
               {note !== null && (
                 <span className="shrink-0 text-(length:--fs-12) text-warn">{note}</span>
               )}

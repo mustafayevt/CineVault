@@ -1,6 +1,7 @@
 import { activeLocale, numberFormat } from "./locale";
 import { artwork } from "./messages/en/artwork";
 import { common } from "./messages/en/common";
+import { copies } from "./messages/en/copies";
 import { deleteMessages } from "./messages/en/delete";
 import { drives } from "./messages/en/drives";
 import { history } from "./messages/en/history";
@@ -40,6 +41,7 @@ export const EN_AREAS = {
   settings,
   onboarding,
   delete: deleteMessages,
+  copies,
   common,
 } as const;
 
@@ -57,6 +59,7 @@ const en = {
   ...settings,
   ...onboarding,
   ...deleteMessages,
+  ...copies,
   ...common,
 } as const;
 

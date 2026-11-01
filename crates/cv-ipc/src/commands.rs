@@ -64,6 +64,11 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["candidateId"],
     },
     CommandInfo {
+        name: "ask_again_copies",
+        module: "copies",
+        args: &["id"],
+    },
+    CommandInfo {
         name: "assign_episode",
         module: "episode_scrape",
         args: &["episodeId", "pick", "fields", "doNotOverwrite"],
@@ -114,9 +119,24 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["id"],
     },
     CommandInfo {
+        name: "compare_copies",
+        module: "copies",
+        args: &["id"],
+    },
+    CommandInfo {
         name: "control_move",
         module: "library_ops",
         args: &["action"],
+    },
+    CommandInfo {
+        name: "copies_of",
+        module: "copies",
+        args: &["id"],
+    },
+    CommandInfo {
+        name: "copy_label_to_drop",
+        module: "organize",
+        args: &["id"],
     },
     CommandInfo {
         name: "count_rating_sweep",
@@ -287,6 +307,16 @@ pub const COMMANDS: &[CommandInfo] = &[
         name: "install_tool",
         module: "tools",
         args: &["tool", "onProgress"],
+    },
+    CommandInfo {
+        name: "keep_all_copies",
+        module: "copies",
+        args: &["ids"],
+    },
+    CommandInfo {
+        name: "keep_copy",
+        module: "copies",
+        args: &["keep", "others"],
     },
     CommandInfo {
         name: "keep_review_rows",

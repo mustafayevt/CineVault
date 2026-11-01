@@ -15,6 +15,7 @@ fn configure_common(conn: &Connection) -> rusqlite::Result<()> {
     // of them on every call.
     conn.set_prepared_statement_cache_capacity(128);
     crate::repo::search::register_functions(conn)?;
+    crate::repo::copies::register_functions(conn)?;
     Ok(())
 }
 

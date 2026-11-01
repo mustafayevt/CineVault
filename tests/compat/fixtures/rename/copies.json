@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "note": "Copies of one movie renamed together under the default profile in one library folder: the label each copy gets when their names would clash. Movies are copies unless 'copy' is false. Paths use / as the separator.",
+  "cases": [
+    {"id": "copies-001-resolution", "title": "Example Movie", "year": 2020, "copies": [{"id": 1, "folder": "Example.Movie.2020.2160p.BluRay", "video": "Example.Movie.2020.2160p.BluRay.mkv", "resolution": "2160p", "hdr": "SDR", "source": "BluRay", "audio": "TrueHD 7.1"}, {"id": 2, "folder": "Example Movie (2020) 1080p WEB", "video": "Example Movie (2020) 1080p WEB.mkv", "resolution": "1080p", "hdr": "SDR", "source": "WEB-DL", "audio": "AAC 5.1"}]},
+    {"id": "copies-002-hdr", "title": "Example Movie", "year": 2020, "copies": [{"id": 3, "folder": "dl-1", "video": "a.mkv", "resolution": "2160p", "hdr": "DV", "source": "BluRay", "audio": "Atmos"}, {"id": 4, "folder": "dl-2", "video": "b.mkv", "resolution": "2160p", "hdr": "HDR10", "source": "BluRay", "audio": "Atmos"}]},
+    {"id": "copies-003-source", "title": "Example Movie", "year": 2020, "copies": [{"id": 5, "folder": "dl-1", "video": "a.mkv", "resolution": "2160p", "hdr": "HDR10", "source": "BluRay", "audio": "Atmos"}, {"id": 6, "folder": "dl-2", "video": "b.mkv", "resolution": "2160p", "hdr": "HDR10", "source": "WEB-DL", "audio": "Atmos"}]},
+    {"id": "copies-004-identical", "title": "Example Movie", "year": 2020, "copies": [{"id": 7, "folder": "dl-1", "video": "a.mkv", "resolution": "1080p", "hdr": "SDR", "source": "WEB-DL", "audio": "AAC 5.1"}, {"id": 8, "folder": "dl-2", "video": "b.mkv", "resolution": "1080p", "hdr": "SDR", "source": "WEB-DL", "audio": "AAC 5.1"}]},
+    {"id": "copies-005-single-movie", "title": "Another Example", "year": 2018, "copies": [{"id": 9, "folder": "another.example.2018", "video": "another.example.2018.mkv", "copy": false}]},
+    {"id": "copies-006-lost-member", "title": "Example Movie", "year": 2020, "copies": [{"id": 10, "folder": "Example Movie (2020) - 2160p", "video": "Example Movie (2020) - 2160p.mkv", "resolution": "2160p", "hdr": "SDR", "source": "BluRay", "audio": "TrueHD 7.1"}]}
+  ]
+}

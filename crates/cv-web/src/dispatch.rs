@@ -571,6 +571,42 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
                 .map_err(command_error)
                 .and_then(to_value)
         }
+        "copies_of" => {
+            let id: String = arg(args, "id")?;
+            cv_ipc::copies::copies_of(library, id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "compare_copies" => {
+            let id: String = arg(args, "id")?;
+            cv_ipc::copies::compare_copies(library, id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "keep_all_copies" => {
+            let ids: Vec<String> = arg(args, "ids")?;
+            cv_ipc::copies::keep_all_copies(library, ids)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "keep_copy" => {
+            let keep: String = arg(args, "keep")?;
+            let others: Vec<String> = arg(args, "others")?;
+            cv_ipc::copies::keep_copy(library, keep, others)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "ask_again_copies" => {
+            let id: String = arg(args, "id")?;
+            cv_ipc::copies::ask_again_copies(library, id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
         "lifecycle_counts" => {
             let kind: LibraryKindDto = arg(args, "kind")?;
             cv_ipc::lifecycle::lifecycle_counts(library, kind)
@@ -1580,6 +1616,18 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
                 &commands.organize,
                 &commands.settings,
                 request,
+            )
+            .await
+            .map_err(command_error)
+            .and_then(to_value)
+        }
+        "copy_label_to_drop" => {
+            let id: String = arg(args, "id")?;
+            cv_ipc::organize::copy_label_to_drop(
+                library,
+                &commands.organize,
+                &commands.settings,
+                id,
             )
             .await
             .map_err(command_error)

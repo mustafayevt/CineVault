@@ -169,7 +169,8 @@ async fn a_changed_template_marks_a_tidy_title_pending() {
 async fn two_titles_with_one_destination_conflict_and_say_which() {
     let rig = Rig::new();
     let first = rig.movie("heat-a", "heat", "Heat", 1995, "949");
-    let second = rig.movie("heat-b", "heat", "Heat", 1995, "949");
+    // Another film of the same title and year (not a copy: its TMDB ID differs).
+    let second = rig.movie("heat-b", "heat", "Heat", 1995, "950");
     rig.refresh().await;
     for id in [first, second] {
         let (state, reason) = rig.state(id).unwrap();
@@ -241,7 +242,7 @@ async fn the_organize_tab_and_the_rename_pending_count_agree_on_one_library() {
     rig.movie("drive.2011", "drive", "Drive", 2011, "64690");
     rig.movie("Alien (1979)", "Alien (1979)", "Alien", 1979, "348");
     rig.movie("dune-a", "dune", "Dune", 2021, "438631");
-    rig.movie("dune-b", "dune", "Dune", 2021, "438631");
+    rig.movie("dune-b", "dune", "Dune", 2021, "438632");
     let locked = rig.movie("blade", "blade", "Blade Runner", 1982, "78");
     rig.services
         .db()

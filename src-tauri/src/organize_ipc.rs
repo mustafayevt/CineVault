@@ -163,6 +163,19 @@ pub async fn organize_preview(
     cv_ipc::organize::organize_preview(&library, &organize, &settings, request).await
 }
 
+/// The copy label (such as `2160p`) a kept movie carries in its names that its other copies no
+/// longer need; `None` when its names are plain. Nothing is renamed.
+#[tauri::command]
+#[specta::specta]
+pub async fn copy_label_to_drop(
+    library: State<'_, LibraryState>,
+    organize: State<'_, OrganizeState>,
+    settings: State<'_, SettingsState>,
+    id: String,
+) -> Result<Option<String>, OrganizeCommandError> {
+    cv_ipc::organize::copy_label_to_drop(&library, &organize, &settings, id).await
+}
+
 /// Runs the checked changes of the request and records one journal batch. The request is
 /// planned again first; a checked item that is not a clean change any more is not run and is
 /// listed in `not_run`.

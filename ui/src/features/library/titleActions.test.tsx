@@ -5,7 +5,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -24,12 +24,13 @@ import {
 import { useLibraryActions } from "./useLibraryActions";
 import type { TitleTarget } from "./useLibraryActions";
 
-const target = (id: string, title: string): TitleTarget => ({
+const target = (id: string, title: string, copies = 0): TitleTarget => ({
   id,
   kind: "movie",
   title,
   folder: `D:/Movies/${title}`,
   filesMissing: false,
+  copies,
 });
 
 function Page({ targets }: { targets: readonly TitleTarget[] }) {
@@ -58,11 +59,17 @@ async function renderPage(targets: readonly TitleTarget[]) {
         path: "/",
         component: () => <Page targets={targets} />,
       }),
+      createRoute({
+        getParentRoute: () => root,
+        path: "/movies/$movieId/copies",
+        component: () => <p>Compare page</p>,
+      }),
     ]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
   render(<RouterProvider router={router} />);
   await screen.findByRole("toolbar", { name: "Bulk actions" });
+  return router;
 }
 
 const four = [target("1", "Heat"), target("2", "Alien"), target("3", "Dune"), target("4", "Jaws")];
@@ -128,8 +135,9 @@ describe("title actions", () => {
       "Ignore this folder",
       "DeleteDel",
     ]);
-    // Every action of the bar and of More is in the menu, once.
-    expect(menu).toHaveLength(MENU_GROUPS.flat().length);
+    // Every action of the bar and of More is in the menu, once; Compare only for one movie that
+    // has copies.
+    expect(menu).toHaveLength(MENU_GROUPS.flat().length - 1);
     for (const id of [...BAR_ORDER, ...MORE_ORDER]) expect(MENU_GROUPS.flat()).toContain(id);
   });
 
@@ -153,6 +161,39 @@ describe("title actions", () => {
       "aria-disabled",
       "true",
     );
+  });
+
+  it("offers Compare 2 copies with the title actions for one movie with copies", async () => {
+    const user = userEvent.setup();
+    const router = await renderPage([target("1", "Heat", 2)]);
+    await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
+    const menu = await screen.findAllByRole("menuitem");
+    const labels = names(menu);
+
+    const compare = labels.indexOf("Compare 2 copies");
+    expect(compare).toBe(3);
+    // In the group of title actions, before the separator; never next to Delete.
+    expect(labels.findIndex((label) => label.startsWith("Rename"))).toBeGreaterThan(compare);
+    expect(labels.at(-1)).toBe("DeleteDel");
+    await user.click(screen.getByRole("menuitem", { name: "Compare 2 copies" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/movies/1/copies"));
+  });
+
+  it("leaves Compare out for several titles and for a movie without copies", async () => {
+    const user = userEvent.setup();
+    await renderPage([target("1", "Heat", 2), target("2", "Alien", 2)]);
+    await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
+    await screen.findAllByRole("menuitem");
+    expect(screen.queryByRole("menuitem", { name: /^Compare/ })).toBeNull();
+    await user.keyboard("{Escape}");
+  });
+
+  it("leaves Compare out for a movie that has no copy", async () => {
+    const user = userEvent.setup();
+    await renderPage([target("1", "Heat")]);
+    await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
+    await screen.findAllByRole("menuitem");
+    expect(screen.queryByRole("menuitem", { name: /^Compare/ })).toBeNull();
   });
 
   it("shares icons, names and hints with the title page header", () => {

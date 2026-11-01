@@ -241,6 +241,7 @@ describe("the area files of the catalogue", () => {
       [
         "artwork",
         "common",
+        "copies",
         "delete",
         "drives",
         "history",

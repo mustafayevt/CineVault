@@ -669,6 +669,44 @@ export const commands = {
 	 *  the search's channel: `Started`, the result and `Done`.
 	 */
 	retryProvider: (searchId: string, provider: string) => typedError<null, SearchCommandError>(__TAURI_INVOKE("retry_provider", { searchId, provider })),
+	/**  The copies of a movie, kept or not; `None` when it has no copy. */
+	copiesOf: (id: string) => typedError<{
+	/**  The ids of every copy of the film (the movie itself included), in id order. */
+	ids: string[],
+	/**  The user chose to keep these copies: they are not counted and show no badge. */
+	kept: boolean,
+} | null, LibraryCommandError>(__TAURI_INVOKE("copies_of", { id })),
+	/**
+	 *  The Compare copies page of a movie: one card per copy, the best quality marked; `None` when
+	 *  the movie has no copy left.
+	 */
+	compareCopies: (id: string) => typedError<{
+	/**  The movie's own copy first, then the others in id order. */
+	copies: CopyRowDto[],
+	/**  The user chose to keep these copies ("You chose to keep these copies"). */
+	kept: boolean,
+	/**  Every copy shows the same Resolution, HDR, Audio and Source. */
+	look_same: boolean,
+	/**
+	 *  Two copies may be one file reached through two library folders: the page offers no
+	 *  "Keep this one".
+	 */
+	same_file: boolean,
+} | null, LibraryCommandError>(__TAURI_INVOKE("compare_copies", { id })),
+	/**  "Keep both" / "Keep all": the user keeps every one of `ids` as copies. No file changes. */
+	keepAllCopies: (ids: string[]) => typedError<null, LibraryCommandError>(__TAURI_INVOKE("keep_all_copies", { ids })),
+	/**
+	 *  "Keep this one", checked before anything is deleted: the copies the delete may take, or a
+	 *  refusal with a plain message. Deletes nothing itself.
+	 */
+	keepCopy: (keep: string, others: string[]) => typedError<string[], LibraryCommandError>(__TAURI_INVOKE("keep_copy", { keep, others })),
+	/**  "Ask again": the movie's group counts as copies again. Also the Undo of "Keep both". */
+	askAgainCopies: (id: string) => typedError<null, LibraryCommandError>(__TAURI_INVOKE("ask_again_copies", { id })),
+	/**
+	 *  The copy label (such as `2160p`) a kept movie carries in its names that its other copies no
+	 *  longer need; `None` when its names are plain. Nothing is renamed.
+	 */
+	copyLabelToDrop: (id: string) => typedError<string | null, OrganizeCommandError>(__TAURI_INVOKE("copy_label_to_drop", { id })),
 	/**
 	 *  The pipeline counts of the movies or the shows: titles per stage, and Needs review, Not
 	 *  matched, Working, Rename pending, Locked and Missing. Every screen that shows these numbers
@@ -1019,6 +1057,21 @@ export type CompanionsDto = {
 	other: number,
 };
 
+/**  The Compare copies page of one movie. */
+export type ComparisonDto = {
+	/**  The movie's own copy first, then the others in id order. */
+	copies: CopyRowDto[],
+	/**  The user chose to keep these copies ("You chose to keep these copies"). */
+	kept: boolean,
+	/**  Every copy shows the same Resolution, HDR, Audio and Source. */
+	look_same: boolean,
+	/**
+	 *  Two copies may be one file reached through two library folders: the page offers no
+	 *  "Keep this one".
+	 */
+	same_file: boolean,
+};
+
 /**  A title that Accept all confident scraped. */
 export type ConfidentAcceptedDto = {
 	itemId: string,
@@ -1066,6 +1119,64 @@ export type ConnectShareInput = {
 	password: string,
 	/**  Keep the password in the system credential store. */
 	remember: boolean,
+};
+
+/**  The copies of one movie, kept or not. */
+export type CopiesOfDto = {
+	/**  The ids of every copy of the film (the movie itself included), in id order. */
+	ids: string[],
+	/**  The user chose to keep these copies: they are not counted and show no badge. */
+	kept: boolean,
+};
+
+/**  What the media info of one copy says. */
+export type CopyMediaDto = {
+	/**  `2160p`, `1080p`, ...; empty when the frame is below every bucket. */
+	resolution: string,
+	/**  `Dolby Vision`, `HDR10`, ...; empty for SDR. */
+	hdr_formats: string[],
+	/**  The lead audio track, such as `TrueHD Atmos 7.1`; empty without audio. */
+	audio: string,
+	video_bitrate_kbps: number,
+	/**  The running time of the video in minutes; `0` when the file does not say. */
+	duration_minutes: number,
+};
+
+/**  A movie that is one of several copies of a film. */
+export type CopyNoteDto = {
+	/**  Its place among the copies, from 1. */
+	nth: number,
+	/**  How many copies the film has. */
+	of: number,
+	/**
+	 *  The label (`2160p`, `copy 2`) added after the names of its folder and video so the copies
+	 *  keep different names; empty when its names need none.
+	 */
+	label: string,
+};
+
+/**  One card of the Compare copies page. */
+export type CopyRowDto = {
+	/**  Item id as text. */
+	id: string,
+	title: string,
+	/**  `0` when unknown. */
+	year: number,
+	/**  `None` while the media info has not been read ("Not read yet"). */
+	media: CopyMediaDto | null,
+	/**  `BluRay`, `WEB-DL`, ...; empty when unknown. */
+	source: string,
+	/**  Bytes by the library's size rule. A plain number: exact up to 2^53. */
+	size_bytes: number | null,
+	folder: string,
+	/**  The name of the main video file. */
+	file_name: string,
+	/**  The label of the library folder the copy lives on; empty when it was removed. */
+	source_label: string,
+	/**  The suggested copy ("Best quality"). */
+	best: boolean,
+	/**  The video may be the same file as another copy's. */
+	same_file: boolean,
 };
 
 /**  The numbers above the diff list. */
@@ -2185,6 +2296,10 @@ export type LibraryCardDto = {
 	/**  Short HDR label such as `DV` or `HDR10`; `None` for SDR or unknown. */
 	hdr: string | null,
 	poster: PosterDto | null,
+	/**  The copies of a movie whose group the user has not kept (the poster badge), else 0. */
+	copies: number,
+	/**  The copies in the movie's group, kept or not (the Compare entry), else 0. */
+	copies_total: number,
 };
 
 /**  One filter chip: a field, its value(s) and whether it is negated. */
@@ -2215,7 +2330,12 @@ export type LibraryChipFieldDto = "watched" | "new" |
 /**  Scraped titles whose names a rename would change: the lifecycle's Rename pending flag. */
 "rename_pending" | 
 /**  Files or library folder out of reach: the lifecycle's Missing flag. */
-"missing" | "year" | "runtime" | "top250" | 
+"missing" | 
+/**
+ *  Movies in groups of copies the user has not kept (`movie-copies`): they are listed with
+ *  the copies of each film together.
+ */
+"copies" | "year" | "runtime" | "top250" | 
 /**  The preferred rating (or its fallback) on the 0 to 10 scale. */
 "rating" | "imdb_rating" | "tmdb_rating" | "rotten_tomatoes_rating" | "metacritic_rating" | "user_rating" | "resolution" | "hdr" | "codec" | "audio_language" | "subtitle_language" | "genre" | "actor" | "director" | "writer" | "certification" | "edition" | 
 /**  The release source (Blu-ray, DVD, ...). */
@@ -2227,7 +2347,10 @@ export type LibraryChipFieldDto = "watched" | "new" |
 
 /**  Why a library command did not answer. */
 export type LibraryCommandError = {
-	/**  Stable code: `storage`, `bad_cursor` or `bad_filter`. */
+	/**
+	 *  Stable code: `storage`, `bad_cursor` or `bad_filter`; "Keep this one" also refuses with
+	 *  `nothing_to_delete`, `keep_gone`, `copies_changed` or `same_file`.
+	 */
 	code: string,
 	/**  Plain sentence for the user. */
 	message: string,
@@ -2465,6 +2588,8 @@ export type LifecycleCountsDto = {
 	missing: number,
 	/**  Titles whose names are still being checked against the naming style. */
 	checking: number,
+	/**  Movies in groups of copies the user has not kept (the Copies chip); 0 for shows. */
+	copies: number,
 };
 
 /**  The stage, flags and explanation of a title. */
@@ -3165,6 +3290,8 @@ export type PreviewRowDto = {
 	 *  show's episodes.
 	 */
 	files: FileChangeDto[],
+	/**  Set for a movie that has copies in the library. */
+	copy: CopyNoteDto | null,
 };
 
 /**  Scheduling priority as the UI sees it. */
@@ -3836,8 +3963,8 @@ export type ShowOrderingsDto = {
 export type SourceCommandError = {
 	/**
 	 *  Stable code: `empty`, `not_absolute`, `invalid_characters`, `system_folder`,
-	 *  `already_added`, `inside_existing`, `contains_existing`, `unchanged`, `unknown_source`,
-	 *  `not_reachable`, `bad_order`, `label_taken`, `label_empty` or `storage`.
+	 *  `already_added`, `same_folder`, `inside_existing`, `contains_existing`, `unchanged`,
+	 *  `unknown_source`, `not_reachable`, `bad_order`, `label_taken`, `label_empty` or `storage`.
 	 */
 	code: string,
 	/**  Plain sentence for the user. */

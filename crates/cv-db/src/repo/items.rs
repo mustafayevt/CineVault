@@ -413,10 +413,14 @@ pub fn get_summary(conn: &Connection, id: ItemId) -> DbResult<Option<ItemSummary
     let sql = format!("SELECT {} FROM item WHERE id = ?1", ItemSummary::COLUMNS);
     let mut stmt = conn.prepare_cached(&sql)?;
     let mut rows = stmt.query([id.0])?;
-    match rows.next()? {
-        Some(row) => Ok(Some(ItemSummary::from_row(row)?)),
-        None => Ok(None),
-    }
+    let Some(row) = rows.next()? else {
+        return Ok(None);
+    };
+    let mut summary = ItemSummary::from_row(row)?;
+    drop(rows);
+    drop(stmt);
+    super::query::fill_copies(conn, std::slice::from_mut(&mut summary))?;
+    Ok(Some(summary))
 }
 
 /// The ids of an item's direct children (seasons of a show, episodes of a season, movies of a

@@ -295,7 +295,7 @@ describe("Delete from the Library", () => {
       ]),
     );
     const dialog = await screen.findByRole("dialog");
-    expect(await within(dialog).findByText("Cats (2019)")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Cats (2019)", { selector: "div" })).toBeInTheDocument();
     expect(within(dialog).getByText("The Room")).toBeInTheDocument();
     expect(within(dialog).getByText("Its drive is offline.")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Delete permanently" }));

@@ -29,6 +29,8 @@ export interface SyntheticLifecycleInput {
   /** An uncertain match waits for a decision. */
   needsReview: boolean;
   show?: boolean;
+  /** A scraped title whose names are already tidy (the fixture copies of a movie). */
+  renamed?: boolean;
 }
 
 const SCAN_MS = Date.UTC(2024, 9, 2, 10, 4);
@@ -56,6 +58,7 @@ function flag(kind: FlagKindDto, reason = ""): LifecycleFlagDto {
 
 function shapeOf(input: SyntheticLifecycleInput): Shape {
   const h = mix(input.index + 31);
+  if (input.renamed === true) return { stage: "renamed", organize: "tidy", flags: [] };
   if (input.unmatched) {
     return { stage: "new", organize: null, flags: [flag("not-matched", "No candidates found")] };
   }
@@ -218,6 +221,7 @@ export function syntheticLifecycleCounts(
     locked: 0,
     missing: 0,
     checking: 0,
+    copies: 0,
   };
   for (let index = 0; index < total; index += 1) {
     // The shape alone is enough to count; the explanation lines are built on demand.

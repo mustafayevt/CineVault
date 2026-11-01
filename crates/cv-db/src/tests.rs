@@ -268,6 +268,42 @@ fn migration_103_reads_disc_and_mis_mapped_videos_again() {
     assert_eq!(width, 3840);
 }
 
+#[test]
+fn migration_106_adds_the_kept_copies_and_a_removed_title_takes_its_rows() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    conn.pragma_update(None, "foreign_keys", true).unwrap();
+    let before_106: Vec<Migration> = MIGRATIONS
+        .iter()
+        .copied()
+        .filter(|m| m.version < 106)
+        .collect();
+    schema::migrate_with(&mut conn, &before_106).unwrap();
+    let kept = insert_item(&conn, "movie", "Example");
+    let other = insert_item(&conn, "movie", "Example");
+    assert!(!object_names(&conn, "table").contains("copies_kept"));
+
+    schema::migrate(&mut conn).unwrap();
+
+    assert!(object_names(&conn, "table").contains("copies_kept"));
+    for id in [kept, other] {
+        conn.execute(
+            "INSERT INTO copies_kept (set_id, item_id, kept_ms) VALUES (1, ?1, 5)",
+            [id],
+        )
+        .unwrap();
+    }
+    conn.execute("DELETE FROM item WHERE id = ?1", [other])
+        .unwrap();
+    let left: Vec<i64> = conn
+        .prepare("SELECT item_id FROM copies_kept")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(left, vec![kept]);
+}
+
 // ---- opening: WAL, pragmas, files ------------------------------------------------------------
 
 #[test]

@@ -127,7 +127,7 @@ fn edit_item(
 }
 
 /// Moves everything that ends in the item's new folder into `folder`.
-fn change_folder(item: &mut BatchItem, folder: &str) {
+pub(super) fn change_folder(item: &mut BatchItem, folder: &str) {
     let old = item.new_folder.clone();
     if old == folder {
         return;
@@ -155,7 +155,7 @@ fn change_folder(item: &mut BatchItem, folder: &str) {
 }
 
 /// Replaces the base name at the start of the file names the item writes.
-fn change_base(item: &mut BatchItem, base: &str) {
+pub(super) fn change_base(item: &mut BatchItem, base: &str) {
     let Some(old) = item.base_name.clone().filter(|b| !b.is_empty()) else {
         return;
     };
