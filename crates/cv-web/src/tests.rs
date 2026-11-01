@@ -693,6 +693,63 @@ async fn start_sign_in_invoke_and_stop_closes_the_port() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_network_share_commands_answer_not_applicable_in_a_browser() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let root = services.location().root().to_path_buf();
+    embed::set_password(&root, PASSWORD, PASSWORD).unwrap();
+    let port = free_port();
+    let running = embed::start(options(port), shared(&services)).expect("it starts");
+    let cookie = sign_in(port).await;
+    let (_, _, index) = http(port, "GET", "/", Some(&cookie), &[], None)
+        .await
+        .unwrap();
+    let csrf = index
+        .split("__CINEVAULT_CSRF__=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .unwrap()
+        .to_owned();
+    let origin = format!("http://127.0.0.1:{port}");
+
+    for (cmd, args) in [
+        ("network_share_support", serde_json::json!({})),
+        (
+            "connect_network_share",
+            serde_json::json!({ "input": {
+                "address": "smb://nas/movies", "kind": null, "user": "alex",
+                "password": "Example-Pass-42", "remember": true
+            } }),
+        ),
+        (
+            "connect_network_share_again",
+            serde_json::json!({ "input": {
+                "id": 1, "user": "alex", "password": "Example-Pass-42", "remember": true
+            } }),
+        ),
+        ("cancel_network_share_connect", serde_json::json!({})),
+        ("list_network_shares", serde_json::json!({})),
+    ] {
+        let invoke = serde_json::json!({ "cmd": cmd, "args": args, "client": "t" }).to_string();
+        let (status, _, answer) = http(
+            port,
+            "POST",
+            "/api/invoke",
+            Some(&cookie),
+            &[("x-cinevault-csrf", &csrf), ("origin", &origin)],
+            Some(&invoke),
+        )
+        .await
+        .unwrap();
+        assert_eq!(status, 200, "{cmd}: {answer}");
+        assert!(answer.contains("\"ok\":false"), "{cmd}: {answer}");
+        assert!(answer.contains("not_applicable"), "{cmd}: {answer}");
+        assert!(!answer.contains("Example-Pass-42"), "{cmd}: {answer}");
+    }
+    running.stop().await;
+    services.shutdown();
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_port_in_use_is_reported_with_a_free_one() {
     let dir = tempfile::tempdir().unwrap();
     let services = boot(dir.path());
