@@ -31,7 +31,7 @@ function nameOf(row: { title: string; year: number }): string {
  * files go under Settings › Deleted files, up to five titles with their sizes and the total, a
  * "Don't ask again" box, and Cancel · Delete. Focus starts on Delete, so Enter deletes at once;
  * Esc and Cancel leave everything as it is. Delete permanently never comes here: it always asks
- * for the typed DELETE in the permanent-delete dialog.
+ * in the permanent-delete dialog.
  */
 export function DeleteConfirmDialog() {
   const request = useDeleteStore((state) => state.confirm);

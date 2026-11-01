@@ -4,8 +4,8 @@
 
 ## 2. One Delete
 
-- [ ] 2.1 Remove "Delete permanently…" from the selection bar's More, the right-click menu and the title page's ⋯ menu; label the one entry "Delete"; Shift+Delete acts as Delete. Verified by `bun run test` (library and title action tests, the delete keys test).
-- [ ] 2.2 The permanent-delete dialog asks Yes or No: no DELETE field and no "Send to Recycle Bin instead"; in a browser it keeps the password. Choosing "Delete permanently" in Settings › Deleted files and the Drives "Empty…" dialogs ask Yes or No too. Verified by `bun run test` (`delete.test.tsx`, the settings and drives tests).
+- [x] 2.1 Remove "Delete permanently…" from the selection bar's More, the right-click menu and the title page's ⋯ menu; label the one entry "Delete"; Shift+Delete acts as Delete. Verified by `bun run test` (library and title action tests, the delete keys test).
+- [x] 2.2 The permanent-delete dialog asks Yes or No: no DELETE field and no "Send to Recycle Bin instead"; in a browser it keeps the password. Choosing "Delete permanently" in Settings › Deleted files and the Drives "Empty…" dialogs ask Yes or No too. Verified by `bun run test` (`delete.test.tsx`, the settings and drives tests).
 
 ## 3. Docs and integration
 

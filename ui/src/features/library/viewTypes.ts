@@ -15,6 +15,6 @@ export interface ListViewProps {
   bottomRoom: number;
   /** Shown instead of the rows when nothing matches. */
   empty: ReactNode;
-  /** F2, Delete and Shift+Delete; true when the key did something. */
+  /** F2 and Delete; true when the key did something. */
   onKey: (event: ReactKeyboardEvent | KeyboardEvent) => boolean;
 }

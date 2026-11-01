@@ -22,7 +22,7 @@ export interface DeleteTarget {
 /** What the permanent-delete dialog was asked for. */
 export interface PermanentRequest {
   targets: readonly DeleteTarget[];
-  /** Runs after the titles were deleted (by either button), for example to leave a title page. */
+  /** Runs after the titles were deleted, for example to leave a title page. */
   onDone?: (() => void) | undefined;
 }
 
@@ -66,7 +66,7 @@ export function deletedMode(): DeletedMode {
 /**
  * Delete as the person starts it (the title page button, the selection bar, the context menu, the
  * Delete key): asks first. When Deleted files is Delete permanently it opens the permanent-delete
- * confirmation with the typed DELETE, always. Otherwise it opens the Delete confirmation, unless
+ * confirmation, always. Otherwise it opens the Delete confirmation, unless
  * Settings › Deleted files › "Ask before deleting" (`delete.confirm`) is off, in which case the
  * titles go at once with an Undo toast.
  */
@@ -188,8 +188,8 @@ export async function deleteToBin(
   }
 }
 
-/** Opens the one confirmation dialog for a permanent delete (Shift+Delete, "Delete permanently…"). */
-export function requestPermanentDelete(
+/** Opens the one confirmation dialog for a permanent delete (Delete under "Delete permanently"). */
+function requestPermanentDelete(
   targets: readonly DeleteTarget[],
   options: { onDone?: (() => void) | undefined } = {},
 ): void {
@@ -219,13 +219,12 @@ function reportErased(result: EraseResult): void {
 }
 
 /**
- * Erases the titles' files for good (spec `title-deletion` "Shift+Delete asks for a typed
- * confirmation"). Only the dialog calls this, with what the person typed: the backend erases
- * nothing unless it is exactly `DELETE`. Resolves to whether any title was erased whole.
+ * Erases the titles' files for good (spec `title-deletion` "A permanent delete asks Yes or No").
+ * Only the dialog calls this, after its "Delete permanently". Resolves to whether any title was
+ * erased whole.
  */
 export async function erasePermanently(
   targets: readonly DeleteTarget[],
-  confirm: string,
   options: { onDone?: (() => void) | undefined; password?: string | undefined } = {},
 ): Promise<boolean> {
   if (targets.length === 0) return false;
@@ -235,8 +234,8 @@ export async function erasePermanently(
     const backend = currentHistoryBackend();
     const result =
       options.password === undefined
-        ? await backend.eraseTitles(ids, confirm)
-        : await backend.eraseTitles(ids, confirm, options.password);
+        ? await backend.eraseTitles(ids)
+        : await backend.eraseTitles(ids, options.password);
     reportErased(result);
     store.hide(result.erased.map((entry) => entry.id));
     void queryClient.invalidateQueries({ queryKey: HISTORY_KEY });

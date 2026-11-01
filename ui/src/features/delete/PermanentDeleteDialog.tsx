@@ -1,24 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "../../components/Button";
-import { Dialog } from "../../components/Dialog";
-import { Field } from "../../components/Field";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { isServer } from "../../lib/transport";
 import { useFormat } from "../../i18n/useFormat";
-import { useSetting } from "../settings/settingsStore";
 import { currentLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import type { RemovalPlan } from "../library-ops/libraryOpsBackend";
-import { binName } from "../shell/binName";
-import { detectPlatform } from "../shell/platform";
-import { deleteToBin, erasePermanently, useDeleteStore } from "./deleteActions";
+import { EraseConfirmDialog } from "../trash/EraseConfirmDialog";
+import { erasePermanently, useDeleteStore } from "./deleteActions";
 import type { DeleteTarget } from "./deleteActions";
-
-/** The word that has to be typed. The backend checks it again. */
-const CONFIRM_WORD = "DELETE";
 
 /** "Heat (1995)", or the title alone without a year. */
 function nameOf(row: { title: string; year: number }): string {
@@ -26,13 +17,12 @@ function nameOf(row: { title: string; year: number }): string {
 }
 
 /**
- * The permanent-delete dialog (spec `title-deletion` "Shift+Delete asks for a typed confirmation"), also
- * what Delete opens when Settings › Deleted files is Delete permanently: how many titles, each with its folder and size on a well list, the words
- * "This skips the bin and cannot be undone" (the bin is the Recycle Bin on Windows, the Trash
- * elsewhere), a field for DELETE, and the buttons Cancel, "Send to the bin instead" and "Delete
- * permanently", which stays off until the field holds
- * exactly DELETE. The list is what the backend says it will touch; the titles it would refuse
- * (an offline drive) are named apart and are not sent.
+ * The permanent-delete dialog (spec `title-deletion` "A permanent delete asks Yes or No"), what
+ * Delete opens when Settings › Deleted files is Delete permanently: how many titles, each with its
+ * folder and size on a well list and the total, the words "This cannot be undone", and the buttons
+ * Cancel and "Delete permanently". In a browser it also asks for the current password. The list is
+ * what the backend says it will touch; the titles it would refuse (an offline drive) are named
+ * apart and are not sent.
  */
 export function PermanentDeleteDialog() {
   const request = useDeleteStore((state) => state.request);
@@ -57,13 +47,9 @@ function Confirmation({
   onClose: () => void;
 }) {
   const format = useFormat();
-  const bin = binName(detectPlatform());
-  const [typed, setTyped] = useState("");
   const [password, setPassword] = useState("");
   const browser = isServer();
   const [busy, setBusy] = useState(false);
-  // Under Delete permanently a delete erases too, so there is no bin to offer instead.
-  const erasing = useSetting<string>("files.deleted-mode") === "erase";
   const ids = targets.map((target) => target.id);
 
   const plan = useQuery<RemovalPlan>({
@@ -74,70 +60,33 @@ function Confirmation({
   });
   const rows = plan.data?.rows ?? [];
   const skipped = plan.data?.skipped ?? [];
-  const files = rows.reduce((sum, row) => sum + row.files, 0);
+  const total = rows.some((row) => row.bytes === null)
+    ? null
+    : rows.reduce((sum, row) => sum + (row.bytes ?? 0), 0);
 
-  const ready =
-    typed === CONFIRM_WORD && rows.length > 0 && !busy && (!browser || password.length > 0);
+  const ready = rows.length > 0 && !busy && (!browser || password.length > 0);
 
   const confirm = async () => {
-    if (!ready) return;
     setBusy(true);
     const listed = rows.map((row) => ({ id: row.id, title: nameOf(row) }));
     onClose();
-    await erasePermanently(listed, typed, { onDone, password: browser ? password : undefined });
-  };
-  const sendToBin = () => {
-    onClose();
-    void deleteToBin(targets, { onDone });
+    await erasePermanently(listed, { onDone, password: browser ? password : undefined });
   };
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      hideClose
-      className="w-[520px]!"
-      title={
-        <span className="flex items-center gap-2">
-          <Trash2 aria-hidden="true" size={18} className="shrink-0 text-danger" />
-          {t("delete.dialog.title", { count: targets.length })}
-        </span>
-      }
+    <EraseConfirmDialog
+      title={t("delete.dialog.title", { count: targets.length })}
       description={
         plan.isPending
           ? t("delete.dialog.reading")
           : plan.isError
             ? t("delete.dialog.planFailed")
-            : t("delete.dialog.body", {
-                count: rows.length,
-                files: t("delete.dialog.files", { count: files }),
-                bin,
-              })
+            : t("delete.dialog.body", { count: rows.length })
       }
-      footer={
-        <div className="flex w-full items-center gap-2">
-          {erasing ? null : (
-            <Button variant="ghost" onClick={sendToBin} disabled={busy}>
-              {t("delete.dialog.toBin", { bin })}
-            </Button>
-          )}
-          <span className="flex-1" />
-          <Button size="lg" onClick={onClose}>
-            {t("delete.dialog.cancel")}
-          </Button>
-          <Button
-            size="lg"
-            variant="danger"
-            disabled={!ready}
-            onClick={() => void confirm()}
-            data-testid="confirm-erase"
-          >
-            {t("delete.dialog.confirm")}
-          </Button>
-        </div>
-      }
+      confirmLabel={t("delete.dialog.confirm")}
+      canConfirm={ready}
+      onConfirm={() => void confirm()}
+      onClose={onClose}
     >
       <ul
         aria-label={t("delete.dialog.list")}
@@ -187,10 +136,18 @@ function Confirmation({
           </>
         )}
       </ul>
+      {!plan.isPending && !plan.isError && rows.length > 1 ? (
+        <div className="flex justify-between px-3.5 text-text-2">
+          <span>{t("delete.confirm.total")}</span>
+          <span className="tabular-nums">
+            {total === null ? t("common.unknownSize") : format.size(total)}
+          </span>
+        </div>
+      ) : null}
       {browser ? (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="delete-password" className="text-text-2">
-            Current password
+            {t("delete.dialog.password")}
           </label>
           <input
             id="delete-password"
@@ -202,25 +159,6 @@ function Confirmation({
           />
         </div>
       ) : null}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="delete-confirm" className="text-text-2">
-          {t("delete.dialog.typeBefore")}{" "}
-          <b className="font-mono font-(weight:--fw-700) text-text">{CONFIRM_WORD}</b>{" "}
-          {t("delete.dialog.typeAfter")}
-        </label>
-        <Field
-          id="delete-confirm"
-          mono
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && ready) void confirm();
-          }}
-          autoComplete="off"
-          spellCheck={false}
-          aria-label={t("delete.dialog.field")}
-        />
-      </div>
-    </Dialog>
+    </EraseConfirmDialog>
   );
 }

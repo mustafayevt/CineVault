@@ -137,17 +137,17 @@ export function TitlesView({ type, text, onClearText }: TitlesViewProps) {
     return format.size(sum);
   }, [selection.selected, listing, format]);
 
-  /** F2, Delete and Shift+Delete on the list; Enter, arrows, Ctrl+A and Esc are the selection's. */
+  /** F2 and Delete on the list; Enter, arrows, Ctrl+A and Esc are the selection's. */
   const onKey = useCallback(
     (event: KeyboardEvent | React.KeyboardEvent): boolean => {
       if (selection.count === 0 || isTextField(event.target)) return false;
-      const act = (id: "rename" | "delete" | "delete-permanently") => {
+      const act = (id: "rename" | "delete") => {
         const action = actions[id];
         if (action.disabledReason === undefined) action.onSelect();
         return true;
       };
       if (event.key === "F2") return act("rename");
-      if (event.key === "Delete") return act(event.shiftKey ? "delete-permanently" : "delete");
+      if (event.key === "Delete") return act("delete");
       return false;
     },
     [selection.count, actions],

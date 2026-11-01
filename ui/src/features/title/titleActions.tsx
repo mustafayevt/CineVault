@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { useMemo } from "react";
 
 import { t } from "../../i18n/catalog";
-import { requestDelete, requestPermanentDelete } from "../delete/deleteActions";
+import { requestDelete } from "../delete/deleteActions";
 import { filesStateOf, playBlockedFor } from "../detail/filesState";
 import { useOpenFolder } from "../detail/useOpenFolder";
 import { shortLabel, TITLE_ACTIONS } from "../library/titleActions";
@@ -18,14 +18,7 @@ import { removeTitlesFromLibrary } from "./removeTitles";
 export type HeaderActionId = "play" | "scrape" | "rename" | "move" | "open-folder" | "artwork";
 /** What the ⋯ menu holds. */
 export type MenuActionId =
-  | "edit"
-  | "show-nfo"
-  | "rewrite-nfo"
-  | "reload-media-info"
-  | "remove"
-  | "ignore"
-  | "delete-permanently"
-  | "delete";
+  "edit" | "show-nfo" | "rewrite-nfo" | "reload-media-info" | "remove" | "ignore" | "delete";
 
 export interface TitleAction<Id extends string> {
   id: Id;
@@ -154,14 +147,7 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
           onSelect: () => removeFromLibrary(true),
         },
         {
-          id: "delete-permanently",
-          label: shortLabel("delete-permanently"),
-          icon: TITLE_ACTIONS["delete-permanently"].icon,
-          onSelect: () => requestPermanentDelete([{ id, title }], { onDone: leave }),
-          danger: true,
-        },
-        {
-          // Asks first, then sends the title to the Deleted files destination; Delete… is last.
+          // Asks first, then sends the title where Settings › Deleted files says; Delete… is last.
           id: "delete",
           label: t("title.menu.delete"),
           icon: TITLE_ACTIONS["delete"].icon,

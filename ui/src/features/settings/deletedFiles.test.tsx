@@ -51,7 +51,7 @@ describe("Settings › Deleted files", () => {
     expect(locked).toBeDisabled();
   });
 
-  it("chooses Delete permanently only after the typed confirmation", async () => {
+  it("chooses Delete permanently only after a Yes or No", async () => {
     const user = userEvent.setup();
     render(<DeletedFilesSection />);
     expect(
@@ -60,17 +60,15 @@ describe("Settings › Deleted files", () => {
       ),
     ).toBeVisible();
     await user.click(screen.getByRole("radio", { name: /Delete permanently/ }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog", { name: "Erase deleted files at once?" });
     expect(useSettingsStore.getState().values["files.deleted-mode"]).toBeUndefined();
     // Cancel keeps the Recycle Bin.
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(useSettingsStore.getState().values["files.deleted-mode"]).toBeUndefined();
     await user.click(screen.getByRole("radio", { name: /Delete permanently/ }));
     const again = await screen.findByRole("dialog");
-    const confirm = within(again).getByRole("button", { name: "Delete permanently" });
-    expect(confirm).toBeDisabled();
-    await user.type(within(again).getByRole("textbox"), "DELETE");
-    await user.click(confirm);
+    expect(within(again).queryByRole("textbox")).toBeNull();
+    await user.click(within(again).getByRole("button", { name: "Erase at once" }));
     expect(useSettingsStore.getState().values["files.deleted-mode"]).toBe("erase");
   });
 

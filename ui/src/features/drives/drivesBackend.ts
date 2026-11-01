@@ -14,8 +14,8 @@ export interface DrivesBackend {
   onChanged: (handler: () => void) => () => void;
   /** What Empty… would erase on the drive `driveId`, or on every drive (`null`). */
   trashContents: (driveId: string | null) => Promise<TrashContents>;
-  /** Erases it; `confirm` is the word the person typed (the backend checks it again). */
-  emptyTrash: (driveId: string | null, confirm: string) => Promise<EmptyResult>;
+  /** Erases it, after the person said yes. */
+  emptyTrash: (driveId: string | null) => Promise<EmptyResult>;
 }
 
 /** The overview as the pages read it: a number the wire could not carry is zero. */
@@ -72,8 +72,8 @@ export const tauriDrivesBackend: DrivesBackend = {
       })),
     };
   },
-  emptyTrash: async (driveId, confirm) => {
-    const result = await commands.emptyDrivesTrash(driveId, confirm);
+  emptyTrash: async (driveId) => {
+    const result = await commands.emptyDrivesTrash(driveId);
     if (result.status === "error") throw new Error(result.error.message);
     return { bytes: result.data.bytes ?? 0, problems: result.data.problems };
   },
@@ -125,8 +125,7 @@ export function currentDrivesBackend(): DrivesBackend {
         bytes: entries.reduce((sum, entry) => sum + entry.bytes, 0),
       });
     },
-    emptyTrash: (driveId, confirm) => {
-      if (confirm !== "DELETE") return Promise.reject(new Error("Type DELETE to empty the trash."));
+    emptyTrash: (driveId) => {
       const drives = syntheticOverview().drives.filter(
         (drive) => driveId === null || drive.id === driveId,
       );

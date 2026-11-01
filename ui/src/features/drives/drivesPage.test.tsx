@@ -175,7 +175,7 @@ describe("the drive numbers", () => {
     expect(agoText(now - 2 * 86_400_000, now, "en")).toBe("2 days ago");
   });
 
-  it("shows the trash of a drive and empties it after the typed confirmation", async () => {
+  it("shows the trash of a drive and empties it after a Yes or No", async () => {
     const user = userEvent.setup();
     const emptied: (string | null)[] = [];
     let overview = syntheticDrives();
@@ -193,9 +193,8 @@ describe("the drive numbers", () => {
           ],
           bytes: 6e9,
         }),
-      emptyTrash: (driveId: string | null, confirm: string) => {
+      emptyTrash: (driveId: string | null) => {
         emptied.push(driveId);
-        expect(confirm).toBe("DELETE");
         overview = {
           ...overview,
           drives: overview.drives.map((d) => ({ ...d, trashBytes: 0, binBytes: 0 })),
@@ -217,8 +216,7 @@ describe("the drive numbers", () => {
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByText(String.raw`D:\Movies\Heat (1995)`)).toBeVisible();
     const confirm = within(dialog).getByRole("button", { name: "Empty for good" });
-    expect(confirm).toBeDisabled();
-    await user.type(within(dialog).getByRole("textbox"), "DELETE");
+    expect(within(dialog).queryByRole("textbox")).toBeNull();
     expect(confirm).toBeEnabled();
     await user.click(confirm);
     await waitFor(() => expect(emptied).toEqual(["D:"]));

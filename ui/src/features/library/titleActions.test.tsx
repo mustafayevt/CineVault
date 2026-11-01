@@ -72,11 +72,11 @@ const names = (items: HTMLElement[]) => items.map((item) => item.textContent?.tr
 beforeEach(() => stubPlatform("windows"));
 afterEach(() => restorePlatform());
 
-describe("the name of the bin in the actions", () => {
-  it("says Recycle Bin on Windows and Trash on Linux", () => {
-    expect(fullLabel("delete", 1)).toBe("Delete to Recycle Bin");
+describe("the name of Delete", () => {
+  it("says Delete on every platform, because Settings › Deleted files decides where it goes", () => {
+    expect(fullLabel("delete", 1)).toBe("Delete");
     stubPlatform("linux");
-    expect(fullLabel("delete", 1)).toBe("Delete to Trash");
+    expect(fullLabel("delete", 1)).toBe("Delete");
   });
 });
 
@@ -106,7 +106,6 @@ describe("title actions", () => {
       "Edit details",
       "Remove from library (keep files)",
       "Ignore this folder",
-      "Delete permanently…Shift Del",
     ]);
     expect(more).toHaveLength(MORE_ORDER.length);
     await user.keyboard("{Escape}");
@@ -127,8 +126,7 @@ describe("title actions", () => {
       "Edit details",
       "Remove from library (keep files)",
       "Ignore this folder",
-      "Delete to Recycle BinDel",
-      "Delete permanently…Shift Del",
+      "DeleteDel",
     ]);
     // Every action of the bar and of More is in the menu, once.
     expect(menu).toHaveLength(MENU_GROUPS.flat().length);
@@ -163,6 +161,5 @@ describe("title actions", () => {
     expect(HEADER_ORDER).toEqual(["play", "scrape", "rename", "move", "open-folder", "artwork"]);
     expect(TITLE_ACTIONS.rename.hint).toBe("F2");
     expect(TITLE_ACTIONS.delete.hint).toBe("Del");
-    expect(TITLE_ACTIONS["delete-permanently"].hint).toBe("Shift Del");
   });
 });
