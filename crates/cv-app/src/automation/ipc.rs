@@ -189,14 +189,9 @@ fn write_endpoint(path: &Path, endpoint: &Endpoint) -> io::Result<()> {
         std::fs::create_dir_all(parent)?;
     }
     let text = serde_json::to_vec_pretty(endpoint).map_err(io::Error::other)?;
-    let temporary = path.with_extension("json.tmp");
-    std::fs::write(&temporary, text)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o600))?;
-    }
-    std::fs::rename(&temporary, path)
+    // The token is a secret: the file is created readable by its owner only, never widened and
+    // narrowed afterwards.
+    cv_fs::write_atomic_with_mode(path, &text, 0o600)
 }
 
 /// Reads an endpoint file; `None` when it is missing or damaged.
@@ -498,6 +493,28 @@ mod tests {
         assert_eq!(read_endpoint(&path), Some(endpoint));
         std::fs::write(&path, "{not json").unwrap();
         assert!(read_endpoint(&path).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_endpoint_file_is_private_to_its_owner() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(ENDPOINT_FILE);
+        let endpoint = Endpoint {
+            protocol: PROTOCOL,
+            address: "x".into(),
+            token: "t".into(),
+            pid: 7,
+        };
+        write_endpoint(&path, &endpoint).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+        // A rewrite over an existing file keeps it private, and no temporary file stays behind.
+        write_endpoint(&path, &endpoint).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     }
 
     #[test]
