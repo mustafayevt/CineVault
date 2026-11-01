@@ -78,9 +78,18 @@ function Ensure-Docker {
 # is read here instead of passing it templates with quoted keys.
 function Inspect { return @(docker inspect $Name | Out-String | ConvertFrom-Json)[0] }
 
+# Docker Desktop sometimes reports a bind's Windows folder as the path inside its virtual machine
+# (it does so once a named volume, such as a share's, is listed first): this turns it back.
+function Host-Bind([string]$Bind) {
+    if ($Bind -match '^/run/desktop/mnt/host/([A-Za-z])(/[^:]*)?(:.*)$') {
+        return '{0}:{1}{2}' -f $Matches[1].ToUpperInvariant(), ($(if ($Matches[2]) { $Matches[2] } else { '/' }) -replace '/', '\'), $Matches[3]
+    }
+    return $Bind
+}
+
 function Read-Existing {
     $info = Inspect
-    $S.Binds = @($info.HostConfig.Binds | Where-Object { $_ })
+    $S.Binds = @($info.HostConfig.Binds | Where-Object { $_ } | ForEach-Object { Host-Bind $_ })
     $S.Envs = @($info.Config.Env | Where-Object { $_ -match "^($KeepIn)=" })
     $S.Port = '8787'
     $bindings = $info.HostConfig.PortBindings.'8787/tcp'
@@ -565,6 +574,12 @@ function Self-Test {
     $S.Binds = @('cinevault-nas-movies:/media/movies')
     Expect 'second share named movies' (Mount-Name 'movies') 'movies-2'
     $S.Binds = @()
+
+    Expect 'bind from the VM path' (Host-Bind '/run/desktop/mnt/host/c/Users/alex/CineVault/data:/data') 'C:\Users\alex\CineVault\data:/data'
+    Expect 'read-only bind from the VM path' (Host-Bind '/run/desktop/mnt/host/c/Users/alex/CineVault/secret.key:/run/secrets/cinevault_key:ro') 'C:\Users\alex\CineVault\secret.key:/run/secrets/cinevault_key:ro'
+    Expect 'drive root from the VM path' (Host-Bind '/run/desktop/mnt/host/d:/media/d') 'D:\:/media/d'
+    Expect 'Windows bind unchanged' (Host-Bind 'D:\Films:/media/Films') 'D:\Films:/media/Films'
+    Expect 'volume bind unchanged' (Host-Bind 'cinevault-nas-movies:/media/movies') 'cinevault-nas-movies:/media/movies'
 
     $volumes = @('cinevault-nas-movies', 'cinevault-nas-tv', 'cinevault-nas-movies-2')
     $binds = @('C:\CineVault\data:/data', 'cinevault-nas-movies:/media/movies', 'D:\Films:/media/Films')
