@@ -20,6 +20,24 @@ fn an_atomic_write_replaces_the_file_and_leaves_no_temporary_file() {
     assert_eq!(names(dir.path()), ["Heat.nfo"]);
 }
 
+#[test]
+fn flushing_the_parent_folder_never_fails_a_write() {
+    let dir = tempfile::tempdir().unwrap();
+    // An existing folder, a folder that is not there and a path with no parent are all fine: the
+    // flush is best effort and the file is already in place.
+    sync_parent_folder(&dir.path().join("Heat.nfo"));
+    sync_parent_folder(&dir.path().join("missing").join("Heat.nfo"));
+    sync_parent_folder(Path::new("Heat.nfo"));
+    sync_parent_folder(Path::new(""));
+
+    let target = dir.path().join("Heat.nfo");
+    let temp = write_temp(&target, b"new").unwrap();
+    persist(&temp, &target).unwrap();
+    let temp = write_temp(&dir.path().join("Ronin.nfo"), b"other").unwrap();
+    persist_new(&temp, &dir.path().join("Ronin.nfo")).unwrap();
+    assert_eq!(names(dir.path()), ["Heat.nfo", "Ronin.nfo"]);
+}
+
 #[cfg(unix)]
 #[test]
 fn a_restricted_atomic_write_is_owner_only_from_the_first_byte() {

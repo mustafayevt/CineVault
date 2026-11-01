@@ -207,13 +207,17 @@ pub fn copy_temp(target: &Path, source: &Path) -> io::Result<PathBuf> {
 }
 
 /// Renames the temporary file `temp` over `target`, retrying [transient](is_transient) errors.
-/// The temporary file is removed when the rename fails, and `target` is then unchanged.
+/// The temporary file is removed when the rename fails, and `target` is then unchanged. On Unix
+/// the folder is flushed afterwards, so the new name survives a power failure.
 ///
 /// # Errors
 /// The rename failed.
 pub fn persist(temp: &Path, target: &Path) -> io::Result<()> {
     match rename(temp, target) {
-        Ok(()) => Ok(()),
+        Ok(()) => {
+            sync_parent_folder(target);
+            Ok(())
+        }
         Err(error) => {
             let _ = fs::remove_file(temp);
             Err(error)
@@ -236,6 +240,7 @@ pub fn persist_new(temp: &Path, target: &Path) -> io::Result<()> {
         Ok(()) => {
             // The name `temp` is not needed any more; the data stays under `target`.
             let _ = fs::remove_file(temp);
+            sync_parent_folder(target);
             Ok(())
         }
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Err(error),
@@ -243,9 +248,28 @@ pub fn persist_new(temp: &Path, target: &Path) -> io::Result<()> {
             if target.exists() {
                 return Err(io::Error::from(io::ErrorKind::AlreadyExists));
             }
-            rename(temp, target)
+            rename(temp, target)?;
+            sync_parent_folder(target);
+            Ok(())
         }
     }
+}
+
+/// Flushes the folder that holds `path`, so a rename or a new name in it is on the disk and not
+/// only in the cache. Best effort: a file system that refuses to flush a folder (some network and
+/// FUSE ones) is not an error, because the file itself is already in place. Nothing is done on
+/// Windows, where a folder cannot be opened this way.
+fn sync_parent_folder(path: &Path) {
+    #[cfg(unix)]
+    {
+        let folder = match path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent,
+            _ => Path::new("."),
+        };
+        let _ = fs::File::open(folder).and_then(|folder| folder.sync_all());
+    }
+    #[cfg(not(unix))]
+    let _ = path;
 }
 
 /// Puts `bytes` at `target` atomically: the old file stays until the new one is complete and on
