@@ -22,19 +22,19 @@
 
 A new crate `crates/cv-shares` holds a `ShareConnector` trait (`connect`, `is_connected`, `disconnect`, `local_root`) with one implementation per OS and a fake for tests. Every implementation starts a system tool with a fixed argument list and writes the password to that tool's standard input (or its terminal, D4), then drops the buffer. Arguments carry only the server, share, user and paths, never the password; a unit test per connector asserts this on the exact `Command` it builds.
 
-*Alternative:* `WNetAddConnection2W` through the `windows` crate. It is the cleanest Windows path (typed errors, no extra process, about 50 ms instead of the 0.5 to 1 s PowerShell needs to start), but it is `unsafe` FFI. It is listed under Open Questions as a second scoped exception the owner may prefer.
+*Alternative:* `WNetAddConnection2W` through the `windows` crate. It is the cleanest Windows path (typed errors, no extra process, about 50 ms instead of the 0.5 to 1 s PowerShell needs to start), but it is `unsafe` FFI in CineVault. D2 calls the same function from inside the fixed PowerShell script instead, so CineVault keeps no `unsafe` of its own.
 
 *Alternative:* a pure-Rust SMB client library. Rejected: every file operation (scan, NFO and artwork writes, rename, move, delete, the player) would need a second I/O path.
 
-### D2. Windows: `New-SmbMapping` without a drive letter
+### D2. Windows: `WNetAddConnection2W` without a drive letter, from a fixed script
 
-`powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command <fixed script>` with the script text constant in the binary. The script sets `[Console]::InputEncoding` to UTF-8, reads the password with `[Console]::In.ReadLine()`, calls `New-SmbMapping -RemotePath \\server\share -UserName <user> -Password $p -Persistent $false` (no `-LocalPath`, so no drive letter) and prints one JSON line `{ok, code, message}` from the CIM error's Win32 code. Server, share and user are passed as `-Command` arguments after validation (D7), never interpolated into script text.
+`System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand <fixed script>` with the script text constant in the binary. The script declares `WNetAddConnection2W` and `WNetCancelConnection2W` with `Add-Type` (C# source that is part of the constant script), reads the password from standard input as UTF-8 and passes it to `WNetAddConnection2W` as a .NET method argument (`RemoteName` `\\server\share`, no `LocalName`, so no drive letter; flags 0, so not remembered in the profile), then prints one JSON line `{ok, code, message}` with the returned Win32 code (for `ERROR_EXTENDED_ERROR`, the network's own code from `WNetGetLastErrorW`). No cmdlet gets the password as a parameter: PowerShell's module logging (event 4103) records cmdlet parameters, so `New-SmbMapping -Password` could write it to the event log; method calls are not recorded, and script block logging sees only the constant script. Server, share and user are passed in the environment after validation (D7), never interpolated into script text.
 
-Error mapping: 1326, 86 and 2202 → wrong user or password; 53 and 1231 → server not reachable; 67 → share not found; 1219 → already connected to this server as another user ("Windows is already connected to nas as another user. Disconnect it in File Explorer, or use the same user."); 1909 → account locked; anything else → the system message with its code.
+Error mapping: 1326, 86 and 2202 → wrong user or password; 53 and 1231 → server not reachable; 67 → share not found (Windows also answers 67 when the server does not answer at all, so the script then tries the server's SMB port and reports 53 when it is closed); 1219 → already connected to this server as another user ("Windows is already connected to nas as another user. Disconnect it in File Explorer, or use the same user."); 1909 → account locked; anything else → the system message with its code.
 
-Before connecting, `is_connected` lists the user's SMB mappings of the share without a drive letter (`Get-SmbMapping -RemotePath … | Where-Object { -not $_.LocalPath }`); an already connected share is not connected again. A drive letter the user mapped to the same share never counts. Disconnect removes only such a mapping (`Remove-SmbMapping -Force:$false` on the mapping without a drive letter), never a drive letter; open files make it fail, which is accepted (D9). A non-persistent mapping lasts until the user signs out, which is what "Shares stay connected" needs; nothing is written to the registry and Windows stores no credential.
+Before connecting, `is_connected` lists the user's SMB mappings of the share without a drive letter (`Get-SmbMapping -RemotePath … | Where-Object { -not $_.LocalPath }`); an already connected share is not connected again. A drive letter the user mapped to the same share never counts. Disconnect is `WNetCancelConnection2W(\\server\share, 0, force: false)` when such a mapping exists, which cancels only connections without a device, never a drive letter; open files make it fail, which is accepted (D9). A non-persistent connection lasts until the user signs out, which is what "Shares stay connected" needs; nothing is written to the registry and Windows stores no credential.
 
-Trade-off: a PowerShell start per connect and per reconnect at start (run in parallel per server, off the UI thread), and the SmbShare module must exist (Windows 8 and later; CineVault supports Windows 10 and 11). A machine whose policy blocks PowerShell gets the system message.
+Trade-off: a PowerShell start (and a small `Add-Type` compile) per connect and per reconnect at start (run in parallel per server, off the UI thread), and the SmbShare module must exist for the check (Windows 8 and later; CineVault supports Windows 10 and 11). A machine whose policy blocks PowerShell or `Add-Type` gets the system message.
 
 ### D3. Library paths and the share table
 
@@ -115,7 +115,7 @@ A page, like the other pickers (no dialog), opened from "Network share…" with 
 
 ## Risks / Trade-offs
 
-- [PowerShell is slow to start or blocked by policy] → connects run off the UI thread with a busy state; reconnects at start run in parallel and only for shares not already connected; a blocked PowerShell shows the system message. The FFI alternative is in Open Questions.
+- [PowerShell is slow to start or blocked by policy] → connects run off the UI thread with a busy state; reconnects at start run in parallel and only for shares not already connected; a blocked PowerShell shows the system message.
 - [`mount_smbfs` changes its prompt on a future macOS] → the prompt is matched loosely, a timeout ends the attempt with the system's last line, and the `osascript` fallback is documented.
 - [gvfs FUSE paths are slow and its rename semantics differ] → scans already limit reads per drive and treat gvfs as a network file system for deletes; a note in the page suggests the system mount for large libraries.
 - [Windows error 1219 when Explorer is already connected as another user] → mapped to a sentence that says what to do.
@@ -129,7 +129,7 @@ Additive. A schema migration adds `network_share`; libraries without shares are 
 
 ## Open Questions
 
-1. **Scoped `unsafe` on Windows.** `WNetAddConnection2W` / `WNetCancelConnection2W` in a small module with `#[allow(unsafe_code)]` and `SAFETY:` comments, like the MediaInfo FFI, would replace PowerShell with a faster call and typed errors. Keep the PowerShell approach (no new exception), or allow this second exception?
+1. **Scoped `unsafe` on Windows.** Calling `WNetAddConnection2W` / `WNetCancelConnection2W` directly from a small Rust module with `#[allow(unsafe_code)]` and `SAFETY:` comments, like the MediaInfo FFI, would drop the PowerShell start. D2 now calls them from the fixed script (no new exception); keep that, or allow this second exception for speed?
 2. **macOS mount folder.** `~/CineVault Shares/<server>/<share>` is visible in the home folder. Is that acceptable, or would the owner prefer the `osascript` route that mounts in `/Volumes` like Finder, at the cost of a possible system dialog and `-1` name suffixes?
 3. **Linux Docker.** The owner's brief named a CIFS volume for containers. The design uses a host mount with a root-only credentials file for Linux `--docker` (password never in Docker, container starts while the NAS is off) and the CIFS volume only for Docker Desktop. Confirm, or use the CIFS volume everywhere for one code path.
 4. **SMB version.** `vers=3.0` is the installer default. Some older NAS units need `2.1` or `1.0`; should the installer retry with `2.1` automatically, or ask?

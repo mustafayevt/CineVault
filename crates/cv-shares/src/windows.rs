@@ -1,16 +1,22 @@
-//! Windows: `New-SmbMapping` without a drive letter, through a fixed PowerShell script.
+//! Windows: a connection without a drive letter (`WNetAddConnection2W`), through a fixed
+//! PowerShell script.
 //!
 //! The script is a constant of this file, sent as `-EncodedCommand` so no quoting can change it.
 //! The share's network path and the user go in the environment (`CINEVAULT_SHARE_REMOTE`,
 //! `CINEVAULT_SHARE_USER`), already checked and never pasted into script text; the password is
-//! the one line the script reads from standard input as UTF-8. The script prints one JSON line
-//! `{ok, code, message, connected}` with the Win32 error code of a failure.
+//! the one line the script reads from standard input as UTF-8. The script declares
+//! `WNetAddConnection2W` and `WNetCancelConnection2W` with `Add-Type` (C# source that is part of
+//! the script) and hands the password to it as a .NET method argument: no cmdlet ever gets it as
+//! a parameter, so PowerShell's module logging, which records cmdlet parameters, never sees it.
+//! The script prints one JSON line `{ok, code, message, connected}` with the Win32 error code of
+//! a failure.
 //!
-//! The mapping is not persistent: it lasts until the user signs out, Windows stores no credential
-//! for it, and the folder keeps its network path (`\\nas\movies\Films`).
+//! The connection is not persistent: it lasts until the user signs out, Windows stores no
+//! credential for it, and the folder keeps its network path (`\\nas\movies\Films`).
 //!
-//! Only mappings without a drive letter count as CineVault's: a drive letter the user mapped to
-//! the same share is never reported as connected here and never removed.
+//! Only connections without a drive letter count as CineVault's: a drive letter the user mapped
+//! to the same share is never reported as connected here and never disconnected
+//! (`WNetCancelConnection2W` on a network path cancels only the connections without a device).
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -34,7 +40,7 @@ const REMOTE_VAR: &str = "CINEVAULT_SHARE_REMOTE";
 const USER_VAR: &str = "CINEVAULT_SHARE_USER";
 
 /// Shared start of every script: stop on errors, no progress records, UTF-8 output, the result
-/// line, and the mappings of the share that have no drive letter.
+/// line, and the connections to the share that have no drive letter.
 const PRELUDE: &str = r"
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -51,6 +57,9 @@ function Get-Win32Code($record) {
     }
     return 0
 }
+function Get-Win32Message($code) {
+    return (New-Object System.ComponentModel.Win32Exception ([int]$code)).Message
+}
 function Get-DevicelessMapping {
     Get-SmbMapping -RemotePath $env:CINEVAULT_SHARE_REMOTE -ErrorAction SilentlyContinue |
         Where-Object { -not $_.LocalPath }
@@ -60,14 +69,75 @@ function Test-Mapped {
 }
 ";
 
+/// The two calls of the Windows networking API the connect and disconnect scripts use, declared
+/// with `Add-Type`. No drive letter (`LocalName` is null), not remembered in the profile (flags
+/// 0), and a disconnect never forced while files are open.
+const NATIVE: &str = r#"
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class CineVaultShare {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private class NetResource {
+        public int Scope;
+        public int Type;
+        public int DisplayType;
+        public int Usage;
+        public string LocalName;
+        public string RemoteName;
+        public string Comment;
+        public string Provider;
+    }
+    [DllImport("mpr.dll", CharSet = CharSet.Unicode)]
+    private static extern int WNetAddConnection2W(NetResource resource, string password, string user, int flags);
+    [DllImport("mpr.dll", CharSet = CharSet.Unicode)]
+    private static extern int WNetCancelConnection2W(string name, int flags, bool force);
+    [DllImport("mpr.dll", CharSet = CharSet.Unicode)]
+    private static extern int WNetGetLastErrorW(out int error, StringBuilder description, int descriptionSize, StringBuilder provider, int providerSize);
+    public static int Connect(string remote, string user, string password) {
+        NetResource resource = new NetResource();
+        resource.Type = 1;
+        resource.RemoteName = remote;
+        int code = WNetAddConnection2W(resource, password, user, 0);
+        if (code == 1208) {
+            // ERROR_EXTENDED_ERROR: the network's own code says what happened.
+            int extended;
+            StringBuilder description = new StringBuilder(256);
+            StringBuilder provider = new StringBuilder(256);
+            if (WNetGetLastErrorW(out extended, description, description.Capacity, provider, provider.Capacity) == 0 && extended != 0) {
+                return extended;
+            }
+        }
+        return code;
+    }
+    public static int Disconnect(string remote) {
+        return WNetCancelConnection2W(remote, 0, false);
+    }
+}
+'@
+"#;
+
+/// Windows answers "the network name cannot be found" (67) also when the server does not answer
+/// at all; the server's SMB port tells the two apart, so an unreachable server reads as such (53).
 const CONNECT: &str = r"
+function Test-Server {
+    $server = $env:CINEVAULT_SHARE_REMOTE.TrimStart('\').Split('\')[0]
+    $client = New-Object System.Net.Sockets.TcpClient
+    try { return $client.ConnectAsync($server, 445).Wait(3000) } catch { return $false } finally { $client.Dispose() }
+}
 try {
     $reader = New-Object System.IO.StreamReader ([Console]::OpenStandardInput()), (New-Object System.Text.UTF8Encoding $false)
     $password = $reader.ReadLine()
     if ($null -eq $password) { $password = '' }
-    New-SmbMapping -RemotePath $env:CINEVAULT_SHARE_REMOTE -UserName $env:CINEVAULT_SHARE_USER -Password $password -Persistent $false | Out-Null
+    $code = [CineVaultShare]::Connect($env:CINEVAULT_SHARE_REMOTE, $env:CINEVAULT_SHARE_USER, $password)
     $password = $null
-    Write-Result $true 0 '' $true
+    if ($code -eq 67 -and -not (Test-Server)) { $code = 53 }
+    if ($code -eq 0) {
+        Write-Result $true 0 '' $true
+    } else {
+        Write-Result $false $code (Get-Win32Message $code) $false
+    }
 } catch {
     $password = $null
     Write-Result $false (Get-Win32Code $_) $_.Exception.Message $false
@@ -84,11 +154,15 @@ try {
 
 const DISCONNECT: &str = r"
 try {
-    $mapping = Get-DevicelessMapping
-    if ($mapping) {
-        $mapping | Remove-SmbMapping -Force:$false -UpdateProfile:$false -Confirm:$false
+    $code = 0
+    if (Get-DevicelessMapping) {
+        $code = [CineVaultShare]::Disconnect($env:CINEVAULT_SHARE_REMOTE)
     }
-    Write-Result $true 0 '' $false
+    if ($code -eq 0) {
+        Write-Result $true 0 '' $false
+    } else {
+        Write-Result $false $code (Get-Win32Message $code) (Test-Mapped)
+    }
 } catch {
     Write-Result $false (Get-Win32Code $_) $_.Exception.Message (Test-Mapped)
 }
@@ -106,7 +180,7 @@ struct ScriptResult {
     connected: bool,
 }
 
-/// Connects shares with `New-SmbMapping`.
+/// Connects shares with `WNetAddConnection2W`.
 pub struct WindowsConnector {
     spawner: Arc<dyn Spawner>,
     powershell: PathBuf,
@@ -133,20 +207,38 @@ impl WindowsConnector {
         }
     }
 
-    /// The command that runs `script` for `share`, with `user` when connecting.
-    fn command(&self, script: &str, share: &ShareAddress, user: Option<&str>) -> ToolCommand {
+    /// The command that runs the `parts` of a script for `share`, with `user` when connecting.
+    fn command(&self, parts: &[&str], share: &ShareAddress, user: Option<&str>) -> ToolCommand {
         let mut command = ToolCommand::new(&self.powershell)
             .arg("-NoProfile")
             .arg("-NonInteractive")
             .arg("-ExecutionPolicy")
             .arg("Bypass")
             .arg("-EncodedCommand")
-            .arg(encode_script(script))
+            .arg(encode_script(parts))
             .env(REMOTE_VAR, share.unc());
         if let Some(user) = user {
             command = command.env(USER_VAR, user);
         }
         command
+    }
+
+    /// Runs the connect script for `share`: the password goes to its standard input only.
+    fn map_connection(
+        &self,
+        share: &ShareAddress,
+        login: &Login,
+        cancel: &Cancel,
+    ) -> Result<ScriptResult, ShareError> {
+        let command = self.command(&[NATIVE, CONNECT], share, Some(login.user()));
+        let password = login.password();
+        self.run(
+            &command,
+            Some(password.expose()),
+            cancel,
+            CONNECT_LIMIT,
+            |text| password.scrub(text),
+        )
     }
 
     fn run(
@@ -190,26 +282,20 @@ impl ShareConnector for WindowsConnector {
         if self.is_connected(share, cancel)? {
             return Ok(Connected { root, made: false });
         }
-        let command = self.command(CONNECT, share, Some(login.user()));
-        let password = login.password();
-        let result = self.run(
-            &command,
-            Some(password.expose()),
-            cancel,
-            CONNECT_LIMIT,
-            |text| password.scrub(text),
-        )?;
+        let result = self.map_connection(share, login, cancel)?;
         if result.ok {
             Ok(Connected { root, made: true })
         } else {
-            let message = password.scrub(result.message.as_deref().unwrap_or_default());
+            let message = login
+                .password()
+                .scrub(result.message.as_deref().unwrap_or_default());
             Err(error_for(result.code, message))
         }
     }
 
     fn is_connected(&self, share: &ShareAddress, cancel: &Cancel) -> Result<bool, ShareError> {
         let result = self.run(
-            &self.command(CHECK, share, None),
+            &self.command(&[CHECK], share, None),
             None,
             cancel,
             CHECK_LIMIT,
@@ -224,7 +310,7 @@ impl ShareConnector for WindowsConnector {
 
     fn disconnect(&self, share: &ShareAddress, cancel: &Cancel) -> Result<(), ShareError> {
         let result = self.run(
-            &self.command(DISCONNECT, share, None),
+            &self.command(&[NATIVE, DISCONNECT], share, None),
             None,
             cancel,
             CHECK_LIMIT,
@@ -247,9 +333,9 @@ impl ShareConnector for WindowsConnector {
     }
 }
 
-/// The script as `-EncodedCommand` takes it: the prelude and `script`, UTF-16LE, base64.
-fn encode_script(script: &str) -> String {
-    let text = format!("{PRELUDE}{script}");
+/// The script as `-EncodedCommand` takes it: the prelude and `parts`, UTF-16LE, base64.
+fn encode_script(parts: &[&str]) -> String {
+    let text = format!("{PRELUDE}{}", parts.concat());
     let bytes: Vec<u8> = text.encode_utf16().flat_map(u16::to_le_bytes).collect();
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }
@@ -359,9 +445,18 @@ mod tests {
             ]
             .map(std::ffi::OsString::from)
         );
-        assert!(decoded(connect).contains("New-SmbMapping"));
-        assert!(decoded(connect).contains("-Persistent $false"));
-        assert!(!decoded(connect).contains("-LocalPath"), "no drive letter");
+        let script = decoded(connect);
+        assert!(script.contains("WNetAddConnection2W"));
+        assert!(script.contains("[CineVaultShare]::Connect("));
+        assert!(
+            script.contains("WNetAddConnection2W(resource, password, user, 0)"),
+            "not remembered in the profile"
+        );
+        // The password is a .NET method argument, never a cmdlet parameter that module logging
+        // would record.
+        assert!(!script.contains("-Password"), "{script}");
+        assert!(!script.contains("New-SmbMapping"));
+        assert!(!script.contains("LocalName ="), "no drive letter");
         assert!(
             connect
                 .env
@@ -469,18 +564,18 @@ mod tests {
         let busy = connector.disconnect(&share(), &Cancel::new()).unwrap_err();
         assert_eq!(busy.kind(), ShareErrorKind::InUse);
         let script = decoded(&spawner.commands()[0]);
-        assert!(script.contains("$mapping | Remove-SmbMapping"));
-        assert!(script.contains("-Force:$false"));
+        assert!(script.contains("WNetCancelConnection2W(remote, 0, false)"));
+        assert!(!script.contains("Remove-SmbMapping"));
+        assert!(script.contains("if (Get-DevicelessMapping)"));
     }
 
     #[test]
-    fn only_mappings_without_a_drive_letter_count() {
+    fn only_connections_without_a_drive_letter_count() {
         // A drive letter the user mapped to the same share is neither "connected" for CineVault
-        // nor ever removed by it.
+        // nor ever disconnected by it.
         assert!(PRELUDE.contains("Where-Object { -not $_.LocalPath }"));
         assert!(PRELUDE.contains("Get-DevicelessMapping | Where-Object"));
         assert!(!CHECK.contains("Get-SmbMapping") && !DISCONNECT.contains("Get-SmbMapping"));
-        assert!(!DISCONNECT.contains("Remove-SmbMapping -RemotePath"));
         assert!(DISCONNECT.contains("Get-DevicelessMapping"));
     }
 
@@ -498,7 +593,7 @@ mod tests {
     #[test]
     fn the_scripts_read_their_inputs_from_the_environment_only() {
         for script in [CONNECT, CHECK, DISCONNECT] {
-            let text = format!("{PRELUDE}{script}");
+            let text = format!("{PRELUDE}{NATIVE}{script}");
             assert!(!text.contains("{0}") && !text.contains("$args"), "{script}");
         }
         assert!(CONNECT.contains("$env:CINEVAULT_SHARE_USER"));

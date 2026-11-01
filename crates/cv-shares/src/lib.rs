@@ -33,7 +33,7 @@ pub use address::{Address, InputError, ShareAddress, check_user, folder_in_share
 pub use connector::{Cancel, Connected, Login, Password, ShareConnector, Support};
 pub use error::{ShareError, ShareErrorKind};
 
-/// The connector of this operating system: `New-SmbMapping` on Windows, `mount_smbfs` on macOS,
+/// The connector of this operating system: `WNetAddConnection2W` on Windows, `mount_smbfs` on macOS,
 /// `gio` on a Linux desktop.
 #[must_use]
 pub fn system_connector() -> Arc<dyn ShareConnector> {
