@@ -19,7 +19,7 @@ import { useEscapeLayer } from "../shell/escStack";
 import { binName } from "../shell/binName";
 import { detectPlatform } from "../shell/platform";
 import { usePickerClose } from "../scrape/usePickerClose";
-import { subjectName, useTitleSubject } from "../scrape/titleSubject";
+import { useTitleSubject } from "../scrape/titleSubject";
 import { askAgain, copyName, keepBoth, keepThisOne } from "./copiesActions";
 import { currentCopiesBackend } from "./copiesBackend";
 import type { Comparison } from "./copiesBackend";
@@ -203,7 +203,8 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
     folder: (path) => path,
   });
   const own = page.copies[0];
-  const name = subject.data !== undefined ? subjectName(subject.data) : own ? copyName(own) : "";
+  // The film's name as its copies carry it; the poster comes from the movie's own page.
+  const name = own !== undefined ? copyName(own) : "";
   const poster = subject.data?.poster ?? null;
   const count = page.copies.length;
 
