@@ -198,8 +198,9 @@ pub fn volume_key(path: &str) -> String {
         let name = rest.split('/').next().unwrap_or_default();
         return format!("/Volumes/{name}");
     }
-    // A Linux mount point (`/media/<user>/<name>`, `/run/media/<user>/<name>`, `/mnt/<name>`) is
-    // its own drive. Any other path is on the root drive.
+    // A Linux mount point (`/media/<user>/<name>`, `/run/media/<user>/<name>`, `/mnt/<name>`, or
+    // a share the mount list names higher up, such as `/media/nas`) is its own drive. Any other
+    // path is on the root drive.
     let mount = cv_fs::paths::linux_mount_root(text);
     if mount != "/" {
         return mount;
