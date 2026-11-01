@@ -397,3 +397,53 @@ fn a_permanent_delete_erases_the_named_files_and_lists_them_first() {
         "the entry lists the named files: {detail}"
     );
 }
+
+/// Keep this one on copies that share a folder (`movie-copies`): the other copy goes through
+/// the ordinary delete, which takes only the video and the files named after it.
+#[test]
+fn two_copies_in_one_folder_lose_only_the_files_of_the_one_that_goes() {
+    let lab = Lab::new();
+    let trash = FakeTrash::new(lab.dir.path());
+    let folder = Path::new(&lab.movies.path).join("Mixed");
+    let hd = lab.movie_in(
+        &lab.movies,
+        &folder,
+        "Example Movie",
+        "Example Movie (2020).1080p.mkv",
+    );
+    let uhd = lab.movie_in(
+        &lab.movies,
+        &folder,
+        "Example Movie",
+        "Example Movie (2020).2160p.mkv",
+    );
+    drop_files(
+        &folder,
+        &[
+            "Example Movie (2020).1080p.en.srt",
+            "Example Movie (2020).1080p.nfo",
+            "Example Movie (2020).2160p.en.srt",
+            "Example Movie (2020).2160p.nfo",
+        ],
+    );
+
+    // The user keeps the 2160p copy: the 1080p one is the only one deleted.
+    let report = lab.removal(&trash).delete_with_files(&[hd]).unwrap();
+
+    assert!(report.problems.is_empty(), "{report:?}");
+    assert_eq!(
+        left_in(&folder),
+        [
+            "Example Movie (2020).2160p.en.srt",
+            "Example Movie (2020).2160p.mkv",
+            "Example Movie (2020).2160p.nfo",
+        ]
+    );
+    assert!(lab.hidden(hd) && !lab.hidden(uhd));
+
+    // Undo brings the 1080p copy's files back and leaves the 2160p copy's where they are.
+    lab.history(&trash)
+        .undo(report.history_id.unwrap())
+        .unwrap();
+    assert_eq!(left_in(&folder).len(), 6);
+}
