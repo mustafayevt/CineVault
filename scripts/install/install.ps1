@@ -166,6 +166,7 @@ function Recreate {
     docker rm $Name | Out-Null
     Run-Container
     Wait-Healthy
+    Remove-Unused-Volumes $S.Binds
     Finish $false
 }
 
@@ -197,6 +198,7 @@ function Uninstall {
     docker stop $Name *> $null
     docker rm $Name | Out-Null
     docker image rm $Image *> $null
+    Remove-Unused-Volumes @()
     Say 'CineVault is removed. Your movie folders were not touched.'
     if ($data -and -not $Yes -and (Ask 'Type DELETE to also erase the data folder (library, password, keys), or press Enter to keep it' '') -ceq 'DELETE') {
         Remove-Item -Recurse -Force -LiteralPath $data
@@ -434,6 +436,21 @@ function Add-Share([string]$Address) {
     return $true
 }
 
+# Removes the share volumes this installer made that no bind uses any more. Removing a volume
+# unmounts it and removes Docker's own mount folder; the files on the share are not touched.
+function Unused-Volumes([string[]]$Volumes, [string[]]$Binds) {
+    $used = @($Binds | Where-Object { $_ } | ForEach-Object { ($_ -split ':/media/', 2)[0] })
+    return @($Volumes | Where-Object { $_ -and $used -notcontains $_ })
+}
+
+function Remove-Unused-Volumes([string[]]$Binds) {
+    foreach ($v in (Unused-Volumes @(docker volume ls -q --filter label=cinevault.share 2>$null) $Binds)) {
+        docker volume rm $v *> $null
+        if ($LASTEXITCODE -eq 0) { Say "Removed the volume $v of a network share that is no longer a library folder. The files on the share were not touched." }
+        else { Say "The volume $v is still in use by another container, so it was kept." }
+    }
+}
+
 function Volume-Share([string]$Vol) { # the share a volume made by this installer holds, or ''
     try { return [string]@(docker volume inspect $Vol 2>$null | Out-String | ConvertFrom-Json)[0].Labels.'cinevault.share' } catch { return '' }
 }
@@ -548,6 +565,12 @@ function Self-Test {
     $S.Binds = @('cinevault-nas-movies:/media/movies')
     Expect 'second share named movies' (Mount-Name 'movies') 'movies-2'
     $S.Binds = @()
+
+    $volumes = @('cinevault-nas-movies', 'cinevault-nas-tv', 'cinevault-nas-movies-2')
+    $binds = @('C:\CineVault\data:/data', 'cinevault-nas-movies:/media/movies', 'D:\Films:/media/Films')
+    Expect 'removal plan: the share still used stays' ((Unused-Volumes $volumes $binds) -join ',') 'cinevault-nas-tv,cinevault-nas-movies-2'
+    Expect 'removal plan: uninstall removes all' ((Unused-Volumes $volumes @()) -join ',') ($volumes -join ',')
+    Expect 'removal plan: nothing made' ((Unused-Volumes @() $binds) -join ',') ''
 
     if ($T.Fails -eq 0) { Write-Host 'install.ps1 self-test passed' } else { Write-Host "install.ps1 self-test: $($T.Fails) failed"; exit 1 }
 }

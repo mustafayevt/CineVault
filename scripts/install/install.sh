@@ -442,6 +442,55 @@ share_units_of() { # share_units_of "folders" -> the installer's mount units the
     done | sort -u | paste -sd ' ' -
 }
 
+share_keys() { # the shares the installer set up on this computer, one key per line (needs root)
+    {
+        for f in /etc/systemd/system/mnt-*.mount; do
+            if grep -q "^$SHARE_MARK" "$f" 2>/dev/null; then sed -n 's#^Where=/mnt/##p' "$f"; fi
+        done
+        if as_root test -d "$SHARE_DIR"; then as_root ls -1 "$SHARE_DIR" | sed -n -e 's/\.cred$//p' -e 's/\.new$//p'; fi
+    } | sort -u
+}
+
+shares_unused() { # shares_unused "keys" "folders in use" -> the keys no folder is on
+    printf '%s\n' "$1" | while IFS= read -r key; do
+        [ -n "$key" ] || continue
+        if ! printf '%s\n' "$2" | awk -v m="/mnt/$key" '$0 == m || index($0, m "/") == 1 { found = 1 } END { exit !found }'; then
+            printf '%s\n' "$key"
+        fi
+    done
+}
+
+share_remove() { # share_remove key: stops and removes the mount unit and the login; never touches the share
+    key=$1
+    mnt=/mnt/$key
+    unit=$(unit_name "$key")
+    what=$(sed -n 's/^What=//p' "/etc/systemd/system/$unit" 2>/dev/null)
+    [ -n "$what" ] || what=$mnt
+    if [ -f "/etc/systemd/system/$unit" ]; then as_root systemctl disable --now --quiet "$unit" 2>/dev/null || true; fi
+    if mountpoint -q "$mnt"; then as_root umount "$mnt" 2>/dev/null || true; fi
+    as_root rm -f "/etc/systemd/system/$unit" "$SHARE_DIR/$key.cred" "$SHARE_DIR/$key.new"
+    # The folder is removed with rmdir, and only once it is no longer mounted: an unmount that
+    # failed can never lead to deleting files on the share.
+    if mountpoint -q "$mnt"; then
+        say "Removed the network share $what. It stays mounted at $mnt until the next restart, because files on it are open."
+    else
+        if [ -d "$mnt" ]; then as_root rmdir "$mnt" 2>/dev/null || say "$mnt is not empty, so it was left as it is."; fi
+        say "Removed the network share $what (it was mounted at $mnt). The files on it were not touched."
+    fi
+}
+
+shares_cleanup() { # shares_cleanup "folders in use": removes the shares none of them is on
+    if [ ! -d "$SHARE_DIR" ] && ! grep -qs "^$SHARE_MARK" /etc/systemd/system/mnt-*.mount; then return 0; fi
+    need_root
+    unused=$(shares_unused "$(share_keys)" "$1")
+    [ -n "$unused" ] || return 0
+    while IFS= read -r key; do share_remove "$key"; done <<EOF_UNUSED
+$unused
+EOF_UNUSED
+    if has_systemd; then as_root systemctl daemon-reload; fi
+    as_root rmdir "$SHARE_DIR" 2>/dev/null || true
+}
+
 wait_url() { # waits until the server answers; $1 is a command that prints why it did not
     step "Waiting for CineVault to start"
     i=0
@@ -694,6 +743,7 @@ n_install() {
     n_install_package
     n_configure
     n_start
+    shares_cleanup "$MEDIA"
     n_finish fresh
 }
 
@@ -705,6 +755,7 @@ n_update() {
     n_install_package
     n_configure
     n_start
+    shares_cleanup "$MEDIA"
     n_finish update
 }
 
@@ -716,6 +767,7 @@ n_folders() {
     ask_media
     n_configure
     n_start
+    shares_cleanup "$MEDIA"
     n_finish update
 }
 
@@ -724,6 +776,7 @@ n_uninstall() {
     yes_no "Remove the CineVault server? Its library and settings in $DATA are kept." y || exit 1
     need_root
     if has_systemd; then as_root systemctl disable --now "$UNIT" >/dev/null 2>&1 || true; fi
+    shares_cleanup ""
     if dpkg -s cinevault-server >/dev/null 2>&1; then as_root apt-get purge -y cinevault-server
     elif rpm -q cinevault-server >/dev/null 2>&1; then
         if command -v dnf >/dev/null 2>&1; then as_root dnf remove -y cinevault-server
@@ -881,6 +934,21 @@ d_free_volume() { # d_free_volume name -> name, or name-2, name-3... when it is 
     printf '%s' "$vname"
 }
 
+d_shares_cleanup() { # d_shares_cleanup "binds": removes the share volumes and mounts no bind uses any more
+    used=$(printf '%s\n' "$1" | sed -n 's#:/media/.*##p')
+    for v in $($DOCKER volume ls -q --filter label=cinevault.share 2>/dev/null); do
+        if printf '%s\n' "$used" | grep -qxF -e "$v"; then continue; fi
+        # Removing a volume unmounts it and removes Docker's own mount folder; the files on the
+        # share are not touched.
+        if $DOCKER volume rm "$v" >/dev/null 2>&1; then
+            say "Removed the volume $v of a network share that is no longer a library folder. The files on the share were not touched."
+        else
+            say "The volume $v is still in use by another container, so it was kept."
+        fi
+    done
+    [ "$OS" != Linux ] || shares_cleanup "$used"
+}
+
 d_share_volume() { # a CIFS volume for //S_SERVER/S_SHARE, checked in a throwaway container
     d_have_image
     vol=$($DOCKER volume ls -q --filter "label=cinevault.key=$S_KEY" | head -n 1)
@@ -963,6 +1031,7 @@ d_recreate() {
     $DOCKER rm "$NAME" >/dev/null
     d_run
     wait_url d_logs
+    d_shares_cleanup "$BINDS"
     d_finish update
 }
 
@@ -994,6 +1063,7 @@ d_uninstall() {
     $DOCKER stop "$NAME" >/dev/null 2>&1 || true
     $DOCKER rm "$NAME" >/dev/null
     $DOCKER image rm "$IMAGE" >/dev/null 2>&1 || true
+    d_shares_cleanup ""
     say "CineVault is removed. Your movie folders were not touched."
     if [ -n "$data" ] && [ -z "$YES" ] && [ "$(ask "Type DELETE to also erase the data folder (library, password, keys), or press Enter to keep it" "")" = DELETE ]; then
         rm -rf "$data"
@@ -1143,6 +1213,17 @@ domain=WORK"
     BINDS="/mnt/nas-movies:/media/movies:rslave"
     expect "second share named movies" "$(share_bind cinevault-other-movies //other/movies)" cinevault-other-movies:/media/movies-2
     BINDS=""
+
+    keys="nas-movies
+nas-tv
+nas-movies2"
+    expect "removal plan: the share still used stays" "$(shares_unused "$keys" "/mnt/nas-movies/Films
+/srv/local")" "nas-tv
+nas-movies2"
+    expect "removal plan: a Docker bind of the share root" "$(shares_unused "$keys" "/mnt/nas-tv
+/mnt/nas-movies2")" nas-movies
+    expect "removal plan: uninstall removes all" "$(shares_unused "$keys" "")" "$keys"
+    expect "removal plan: nothing set up" "$(shares_unused "" "/mnt/nas-movies")" ""
 
     if [ "$fails" -eq 0 ]; then echo "install.sh self-test passed"; else echo "install.sh self-test: $fails failed"; exit 1; fi
 }
