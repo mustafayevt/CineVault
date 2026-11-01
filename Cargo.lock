@@ -1174,6 +1174,7 @@ dependencies = [
  "cv-providers",
  "cv-rename",
  "cv-scan",
+ "cv-shares",
  "cv-template",
  "cv-torrent",
  "dirs 7.0.0",

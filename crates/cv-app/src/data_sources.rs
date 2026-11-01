@@ -105,9 +105,7 @@ impl DataSourceService {
     /// # Errors
     /// [`DataSourceError::Rejected`] with the rule that failed, or a storage error.
     pub fn add(&self, kind: SourceKind, raw_path: &str) -> Result<DataSource, DataSourceError> {
-        let existing = self.existing(kind)?;
-        let path = self.guard.check_with_links(raw_path, &existing, None)?;
-        self.require_reachable(&path)?;
+        let path = self.check_new(kind, raw_path)?;
 
         let guard = self.guard.clone();
         let outcome = self.db.write(move |tx| {
@@ -119,6 +117,18 @@ impl DataSourceService {
             })
         })?;
         Ok(outcome?)
+    }
+
+    /// Checks that `raw_path` could be added as a source of `kind` now, with the rules of
+    /// [`Self::add`], without adding it. Returns the normalised path.
+    ///
+    /// # Errors
+    /// [`DataSourceError::Rejected`] with the rule that failed, or a storage error.
+    pub fn check_new(&self, kind: SourceKind, raw_path: &str) -> Result<String, DataSourceError> {
+        let existing = self.existing(kind)?;
+        let path = self.guard.check_with_links(raw_path, &existing, None)?;
+        self.require_reachable(&path)?;
+        Ok(path)
     }
 
     /// Checks that `raw_path` could be a library folder at all, before its type is known: a full
