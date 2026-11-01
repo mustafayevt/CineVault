@@ -7,13 +7,14 @@
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use crate::state::{DeleteGuard, UiAssets, WebState, random_token};
 use crate::{auth, dispatch, network};
 use axum::body::Body;
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, DefaultBodyLimit, Path as UrlPath, Query, State};
-use axum::http::{HeaderMap, StatusCode, Uri, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::response::sse::{KeepAlive, Sse};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
@@ -73,7 +74,22 @@ pub(crate) fn router(state: WebState) -> Router {
             state.clone(),
             home_network_guard,
         ))
+        .layer(axum::middleware::map_response(no_framing))
         .with_state(state)
+}
+
+/// No other site may show a CineVault page in a frame: every response says so, the refusals of
+/// the home-network guard included. A handler's own policy already carries `frame-ancestors`.
+async fn no_framing(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    if !headers.contains_key(header::CONTENT_SECURITY_POLICY) {
+        headers.insert(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static("frame-ancestors 'none'"),
+        );
+    }
+    response
 }
 
 /// The sentence a request from outside the home network gets while the desktop's "Only devices
@@ -81,14 +97,14 @@ pub(crate) fn router(state: WebState) -> Router {
 pub(crate) const HOME_ONLY: &str = "Browser access is limited to your home network.";
 
 /// Refuses every peer outside the home network when the state asks for it. The socket peer
-/// decides; the desktop trusts no proxy.
+/// decides, and a forwarded request is outside; the desktop trusts no proxy.
 async fn home_network_guard(
     State(state): State<WebState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
-    if state.lan_only && !network::is_home_address(peer.ip()) {
+    if state.lan_only && !from_home_network(&state, request.headers(), peer.ip()) {
         return (StatusCode::FORBIDDEN, HOME_ONLY).into_response();
     }
     next.run(request).await
@@ -237,7 +253,7 @@ fn signed_out() -> Response {
 }
 
 fn set_cookie(response: &mut Response, value: String) {
-    if let Ok(value) = axum::http::HeaderValue::from_str(&value) {
+    if let Ok(value) = HeaderValue::from_str(&value) {
         response.headers_mut().append(header::SET_COOKIE, value);
     }
 }
@@ -275,9 +291,18 @@ fn user_agent(headers: &HeaderMap) -> String {
 }
 
 /// Whether the request comes from the home network: the socket peer, or the forwarded client
-/// address only when the peer is a trusted proxy.
-fn from_home_network(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> bool {
-    network::is_home_address(client_ip(headers, peer, trust))
+/// address only when the peer is a trusted proxy. A request that came through a proxy that is not
+/// trusted is outside, because every visitor of a local proxy or tunnel arrives from loopback.
+fn from_home_network(state: &WebState, headers: &HeaderMap, peer: IpAddr) -> bool {
+    if !from_trusted_proxy(peer, &state.trust_proxy) && network::forwarded(headers) {
+        if !state.proxy_warned.swap(true, Ordering::Relaxed) {
+            tracing::warn!(
+                "A request came through a proxy that is not in CINEVAULT_WEB_TRUST_PROXY; it is treated as outside the home network."
+            );
+        }
+        return false;
+    }
+    network::is_home_address(client_ip(headers, peer, &state.trust_proxy))
 }
 
 async fn setup_page(
@@ -288,7 +313,7 @@ async fn setup_page(
     if !state.auth.needs_setup() {
         return Redirect::to("/login").into_response();
     }
-    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+    if !from_home_network(&state, &headers, peer.ip()) {
         return (
             StatusCode::FORBIDDEN,
             axum::response::Html(auth::away_page()),
@@ -337,9 +362,11 @@ async fn login(
     Json(body): Json<PasswordBody>,
 ) -> Response {
     let client = client_ip(&headers, peer.ip(), &state.trust_proxy).to_string();
+    let home = from_home_network(&state, &headers, peer.ip());
     match state
         .auth
-        .login(&body.password, &client, &user_agent(&headers))
+        .login(&body.password, &client, &user_agent(&headers), home)
+        .await
     {
         Ok((id, _)) => {
             let mut response = Json(json!({ "ok": true })).into_response();
@@ -368,7 +395,7 @@ async fn setup(
     headers: HeaderMap,
     Json(body): Json<SetupBody>,
 ) -> Response {
-    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+    if !from_home_network(&state, &headers, peer.ip()) {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({ "message": auth::AuthError::NotHomeNetwork.to_string() })),
@@ -428,7 +455,7 @@ async fn reset_start(
         let message = auth::AuthError::DesktopReset(computer.clone()).to_string();
         return (StatusCode::FORBIDDEN, Json(json!({ "message": message }))).into_response();
     }
-    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+    if !from_home_network(&state, &headers, peer.ip()) {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({ "message": RESET_AWAY })),
@@ -482,7 +509,7 @@ async fn reset_finish(
         let message = auth::AuthError::DesktopReset(computer.clone()).to_string();
         return (StatusCode::FORBIDDEN, Json(json!({ "message": message }))).into_response();
     }
-    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+    if !from_home_network(&state, &headers, peer.ip()) {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({ "message": RESET_AWAY })),
@@ -499,7 +526,7 @@ async fn reset_finish(
     match finished {
         Ok(Ok((id, _))) => {
             // Every other browser's streams end with their sessions.
-            state.streams.close_all_except(&id);
+            state.streams.close_all_except(&auth::session_key(&id));
             let mut response = Json(json!({ "ok": true })).into_response();
             set_cookie(
                 &mut response,
@@ -575,10 +602,13 @@ async fn server_password(
     match state
         .auth
         .change_password(&body.current, &body.password, &body.confirm)
+        .await
     {
         Ok(()) => {
             state.auth.logout_all_except(Some(&session_id));
-            state.streams.close_all_except(&session_id);
+            state
+                .streams
+                .close_all_except(&auth::session_key(&session_id));
             Json(json!({ "ok": true })).into_response()
         }
         Err(error) => {
@@ -607,7 +637,9 @@ async fn server_sign_out_all(State(state): State<WebState>, headers: HeaderMap) 
             .into_response();
     }
     state.auth.logout_all_except(Some(&session_id));
-    state.streams.close_all_except(&session_id);
+    state
+        .streams
+        .close_all_except(&auth::session_key(&session_id));
     Json(json!({ "ok": true })).into_response()
 }
 
@@ -618,7 +650,7 @@ async fn logout(
 ) -> Response {
     if let Some(id) = auth::cookie(&headers, "cv_session") {
         state.auth.logout(&id);
-        state.streams.close_session(&id);
+        state.streams.close_session(&auth::session_key(&id));
     }
     let mut response = Json(json!({ "ok": true })).into_response();
     set_cookie(
@@ -687,7 +719,7 @@ async fn delete_intent(
         )
             .into_response();
     }
-    if !state.auth.check_password(&body.password) {
+    if !state.auth.check_password(&body.password).await {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "message": "That password is not right." })),
@@ -723,7 +755,7 @@ async fn delete_erase(
         )
             .into_response();
     }
-    if !state.auth.check_password(&body.password) {
+    if !state.auth.check_password(&body.password).await {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "message": "That password is not right." })),
@@ -883,7 +915,8 @@ async fn stream(
         .get("last-event-id")
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse::<u64>().ok());
-    let (replay, receiver) = state.streams.connect(&client, &session_id, last_event_id);
+    let key = auth::session_key(&session_id);
+    let (replay, receiver) = state.streams.connect(&client, &key, last_event_id);
     let stream =
         tokio_stream::iter(replay.into_iter().map(Ok)).chain(ReceiverStream::new(receiver));
     Sse::new(stream)
@@ -1271,7 +1304,7 @@ async fn serve_media(
         // No scripts, forms or plugins in a document opened from this address. A bare `sandbox`
         // also made the origin opaque, so the browser's own player document was refused its
         // video by CORS and Play showed an empty player.
-        .header("content-security-policy", MEDIA_CSP);
+        .header(header::CONTENT_SECURITY_POLICY, MEDIA_CSP);
     if download {
         builder = builder.header(header::CONTENT_DISPOSITION, attachment_name(&canonical));
     }
@@ -1287,8 +1320,8 @@ async fn serve_media(
 }
 
 /// The policy on a media response: sandboxed, but keeping the server's origin so the browser's
-/// player document may load the video it shows.
-const MEDIA_CSP: &str = "sandbox allow-same-origin";
+/// player document may load the video it shows, and never in another site's frame.
+const MEDIA_CSP: &str = "sandbox allow-same-origin; frame-ancestors 'none'";
 
 /// `attachment; filename="…"; filename*=UTF-8''…`, with a quoted and an RFC 5987 name so a
 /// release name with spaces, quotes or accents saves under its own name.
@@ -1575,7 +1608,7 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
         body,
     )
         .into_response();
-    if let Ok(value) = axum::http::HeaderValue::from_str(&mime) {
+    if let Ok(value) = HeaderValue::from_str(&mime) {
         response.headers_mut().insert(header::CONTENT_TYPE, value);
     }
     response
@@ -1584,7 +1617,6 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::http::HeaderValue;
 
     #[test]
     fn ranges_are_closed_and_clamped() {

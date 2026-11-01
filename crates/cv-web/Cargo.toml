@@ -33,6 +33,7 @@ percent-encoding = "2"
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tokio-stream = "0.1"

@@ -69,6 +69,16 @@
 <h3>Added</h3>
 <ul>
 <li>CineVault keeps a checked backup of your library every day (the last seven), so History and Undo can be brought back; it tells you if backups keep failing.</li>
+<h3>Changed</h3>
+<ul>
+<li>Browsers stay signed in when the server restarts or the desktop app updates. Switching Browser access off, changing its port, signing out or choosing a new password still signs them out.</li>
+</ul>
+<h3>Security</h3>
+<ul>
+<li>A browser can no longer change the update channel, the update signing key, a tool's path or the video player. These are changed at the computer that runs CineVault; on a server, a tool's path goes in <code>settings.json</code> while CineVault is stopped. The custom trash folder and the collection folder must be inside the folders the server may browse.</li>
+<li>A request that comes through a reverse proxy or tunnel is treated as outside your home network unless the proxy is listed in <code>CINEVAULT_WEB_TRUST_PROXY</code>, so a stranger cannot reach the welcome page or a password reset through it, and &quot;Only devices on my home network&quot; refuses it.</li>
+<li>A flood of wrong passwords from the internet no longer stops you from signing in from your home network, and checking passwords no longer slows the server for everyone else.</li>
+<li>No other website can show CineVault inside a frame.</li>
 </ul>
       </div>
     </article>

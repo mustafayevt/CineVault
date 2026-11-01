@@ -75,6 +75,7 @@ pub async fn run(options: Options) -> Result<(), Box<dyn std::error::Error>> {
         trust_proxy: server::parse_trust_proxy(),
         ui: UiAssets::Folder(ui_dir.clone()),
         lan_only: false,
+        proxy_warned: Arc::default(),
     };
     let _feed = server::wire(&state);
     let app = server::router(state.clone());
@@ -115,6 +116,8 @@ async fn shutdown(state: WebState, stopping: Arc<tokio::sync::Notify>) {
     stopping.notify_one();
     // Dropping every stream ends the SSE responses, so axum can finish its graceful shutdown.
     state.streams.close_all();
+    // The browsers stay signed in for the next start.
+    state.auth.flush();
     state.services.shutdown();
 }
 
@@ -162,7 +165,7 @@ pub fn passwd(arguments: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let auth = auth::Auth::open(location.root())?;
     if auth.has_password() {
         let current = rpassword::prompt_password("Current password: ")?;
-        if !auth.check_password(&current) {
+        if !auth.check_password_blocking(&current) {
             return Err("That password is not right.".into());
         }
     }
@@ -175,6 +178,7 @@ pub fn passwd(arguments: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     // Run as root (`sudo`, or `docker exec` without `-u`), the new file would belong to root with
     // mode 0600 and the server, which runs as the data folder's owner, could not read it.
     auth::give_to_folder_owner(&path, location.root());
+    auth::give_to_folder_owner(&location.root().join(auth::SESSIONS_FILE), location.root());
     println!("Password set. Open the server in a browser and sign in.");
     Ok(())
 }
