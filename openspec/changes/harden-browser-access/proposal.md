@@ -27,7 +27,7 @@ None.
 ### Modified Capabilities
 
 - `web-server`: desktop-only commands gain `set_tool_path`; host-sensitive settings refused from a browser; forwarded requests not home network; sign-in limits; `Origin` rule; no framing; sessions kept across restarts.
-- `settings`: Settings in a browser shows the host-sensitive settings read-only.
+- `settings`: Settings in a browser has no control for the host-sensitive settings, which the server refuses.
 
 ## Out of scope
 
@@ -40,6 +40,6 @@ None.
 
 - `crates/cv-web`: `dispatch.rs` (the `set_tool_path` arm, the settings guard), `server.rs` (forwarding-header rule, warning, frame headers), `network.rs`, `auth.rs` (sign-in limits, session store), `embed.rs` (stop keeps or ends sessions).
 - `crates/cv-ipc`: `commands.rs` loses `set_tool_path` from the served list.
-- `ui`: the Tools rows and the Updates section show their paths and channel read-only in a browser.
+- `ui`: no change; the interface has no control for the update channel, the update key or a tool's path.
 - New file in the data folder: `server-sessions.json`.
 - `packaging/README.md` (trusted proxy and tool paths on the server), `CHANGELOG.md` and `site/changelog.html`.
