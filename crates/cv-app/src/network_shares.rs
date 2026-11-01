@@ -67,6 +67,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
@@ -168,10 +169,9 @@ impl OfflineReason {
     }
 }
 
-/// The owner of a share's password kept in memory, in the log redaction holders.
-fn memory_owner(id: i64) -> String {
-    format!("network-share-memory.{id}")
-}
+/// Numbers the services, so the passwords each keeps in memory have owners of their own in the
+/// log redaction holders (several services share the process in tests).
+static SERVICES: AtomicU64 = AtomicU64::new(0);
 
 /// The credential-store account of a share's remembered password.
 #[must_use]
@@ -254,6 +254,8 @@ pub struct NetworkShareService {
     is_mounted: MountCheck,
     /// The time the shares of one server have at start ([`RECONNECT_LIMIT`]).
     reconnect_limit: Duration,
+    /// This service's number among [`SERVICES`].
+    number: u64,
 }
 
 impl std::fmt::Debug for NetworkShareService {
@@ -295,7 +297,13 @@ impl NetworkShareService {
             busy: Mutex::new(None),
             mount_folders: own_mount_folders(),
             is_mounted: mount_check(),
+            number: SERVICES.fetch_add(1, Ordering::Relaxed),
         }
+    }
+
+    /// The owner of a share's password kept in memory, in the log redaction holders.
+    fn memory_owner(&self, id: i64) -> String {
+        format!("network-share-memory.{}.{id}", self.number)
     }
 
     /// Whether this computer can connect shares for CineVault at all (a Linux desktop without
@@ -735,7 +743,7 @@ impl NetworkShareService {
         if remember && !password.expose().is_empty() {
             self.secrets.set(&account, password.expose())?;
             locked(&self.unsaved).remove(&id);
-            redact::release_secret(&memory_owner(id));
+            redact::release_secret(&self.memory_owner(id));
             return Ok(());
         }
         if let Err(error) = self.secrets.delete(&account) {
@@ -743,10 +751,10 @@ impl NetworkShareService {
         }
         if remember {
             locked(&self.unsaved).remove(&id);
-            redact::release_secret(&memory_owner(id));
+            redact::release_secret(&self.memory_owner(id));
         } else {
             locked(&self.unsaved).insert(id, password.clone());
-            redact::hold_secret(&memory_owner(id), password.expose());
+            redact::hold_secret(&self.memory_owner(id), password.expose());
         }
         Ok(())
     }
@@ -765,7 +773,7 @@ impl NetworkShareService {
             tracing::debug!(%error, "no stored share password to remove");
         }
         locked(&self.unsaved).remove(&id);
-        redact::release_secret(&memory_owner(id));
+        redact::release_secret(&self.memory_owner(id));
         if let Err(error) = self.db.write(move |tx| rows::delete_share(tx, id)) {
             tracing::warn!(%error, "a network share row could not be removed");
         }
@@ -824,7 +832,7 @@ impl NetworkShareService {
             }
         }
         locked(&self.unsaved).remove(&share.id);
-        redact::release_secret(&memory_owner(share.id));
+        redact::release_secret(&self.memory_owner(share.id));
         let (id, root) = (share.id, share.local_root.clone());
         // The check for folders and the removal in one transaction: a folder added meanwhile keeps
         // the share (now asking for its password, which is gone).
