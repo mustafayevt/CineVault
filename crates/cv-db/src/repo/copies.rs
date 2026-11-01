@@ -110,6 +110,25 @@ fn covering_set(
     common.last().copied()
 }
 
+/// The size of each of `ids` under the library's one size rule (distinct files of online rows).
+pub fn copy_sizes(conn: &Connection, ids: &[ItemId]) -> DbResult<HashMap<ItemId, u64>> {
+    let sql = format!(
+        "SELECT i.id, {} FROM item i WHERE i.id IN (SELECT value FROM json_each(?1))",
+        super::size_totals::counted_size_sql("i.id")
+    );
+    let ids = serde_json::to_string(&ids.iter().map(|id| id.0).collect::<Vec<_>>())?;
+    let mut stmt = conn.prepare(&sql)?;
+    let sizes = stmt
+        .query_map([ids], |r| {
+            Ok((
+                ItemId(r.get(0)?),
+                u64::try_from(r.get::<_, i64>(1)?).unwrap_or(0),
+            ))
+        })?
+        .collect::<Result<HashMap<_, _>, _>>()?;
+    Ok(sizes)
+}
+
 /// Records that the user keeps all of `members` as copies ("Keep both" / "Keep all"), in one new
 /// set. Returns the set, which [`remove_kept_set`] takes back.
 ///

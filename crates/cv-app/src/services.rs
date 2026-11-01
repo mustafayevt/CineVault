@@ -26,6 +26,7 @@ use crate::app_settings::SettingsService;
 use crate::artwork::ArtworkService;
 use crate::caches::CacheService;
 use crate::changes::{ChangeHub, ChangePart};
+use crate::copies::CopiesService;
 use crate::data_location::DataLocation;
 use crate::lifecycle::{LifecycleService, Working};
 use crate::local_library::submit_local_import;
@@ -174,6 +175,7 @@ pub struct AppServices {
     organize_state: Arc<OrganizeStateService>,
     scrape_follow_up: Arc<ScrapeFollowUp>,
     lifecycle: Arc<LifecycleService>,
+    copies: Arc<CopiesService>,
     rating_status: Arc<RatingStatusService>,
     changes: Arc<ChangeHub>,
     activity: Arc<ActivityService>,
@@ -397,6 +399,7 @@ impl AppServices {
             Arc::clone(&organize_state),
             working,
         );
+        let copies = CopiesService::new(Arc::clone(&db));
         // The chips of the ratings strip: a value, or why there is none.
         let rating_status = RatingStatusService::new(
             Arc::clone(&db),
@@ -556,6 +559,7 @@ impl AppServices {
             organize_state,
             scrape_follow_up,
             lifecycle,
+            copies,
             rating_status,
             changes,
             activity,
@@ -645,6 +649,11 @@ impl AppServices {
     /// The stage, flags and explanation lines of titles, and the pipeline counts.
     pub fn lifecycle(&self) -> &Arc<LifecycleService> {
         &self.lifecycle
+    }
+
+    /// The copies of a movie: groups, compare rows, "Keep both" and "Ask again".
+    pub fn copies(&self) -> &Arc<CopiesService> {
+        &self.copies
     }
 
     /// The chips of the ratings strip.

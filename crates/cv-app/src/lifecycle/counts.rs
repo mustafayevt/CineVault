@@ -39,6 +39,8 @@ pub struct LifecycleCounts {
     pub missing: u32,
     /// Titles whose organize state is still being computed.
     pub checking: u32,
+    /// Movies in groups of copies the user has not kept (the Copies chip); always 0 for shows.
+    pub copies: u32,
 }
 
 /// The pipeline counts of the movies or the shows of the library.
@@ -56,8 +58,14 @@ pub fn lifecycle_counts(
 ) -> Result<LifecycleCounts, cv_db::DbError> {
     let profile_key = profile_key.to_owned();
     let groups = db.read(move |conn| lifecycle_groups(conn, kind, &profile_key))?;
+    let copies = if kind == ItemKind::Movie {
+        crate::copies::open_count(&db.read(cv_db::repo::copies::copy_groups)?)
+    } else {
+        0
+    };
     let mut counts = LifecycleCounts {
         working,
+        copies,
         ..LifecycleCounts::default()
     };
     let mut reasons: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
