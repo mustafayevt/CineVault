@@ -28,14 +28,14 @@ beforeEach(() => stubPlatform("windows"));
 afterEach(() => restorePlatform());
 
 describe("component gallery", () => {
-  it("names the Trash in the menu on Linux", async () => {
+  it("offers one Delete in the menu", async () => {
     stubPlatform("linux");
     const user = userEvent.setup();
     render(<GalleryPage />);
     await user.click(within(panel("Light theme")).getByRole("button", { name: "Actions" }));
     const menu = await screen.findByRole("menu", { name: "Title actions" });
-    expect(within(menu).getByRole("menuitem", { name: /Delete to Trash/ })).toBeInTheDocument();
-    expect(within(menu).queryByText(/Recycle Bin/)).toBeNull();
+    expect(within(menu).getByRole("menuitem", { name: /^Delete/ })).toBeInTheDocument();
+    expect(within(menu).queryByText(/permanently|Recycle Bin|Trash/)).toBeNull();
   });
 
   it("has a dark and a light column", () => {
@@ -148,9 +148,7 @@ describe("component gallery", () => {
     // The menu is drawn in the light column, so it is light whatever theme the window has.
     expect(light.contains(menu)).toBe(true);
     expect(panel("Dark theme").contains(menu)).toBe(false);
-    expect(
-      within(menu).getByRole("menuitem", { name: /Delete to Recycle Bin/ }),
-    ).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /^Delete/ })).toBeInTheDocument();
   });
 
   it("opens the dialog inside the frame of its column", async () => {
