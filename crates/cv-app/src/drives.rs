@@ -10,6 +10,10 @@
 //! drive with two folders. The numbers come from the operating system ([`SystemVolumes`]); a share
 //! or mapped drive the system list does not show is asked for its space directly.
 //!
+//! A folder on a network share CineVault connected ([`crate::network_shares`]) belongs to that
+//! share, named `\\server\share`, wherever the share is mounted: a macOS mount folder
+//! (`~/CineVault Shares/nas/movies`) or a Linux desktop's user mount (`/run/user/1000/gvfs/…`).
+//!
 //! # Low on space
 //!
 //! A drive is low when less than 5 percent of it or less than 50 GB is free (spec `drives`
@@ -37,6 +41,7 @@ use cv_db::repo::data_sources::list_sources;
 use cv_db::repo::drive_facts::{
     SourceQuality, SourceUsage, source_key, source_quality, source_usage, sources_last_seen,
 };
+use cv_db::repo::network_shares::{NetworkShare, list_shares, share_holding};
 use cv_db::{Database, DbError};
 use cv_domain::{DataSource, SourceKind};
 use sysinfo::{DiskKind, Disks};
@@ -497,9 +502,14 @@ impl DrivesService {
     pub fn overview(&self) -> Result<DrivesOverview, DbError> {
         self.volumes.refresh();
         let sources = self.db.read(|c| list_sources(c, None))?;
-        let (usage, quality, seen_at) = self
-            .db
-            .read(|c| Ok((source_usage(c)?, source_quality(c)?, sources_last_seen(c)?)))?;
+        let (usage, quality, seen_at, shares) = self.db.read(|c| {
+            Ok((
+                source_usage(c)?,
+                source_quality(c)?,
+                sources_last_seen(c)?,
+                list_shares(c)?,
+            ))
+        })?;
         let answering = self.states.states()?;
         let mut drives = group(
             &sources,
@@ -508,6 +518,7 @@ impl DrivesService {
                 quality: &quality,
                 last_seen: &seen_at,
                 answering: &answering,
+                shares: &shares,
             },
             self.volumes.as_ref(),
         );
@@ -537,11 +548,8 @@ impl DrivesService {
 
 impl DrivesService {
     fn key_of(&self, path: &str) -> String {
-        let volume = self
-            .volumes
-            .locate(path)
-            .map_or_else(|| volume_key(path), |v| v.key);
-        drive_key(&volume)
+        let shares = self.db.read(list_shares).unwrap_or_default();
+        drive_key(&locate(self.volumes.as_ref(), &shares, path).0)
     }
 
     fn custom_folder(&self) -> Option<PathBuf> {
@@ -638,9 +646,14 @@ impl DrivesService {
     fn drives_now(&self) -> Result<Vec<Drive>, DbError> {
         self.volumes.refresh();
         let sources = self.db.read(|c| list_sources(c, None))?;
-        let (usage, quality, seen_at) = self
-            .db
-            .read(|c| Ok((source_usage(c)?, source_quality(c)?, sources_last_seen(c)?)))?;
+        let (usage, quality, seen_at, shares) = self.db.read(|c| {
+            Ok((
+                source_usage(c)?,
+                source_quality(c)?,
+                sources_last_seen(c)?,
+                list_shares(c)?,
+            ))
+        })?;
         let answering = self.states.states()?;
         Ok(group(
             &sources,
@@ -649,6 +662,7 @@ impl DrivesService {
                 quality: &quality,
                 last_seen: &seen_at,
                 answering: &answering,
+                shares: &shares,
             },
             self.volumes.as_ref(),
         ))
@@ -786,6 +800,32 @@ struct Facts<'a> {
     quality: &'a HashMap<String, SourceQuality>,
     last_seen: &'a HashMap<i64, i64>,
     answering: &'a HashMap<i64, bool>,
+    /// The network shares CineVault connected.
+    shares: &'a [NetworkShare],
+}
+
+/// The drive key of the folder at `path` and its volume: the share `\\server\share` for a folder
+/// on a share CineVault connected (on the volume that holds it), else the volume's own key.
+fn locate(volumes: &dyn Volumes, shares: &[NetworkShare], path: &str) -> (String, Option<Volume>) {
+    let volume = volumes.locate(path);
+    match share_holding(shares, path, cv_fs::paths::CASE_SENSITIVE) {
+        Some(share) => {
+            let key = format!(r"\\{}\{}", share.server, share.share);
+            let volume = volume.map(|volume| Volume {
+                key: key.clone(),
+                label: String::new(),
+                kind: DriveKind::Network,
+                ..volume
+            });
+            (key, volume)
+        }
+        None => {
+            let key = volume
+                .as_ref()
+                .map_or_else(|| volume_key(path), |v| v.key.clone());
+            (key, volume)
+        }
+    }
 }
 
 /// Groups the library folders into drives, in the order their first folder is listed.
@@ -793,10 +833,7 @@ fn group(sources: &[DataSource], facts: &Facts<'_>, volumes: &dyn Volumes) -> Ve
     let mut drives: Vec<Drive> = Vec::new();
     let mut by_key: HashMap<String, usize> = HashMap::new();
     for source in sources {
-        let volume = volumes.locate(&source.path);
-        let key = volume
-            .as_ref()
-            .map_or_else(|| volume_key(&source.path), |v| v.key.clone());
+        let (key, volume) = locate(volumes, facts.shares, &source.path);
         let at = *by_key.entry(drive_key(&key)).or_insert_with(|| {
             drives.push(new_drive(&key, volume.as_ref()));
             drives.len() - 1
