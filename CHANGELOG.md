@@ -4,6 +4,10 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ## [1.3.1] - unreleased
 
+### Added
+
+- Copies: if you have the same movie twice (say a 4K and a 1080p download), the Copies filter shows them, Compare puts them side by side, and Keep this one deletes the other the usual way. Keep both, and Rename gives each its own name, like '- 2160p' and '- 1080p'.
+
 ### Changed
 
 - One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item and Shift+Delete are gone, and a permanent delete asks Yes or No instead of making you type DELETE.

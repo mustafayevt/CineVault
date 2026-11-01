@@ -15,7 +15,7 @@
 </div>
 
 <p align="center">
-  <img src=".github/assets/library.png" alt="The Library in the dark theme: a poster grid with stage marks, stage filters with counts, and the sidebar with Scrape, Rename, Drives and Torrents" width="100%">
+  <img src=".github/assets/library.png" alt="The Library in the dark theme: a poster grid with stage marks and a 2 copies badge on two movies, stage filters with counts, a Copies filter, and the sidebar with Scrape, Rename, Drives and Torrents" width="100%">
 </p>
 
 ## What it does
@@ -26,6 +26,7 @@
 - **Ratings side by side.** TMDB, plus IMDb, Rotten Tomatoes, Metacritic, Letterboxd and Trakt with your own free OMDb or MDBList key.
 - **Search as you type.** Type in the search box and matching titles appear at once, grouped, with your recent searches and See all results. Punctuation, spacing, accents and small typos do not matter; messy release names still match, with a confidence score for every candidate.
 - **Library your way.** A poster grid with a size you choose, or a table with a Stage column whose columns you can move and resize.
+- **Copies of a movie.** If the same movie is in the library twice (a 4K and a 1080p download, say), the Copies filter lists them, Compare puts them side by side with the better value of each row marked, and Keep this one deletes the other the way Delete always does. Keep both leaves them alone, and Rename gives each its own name, such as `- 2160p` and `- 1080p`.
 - **HDR details.** The Technical card shows the exact HDR format (Dolby Vision profile, HDR10+, HDR10, HLG), audio and file details read from the file.
 - **Drives with safe moves.** Free space per drive and Move to another drive: copy, verify, and only then do the originals go to the Recycle Bin (the Trash on Linux).
 - **Deleted files handled your way.** Delete sends a title to the Recycle Bin or Trash, a trash folder on each drive or a trash folder you choose, and old trash can be emptied automatically. Choosing "Delete permanently" there makes Delete erase a title, after a Yes or No that lists what goes.

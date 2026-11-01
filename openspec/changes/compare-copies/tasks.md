@@ -34,7 +34,7 @@
 - [x] 6.2 "Keep this one" through `requestDelete` with the other copies, opening the kept copy's Movie page only after a delete that went through. Verified by `bun run test` (Recycle Bin with Undo toast, Ask before deleting off, Delete permanently opens its confirmation, cancel deletes nothing, "Keep this one" on the card that is not marked) and `cargo test -p cv-app --lib library_ops` with a test where two copies share one folder and only the other copy's files go.
 - [x] 6.3 "Keep both" / "Keep all" with an Undo toast, and "Ask again" on a kept group. Verified by `bun run test` (count and badges drop, Undo and Ask again bring them back).
 - [x] 6.4 After Keep this one, the toast's "Rename to drop the '- <label>' label?" when the kept copy carries a label that no longer clashes, opening the Rename preview for that movie. Verified by `bun run test` (offered for "- copy 2" and "- 2160p", absent for a plain name, opens the preview with the plain name, renames nothing by itself).
-- [ ] 6.5 `CHANGELOG.md` line under the unreleased version and `bun run site:changelog`; README and landing page wording; screenshots in `.github/assets/` and `site/img/` (dark and light) showing the chip, the Compare copies page and a labelled Rename preview. Verified by `bun run site:changelog -- --check` and the refreshed images.
+- [x] 6.5 `CHANGELOG.md` line under the unreleased version and `bun run site:changelog`; README and landing page wording; screenshots in `.github/assets/` and `site/img/` (dark and light) showing the chip, the Compare copies page and a labelled Rename preview. Verified by `bun run site:changelog -- --check` and the refreshed images.
 
 ## 7. Integration
 
