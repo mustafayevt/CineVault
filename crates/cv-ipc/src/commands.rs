@@ -161,12 +161,12 @@ pub const COMMANDS: &[CommandInfo] = &[
     CommandInfo {
         name: "empty_drives_trash",
         module: "drives",
-        args: &["driveId", "confirm"],
+        args: &["driveId"],
     },
     CommandInfo {
         name: "erase_titles",
         module: "history",
-        args: &["ids", "confirm"],
+        args: &["ids"],
     },
     CommandInfo {
         name: "expect_tools",

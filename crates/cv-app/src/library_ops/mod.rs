@@ -16,11 +16,11 @@
 //!   Trash, freedesktop Trash on Linux, sent by one rename) through [`SystemBin`], which remembers where each one went, and hides the titles under
 //!   one History entry; History's Undo restores both. Where the bin cannot take a path (a network
 //!   share), the files go to `<data source>/.deletedByCineVault/<batch>/` instead. Files are never
-//!   deleted for good here, unless Settings › Deleted files is Delete permanently (chosen behind
-//!   the typed confirmation): the delete is then a permanent delete ([`PolicyBin`] serves the
+//!   deleted for good here, unless Settings › Deleted files is Delete permanently (chosen after a
+//!   Yes or No): the delete is then a permanent delete ([`PolicyBin`] serves the
 //!   other choices: the trash folder of each drive, a custom trash folder).
-//! * [`RemovalService::erase`] is the one permanent delete: only with the typed confirmation
-//!   `DELETE`, never a library folder root, recorded in History first (see `erase`).
+//! * [`RemovalService::erase`] is the one permanent delete: only after the caller's Yes or No,
+//!   never a library folder root, recorded in History first (see `erase`).
 //! * [`ReviewService`] lists the rows that are missing on disk, offline, duplicates of another row
 //!   or set aside by a rescan, and removes (with Undo), relocates or keeps the ones the user
 //!   chooses. Nothing is removed by it on its own.
@@ -56,7 +56,7 @@ pub use change_source::{
     ChangeSourceService, ChangedHook, MoveApplied, MoveOutcome, MovePlan, MoveResult, MoveRow,
     MoveStatus,
 };
-pub use erase::{ERASE_CONFIRMATION, EraseFs, EraseReport, ErasedTitle, StdErase};
+pub use erase::{EraseFs, EraseReport, ErasedTitle, StdErase};
 pub use move_engine::{
     BinLedger, DbBinLedger, JobOutcome, MOVE_BATCH_PREFIX, MoveControl, MoveEngine, MoveFs,
     MovePhase, MoveProgress, STOPPED_PREFIX, StdMoveFs, TakeBackStatus, TakenBack, is_move_batch,

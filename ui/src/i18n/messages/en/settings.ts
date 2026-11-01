@@ -96,7 +96,7 @@ export const settings = {
     "sub-folders, subfolders, category, keep, flatten, folder, structure, rename",
   "settings.files.deleted-mode.title": "Deleted and replaced files",
   "settings.files.deleted-mode.description":
-    "Where Delete, a move's originals, rename leftovers and replaced artwork or NFO files go. Shift+Delete always erases, after its confirmation.",
+    "Where Delete, a move's originals, rename leftovers and replaced artwork or NFO files go.",
   "settings.files.deleted-mode.keywords":
     "delete, deleted, recycle bin, trash, bin, erase, permanently, replaced, leftovers, originals",
   "settings.files.deleted-mode.option.bin": "{bin}",
@@ -685,7 +685,7 @@ export const settings = {
   "settingsPage.deleted.choose": "Choose folder…",
   "settingsPage.deleted.pickTitle": "Choose the custom trash folder",
   "settingsPage.deleted.confirmTitle": "Erase deleted files at once?",
-  "settingsPage.deleted.confirm": "Delete permanently",
+  "settingsPage.deleted.confirm": "Erase at once",
   "settingsPage.appearance.theme": "Theme",
   "settingsPage.appearance.light": "Light",
   "settingsPage.appearance.dark": "Dark",
@@ -698,7 +698,7 @@ export const settings = {
   "settingsPage.appearance.sizeOption": "{percent}%",
   "settings.server.permanent-delete.title": "Allow permanent delete from a browser",
   "settings.server.permanent-delete.description":
-    "Permanent delete asks for the typed DELETE and the current password, and the confirmation expires after a minute. Off unless you turn it on.",
+    "Permanent delete asks for the current password, and the confirmation expires after a minute. Off unless you turn it on.",
   "settings.server.permanent-delete.keywords": "delete erase permanent password",
   "settingsPage.server.title": "Server",
   "settingsPage.server.address": "Address",

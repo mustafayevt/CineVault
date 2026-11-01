@@ -25,13 +25,7 @@ import { setLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import { createSyntheticLibraryOpsBackend } from "../library-ops/syntheticLibraryOps";
 import { useSettingsStore } from "../settings/settingsStore";
 import { useToastStore } from "../toasts/toastStore";
-import {
-  deleteToBin,
-  erasePermanently,
-  requestDelete,
-  requestPermanentDelete,
-  useDeleteStore,
-} from "./deleteActions";
+import { deleteToBin, erasePermanently, requestDelete, useDeleteStore } from "./deleteActions";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { isTextField } from "./deleteKeys";
 import { withoutHidden } from "./hiddenTitles";
@@ -98,6 +92,10 @@ afterEach(() => {
   setLibraryOpsBackend(null);
   setHistoryBackend(null);
 });
+
+/** Settings › Deleted files set to Delete permanently, as Delete then erases. */
+const eraseMode = () =>
+  useSettingsStore.setState({ values: { "files.deleted-mode": "erase" }, status: "ready" });
 
 const tile = async (index: number) => {
   const cell = await waitFor(() => {
@@ -178,34 +176,32 @@ describe("Delete from the Library", () => {
     await waitFor(() => expect(filters.textContent).toMatch(/181 movies/));
   });
 
-  it("opens the confirmation with Shift+Delete and erases nothing until DELETE is typed", async () => {
+  it("asks Yes or No under Delete permanently and erases only on the red button", async () => {
     const user = userEvent.setup();
     const { deleteTitles, eraseTitles } = spiedHistory();
+    eraseMode();
     renderApp();
     await user.click(await tile(2));
-    await user.keyboard("{Shift>}{Delete}{/Shift}");
+    await user.keyboard("{Delete}");
 
     const dialog = await screen.findByRole("dialog", { name: /Delete 1 title permanently\?/ });
     expect(
-      await within(dialog).findByText(/This skips the Recycle Bin and cannot be undone/),
+      await within(dialog).findByText("Its folder and files are erased. This cannot be undone."),
     ).toBeInTheDocument();
     // What will be erased: the title, its folder and size.
     const list = within(dialog).getByRole("list", { name: "What will be erased" });
     expect(await within(list).findByText(/D:\\Movies\\Title/)).toBeInTheDocument();
     expect(within(list).getByText(/GB/)).toBeInTheDocument();
 
+    // Nothing to type, and no way out to the bin.
+    expect(within(dialog).queryByRole("textbox")).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: /instead/ })).toBeNull();
     const confirm = within(dialog).getByRole("button", { name: "Delete permanently" });
-    expect(confirm).toBeDisabled();
-    await user.type(within(dialog).getByRole("textbox"), "delet");
-    expect(confirm).toBeDisabled();
-    await user.clear(within(dialog).getByRole("textbox"));
-    await user.type(within(dialog).getByRole("textbox"), "DELETE");
-    expect(confirm).toBeEnabled();
+    await waitFor(() => expect(confirm).toBeEnabled());
     expect(eraseTitles).not.toHaveBeenCalled();
 
     await user.click(confirm);
     await waitFor(() => expect(eraseTitles).toHaveBeenCalledTimes(1));
-    expect(eraseTitles.mock.calls[0]?.[1]).toBe("DELETE");
     expect(deleteTitles).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() =>
@@ -215,17 +211,16 @@ describe("Delete from the Library", () => {
     expect(useToastStore.getState().toasts.at(-1)?.undo).toBeUndefined();
   });
 
-  it("sends the titles to the Recycle Bin instead from the dialog", async () => {
+  it("does the same with Shift+Delete as with Delete", async () => {
     const user = userEvent.setup();
     const { deleteTitles, eraseTitles } = spiedHistory();
     renderApp();
     await user.click(await tile(0));
     await user.keyboard("{Shift>}{Delete}{/Shift}");
-    const dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: "Send to Recycle Bin instead" }));
+    const dialog = await screen.findByRole("dialog", { name: /^Delete “.*”\?$/ });
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(deleteTitles).toHaveBeenCalledTimes(1));
     expect(eraseTitles).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("names the Trash on Linux, in the dialog and in the toast", async () => {
@@ -234,28 +229,31 @@ describe("Delete from the Library", () => {
     const { deleteTitles, eraseTitles } = spiedHistory();
     renderApp();
     await user.click(await tile(0));
-    await user.keyboard("{Shift>}{Delete}{/Shift}");
+    await user.keyboard("{Delete}");
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/This skips the Trash and cannot be undone/)).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: "Send to Trash instead" }));
+    expect(
+      within(dialog).getByText("The folder goes to the Trash. You can undo this from History."),
+    ).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(deleteTitles).toHaveBeenCalledTimes(1));
     expect(eraseTitles).not.toHaveBeenCalled();
     await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
     expect(useToastStore.getState().toasts[0]?.message).toMatch(/^Deleted .* to the Trash$/);
   });
 
-  it("closes the dialog with Cancel and Esc without touching anything", async () => {
+  it("closes the permanent-delete dialog with Cancel and Esc without touching anything", async () => {
     const user = userEvent.setup();
     const { deleteTitles, eraseTitles } = spiedHistory();
+    eraseMode();
     renderApp();
     await user.click(await tile(0));
-    await user.keyboard("{Shift>}{Delete}{/Shift}");
+    await user.keyboard("{Delete}");
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
     (await tile(0)).closest<HTMLElement>("[role='group']")?.focus();
-    await user.keyboard("{Shift>}{Delete}{/Shift}");
+    await user.keyboard("{Delete}");
     await screen.findByRole("dialog");
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -288,9 +286,10 @@ describe("Delete from the Library", () => {
           skipped: [{ id: "9", title: "The Room", reason: "Its drive is offline." }],
         }),
     });
+    eraseMode();
     renderApp();
     act(() =>
-      requestPermanentDelete([
+      requestDelete([
         { id: "5", title: "Cats (2019)" },
         { id: "9", title: "The Room (2003)" },
       ]),
@@ -299,7 +298,6 @@ describe("Delete from the Library", () => {
     expect(await within(dialog).findByText("Cats (2019)")).toBeInTheDocument();
     expect(within(dialog).getByText("The Room")).toBeInTheDocument();
     expect(within(dialog).getByText("Its drive is offline.")).toBeInTheDocument();
-    await user.type(within(dialog).getByRole("textbox"), "DELETE");
     await user.click(within(dialog).getByRole("button", { name: "Delete permanently" }));
     await waitFor(() => expect(eraseTitles).toHaveBeenCalledTimes(1));
     expect(eraseTitles.mock.calls[0]?.[0]).toEqual(["5"]);
@@ -369,7 +367,7 @@ describe("the Delete confirmation", () => {
     expect(deleteTitles).toHaveBeenCalledTimes(2);
   });
 
-  it("under Delete permanently always asks for the typed DELETE, even after Don't ask again", async () => {
+  it("under Delete permanently always asks Yes or No, even after Don't ask again", async () => {
     const user = userEvent.setup();
     const { deleteTitles, eraseTitles } = spiedHistory();
     useSettingsStore.setState({
@@ -380,20 +378,11 @@ describe("the Delete confirmation", () => {
     await user.click(await tile(2));
     await user.keyboard("{Delete}");
     const dialog = await screen.findByRole("dialog", { name: /Delete 1 title permanently\?/ });
-    expect(
-      await within(dialog).findByText(/This skips the Recycle Bin and cannot be undone/),
-    ).toBeInTheDocument();
     expect(within(dialog).queryByRole("checkbox")).toBeNull();
-    // There is no Recycle Bin to fall back to under this choice.
-    expect(
-      within(dialog).queryByRole("button", { name: "Send to Recycle Bin instead" }),
-    ).toBeNull();
     const confirm = within(dialog).getByRole("button", { name: "Delete permanently" });
-    expect(confirm).toBeDisabled();
-    await user.type(within(dialog).getByRole("textbox"), "DELETE");
+    await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
     await waitFor(() => expect(eraseTitles).toHaveBeenCalledTimes(1));
-    expect(eraseTitles.mock.calls[0]?.[1]).toBe("DELETE");
     expect(deleteTitles).not.toHaveBeenCalled();
   });
 });
@@ -418,10 +407,10 @@ describe("the actions behind the keys", () => {
     expect(useDeleteStore.getState().hidden.size).toBe(0);
   });
 
-  it("erasePermanently passes exactly what the dialog typed to the backend", async () => {
+  it("erasePermanently passes the ids to the backend", async () => {
     const { eraseTitles } = spiedHistory();
-    await erasePermanently([{ id: "4", title: "Heat" }], "DELETE");
-    expect(eraseTitles).toHaveBeenCalledWith(["4"], "DELETE");
+    await erasePermanently([{ id: "4", title: "Heat" }]);
+    expect(eraseTitles).toHaveBeenCalledWith(["4"]);
   });
 
   it("lists without the hidden titles and numbers the rest", () => {

@@ -26,7 +26,7 @@ const AUTO_EMPTY = ["off", "7", "30", "90"] as const;
  * Settings, Deleted files (spec `title-deletion` "Where deleted files go"): where Delete, a move's
  * originals, rename leftovers and replaced artwork or NFO files go: the bin (default),
  * the trash folder on each drive, a custom trash folder, or erased at once. Choosing Delete
- * permanently asks for the typed confirmation of Shift+Delete first. Below it, whether Delete asks
+ * permanently asks Yes or No first. Below it, whether Delete asks
  * first (`delete.confirm`; Delete permanently always asks) and the automatic
  * emptying of CineVault's own trash folders (off by default).
  */
@@ -45,7 +45,7 @@ export function DeletedFilesSection() {
 
   const choose = (next: DeletedMode) => {
     if (next === mode) return;
-    // Erasing at once is chosen only with the typed confirmation of a permanent delete.
+    // Erasing at once is chosen only after a Yes or No.
     if (next === "erase") {
       setConfirming(true);
       return;

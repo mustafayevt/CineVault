@@ -291,7 +291,7 @@ impl Commands {
 }
 
 /// One-time intents for permanent delete. A browser must mint one with the current password and
-/// spend it within a minute on the exact same titles; the desktop keeps the typed DELETE check.
+/// spend it within a minute on the exact same titles; the desktop asks Yes or No in its dialog.
 #[derive(Default)]
 pub(crate) struct DeleteGuard {
     intents: StdMutex<HashMap<String, DeleteIntent>>,

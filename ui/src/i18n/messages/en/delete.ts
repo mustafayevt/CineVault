@@ -34,8 +34,7 @@ export const deleteMessages = {
   "delete.dialog.title":
     "{count, plural, one {Delete # title permanently?} other {Delete # titles permanently?}}",
   "delete.dialog.body":
-    "{count, plural, one {Its folder and all} other {Their folders and all}} {files} erased from disk. This skips the {bin} and cannot be undone.",
-  "delete.dialog.files": "{count, plural, one {# file is} other {# files are}}",
+    "{count, plural, one {Its folder and files are} other {Their folders and files are}} erased. This cannot be undone.",
   "delete.dialog.reading": "Reading what these titles hold",
   "delete.dialog.planFailed":
     "CineVault could not read what these titles hold, so nothing can be erased.",
@@ -44,10 +43,7 @@ export const deleteMessages = {
   "delete.dialog.root": "Only its own files; the library folder stays",
   "delete.dialog.noFolder": "Nothing on disk",
   "delete.dialog.skipped": "Not deleted",
-  "delete.dialog.typeBefore": "Type",
-  "delete.dialog.typeAfter": "to confirm",
-  "delete.dialog.field": "Type DELETE to confirm",
-  "delete.dialog.toBin": "Send to {bin} instead",
+  "delete.dialog.password": "Current password",
   "delete.dialog.cancel": "Cancel",
   "delete.dialog.confirm": "Delete permanently",
 

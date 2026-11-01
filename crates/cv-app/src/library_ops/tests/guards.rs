@@ -27,7 +27,7 @@ fn a_folder_path_that_climbs_out_of_its_library_folder_is_never_erased() {
     let outside = Lab::put(lab.dir.path(), "elsewhere/precious.mkv", "keep");
     let stray = stray_movie(&lab, "../elsewhere", "precious.mkv");
 
-    let report = lab.removal(&trash).erase(&[stray], "DELETE").unwrap();
+    let report = lab.removal(&trash).erase(&[stray]).unwrap();
     assert!(report.erased.is_empty(), "{report:?}");
     assert_eq!(report.problems.len(), 1, "{report:?}");
     assert!(
@@ -49,7 +49,7 @@ fn a_folder_path_that_names_the_library_folder_itself_is_never_erased() {
     let video = Path::new(&lab.movies.path).join("Heat (1995)/Heat (1995).mkv");
     let stray = stray_movie(&lab, ".", "Heat (1995).mkv");
 
-    let report = lab.removal(&trash).erase(&[stray], "DELETE").unwrap();
+    let report = lab.removal(&trash).erase(&[stray]).unwrap();
     assert!(report.erased.is_empty(), "{report:?}");
     assert!(video.is_file(), "the library folder and its titles stay");
     assert!(lab.exists(heat));
@@ -72,7 +72,7 @@ fn a_permanent_delete_waits_for_a_write_into_the_title_and_erases_what_it_wrote(
         drop(writing);
     });
     std::thread::sleep(Duration::from_millis(50));
-    let report = lab.removal(&trash).erase(&[heat], "DELETE").unwrap();
+    let report = lab.removal(&trash).erase(&[heat]).unwrap();
     writer.join().unwrap();
 
     assert_eq!(report.erased.len(), 1, "{report:?}");
@@ -92,7 +92,7 @@ fn a_title_whose_scrape_steps_still_write_is_not_deleted() {
     let folder = Path::new(&lab.movies.path).join("Heat (1995)");
     let pinned = title_guard::pin(&lab.db, [heat]);
 
-    let report = lab.removal(&trash).erase(&[heat], "DELETE").unwrap();
+    let report = lab.removal(&trash).erase(&[heat]).unwrap();
     assert!(
         report.erased.is_empty() && report.history_id.is_none(),
         "{report:?}"

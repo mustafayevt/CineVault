@@ -1,14 +1,9 @@
 import { Trash2 } from "lucide-react";
-import { useId, useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
-import { Field } from "../../components/Field";
 import { t } from "../../i18n/catalog";
-
-/** The word that has to be typed. The backend checks it again. */
-export const ERASE_WORD = "DELETE";
 
 interface EraseConfirmDialogProps {
   title: string;
@@ -20,15 +15,15 @@ interface EraseConfirmDialogProps {
   confirmLabel: string;
   /** Off while there is nothing to erase or the list is still read. */
   canConfirm?: boolean;
-  onConfirm: (typed: string) => void;
+  onConfirm: () => void;
   onClose: () => void;
 }
 
 /**
- * The typed confirmation of the permanent delete, for the other places that erase files for good
- * (spec `drives` "Empty a drive's trash", `title-deletion` "Delete permanently as the choice"):
- * the title with a red bin, a line that says it cannot be undone, the list, a field for DELETE,
- * and Cancel and the red button, which stays off until the field holds exactly DELETE.
+ * The Yes or No before files are erased for good (spec `title-deletion` "A permanent delete asks
+ * Yes or No", "Delete permanently as the choice", `drives` "Empty trash folders with a Yes or No"):
+ * the title with a red bin, a line that says it cannot be undone, the list, and Cancel and the red
+ * button.
  */
 export function EraseConfirmDialog({
   title,
@@ -39,12 +34,6 @@ export function EraseConfirmDialog({
   onConfirm,
   onClose,
 }: EraseConfirmDialogProps) {
-  const [typed, setTyped] = useState("");
-  const field = useId();
-  const ready = typed === ERASE_WORD && canConfirm;
-  const confirm = () => {
-    if (ready) onConfirm(typed);
-  };
   return (
     <Dialog
       open
@@ -73,8 +62,8 @@ export function EraseConfirmDialog({
           <Button
             size="lg"
             variant="danger"
-            disabled={!ready}
-            onClick={confirm}
+            disabled={!canConfirm}
+            onClick={onConfirm}
             data-testid="confirm-erase"
           >
             {confirmLabel}
@@ -83,25 +72,6 @@ export function EraseConfirmDialog({
       }
     >
       {children}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={field} className="text-text-2">
-          {t("delete.dialog.typeBefore")}{" "}
-          <b className="font-mono font-(weight:--fw-700) text-text">{ERASE_WORD}</b>{" "}
-          {t("delete.dialog.typeAfter")}
-        </label>
-        <Field
-          id={field}
-          mono
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") confirm();
-          }}
-          autoComplete="off"
-          spellCheck={false}
-          aria-label={t("delete.dialog.field")}
-        />
-      </div>
     </Dialog>
   );
 }

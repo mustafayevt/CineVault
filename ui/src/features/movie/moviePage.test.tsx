@@ -222,6 +222,7 @@ describe("the Movie page artwork buttons", () => {
     expect(items.at(-1)).toHaveTextContent("Delete…");
     expect(items.at(-1)?.className).toContain("text-danger");
     expect(screen.queryByRole("menuitem", { name: "Artwork…" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: /permanently/ })).toBeNull();
     expect(items.slice(0, 4).map((item) => item.textContent)).toEqual([
       "Edit details",
       "Show NFO",

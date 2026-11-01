@@ -609,17 +609,15 @@ impl From<EraseReport> for EraseTitlesDto {
     }
 }
 
-/// Delete permanently: erases the titles' files for good. `confirm` is what the person typed in
-/// the confirmation dialog; anything but exactly `DELETE` erases nothing.
+/// Delete permanently: erases the titles' files for good. The caller has asked the person.
 pub async fn erase_titles(
     library: &LibraryState,
     history: &HistoryState,
     ids: Vec<String>,
-    confirm: String,
 ) -> Result<EraseTitlesDto, HistoryCommandError> {
     let service = history.removal(library)?;
     let ids = ids_of(&ids)?;
-    let report = blocking(move || Ok(service.erase(&ids, &confirm)?)).await?;
+    let report = blocking(move || Ok(service.erase(&ids)?)).await?;
     let touched: Vec<ItemId> = report
         .erased
         .iter()

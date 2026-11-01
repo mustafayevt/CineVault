@@ -108,7 +108,7 @@ Keep this list accurate: when you add or rename a script, update this file in th
 - Colours, radii, spacing, shadows, durations and easing come from the design tokens as CSS variables. No hard-coded hex, except rating-source brand colours.
 - Icons from `lucide-react` at 1.75 stroke.
 - Every control is keyboard reachable with a visible focus ring; icon-only buttons have an `aria-label`.
-- Pickers are pages (Scrape match, Artwork, Rename preview, Edit). The only dialogs are the delete and permanent-delete confirmations; what floats is menus, tooltips, popovers, toasts and the selection bar. There are no single-key shortcuts: Ctrl/Alt chords, Delete, Shift+Delete, Esc, F2, Enter and the arrow keys only. Esc closes the innermost menu, dialog or picker page, then clears the selection. Reversible actions confirm with an Undo toast.
+- Pickers are pages (Scrape match, Artwork, Rename preview, Edit). The only dialogs are the delete and permanent-delete confirmations; what floats is menus, tooltips, popovers, toasts and the selection bar. There are no single-key shortcuts: Ctrl/Alt chords, Delete, Esc, F2, Enter and the arrow keys only. Esc closes the innermost menu, dialog or picker page, then clears the selection. Reversible actions confirm with an Undo toast.
 - One verb per job everywhere (UI, CLI, docs): Scan, Scrape, Rename. A title's stage is New → Scraped → Renamed. Scrape is the only verb for fetching metadata and choosing a match. `ui/src/i18n/verbs.test.ts` fails when a message uses a retired verb.
 - Optional features are off by default and switched on in Settings › Features. While off, their UI and background work are hidden and stopped.
 - Every change that alters the UI also refreshes the screenshots in the same piece of work: the README images in `.github/assets/` and the landing-page images in `site/img/` (dark and light pairs, via `bun run shots`), and updates the landing page wording, the changelog (`CHANGELOG.md` plus the regenerated `site/changelog.html`) and the README where the change is visible.
@@ -125,7 +125,7 @@ Keep this list accurate: when you add or rename a script, update this file in th
 - Write settings and media-folder files atomically (`cv-fs`).
 - Renames go through the planner → preview → journal, so every rename can be undone.
 - Delete follows Settings › Deleted files: the Recycle Bin (the default), a trash folder on each drive (`.deletedByCineVault`), a custom trash folder, or permanent deletion. Rename leftovers and replaced artwork or NFO files go to a trash folder, never straight to permanent deletion. Automatic emptying only ever touches CineVault's own trash folders, never the system bin.
-- Delete asks for confirmation before anything moves. Shift+Delete is always a permanent delete and needs the typed confirmation, whatever the setting.
+- There is one Delete (menu, selection bar, title page, Delete and Shift+Delete keys), and it follows Settings › Deleted files. Delete asks for confirmation before anything moves; a permanent delete, which happens only when "Delete permanently" is chosen there, asks Yes or No with the list of what it erases, and in a browser also needs the current password.
 - Moves to another drive copy, verify, and only then send the originals away.
 
 **Naming**

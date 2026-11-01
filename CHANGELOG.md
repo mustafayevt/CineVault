@@ -28,6 +28,9 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - A request that comes through a reverse proxy or tunnel is treated as outside your home network unless the proxy is listed in `CINEVAULT_WEB_TRUST_PROXY`, so a stranger cannot reach the welcome page or a password reset through it, and "Only devices on my home network" refuses it.
 - A flood of wrong passwords from the internet no longer stops you from signing in from your home network, and checking passwords no longer slows the server for everyone else.
 - No other website can show CineVault inside a frame.
+### Changed
+
+- One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item and Shift+Delete are gone, and a permanent delete asks Yes or No instead of making you type DELETE.
 
 ## [1.3.0] - 2026-10-31
 

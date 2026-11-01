@@ -34,7 +34,7 @@ export function TitleActionBar({ actions, label }: { actions: TitleActions; labe
       >
         {actions.menu.map((entry) => (
           <Fragment key={entry.id}>
-            {entry.id === "remove" || entry.id === "delete-permanently" ? <MenuSeparator /> : null}
+            {entry.id === "remove" || entry.id === "delete" ? <MenuSeparator /> : null}
             <MenuItem
               icon={entry.icon}
               danger={entry.danger}
