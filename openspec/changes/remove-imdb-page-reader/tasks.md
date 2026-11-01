@@ -5,7 +5,7 @@
 
 ## 2. Wording
 
-- [ ] 2.1 The OMDb hint in Settings › Providers and the onboarding Ratings keys step; any IMDb provider in the UI's synthetic data. Verified by `bun run test` and `bun run typecheck`.
+- [x] 2.1 The OMDb hint in Settings › Providers and the onboarding Ratings keys step; any IMDb provider in the UI's synthetic data. Verified by `bun run test` and `bun run typecheck`.
 
 ## 3. Integration
 
