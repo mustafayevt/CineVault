@@ -274,6 +274,42 @@ fn opening_reports_the_upgrade_and_a_restart_does_not_repeat_it() {
 }
 
 #[test]
+fn migration_105_marks_existing_shares_as_found_not_made() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("library.db");
+    let before_105: Vec<Migration> = MIGRATIONS
+        .iter()
+        .copied()
+        .filter(|m| m.version < 105)
+        .collect();
+    upgrade_file(&path, &before_105).unwrap();
+    Connection::open(&path)
+        .unwrap()
+        .execute(
+            "INSERT INTO network_share (server, share, user, local_root) \
+             VALUES ('nas', 'movies', 'alex', '/m')",
+            [],
+        )
+        .unwrap();
+    assert!(!has_column(&path, "network_share", "connected_by_us"));
+
+    let report = upgrade_file(&path, MIGRATIONS).unwrap();
+
+    assert_eq!(report.from, 104);
+    assert!(has_column(&path, "network_share", "connected_by_us"));
+    let by_us: i64 = Connection::open(&path)
+        .unwrap()
+        .query_row("SELECT connected_by_us FROM network_share", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(
+        by_us, 0,
+        "a connection CineVault did not record making is never its own"
+    );
+}
+
+#[test]
 fn migration_104_adds_the_network_share_table_after_a_backup() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("library.db");

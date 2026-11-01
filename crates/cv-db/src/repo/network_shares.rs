@@ -14,7 +14,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 use crate::error::{DbError, DbResult};
 
 const SELECT: &str = "SELECT id, server, share, user, local_root, remember, created_ms, \
-                      last_connected_ms, last_error, unused_since_ms FROM network_share";
+                      last_connected_ms, last_error, unused_since_ms, connected_by_us \
+                      FROM network_share";
 
 /// One connected network share.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +38,9 @@ pub struct NetworkShare {
     pub last_error: Option<String>,
     /// When the last library folder on the share was removed; `None` while one uses it.
     pub unused_since_ms: Option<i64>,
+    /// Whether CineVault made the system's connection (rather than finding the user's own). Only
+    /// such a connection is ever disconnected. Written by [`set_connected_by_us`] only.
+    pub connected_by_us: bool,
 }
 
 /// The facts of a share that is about to be added.
@@ -61,6 +65,7 @@ fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<NetworkShare> {
         last_connected_ms: row.get(7)?,
         last_error: row.get(8)?,
         unused_since_ms: row.get(9)?,
+        connected_by_us: row.get(10)?,
     })
 }
 
@@ -121,6 +126,22 @@ pub fn update_share(conn: &Connection, share: &NetworkShare) -> DbResult<()> {
     )?;
     if changed == 0 {
         return Err(DbError::NetworkShareNotFound(share.id));
+    }
+    Ok(())
+}
+
+/// Records whether CineVault made the system's connection to share `id`. Kept apart from
+/// [`update_share`], so a copy of a row read earlier never overwrites it.
+///
+/// # Errors
+/// [`DbError::NetworkShareNotFound`] when the row does not exist.
+pub fn set_connected_by_us(conn: &Connection, id: i64, by_us: bool) -> DbResult<()> {
+    let changed = conn.execute(
+        "UPDATE network_share SET connected_by_us = ?2 WHERE id = ?1",
+        params![id, by_us],
+    )?;
+    if changed == 0 {
+        return Err(DbError::NetworkShareNotFound(id));
     }
     Ok(())
 }
@@ -209,6 +230,30 @@ mod tests {
         assert!(delete_share(&conn, share.id).unwrap());
         assert!(!delete_share(&conn, share.id).unwrap());
         assert!(list_shares(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn who_made_the_connection_is_kept_apart_from_the_other_facts() {
+        let conn = library();
+        let share = movies(&conn);
+        assert!(
+            !share.connected_by_us,
+            "found, not made, until told otherwise"
+        );
+
+        set_connected_by_us(&conn, share.id, true).unwrap();
+        assert!(get_share(&conn, share.id).unwrap().unwrap().connected_by_us);
+        // A copy read before the change does not undo it.
+        update_share(&conn, &share).unwrap();
+        assert!(get_share(&conn, share.id).unwrap().unwrap().connected_by_us);
+
+        set_connected_by_us(&conn, share.id, false).unwrap();
+        assert!(!get_share(&conn, share.id).unwrap().unwrap().connected_by_us);
+        delete_share(&conn, share.id).unwrap();
+        assert!(matches!(
+            set_connected_by_us(&conn, share.id, true),
+            Err(DbError::NetworkShareNotFound(_))
+        ));
     }
 
     #[test]
@@ -333,6 +378,7 @@ mod tests {
             last_connected_ms: None,
             last_error: None,
             unused_since_ms: None,
+            connected_by_us: false,
         };
         let inner = NetworkShare {
             id: 2,

@@ -32,13 +32,13 @@ A new crate `crates/cv-shares` holds a `ShareConnector` trait (`connect`, `is_co
 
 Error mapping: 1326, 86 and 2202 → wrong user or password; 53 and 1231 → server not reachable; 67 → share not found; 1219 → already connected to this server as another user ("Windows is already connected to nas as another user. Disconnect it in File Explorer, or use the same user."); 1909 → account locked; anything else → the system message with its code.
 
-Before connecting, `is_connected` lists the user's SMB mappings (`Get-SmbMapping -RemotePath`) and reads the folder with the 3-second probe; an already working path is not connected again. Disconnect is `Remove-SmbMapping -RemotePath … -Force:$false`; open files make it fail, which is accepted (D9). A non-persistent mapping lasts until the user signs out, which is what "Shares stay connected" needs; nothing is written to the registry and Windows stores no credential.
+Before connecting, `is_connected` lists the user's SMB mappings of the share without a drive letter (`Get-SmbMapping -RemotePath … | Where-Object { -not $_.LocalPath }`); an already connected share is not connected again. A drive letter the user mapped to the same share never counts. Disconnect removes only such a mapping (`Remove-SmbMapping -Force:$false` on the mapping without a drive letter), never a drive letter; open files make it fail, which is accepted (D9). A non-persistent mapping lasts until the user signs out, which is what "Shares stay connected" needs; nothing is written to the registry and Windows stores no credential.
 
 Trade-off: a PowerShell start per connect and per reconnect at start (run in parallel per server, off the UI thread), and the SmbShare module must exist (Windows 8 and later; CineVault supports Windows 10 and 11). A machine whose policy blocks PowerShell gets the system message.
 
 ### D3. Library paths and the share table
 
-A new table `network_share (id, server, share, user, local_root UNIQUE, remember, created_ms, last_connected_ms, last_error, unused_since_ms)` with a migration (the existing backup-before-migration applies). `data_source` is unchanged: a library folder belongs to a share when its path equals or lies below the share's `local_root`, compared with the path rules of the OS (case-insensitive on Windows). This keeps "Add folder…" on an already connected `\\nas\movies\TV` working without the Network share page, and needs no join to show a row.
+A new table `network_share (id, server, share, user, local_root UNIQUE, remember, created_ms, last_connected_ms, last_error, unused_since_ms, connected_by_us)` with a migration (the existing backup-before-migration applies). `data_source` is unchanged: a library folder belongs to a share when its path equals or lies below the share's `local_root`, compared with the path rules of the OS (case-insensitive on Windows). This keeps "Add folder…" on an already connected `\\nas\movies\TV` working without the Network share page, and needs no join to show a row.
 
 `local_root` per OS: Windows `\\nas\movies`; macOS `~/CineVault Shares/nas/movies` (D4); Linux the user-mount path reported by `gio info` (D5), such as `/run/user/1000/gvfs/smb-share:server=nas,share=movies`. The user name (with an optional `DOMAIN\` part) is stored, because it is shown and is not a secret.
 
@@ -75,7 +75,13 @@ Health: a folder below a share whose last connect failed reads offline with the 
 
 ### D9. Forgetting a share
 
-Removing a folder sets `unused_since_ms` on its share when no other folder remains below it; Undo (re-adding the folder) clears it. A sweep runs one minute after the removal (longer than any Undo toast) and at every start: for each unused share, it waits until no job (scan, rename, move, artwork or NFO write) has a path below the share, then disconnects, deletes the credential and the row. When disconnecting fails because files are open (a player), the row and the credential are still deleted and the OS connection ends at sign-out.
+Removing a folder sets `unused_since_ms` on its share when no other folder remains below it; Undo (re-adding the folder) clears it. A sweep runs one minute after the removal (longer than any Undo toast) and at every start: for each unused share, it waits until no job (scan, rename, move, artwork or NFO write) has a path below the share, then disconnects (only a connection CineVault made, D13), deletes the credential and the row. When disconnecting fails because files are open (a player), the row and the credential are still deleted and the OS connection ends at sign-out.
+
+### D13. Never the user's own connection
+
+CineVault never disconnects or unmounts a connection the user made (their drive letters, their file-manager mounts). The row's `connected_by_us` says whether CineVault made the system's connection: it is set only when the connector's tool actually connected or mounted the share (in this run or an earlier one), and cleared when a connect finds the share not connected or fails, or when the system cannot say whether it is connected (so a connection that appears later is never taken for CineVault's). Only a share with `connected_by_us` is ever disconnected: when it is forgotten, or when its folder could not be added right after the connect. A failed check whether a share is connected is a failure, never "not connected".
+
+A share that is already connected when the page connects it is used as it is: the system did not check the login then (connecting again would only fail with 1219 on Windows). So a new share keeps no password (`remember` off, nothing in memory) and asks for one if that connection ends; a known share keeps the login it had; neither claims the connection. On Windows only a connection without a drive letter counts (D2): with just the user's drive letter in place, CineVault makes its own connection without one, and only that one is ever cancelled; the drive letter stays.
 
 ### D10. Browser mode: connected on the host by the installer
 

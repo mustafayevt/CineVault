@@ -16,6 +16,16 @@
 //! [`Password`] never shows in `Debug` or `Display`. Errors carry the kind of failure and the
 //! system's message (scrubbed of the password by the connector), never the password.
 //!
+//! # The user's own connections
+//!
+//! CineVault never disconnects a connection the user made (a drive letter, a file-manager mount).
+//! The row records whether CineVault made the system's connection (`connected_by_us`): set only
+//! when the system's tool actually connected, in this run or an earlier one, and cleared when a
+//! connect finds the share not connected. Only such a connection is ever disconnected. A share
+//! that is already connected when the page connects it is used as it is: the system was not asked
+//! to check the login then, so a new share keeps no password (it asks for one if that connection
+//! ends), and a known share keeps the login it had.
+//!
 //! # At start
 //!
 //! [`NetworkShareService::reconnect_at_start`] connects every share that is not connected yet,
@@ -50,7 +60,7 @@
 //! `rmdir`, so one that still holds anything stays.
 //!
 //! Connecting writes, moves and deletes nothing on the share. A share this service connected for
-//! a folder that could not be added is disconnected again.
+//! a folder that could not be added is disconnected again; one it found connected is left so.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -62,8 +72,8 @@ use cv_db::{Database, DbError};
 use cv_domain::{DataSource, SourceKind};
 use cv_fs::paths;
 use cv_shares::{
-    Address, Cancel, Login, Password, ShareAddress, ShareConnector, ShareError, ShareErrorKind,
-    folder_in_share,
+    Address, Cancel, Connected, Login, Password, ShareAddress, ShareConnector, ShareError,
+    ShareErrorKind, folder_in_share,
 };
 
 use crate::data_sources::{DataSourceError, DataSourceService};
@@ -315,7 +325,8 @@ impl NetworkShareService {
     /// [`ShareConnectError::Share`] when the share cannot be connected or the folder is not on
     /// it, [`ShareConnectError::Folder`] when the folder rules refuse it,
     /// [`ShareConnectError::Credential`] when the password cannot be remembered. Nothing is added
-    /// then, and a share connected only for this attempt is disconnected again.
+    /// then, and a share this attempt connected is disconnected again (one that was connected
+    /// already stays connected).
     pub fn connect_and_add(
         &self,
         request: &ConnectRequest,
@@ -325,19 +336,30 @@ impl NetworkShareService {
         // Masked in every log line from here on, whatever happens next.
         redact::register_secret(password.expose());
         let share = &request.address.share;
-        let was_connected = self.connector.is_connected(share, cancel).unwrap_or(false);
-        let root = self.connector.connect(share, &request.login, cancel)?;
-        let local_root = root.to_string_lossy().into_owned();
-        let known = self.row_at(&local_root)?;
-        let added = self.add_on(&root, known.clone(), request);
+        let connected = self.connector.connect(share, &request.login, cancel)?;
+        let local_root = connected.root.to_string_lossy().into_owned();
+        let known = match self.row_at(&local_root) {
+            Ok(known) => known,
+            Err(error) => {
+                if connected.made {
+                    self.disconnect_quietly(share);
+                }
+                return Err(error.into());
+            }
+        };
+        let added = self.add_on(&connected, known.clone(), request);
         if let Err(error) = &added {
             tracing::info!(
                 share = %share,
                 code = error.code(),
                 "a network share folder was not added"
             );
-            if !was_connected && known.is_none() {
-                self.disconnect_quietly(share);
+            match &known {
+                // Only a connection this attempt made, and only for a share with no row.
+                None if connected.made => self.disconnect_quietly(share),
+                // The known share keeps the connection made for it.
+                Some(row) if connected.made => self.note_connection(row.id, true),
+                _ => {}
             }
         }
         added
@@ -345,18 +367,18 @@ impl NetworkShareService {
 
     fn add_on(
         &self,
-        root: &Path,
+        connected: &Connected,
         known: Option<NetworkShare>,
         request: &ConnectRequest,
     ) -> Result<ShareAdded, ShareConnectError> {
-        let folder = folder_in_share(root, &request.address.folder)?;
+        let folder = folder_in_share(&connected.root, &request.address.folder)?;
         let kind = request.kind.unwrap_or_else(|| detect_kind(&folder));
         let path = self.sources.check_new(kind, &folder.to_string_lossy())?;
         let is_new = known.is_none();
         let share = self.keep_login(
             known,
             &request.address.share,
-            root,
+            connected,
             &request.login,
             request.remember,
         )?;
@@ -376,24 +398,55 @@ impl NetworkShareService {
 
     /// Writes the row of a share that just connected (a new one, or the known one with the new
     /// login) and keeps its password as asked.
+    ///
+    /// The login is kept only when this connect made the connection, as only then did the system
+    /// check it. A share that was connected already (by the user, or earlier) is used as it is: a
+    /// new row keeps no password (`remember` off, so it asks for one once that connection ends),
+    /// and a known row keeps its login.
     fn keep_login(
         &self,
         known: Option<NetworkShare>,
         address: &ShareAddress,
-        root: &Path,
+        connected: &Connected,
         login: &Login,
         remember: bool,
     ) -> Result<NetworkShare, ShareConnectError> {
-        let user = login.user();
-        let share = match known {
+        let checked = connected.made;
+        let made = connected.made;
+        match known {
             Some(share) => {
-                self.keep_password(share.id, remember, login.password())
-                    .map_err(ShareConnectError::Credential)?;
-                share
+                let share = if checked {
+                    self.keep_password(share.id, remember, login.password())
+                        .map_err(ShareConnectError::Credential)?;
+                    NetworkShare {
+                        user: login.user().to_owned(),
+                        remember,
+                        ..share
+                    }
+                } else {
+                    share
+                };
+                let share = NetworkShare {
+                    last_connected_ms: Some(now_ms()),
+                    last_error: None,
+                    connected_by_us: share.connected_by_us || made,
+                    ..share
+                };
+                let row = share.clone();
+                self.db.write(move |tx| {
+                    rows::update_share(tx, &row)?;
+                    if made {
+                        rows::set_connected_by_us(tx, row.id, true)?;
+                    }
+                    Ok(())
+                })?;
+                Ok(share)
             }
             None => {
+                let remember = remember && checked;
                 let (server, name) = (address.server().to_owned(), address.share().to_owned());
-                let (user, local_root) = (user.to_owned(), root.to_string_lossy().into_owned());
+                let user = login.user().to_owned();
+                let local_root = connected.root.to_string_lossy().into_owned();
                 let share = self.db.write(move |tx| {
                     rows::insert_share(
                         tx,
@@ -406,24 +459,26 @@ impl NetworkShareService {
                         },
                     )
                 })?;
-                if let Err(error) = self.keep_password(share.id, remember, login.password()) {
+                if checked
+                    && let Err(error) = self.keep_password(share.id, remember, login.password())
+                {
                     let id = share.id;
                     self.db.write(move |tx| rows::delete_share(tx, id))?;
                     return Err(ShareConnectError::Credential(error));
                 }
-                share
+                let share = NetworkShare {
+                    last_connected_ms: Some(now_ms()),
+                    connected_by_us: made,
+                    ..share
+                };
+                let row = share.clone();
+                self.db.write(move |tx| {
+                    rows::update_share(tx, &row)?;
+                    rows::set_connected_by_us(tx, row.id, made)
+                })?;
+                Ok(share)
             }
-        };
-        let share = NetworkShare {
-            user: user.to_owned(),
-            remember,
-            last_connected_ms: Some(now_ms()),
-            last_error: None,
-            ..share
-        };
-        let row = share.clone();
-        self.db.write(move |tx| rows::update_share(tx, &row))?;
-        Ok(share)
+        }
     }
 
     /// Connects a known share again with a new login ("Connect…" on an offline folder), keeps the
@@ -447,8 +502,8 @@ impl NetworkShareService {
             .read(move |c| rows::get_share(c, id))?
             .ok_or(ShareConnectError::UnknownShare)?;
         let address = address_of(&share)?;
-        let root = match self.connector.connect(&address, login, cancel) {
-            Ok(root) => root,
+        let connected = match self.connector.connect(&address, login, cancel) {
+            Ok(connected) => connected,
             Err(error) => {
                 if error.kind() != ShareErrorKind::Cancelled {
                     self.record_failure(&share, error.kind().code());
@@ -456,7 +511,7 @@ impl NetworkShareService {
                 return Err(error.into());
             }
         };
-        let share = self.keep_login(Some(share), &address, &root, login, remember)?;
+        let share = self.keep_login(Some(share), &address, &connected, login, remember)?;
         tracing::info!(share = %address, user = %share.user, "network share connected again");
         self.hand_over(&share);
         Ok(share)
@@ -511,13 +566,21 @@ impl NetworkShareService {
             .map_err(|error| error.kind().code())
             .and_then(|address| self.connect_known(share, &address, cancel));
         match outcome {
-            Ok(()) => {
+            Ok(made) => {
                 let row = NetworkShare {
                     last_connected_ms: Some(now_ms()),
                     last_error: None,
                     ..share.clone()
                 };
-                if let Err(error) = self.db.write(move |tx| rows::update_share(tx, &row)) {
+                let written = self.db.write(move |tx| {
+                    rows::update_share(tx, &row)?;
+                    // A connection found in place keeps what the row knew about it.
+                    if made {
+                        rows::set_connected_by_us(tx, row.id, true)?;
+                    }
+                    Ok(())
+                });
+                if let Err(error) = written {
                     tracing::warn!(%error, "a network share row could not be updated");
                 }
             }
@@ -535,24 +598,26 @@ impl NetworkShareService {
         self.hand_over(share);
     }
 
+    /// Connects a known share unless it is connected; returns whether this made the connection.
+    /// When the system cannot say whether it is connected, that is the failure.
     fn connect_known(
         &self,
         share: &NetworkShare,
         address: &ShareAddress,
         cancel: &Cancel,
-    ) -> Result<(), &'static str> {
+    ) -> Result<bool, &'static str> {
         if self
             .connector
             .is_connected(address, cancel)
-            .unwrap_or(false)
+            .map_err(|error| error.kind().code())?
         {
-            return Ok(());
+            return Ok(false);
         }
         let password = self.password_of(share).ok_or(PASSWORD_NEEDED)?;
         let login = Login::new(&share.user, password).map_err(|_| ShareErrorKind::Other.code())?;
         self.connector
             .connect(address, &login, cancel)
-            .map(drop)
+            .map(|connected| connected.made)
             .map_err(|error| error.kind().code())
     }
 
@@ -571,12 +636,28 @@ impl NetworkShareService {
         }
     }
 
+    /// Stores why a share did not connect. Its connection is gone (or cannot be told), so any
+    /// connection seen later is not taken for CineVault's own.
     fn record_failure(&self, share: &NetworkShare, code: &str) {
         let row = NetworkShare {
             last_error: Some(code.to_owned()),
             ..share.clone()
         };
-        if let Err(error) = self.db.write(move |tx| rows::update_share(tx, &row)) {
+        let written = self.db.write(move |tx| {
+            rows::update_share(tx, &row)?;
+            rows::set_connected_by_us(tx, row.id, false)
+        });
+        if let Err(error) = written {
+            tracing::warn!(%error, "a network share row could not be updated");
+        }
+    }
+
+    /// Records whether CineVault made the connection of share `id`.
+    fn note_connection(&self, id: i64, by_us: bool) {
+        if let Err(error) = self
+            .db
+            .write(move |tx| rows::set_connected_by_us(tx, id, by_us))
+        {
             tracing::warn!(%error, "a network share row could not be updated");
         }
     }
@@ -706,7 +787,8 @@ impl NetworkShareService {
         due.iter().filter(|share| self.forget(share)).count()
     }
 
-    /// Disconnects a share, deletes its password and its row. Returns whether it was forgotten.
+    /// Disconnects a share if CineVault made its connection, deletes its password and its row.
+    /// Returns whether it was forgotten.
     fn forget(&self, share: &NetworkShare) -> bool {
         // A folder added on it since it was marked keeps it.
         if self
@@ -715,7 +797,10 @@ impl NetworkShareService {
         {
             return false;
         }
-        if let Ok(address) = address_of(share) {
+        // Never a connection the user made.
+        if share.connected_by_us
+            && let Ok(address) = address_of(share)
+        {
             self.disconnect_quietly(&address);
         }
         if let Err(error) = self.secrets.delete(&secret_account(share.id)) {

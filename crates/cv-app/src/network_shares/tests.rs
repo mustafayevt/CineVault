@@ -153,9 +153,13 @@ fn a_share_folder_is_added_and_its_password_remembered() {
         Some(PASSWORD.to_owned())
     );
     assert!(rig.service.unsaved_password(added.share.id).is_none());
+    assert!(
+        added.share.connected_by_us,
+        "the connect made the connection"
+    );
     assert!(matches!(
         &rig.fake.calls()[..],
-        [FakeCall::IsConnected(_), FakeCall::Connect { user, .. }] if user == "alex"
+        [FakeCall::Connect { user, .. }] if user == "alex"
     ));
 }
 
@@ -801,4 +805,178 @@ fn a_folder_without_a_chosen_type_is_added_as_what_it_holds() {
 
     assert_eq!(shows.source.kind, SourceKind::Tv);
     assert_eq!(films.source.kind, SourceKind::Movie);
+}
+
+// ---- the user's own connections --------------------------------------------------------------
+
+fn disconnects(fake: &FakeConnector) -> usize {
+    fake.calls()
+        .iter()
+        .filter(|call| matches!(call, FakeCall::Disconnect(_)))
+        .count()
+}
+
+#[test]
+fn a_share_the_user_connected_is_used_as_it_is_and_never_disconnected() {
+    let rig = rig();
+    rig.share_with(&["Films"]);
+    // The user's own connection (a drive letter, a file-manager mount) is there already.
+    rig.fake.mark_connected(&movies());
+
+    let added = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Films", PASSWORD, true),
+            &Cancel::new(),
+        )
+        .unwrap();
+
+    assert!(!added.share.connected_by_us);
+    // The system did not check this login, so it is not kept.
+    assert!(!added.share.remember);
+    assert!(
+        !rig.secrets
+            .contains(&secret_account(added.share.id))
+            .unwrap()
+    );
+    assert!(rig.service.unsaved_password(added.share.id).is_none());
+    assert_eq!(rig.sources().len(), 1);
+
+    remove_folder(&rig, added.source.id);
+    assert_eq!(rig.service.sweep(Duration::ZERO), 1);
+    assert!(rig.service.list().unwrap().is_empty());
+    assert_eq!(disconnects(&rig.fake), 0);
+    assert!(rig.fake.is_connected(&movies(), &Cancel::new()).unwrap());
+}
+
+#[test]
+fn a_folder_not_added_on_the_users_own_connection_leaves_it_connected() {
+    let rig = rig();
+    rig.share_with(&[]);
+    rig.fake.mark_connected(&movies());
+
+    let error = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Films", PASSWORD, true),
+            &Cancel::new(),
+        )
+        .unwrap_err();
+
+    assert_eq!(error.code(), "folder_not_found");
+    assert_eq!(disconnects(&rig.fake), 0);
+    assert!(rig.fake.is_connected(&movies(), &Cancel::new()).unwrap());
+}
+
+#[test]
+fn a_known_share_found_connected_keeps_its_login_and_owner() {
+    let rig = rig();
+    let films = add(&rig, "nas", "movies", true);
+    std::fs::create_dir_all(rig.fake.root_of(&movies()).join("Series")).unwrap();
+
+    // Connected already: the new, unchecked password does not replace the remembered one.
+    let added = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Series", "Unchecked-Pass-9", false),
+            &Cancel::new(),
+        )
+        .unwrap();
+
+    assert_eq!(added.share.id, films.share.id);
+    assert!(added.share.remember);
+    assert!(added.share.connected_by_us, "made by the first connect");
+    assert_eq!(
+        rig.secrets
+            .get(&secret_account(films.share.id))
+            .unwrap()
+            .map(|s| s.expose().to_owned()),
+        Some(PASSWORD.to_owned())
+    );
+}
+
+#[test]
+fn a_check_that_fails_is_a_failure_and_never_counts_as_not_connected() {
+    let rig = rig();
+    rig.share_with(&["Films"]);
+    rig.fake.fail_check(
+        &movies(),
+        Some(ShareError::new(
+            ShareErrorKind::Other,
+            "no answer from the system",
+        )),
+    );
+
+    let error = rig
+        .service
+        .connect_and_add(
+            &request(r"\\nas\movies\Films", PASSWORD, true),
+            &Cancel::new(),
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), "other");
+    assert_eq!(disconnects(&rig.fake), 0);
+
+    // At start: the share is not connected over a check that failed, and its row stops claiming
+    // the connection, so a connection that turns up later is never taken for CineVault's.
+    rig.fake.fail_check(&movies(), None);
+    let films = add(&rig, "nas", "movies", true);
+    assert!(films.share.connected_by_us);
+    let (service, fake) = restarted(&rig);
+    fake.fail_check(
+        &movies(),
+        Some(ShareError::new(
+            ShareErrorKind::Other,
+            "no answer from the system",
+        )),
+    );
+    let events = record_hand_overs(&service);
+    service.reconnect_at_start();
+    wait_for(&events, 1);
+    let after = row(&service, films.share.id);
+    assert_eq!(after.last_error.as_deref(), Some("other"));
+    assert!(!after.connected_by_us);
+    assert!(
+        !fake
+            .calls()
+            .iter()
+            .any(|call| matches!(call, FakeCall::Connect { .. }))
+    );
+}
+
+#[test]
+fn at_start_a_share_is_ours_only_when_this_start_or_an_earlier_one_connected_it() {
+    let rig = rig();
+    let movies_added = add(&rig, "nas", "movies", true);
+    let tv = add(&rig, "nas", "tv", true);
+    let found = add(&rig, "box", "films", true);
+    let tv_address = cv_shares::ShareAddress::new("nas", "tv").unwrap();
+    let box_address = cv_shares::ShareAddress::new("box", "films").unwrap();
+    // The row of a share the user had connected before CineVault did.
+    rig.db
+        .write(move |tx| rows::set_connected_by_us(tx, found.share.id, false))
+        .unwrap();
+
+    let (service, fake) = restarted(&rig);
+    fake.fail_connect(
+        &tv_address,
+        Some(ShareError::new(ShareErrorKind::WrongLogin, "logon failure")),
+    );
+    fake.mark_connected(&box_address);
+    let events = record_hand_overs(&service);
+    service.reconnect_at_start();
+    wait_for(&events, 3);
+
+    assert!(
+        row(&service, movies_added.share.id).connected_by_us,
+        "reconnected now"
+    );
+    assert!(
+        !row(&service, tv.share.id).connected_by_us,
+        "its connection is gone"
+    );
+    assert!(
+        !row(&service, found.share.id).connected_by_us,
+        "still the user's"
+    );
 }

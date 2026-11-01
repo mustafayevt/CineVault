@@ -18,7 +18,9 @@ use cv_db::repo::network_shares::{NewNetworkShare, insert_share};
 use cv_domain::SourceKind;
 use cv_jobs::LaneId;
 use cv_shares::fake::FakeConnector;
-use cv_shares::{Cancel, Login, ShareAddress, ShareConnector, ShareError, ShareErrorKind, Support};
+use cv_shares::{
+    Cancel, Connected, Login, ShareAddress, ShareConnector, ShareError, ShareErrorKind, Support,
+};
 use tempfile::TempDir;
 
 const PASSWORD: &str = "Example-Pass-42";
@@ -58,16 +60,16 @@ impl ShareConnector for Appearing {
         share: &ShareAddress,
         login: &Login,
         cancel: &Cancel,
-    ) -> Result<PathBuf, ShareError> {
+    ) -> Result<Connected, ShareError> {
         std::thread::sleep(self.pause);
         let root = self.fake.root_of(share);
         if let Some(aside) = self.aside.as_ref().filter(|aside| aside.exists()) {
             std::fs::rename(aside, &root)
                 .map_err(|e| ShareError::new(ShareErrorKind::Other, e.to_string()))?;
         }
-        let root = self.fake.connect(share, login, cancel)?;
+        let connected = self.fake.connect(share, login, cancel)?;
         self.connected.store(true, Ordering::SeqCst);
-        Ok(root)
+        Ok(connected)
     }
 
     fn is_connected(&self, share: &ShareAddress, cancel: &Cancel) -> Result<bool, ShareError> {

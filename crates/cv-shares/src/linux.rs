@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::address::ShareAddress;
-use crate::connector::{Cancel, Login, ShareConnector, Support};
+use crate::connector::{Cancel, Connected, Login, ShareConnector, Support};
 use crate::error::{ShareError, ShareErrorKind};
 use crate::process::{self, Session, Spawner, ToolCommand};
 
@@ -80,6 +80,31 @@ impl LinuxConnector {
             .env("LC_ALL", "C"))
     }
 
+    /// Runs `gio mount` for `share`. Returns whether it mounted the share (`false`: it was
+    /// mounted by someone else meanwhile).
+    fn mount(
+        &self,
+        share: &ShareAddress,
+        login: &Login,
+        cancel: &Cancel,
+    ) -> Result<bool, ShareError> {
+        let url = share.smb_url();
+        let command = self.gio(&["mount", &url])?;
+        let mut session = Session::start(self.spawner.as_ref(), &command, cancel, CONNECT_LIMIT)?;
+        Self::answer_prompts(&mut session, login)?;
+        let finished = session.finish()?;
+        let output = login
+            .password()
+            .scrub(&format!("{}\n{}", finished.stdout, finished.stderr));
+        if finished.code == 0 {
+            return Ok(true);
+        }
+        if output.to_ascii_lowercase().contains("already mounted") {
+            return Ok(false);
+        }
+        Err(mount_error(&output).with_code(i64::from(finished.code)))
+    }
+
     fn answer_prompts(session: &mut Session, login: &Login) -> Result<(), ShareError> {
         let password = login.password();
         let (mut user, mut domain, mut sent) = (false, false, false);
@@ -138,27 +163,18 @@ impl ShareConnector for LinuxConnector {
         share: &ShareAddress,
         login: &Login,
         cancel: &Cancel,
-    ) -> Result<PathBuf, ShareError> {
+    ) -> Result<Connected, ShareError> {
         if let Some(root) = self.local_root(share, cancel)? {
-            return Ok(root);
+            return Ok(Connected { root, made: false });
         }
-        let url = share.smb_url();
-        let command = self.gio(&["mount", &url])?;
-        let mut session = Session::start(self.spawner.as_ref(), &command, cancel, CONNECT_LIMIT)?;
-        Self::answer_prompts(&mut session, login)?;
-        let finished = session.finish()?;
-        let output = login
-            .password()
-            .scrub(&format!("{}\n{}", finished.stdout, finished.stderr));
-        if finished.code != 0 && !output.to_ascii_lowercase().contains("already mounted") {
-            return Err(mount_error(&output).with_code(i64::from(finished.code)));
-        }
-        self.local_root(share, cancel)?.ok_or_else(|| {
+        let made = self.mount(share, login, cancel)?;
+        let root = self.local_root(share, cancel)?.ok_or_else(|| {
             ShareError::new(
                 ShareErrorKind::NoUserMounting,
                 "the share is mounted, but the desktop gives it no local folder",
             )
-        })
+        })?;
+        Ok(Connected { root, made })
     }
 
     fn is_connected(&self, share: &ShareAddress, cancel: &Cancel) -> Result<bool, ShareError> {
@@ -338,11 +354,12 @@ mod tests {
             mounted(),
         ]);
 
-        let root = connector
+        let connected = connector
             .connect(&share(), &login(r"HOME\alex"), &Cancel::new())
             .unwrap();
 
-        assert_eq!(root, PathBuf::from(ROOT));
+        assert_eq!(connected.root, PathBuf::from(ROOT));
+        assert!(connected.made);
         assert_eq!(spawner.input(), format!("alex\nHOME\n{SECRET}\n"));
         let commands = spawner.commands();
         assert_eq!(
@@ -492,16 +509,38 @@ mod tests {
     #[test]
     fn a_mounted_share_is_found_and_unmounted() {
         let (connector, spawner) = connector(vec![mounted(), mounted(), vec![Step::Exit(0)]]);
-        let root = connector
+        let connected = connector
             .connect(&share(), &login("alex"), &Cancel::new())
             .unwrap();
-        assert_eq!(root, PathBuf::from(ROOT));
+        assert_eq!(connected.root, PathBuf::from(ROOT));
+        assert!(!connected.made, "mounted by someone else: not ours");
+        assert_eq!(spawner.commands().len(), 1, "no gio mount ran");
         connector.disconnect(&share(), &Cancel::new()).unwrap();
         assert_eq!(
             args(&spawner.commands()[2]),
             ["mount", "-u", "smb://nas/movies/"]
         );
         assert_eq!(spawner.input(), "");
+    }
+
+    #[test]
+    fn a_share_mounted_by_someone_else_meanwhile_is_not_ours() {
+        let (connector, _) = connector(vec![
+            not_mounted(),
+            vec![
+                Step::Out("User [me]: "),
+                Step::Read,
+                Step::Out("Password: "),
+                Step::Read,
+                Step::Err("gio: smb://nas/movies/: Location is already mounted\n"),
+                Step::Exit(2),
+            ],
+            mounted(),
+        ]);
+        let connected = connector
+            .connect(&share(), &login("alex"), &Cancel::new())
+            .unwrap();
+        assert!(!connected.made);
     }
 
     #[test]

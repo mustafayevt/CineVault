@@ -119,6 +119,13 @@ When the last library folder on a share is removed and its Undo has passed, Cine
 - **WHEN** the user removes the share's only folder and chooses Undo in the toast
 - **THEN** the folder is back, online, and the share keeps its stored password
 
+### Requirement: The user's own connections are never disconnected
+CineVault SHALL NEVER disconnect or unmount a connection it did not make, such as the user's own drive letter or file-manager mount of a share. A share found already connected SHALL be used as it is, without taking the typed password as checked, and forgetting it SHALL NOT disconnect it.
+
+#### Scenario: The user's own connection
+- **WHEN** `\\nas\movies` was already connected by the user (for example as drive `M:`) when its folder was added, and its last library folder is removed
+- **THEN** the share is forgotten and the user's connection stays as it was
+
 ### Requirement: Network shares in a browser
 In a browser, "Network share…" SHALL NOT ask for a password. It SHALL explain that network shares are connected on the server by the installer, because the server cannot connect them itself, and SHALL show the installer command with a Copy button and say to add the folder with "Add folder…" afterwards. The share commands SHALL answer `not_applicable`.
 

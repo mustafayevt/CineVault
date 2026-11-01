@@ -8,6 +8,9 @@
 //!
 //! The mapping is not persistent: it lasts until the user signs out, Windows stores no credential
 //! for it, and the folder keeps its network path (`\\nas\movies\Films`).
+//!
+//! Only mappings without a drive letter count as CineVault's: a drive letter the user mapped to
+//! the same share is never reported as connected here and never removed.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -17,7 +20,7 @@ use base64::Engine as _;
 use serde::Deserialize;
 
 use crate::address::ShareAddress;
-use crate::connector::{Cancel, Login, ShareConnector, Support};
+use crate::connector::{Cancel, Connected, Login, ShareConnector, Support};
 use crate::error::{ShareError, ShareErrorKind};
 use crate::process::{self, Spawner, ToolCommand};
 
@@ -30,8 +33,8 @@ const CHECK_LIMIT: Duration = Duration::from_secs(30);
 const REMOTE_VAR: &str = "CINEVAULT_SHARE_REMOTE";
 const USER_VAR: &str = "CINEVAULT_SHARE_USER";
 
-/// Shared start of every script: stop on errors, no progress records, UTF-8 output, and the
-/// result line.
+/// Shared start of every script: stop on errors, no progress records, UTF-8 output, the result
+/// line, and the mappings of the share that have no drive letter.
 const PRELUDE: &str = r"
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -48,9 +51,12 @@ function Get-Win32Code($record) {
     }
     return 0
 }
+function Get-DevicelessMapping {
+    Get-SmbMapping -RemotePath $env:CINEVAULT_SHARE_REMOTE -ErrorAction SilentlyContinue |
+        Where-Object { -not $_.LocalPath }
+}
 function Test-Mapped {
-    $mapping = Get-SmbMapping -RemotePath $env:CINEVAULT_SHARE_REMOTE -ErrorAction SilentlyContinue
-    return [bool]($mapping | Where-Object { $_.Status -eq 'OK' })
+    return [bool](Get-DevicelessMapping | Where-Object { $_.Status -eq 'OK' })
 }
 ";
 
@@ -78,9 +84,9 @@ try {
 
 const DISCONNECT: &str = r"
 try {
-    $mapping = Get-SmbMapping -RemotePath $env:CINEVAULT_SHARE_REMOTE -ErrorAction SilentlyContinue
+    $mapping = Get-DevicelessMapping
     if ($mapping) {
-        Remove-SmbMapping -RemotePath $env:CINEVAULT_SHARE_REMOTE -Force:$false -UpdateProfile:$false -Confirm:$false
+        $mapping | Remove-SmbMapping -Force:$false -UpdateProfile:$false -Confirm:$false
     }
     Write-Result $true 0 '' $false
 } catch {
@@ -179,9 +185,10 @@ impl ShareConnector for WindowsConnector {
         share: &ShareAddress,
         login: &Login,
         cancel: &Cancel,
-    ) -> Result<PathBuf, ShareError> {
+    ) -> Result<Connected, ShareError> {
+        let root = PathBuf::from(share.unc());
         if self.is_connected(share, cancel)? {
-            return Ok(PathBuf::from(share.unc()));
+            return Ok(Connected { root, made: false });
         }
         let command = self.command(CONNECT, share, Some(login.user()));
         let password = login.password();
@@ -193,7 +200,7 @@ impl ShareConnector for WindowsConnector {
             |text| password.scrub(text),
         )?;
         if result.ok {
-            Ok(PathBuf::from(share.unc()))
+            Ok(Connected { root, made: true })
         } else {
             let message = password.scrub(result.message.as_deref().unwrap_or_default());
             Err(error_for(result.code, message))
@@ -327,11 +334,12 @@ mod tests {
             ],
         ]);
 
-        let root = connector
+        let connected = connector
             .connect(&share(), &login(), &Cancel::new())
             .unwrap();
 
-        assert_eq!(root, PathBuf::from(r"\\nas\movies"));
+        assert_eq!(connected.root, PathBuf::from(r"\\nas\movies"));
+        assert!(connected.made);
         assert_eq!(spawner.input(), format!("{SECRET}\n"));
         let commands = spawner.commands();
         assert_eq!(commands.len(), 2);
@@ -372,10 +380,11 @@ mod tests {
             Step::Out("{\"ok\":true,\"code\":0,\"message\":\"\",\"connected\":true}"),
             Step::Exit(0),
         ]]);
-        let root = connector
+        let connected = connector
             .connect(&share(), &login(), &Cancel::new())
             .unwrap();
-        assert_eq!(root, PathBuf::from(r"\\nas\movies"));
+        assert_eq!(connected.root, PathBuf::from(r"\\nas\movies"));
+        assert!(!connected.made, "connected before: not CineVault's");
         assert_eq!(spawner.commands().len(), 1);
         assert!(decoded(&spawner.commands()[0]).contains("Get-SmbMapping"));
         assert_eq!(spawner.input(), "", "no password was sent");
@@ -460,8 +469,19 @@ mod tests {
         let busy = connector.disconnect(&share(), &Cancel::new()).unwrap_err();
         assert_eq!(busy.kind(), ShareErrorKind::InUse);
         let script = decoded(&spawner.commands()[0]);
-        assert!(script.contains("Remove-SmbMapping"));
+        assert!(script.contains("$mapping | Remove-SmbMapping"));
         assert!(script.contains("-Force:$false"));
+    }
+
+    #[test]
+    fn only_mappings_without_a_drive_letter_count() {
+        // A drive letter the user mapped to the same share is neither "connected" for CineVault
+        // nor ever removed by it.
+        assert!(PRELUDE.contains("Where-Object { -not $_.LocalPath }"));
+        assert!(PRELUDE.contains("Get-DevicelessMapping | Where-Object"));
+        assert!(!CHECK.contains("Get-SmbMapping") && !DISCONNECT.contains("Get-SmbMapping"));
+        assert!(!DISCONNECT.contains("Remove-SmbMapping -RemotePath"));
+        assert!(DISCONNECT.contains("Get-DevicelessMapping"));
     }
 
     #[test]
@@ -505,7 +525,16 @@ mod tests {
         )
         .unwrap();
         let own = ShareAddress::new("127.0.0.1", "C$").unwrap();
-        let refused = connector.connect(&own, &stranger, &cancel).unwrap_err();
+        let refused = match connector.connect(&own, &stranger, &cancel) {
+            Ok(connected) => {
+                // Never leave a connection behind, even if this computer accepted the login.
+                if connected.made {
+                    connector.disconnect(&own, &cancel).unwrap();
+                }
+                panic!("a made-up user was accepted: {connected:?}");
+            }
+            Err(refused) => refused,
+        };
         eprintln!("{refused:?}");
         // Loopback refuses another login in its own way (1326 or 1208, by Windows version); the
         // point is that the script ran and reported a Win32 code.

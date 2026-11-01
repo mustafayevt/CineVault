@@ -30,7 +30,7 @@ mod windows;
 use std::sync::Arc;
 
 pub use address::{Address, InputError, ShareAddress, check_user, folder_in_share};
-pub use connector::{Cancel, Login, Password, ShareConnector, Support};
+pub use connector::{Cancel, Connected, Login, Password, ShareConnector, Support};
 pub use error::{ShareError, ShareErrorKind};
 
 /// The connector of this operating system: `New-SmbMapping` on Windows, `mount_smbfs` on macOS,
@@ -73,7 +73,7 @@ impl ShareConnector for Unsupported {
         _share: &ShareAddress,
         _login: &Login,
         _cancel: &Cancel,
-    ) -> Result<std::path::PathBuf, ShareError> {
+    ) -> Result<Connected, ShareError> {
         Err(ShareError::new(
             ShareErrorKind::NoUserMounting,
             "this system cannot connect network shares for apps",

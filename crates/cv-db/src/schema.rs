@@ -52,6 +52,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "network_share",
         sql: include_str!("migrations/104_network_share.sql"),
     },
+    Migration {
+        version: 105,
+        name: "network_share_connected_by_us",
+        sql: include_str!("migrations/105_network_share_connected_by_us.sql"),
+    },
 ];
 
 /// The schema version of this build: the last migration, or [`BASE_VERSION`] when there is none.

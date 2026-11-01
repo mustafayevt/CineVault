@@ -25,17 +25,20 @@ pub trait ShareConnector: Send + Sync {
     /// Whether shares can be connected here at all.
     fn support(&self) -> Support;
 
-    /// Connects `share` with `login` and returns the folder its files appear in. A share that is
-    /// already connected is not connected again.
+    /// Connects `share` with `login` and returns the folder its files appear in, and whether this
+    /// call made the connection. A share that is already connected (by the user, or earlier) is
+    /// not connected again and comes back with [`Connected::made`] false: `login` is not checked
+    /// then.
     ///
     /// # Errors
-    /// A [`ShareError`] whose kind says why.
+    /// A [`ShareError`] whose kind says why; also when the system cannot say whether the share is
+    /// connected already.
     fn connect(
         &self,
         share: &ShareAddress,
         login: &Login,
         cancel: &Cancel,
-    ) -> Result<PathBuf, ShareError>;
+    ) -> Result<Connected, ShareError>;
 
     /// Whether `share` is connected now.
     ///
@@ -60,6 +63,14 @@ pub trait ShareConnector: Send + Sync {
         share: &ShareAddress,
         cancel: &Cancel,
     ) -> Result<Option<PathBuf>, ShareError>;
+}
+
+/// A share that is connected: the folder its files appear in, and whether the connect that
+/// returned it made the connection (`false`: it was there already, perhaps made by the user).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Connected {
+    pub root: PathBuf,
+    pub made: bool,
 }
 
 /// A share password. `Debug` and `Display` never show it.

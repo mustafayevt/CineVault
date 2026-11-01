@@ -462,6 +462,7 @@ mod tests {
             last_connected_ms: None,
             last_error: Some("wrong_login".to_owned()),
             unused_since_ms: None,
+            connected_by_us: false,
         };
         let dto = NetworkShareDto::from(&share);
         assert_eq!(dto.address, r"\\nas\movies");

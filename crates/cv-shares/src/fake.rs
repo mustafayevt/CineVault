@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use crate::address::ShareAddress;
-use crate::connector::{Cancel, Login, Password, ShareConnector, Support};
+use crate::connector::{Cancel, Connected, Login, Password, ShareConnector, Support};
 use crate::error::{ShareError, ShareErrorKind};
 
 /// A call the fake received.
@@ -27,6 +27,7 @@ struct State {
     support: Support,
     connected: HashSet<ShareAddress>,
     connect_errors: HashMap<ShareAddress, ShareError>,
+    check_errors: HashMap<ShareAddress, ShareError>,
     disconnect_errors: HashMap<ShareAddress, ShareError>,
     delay: Duration,
     calls: Vec<FakeCall>,
@@ -47,6 +48,7 @@ impl FakeConnector {
                 support: Support::Supported,
                 connected: HashSet::new(),
                 connect_errors: HashMap::new(),
+                check_errors: HashMap::new(),
                 disconnect_errors: HashMap::new(),
                 delay: Duration::ZERO,
                 calls: Vec::new(),
@@ -76,6 +78,16 @@ impl FakeConnector {
         match error {
             Some(error) => state.connect_errors.insert(share.clone(), error),
             None => state.connect_errors.remove(share),
+        };
+    }
+
+    /// Makes every check whether `share` is connected fail with `error`, the one a connect makes
+    /// first included (`None` answers again).
+    pub fn fail_check(&self, share: &ShareAddress, error: Option<ShareError>) {
+        let mut state = self.state();
+        match error {
+            Some(error) => state.check_errors.insert(share.clone(), error),
+            None => state.check_errors.remove(share),
         };
     }
 
@@ -138,7 +150,7 @@ impl ShareConnector for FakeConnector {
         share: &ShareAddress,
         login: &Login,
         cancel: &Cancel,
-    ) -> Result<PathBuf, ShareError> {
+    ) -> Result<Connected, ShareError> {
         self.record(FakeCall::Connect {
             share: share.clone(),
             user: login.user().to_owned(),
@@ -146,6 +158,16 @@ impl ShareConnector for FakeConnector {
         });
         if self.support() == Support::NoUserMounting {
             return Err(ShareError::no_user_mounting());
+        }
+        if let Some(error) = self.state().check_errors.get(share) {
+            return Err(error.clone());
+        }
+        if self.state().connected.contains(share) {
+            // As the real connectors do: an existing connection is used as it is, login unchecked.
+            return Ok(Connected {
+                root: self.root_of(share),
+                made: false,
+            });
         }
         self.wait(cancel)?;
         if let Some(error) = self.state().connect_errors.get(share) {
@@ -155,12 +177,16 @@ impl ShareConnector for FakeConnector {
         std::fs::create_dir_all(&root)
             .map_err(|error| ShareError::new(ShareErrorKind::Other, error.to_string()))?;
         self.state().connected.insert(share.clone());
-        Ok(root)
+        Ok(Connected { root, made: true })
     }
 
     fn is_connected(&self, share: &ShareAddress, _cancel: &Cancel) -> Result<bool, ShareError> {
         self.record(FakeCall::IsConnected(share.clone()));
-        Ok(self.state().connected.contains(share))
+        let state = self.state();
+        if let Some(error) = state.check_errors.get(share) {
+            return Err(error.clone());
+        }
+        Ok(state.connected.contains(share))
     }
 
     fn disconnect(&self, share: &ShareAddress, _cancel: &Cancel) -> Result<(), ShareError> {
@@ -199,8 +225,12 @@ mod tests {
     fn a_connect_makes_the_folder_and_is_recorded() {
         let dir = tempfile::tempdir().unwrap();
         let fake = FakeConnector::new(dir.path());
-        let root = fake.connect(&share(), &login(), &Cancel::new()).unwrap();
+        let connected = fake.connect(&share(), &login(), &Cancel::new()).unwrap();
+        assert!(connected.made);
+        let root = connected.root;
         assert!(root.is_dir());
+        let again = fake.connect(&share(), &login(), &Cancel::new()).unwrap();
+        assert_eq!((again.root.as_path(), again.made), (root.as_path(), false));
         assert!(fake.is_connected(&share(), &Cancel::new()).unwrap());
         fake.disconnect(&share(), &Cancel::new()).unwrap();
         assert!(!fake.is_connected(&share(), &Cancel::new()).unwrap());

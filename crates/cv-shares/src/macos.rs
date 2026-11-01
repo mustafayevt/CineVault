@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::address::{ShareAddress, percent_encode};
-use crate::connector::{Cancel, Login, ShareConnector, Support};
+use crate::connector::{Cancel, Connected, Login, ShareConnector, Support};
 use crate::error::{ShareError, ShareErrorKind};
 use crate::process::{self, Session, Spawner, ToolCommand};
 
@@ -94,42 +94,22 @@ impl MacConnector {
             .env("LC_ALL", "C")
     }
 
-    /// Removes the empty mount folder of `share` and then its empty server folder, once the share
-    /// is not mounted there. Never recursive: a folder with anything in it stays.
-    fn remove_empty_folder(&self, share: &ShareAddress) {
-        let folder = self.mount_folder(share);
-        if !(self.is_mount_point)(&folder)
-            && std::fs::remove_dir(&folder).is_ok()
-            && let Some(server) = folder.parent()
-        {
-            let _ = std::fs::remove_dir(server);
-        }
-    }
-}
-
-impl ShareConnector for MacConnector {
-    fn support(&self) -> Support {
-        Support::Supported
-    }
-
-    fn connect(
+    /// Mounts `share` at `folder` with `mount_smbfs`, answering its password prompt.
+    fn mount(
         &self,
         share: &ShareAddress,
         login: &Login,
+        folder: &Path,
         cancel: &Cancel,
     ) -> Result<PathBuf, ShareError> {
-        let folder = self.mount_folder(share);
-        if (self.is_mount_point)(&folder) {
-            return Ok(folder);
-        }
-        make_private_folder(&folder).map_err(|error| {
+        make_private_folder(folder).map_err(|error| {
             ShareError::new(
                 ShareErrorKind::Other,
                 format!("{} could not be made: {error}", folder.display()),
             )
         })?;
         let password = login.password();
-        let command = Self::mount_command(share, login, &folder);
+        let command = Self::mount_command(share, login, folder);
         let mut session = Session::start(self.spawner.as_ref(), &command, cancel, CONNECT_LIMIT)?;
         let mut answered = false;
         while let Some(prompt) = session.prompt()? {
@@ -153,12 +133,47 @@ impl ShareConnector for MacConnector {
             answered = true;
         }
         let finished = session.finish()?;
-        if (self.is_mount_point)(&folder) {
-            return Ok(folder);
+        if (self.is_mount_point)(folder) {
+            return Ok(folder.to_path_buf());
         }
         self.remove_empty_folder(share);
         let output = password.scrub(&format!("{}\n{}", finished.stdout, finished.stderr));
         Err(mount_error(&output).with_code(i64::from(finished.code)))
+    }
+
+    /// Removes the empty mount folder of `share` and then its empty server folder, once the share
+    /// is not mounted there. Never recursive: a folder with anything in it stays.
+    fn remove_empty_folder(&self, share: &ShareAddress) {
+        let folder = self.mount_folder(share);
+        if !(self.is_mount_point)(&folder)
+            && std::fs::remove_dir(&folder).is_ok()
+            && let Some(server) = folder.parent()
+        {
+            let _ = std::fs::remove_dir(server);
+        }
+    }
+}
+
+impl ShareConnector for MacConnector {
+    fn support(&self) -> Support {
+        Support::Supported
+    }
+
+    fn connect(
+        &self,
+        share: &ShareAddress,
+        login: &Login,
+        cancel: &Cancel,
+    ) -> Result<Connected, ShareError> {
+        let folder = self.mount_folder(share);
+        if (self.is_mount_point)(&folder) {
+            return Ok(Connected {
+                root: folder,
+                made: false,
+            });
+        }
+        let root = self.mount(share, login, &folder, cancel)?;
+        Ok(Connected { root, made: true })
     }
 
     fn is_connected(&self, share: &ShareAddress, _cancel: &Cancel) -> Result<bool, ShareError> {
@@ -309,10 +324,12 @@ mod tests {
         ]];
         let rig = rig(scripts, mounted);
 
-        let root = rig
+        let connected = rig
             .connector
             .connect(&share(), &login(r"HOME\al ex"), &Cancel::new())
             .unwrap();
+        assert!(connected.made);
+        let root = connected.root;
 
         assert_eq!(root, rig.base.join("nas").join("My Movies"));
         assert!(root.is_dir(), "the mount folder was made");
@@ -352,7 +369,8 @@ mod tests {
         let root = rig
             .connector
             .connect(&share(), &login("alex"), &Cancel::new())
-            .unwrap();
+            .unwrap()
+            .root;
         let mode = std::fs::metadata(&root).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o700);
     }
@@ -455,10 +473,12 @@ mod tests {
             ]],
             mounted,
         );
-        let root = rig
+        let connected = rig
             .connector
             .connect(&share(), &login("alex"), &Cancel::new())
             .unwrap();
+        assert!(!connected.made, "mounted before: not ours");
+        let root = connected.root;
         assert!(rig.spawner.commands().is_empty());
         std::fs::create_dir_all(&root).unwrap();
         assert!(
