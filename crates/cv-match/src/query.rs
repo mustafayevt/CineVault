@@ -162,8 +162,10 @@ fn parse_id_shortcut(input: &str) -> Option<NormalizedQuery> {
 /// Normalises a search input: detects an ID shortcut, otherwise extracts a `(yyyy)` year and
 /// collapses whitespace.
 ///
-/// The last `(yyyy)` with a plausible year (1880 to 2100) is removed from the text and becomes
-/// the search year. If removing it would leave no text, the input is kept as the text.
+/// The last `(yyyy)` with a plausible year (1880 to 2100) becomes the search year, and every
+/// `(yyyy)` of that year is removed from the text, so a title that already carries its year
+/// ("Heat (1995) (1995)") is not searched with a copy of it. If that would leave no text, the
+/// input is kept as the text.
 pub fn normalize_query(input: &str) -> NormalizedQuery {
     let input = input.trim();
     if let Some(q) = parse_id_shortcut(input) {
@@ -172,19 +174,18 @@ pub fn normalize_query(input: &str) -> NormalizedQuery {
 
     let found = YEAR_IN_BRACKETS
         .captures_iter(input)
-        .filter_map(|c| {
-            let m = c.get(0)?;
-            let y: u16 = c[1].parse().ok()?;
-            (MIN_YEAR..=MAX_YEAR).contains(&y).then_some((m.range(), y))
-        })
+        .filter_map(|c| c[1].parse::<u16>().ok())
+        .filter(|y| (MIN_YEAR..=MAX_YEAR).contains(y))
         .last();
 
-    if let Some((range, year)) = found {
-        let text = collapse(&format!(
-            "{} {}",
-            &input[..range.start],
-            &input[range.end..]
-        ));
+    if let Some(year) = found {
+        let text = collapse(&YEAR_IN_BRACKETS.replace_all(input, |c: &regex::Captures| {
+            if c[1].parse() == Ok(year) {
+                " ".to_owned()
+            } else {
+                c[0].to_owned()
+            }
+        }));
         if !text.is_empty() {
             return NormalizedQuery {
                 text,
@@ -360,6 +361,15 @@ mod tests {
         let q = normalize_query("Blade Runner (1982) (2007)");
         assert_eq!(q.text, "Blade Runner (1982)");
         assert_eq!(q.year, Some(2007));
+    }
+
+    #[test]
+    fn a_repeated_year_leaves_the_text() {
+        let q = normalize_query("O Senhor dos Anéis - O Retorno do Rei (2003) (2003)");
+        assert_eq!(q.text, "O Senhor dos Anéis - O Retorno do Rei");
+        assert_eq!(q.year, Some(2003));
+        let q = normalize_query("(2003) (2003)");
+        assert_eq!((q.text.as_str(), q.year), ("(2003) (2003)", None));
     }
 
     #[test]
