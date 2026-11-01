@@ -360,7 +360,7 @@ fn a_permanent_delete_erases_the_named_files_and_lists_them_first() {
         ],
     );
 
-    let report = lab.removal(&trash).erase(&[movie], "DELETE").unwrap();
+    let report = lab.removal(&trash).erase(&[movie]).unwrap();
     assert!(
         report.problems.is_empty() && report.stopped.is_empty(),
         "{report:?}"

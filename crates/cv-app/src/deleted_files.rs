@@ -14,7 +14,7 @@
 //! * `custom`: `<folder>/.deletedByCineVault/<batch>/<drive>/<path>` for files on the folder's
 //!   own volume; files on another volume go to their drive's trash folder (a move there would be
 //!   a copy). Only that `.deletedByCineVault` is ever emptied, never the chosen folder's top.
-//! * `erase`: erased at once. Chosen only after the typed confirmation in Settings. A delete is
+//! * `erase`: erased at once. Chosen only after a Yes or No in Settings. A delete is
 //!   then a permanent delete; a move erases an original only after its copy is verified.
 //!
 //! An unknown or unreadable value is `bin`: the default never erases anything.

@@ -8,7 +8,7 @@ import { useOpenFolder } from "../detail/useOpenFolder";
 import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { playTitle } from "../playback/usePlay";
-import { requestDelete, requestPermanentDelete } from "../delete/deleteActions";
+import { requestDelete } from "../delete/deleteActions";
 import { removeTitlesFromLibrary } from "../title/removeTitles";
 import { fullLabel, shortLabel, TITLE_ACTIONS } from "./titleActions";
 import type { TitleActionDef, TitleActionId } from "./titleActions";
@@ -153,10 +153,6 @@ export function useLibraryActions(targets: readonly TitleTarget[]): TitleActionS
       },
       delete: {
         onSelect: () => requestDelete(namesOf(targets)),
-        disabledReason: none,
-      },
-      "delete-permanently": {
-        onSelect: () => requestPermanentDelete(namesOf(targets)),
         disabledReason: none,
       },
     };

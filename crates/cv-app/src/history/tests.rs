@@ -431,26 +431,11 @@ impl crate::library_ops::EraseFs for InUse {
 }
 
 #[test]
-fn a_permanent_delete_needs_the_typed_confirmation() {
-    let lab = Lab::new();
-    let heat = lab.movie("Heat (1995)", "Heat (1995)", "Heat", 1995);
-    for typed in ["", "delete", "DELET", "DELETE ", "yes"] {
-        let error = lab.removal().erase(&[heat], typed).unwrap_err();
-        assert_eq!(error.code(), "confirmation");
-    }
-    assert!(lab.path("Heat (1995)/Heat (1995).mkv").is_file());
-    assert_eq!(
-        lab.history().list(HistoryFilter::All, 0, 10).unwrap().total,
-        0
-    );
-}
-
-#[test]
 fn a_permanent_delete_erases_the_folder_and_is_listed_without_undo() {
     let lab = Lab::new();
     let heat = lab.movie("Heat (1995)", "Heat (1995)", "Heat", 1995);
     let ronin = lab.movie("Ronin (1998)", "Ronin (1998)", "Ronin", 1998);
-    let report = lab.removal().erase(&[heat], "DELETE").unwrap();
+    let report = lab.removal().erase(&[heat]).unwrap();
     assert_eq!(report.erased.len(), 1, "{report:?}");
     assert!(!lab.path("Heat (1995)").exists());
     assert!(lab.path("Ronin (1998)/Ronin (1998).mkv").is_file());
@@ -485,7 +470,7 @@ fn a_file_in_use_stops_only_its_own_title() {
     let report = lab
         .removal()
         .with_eraser(Arc::new(InUse("Ronin (1998).nfo")))
-        .erase(&[heat, ronin], "DELETE")
+        .erase(&[heat, ronin])
         .unwrap();
     assert_eq!(report.erased.len(), 1);
     assert_eq!(report.erased[0].id, heat);
@@ -529,7 +514,7 @@ fn a_title_in_a_library_folder_root_loses_only_its_files_and_never_the_root() {
     ));
     let loose = lab.db.write(move |tx| insert_item(tx, &item)).unwrap();
 
-    let report = lab.removal().erase(&[loose], "DELETE").unwrap();
+    let report = lab.removal().erase(&[loose]).unwrap();
     assert_eq!(report.erased.len(), 1, "{report:?}");
     assert!(!root.join("loose.mkv").exists());
     assert!(root.is_dir(), "the library folder stays");
@@ -546,7 +531,7 @@ fn a_folder_that_holds_a_library_folder_or_lies_outside_one_is_refused() {
     lab.db
         .write(move |tx| insert_source(tx, SourceKind::Movie, &text))
         .unwrap();
-    let report = lab.removal().erase(&[heat], "DELETE").unwrap();
+    let report = lab.removal().erase(&[heat]).unwrap();
     assert!(report.erased.is_empty());
     assert!(
         report.problems[0].reason.contains("library folder"),
@@ -570,7 +555,7 @@ fn a_folder_that_holds_a_library_folder_or_lies_outside_one_is_refused() {
         "precious.mkv",
     ));
     let stray = lab.db.write(move |tx| insert_item(tx, &stray)).unwrap();
-    let report = lab.removal().erase(&[stray], "DELETE").unwrap();
+    let report = lab.removal().erase(&[stray]).unwrap();
     assert!(report.erased.is_empty());
     assert!(outside.join("precious.mkv").is_file());
 }

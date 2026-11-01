@@ -76,7 +76,6 @@ function StaticItem({
 const keepFocus = (event: Event) => event.preventDefault();
 
 function MenuItems({ highlight = false }: { highlight?: boolean }) {
-  const bin = binName(detectPlatform());
   return (
     <>
       <MenuItem icon={FolderPen} shortcut="F2">
@@ -95,7 +94,7 @@ function MenuItems({ highlight = false }: { highlight?: boolean }) {
       <MenuSeparator />
       <MenuLabel>Danger</MenuLabel>
       <MenuItem icon={Trash2} danger shortcut="Del">
-        Delete to {bin}
+        Delete
       </MenuItem>
     </>
   );
@@ -103,7 +102,6 @@ function MenuItems({ highlight = false }: { highlight?: boolean }) {
 
 /** Menu, Popover, Tooltip and the right-click menu, open so their surfaces can be seen. */
 export function FloatingSections() {
-  const bin = binName(detectPlatform());
   return (
     <Group
       title="Menu, ContextMenu, Popover, Tooltip, Dialog"
@@ -126,7 +124,7 @@ export function FloatingSections() {
             <div className="mx-1.5 my-1 h-px bg-line-section" />
             <div className="type-section-label flex h-7 items-center px-2.5">Danger</div>
             <StaticItem icon={Trash2} danger shortcut="Del">
-              Delete to {bin}
+              Delete
             </StaticItem>
           </div>
         </Stage>

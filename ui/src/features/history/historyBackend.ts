@@ -49,8 +49,8 @@ export interface HistoryBackend {
   undoTitle: (entryId: string, id: string) => Promise<UndoReport>;
   /** Delete: the files go to the Recycle Bin / Trash and the titles leave the library. */
   deleteTitles: (ids: readonly string[]) => Promise<DeleteResult>;
-  /** Delete permanently; `confirm` must be exactly `DELETE` or nothing is erased. */
-  eraseTitles: (ids: readonly string[], confirm: string, password?: string) => Promise<EraseResult>;
+  /** Delete permanently; the browser also sends the current password. */
+  eraseTitles: (ids: readonly string[], password?: string) => Promise<EraseResult>;
   /** Calls `handler` when an entry was written or undone. Returns the way to stop listening. */
   onChanged: (handler: () => void) => () => void;
 }
@@ -72,7 +72,7 @@ const tauriHistoryBackend: HistoryBackend = {
   undo: async (entryId) => unwrap(await commands.historyUndo(entryId)),
   undoTitle: async (entryId, id) => unwrap(await commands.historyUndoTitle(entryId, id)),
   deleteTitles: async (ids) => unwrap(await commands.deleteTitles([...ids])),
-  eraseTitles: async (ids, confirm) => unwrap(await commands.eraseTitles([...ids], confirm)),
+  eraseTitles: async (ids) => unwrap(await commands.eraseTitles([...ids])),
   onChanged: (handler) => {
     let stop: (() => void) | null = null;
     let closed = false;
@@ -92,7 +92,7 @@ const tauriHistoryBackend: HistoryBackend = {
 /** The browser server: reads use the shared commands, permanent delete needs the password. */
 const browserHistoryBackend: HistoryBackend = {
   ...tauriHistoryBackend,
-  eraseTitles: async (ids, confirm, password = "") => {
+  eraseTitles: async (ids, password = "") => {
     const csrf = (window as unknown as Record<string, unknown>).__CINEVAULT_CSRF__;
     const headers = {
       "content-type": "application/json",
@@ -119,7 +119,7 @@ const browserHistoryBackend: HistoryBackend = {
       method: "POST",
       credentials: "same-origin",
       headers,
-      body: JSON.stringify({ ids: [...ids], confirm, intent: intent.intent, password }),
+      body: JSON.stringify({ ids: [...ids], intent: intent.intent, password }),
     });
     const body = (await response.json()) as EraseResult & { code?: string; message?: string };
     if (!response.ok) {

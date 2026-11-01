@@ -259,12 +259,12 @@ impl RemovalService {
     /// # Errors
     /// The library cannot be read or written.
     ///
-    /// With Settings › Deleted files set to Delete permanently (chosen after the same typed
-    /// confirmation as Shift+Delete), the delete is a permanent delete instead: the files are
-    /// erased, the titles leave the library and the History entry has no Undo.
+    /// With Settings › Deleted files set to Delete permanently (chosen after a Yes or No), the
+    /// delete is a permanent delete instead: the files are erased, the titles leave the library
+    /// and the History entry has no Undo.
     pub fn delete_with_files(&self, ids: &[ItemId]) -> Result<DeleteReport, LibraryOpsError> {
         if self.choice.deleted_files().erases() {
-            let erased = self.erase(ids, super::erase::ERASE_CONFIRMATION)?;
+            let erased = self.erase(ids)?;
             return Ok(DeleteReport {
                 deleted: erased
                     .erased

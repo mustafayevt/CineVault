@@ -21,8 +21,8 @@ interface EmptyTrashDialogProps {
 }
 
 /**
- * Empty… of a drive, or Empty all trash folders (spec `drives` "Empty a drive's trash"): the
- * typed confirmation with the batches of the trash folders and what CineVault sent to the bin,
+ * Empty… of a drive, or Empty all trash folders (spec `drives` "Empty trash folders with a Yes or
+ * No"): the confirmation with the batches of the trash folders and what CineVault sent to the bin,
  * each with its size, and the total. Erasing refreshes the drives and History
  * (entries whose files were erased lose their Undo).
  */
@@ -40,11 +40,11 @@ export function EmptyTrashDialog({ driveId, name, onClose }: EmptyTrashDialogPro
   const entries = contents.data?.entries ?? [];
   const total = contents.data?.bytes ?? 0;
 
-  const confirm = (typed: string) => {
+  const confirm = () => {
     setBusy(true);
     onClose();
     void currentDrivesBackend()
-      .emptyTrash(driveId, typed)
+      .emptyTrash(driveId)
       .then((result) => {
         showToast({ message: t("drivesPage.trash.emptied", { size: format.size(result.bytes) }) });
         if (result.problems.length > 0) {

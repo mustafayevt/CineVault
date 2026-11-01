@@ -254,11 +254,7 @@ export function createSyntheticHistoryBackend(): HistoryBackend {
         entry_id: entryId,
       });
     },
-    eraseTitles: (ids, confirm) => {
-      if (confirm !== "DELETE")
-        return Promise.reject(
-          new HistoryError("confirmation", "Type DELETE to erase these titles for good."),
-        );
+    eraseTitles: (ids) => {
       const entryId = record(
         "delete_permanent",
         `Permanently deleted ${ids.length} titles`,

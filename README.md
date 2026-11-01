@@ -28,7 +28,7 @@
 - **Library your way.** A poster grid with a size you choose, or a table with a Stage column whose columns you can move and resize.
 - **HDR details.** The Technical card shows the exact HDR format (Dolby Vision profile, HDR10+, HDR10, HLG), audio and file details read from the file.
 - **Drives with safe moves.** Free space per drive and Move to another drive: copy, verify, and only then do the originals go to the Recycle Bin (the Trash on Linux).
-- **Deleted files handled your way.** Delete sends a title to the Recycle Bin or Trash, a trash folder on each drive or a trash folder you choose, and old trash can be emptied automatically. Shift+Delete erases a title only after you type a confirmation.
+- **Deleted files handled your way.** Delete sends a title to the Recycle Bin or Trash, a trash folder on each drive or a trash folder you choose, and old trash can be emptied automatically. Choosing "Delete permanently" there makes Delete erase a title, after a Yes or No that lists what goes.
 - **History and Undo.** Renames, moves, deletes, artwork and match changes are listed in History, each with Undo.
 - **Collections.** A collection appears on its own once you own two or more films of the same set.
 - **Torrent search hand-off.** Pick a title from the suggestions, search its releases from inside the app and see whether it is better than your copy; CineVault hands the one you pick to your own torrent app. You are responsible for what you download and share.

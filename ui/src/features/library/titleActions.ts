@@ -17,8 +17,6 @@ import type { LucideIcon } from "lucide-react";
 
 import { t } from "../../i18n/catalog";
 import type { MessageKey } from "../../i18n/catalog";
-import { binName } from "../shell/binName";
-import { detectPlatform } from "../shell/platform";
 
 /** Every action on a title, in the words of the three verbs (Scan, Scrape, Rename) and the rest. */
 export type TitleActionId =
@@ -34,8 +32,7 @@ export type TitleActionId =
   | "edit"
   | "remove"
   | "ignore"
-  | "delete"
-  | "delete-permanently";
+  | "delete";
 
 export interface TitleActionDef {
   id: TitleActionId;
@@ -144,14 +141,6 @@ export const TITLE_ACTIONS: Readonly<Record<TitleActionId, TitleActionDef>> = {
     hint: "Del",
     danger: true,
   },
-  "delete-permanently": {
-    id: "delete-permanently",
-    icon: Trash2,
-    short: "library.act.deletePermanently",
-    full: "library.act.deletePermanently",
-    hint: "Shift Del",
-    danger: true,
-  },
 };
 
 /** The buttons of the selection bar, left to right. */
@@ -170,7 +159,6 @@ export const MORE_ORDER: readonly TitleActionId[] = [
   "edit",
   "remove",
   "ignore",
-  "delete-permanently",
 ];
 
 /** The right-click menu: groups divided by a separator. Every action of the bar and More is here. */
@@ -187,7 +175,7 @@ export const MENU_GROUPS: readonly (readonly TitleActionId[])[] = [
     "remove",
     "ignore",
   ],
-  ["delete", "delete-permanently"],
+  ["delete"],
 ];
 
 /** The buttons of a title page header; the ⋯ menu follows them, with Delete… last in it. */
@@ -207,5 +195,5 @@ export function shortLabel(id: TitleActionId): string {
 
 /** The action's name in a menu, with the count when several titles are selected. */
 export function fullLabel(id: TitleActionId, count: number): string {
-  return t(TITLE_ACTIONS[id].full, { count, bin: binName(detectPlatform()) });
+  return t(TITLE_ACTIONS[id].full, { count });
 }

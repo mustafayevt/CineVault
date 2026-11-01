@@ -271,28 +271,19 @@ pub struct EmptyReportDto {
 }
 
 /// Empties the trash of the drive `drive_id` (every drive when `None`): erases its trash folders'
-/// batches and what CineVault sent to the Recycle Bin from it. `confirm` must be the literal
-/// `DELETE` the person typed. History entries whose files were erased lose their Undo.
+/// batches and what CineVault sent to the Recycle Bin from it. The caller has asked the person.
+/// History entries whose files were erased lose their Undo.
 pub async fn empty_drives_trash(
     service: Option<Arc<DrivesService>>,
     drive_id: Option<String>,
-    confirm: String,
 ) -> Result<EmptyReportDto, DrivesCommandError> {
     let Some(service) = service else {
         return Err(storage("The library is not open.".to_owned()));
     };
-    let report =
-        cv_jobs::client::spawn_blocking(move || service.empty_trash(drive_id.as_deref(), &confirm))
-            .await
-            .map_err(|error| storage(error.to_string()))?
-            .map_err(|error| DrivesCommandError {
-                code: match error {
-                    cv_app::drives::EmptyError::Confirmation => "confirmation",
-                    cv_app::drives::EmptyError::Db(_) => "storage",
-                }
-                .to_owned(),
-                message: error.to_string(),
-            })?;
+    let report = cv_jobs::client::spawn_blocking(move || service.empty_trash(drive_id.as_deref()))
+        .await
+        .map_err(|error| storage(error.to_string()))?
+        .map_err(|error| storage(error.to_string()))?;
     Ok(EmptyReportDto {
         bytes: exact(report.bytes),
         batches: u32::try_from(report.batches).unwrap_or(u32::MAX),

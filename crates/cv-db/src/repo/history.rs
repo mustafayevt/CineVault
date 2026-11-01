@@ -17,7 +17,7 @@ pub enum HistoryKind {
     Move,
     /// Sent to the Recycle Bin / Trash (or a library folder's trash folder).
     Delete,
-    /// Erased for good after the typed confirmation; never undoable.
+    /// Erased for good after a Yes or No; never undoable.
     DeletePermanent,
     Artwork,
     Match,

@@ -89,8 +89,8 @@ pub trait SystemBin: SystemTrash {
     /// Each item that could not be restored, with the reason in words.
     fn restore(&self, items: &[BinnedItem]) -> Result<(), Vec<(String, String)>>;
 
-    /// Erases these items from the bin for good (the Drives page's Empty, with its typed
-    /// confirmation). Only the items given are touched, never anything else in the bin; an item
+    /// Erases these items from the bin for good (the Drives page's Empty, after its Yes or
+    /// No). Only the items given are touched, never anything else in the bin; an item
     /// that is no longer there is skipped.
     ///
     /// # Errors
