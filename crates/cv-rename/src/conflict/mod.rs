@@ -25,7 +25,11 @@
 //! [`Resolution::KeepAsVersions`] puts the items side by side by adding a ` - <label>` to the
 //! names that are built on the video name. After resolving, [`detect`] runs again; whatever is
 //! left is still blocked.
+//!
+//! Copies of one movie are told apart before detection: [`copies::label_copies`] gives the
+//! copies whose names would clash a ` - <label>` of their own, so they never meet in [`detect`].
 
+pub mod copies;
 mod disk;
 mod numbered;
 mod resolve;
