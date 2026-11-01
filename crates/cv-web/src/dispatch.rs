@@ -1608,14 +1608,11 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             .await
             .map_err(command_error)
             .and_then(to_value),
-        "set_tool_path" => {
-            let tool: String = arg(args, "tool")?;
-            let path: Option<String> = arg(args, "path")?;
-            cv_ipc::tools::set_tool_path(&commands.tools, &commands.settings, tool, path)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
+        // A chosen path is run at once to read its version, so a browser must not name one.
+        // `install_tool` stays: it fetches only the pinned, checksummed downloads.
+        "set_tool_path" => Err(not_applicable(
+            "A tool's path is set on the computer that runs CineVault.",
+        )),
         "install_tool" => {
             let tool: String = arg(args, "tool")?;
             let stream = channel_arg(args, "onProgress")?;

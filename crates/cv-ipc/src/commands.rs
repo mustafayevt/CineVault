@@ -674,11 +674,6 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["showId", "ordering"],
     },
     CommandInfo {
-        name: "set_tool_path",
-        module: "tools",
-        args: &["tool", "path"],
-    },
-    CommandInfo {
         name: "set_watched",
         module: "curation",
         args: &["ids", "watched"],

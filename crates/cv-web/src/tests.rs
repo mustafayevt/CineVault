@@ -154,6 +154,81 @@ fn pin_of(state: &WebState) -> String {
         .collect()
 }
 
+/// Signs in from the home network; returns the cookie header and the page's CSRF token.
+async fn signed_in(state: &WebState) -> (String, String) {
+    let answer = call(
+        state,
+        "POST",
+        "/api/login",
+        "192.168.1.30",
+        &[],
+        Some(serde_json::json!({ "password": PASSWORD })),
+    )
+    .await;
+    let cookie = format!("cv_session={}", answer.session().expect("a session cookie"));
+    let page = call(
+        state,
+        "GET",
+        "/",
+        "192.168.1.30",
+        &[("cookie", &cookie)],
+        None,
+    )
+    .await;
+    let csrf = page
+        .body
+        .split("__CINEVAULT_CSRF__=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("the page carries the token")
+        .to_owned();
+    (cookie, csrf)
+}
+
+/// One command from a signed-in browser; the answer's `{ok, data | error}`.
+async fn invoke(
+    state: &WebState,
+    (cookie, csrf): &(String, String),
+    cmd: &str,
+    args: serde_json::Value,
+) -> serde_json::Value {
+    let answer = call(
+        state,
+        "POST",
+        "/api/invoke",
+        "192.168.1.30",
+        &[("cookie", cookie), ("x-cinevault-csrf", csrf)],
+        Some(serde_json::json!({ "cmd": cmd, "args": args, "client": "t" })),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK, "{}", answer.body);
+    serde_json::from_str(&answer.body).unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_browser_cannot_choose_a_tool_program() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    set_password(&state);
+    let session = signed_in(&state).await;
+    let answer = invoke(
+        &state,
+        &session,
+        "set_tool_path",
+        serde_json::json!({ "tool": "ffmpeg", "path": r"\\files\share\ffmpeg.exe" }),
+    )
+    .await;
+    assert_eq!(answer["ok"], false);
+    assert_eq!(answer["error"]["code"], "not_applicable");
+    assert_eq!(
+        answer["error"]["message"],
+        "A tool's path is set on the computer that runs CineVault."
+    );
+    assert_eq!(services.settings().get("tools.path.ffmpeg"), None);
+    services.shutdown();
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_welcome_page_is_for_the_home_network_only() {
     let dir = tempfile::tempdir().unwrap();
