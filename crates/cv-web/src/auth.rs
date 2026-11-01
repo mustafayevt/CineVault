@@ -22,6 +22,7 @@ use argon2::password_hash::rand_core::{OsRng, RngCore};
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use axum::http::HeaderMap;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 /// The file the password hash lives in, inside the data folder.
@@ -76,8 +77,25 @@ pub struct Session {
     pub agent: String,
     pub signed_in: SystemTime,
     pub last_used: SystemTime,
-    created: Instant,
-    seen: Instant,
+}
+
+impl Session {
+    /// Neither the idle nor the absolute lifetime has passed. Wall-clock times, so the answer
+    /// holds across a restart.
+    fn live_at(&self, now: SystemTime) -> bool {
+        now.duration_since(self.last_used).unwrap_or_default() <= SESSION_IDLE
+            && now.duration_since(self.signed_in).unwrap_or_default() <= SESSION_MAX
+    }
+}
+
+/// The key a session is kept under: the SHA-256 of its cookie value, so what the server holds
+/// cannot be used as a cookie. The value is 32 random bytes, so a slow hash would add nothing.
+#[must_use]
+pub fn session_key(id: &str) -> String {
+    Sha256::digest(id.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 /// One signed-in browser, as the desktop's Browser access section lists it.
@@ -156,6 +174,7 @@ pub struct Auth {
     data_dir: PathBuf,
     host: HostMode,
     password: Mutex<Option<AuthFile>>,
+    /// The live sessions by [`session_key`].
     sessions: Mutex<HashMap<String, Session>>,
     setup_claim: Mutex<Option<(String, Instant)>>,
     failures: Mutex<Failures>,
@@ -475,51 +494,50 @@ impl Auth {
 
     /// The live session, if the id is valid and neither the idle nor the absolute lifetime passed.
     pub fn session(&self, id: &str) -> Option<Session> {
-        let now = Instant::now();
+        let key = session_key(id);
+        let now = SystemTime::now();
         let mut sessions = Self::lock(&self.sessions);
-        let session = sessions.get_mut(id)?;
-        if now.duration_since(session.seen) > SESSION_IDLE
-            || now.duration_since(session.created) > SESSION_MAX
-        {
-            sessions.remove(id);
+        let session = sessions.get_mut(&key)?;
+        if !session.live_at(now) {
+            sessions.remove(&key);
             return None;
         }
-        session.seen = now;
-        session.last_used = SystemTime::now();
+        session.last_used = now;
         Some(session.clone())
     }
 
     /// Whether the session is still live, without counting as a use (a media stream checks this
     /// once per chunk).
     pub fn is_live(&self, id: &str) -> bool {
-        Self::lock(&self.sessions).contains_key(id)
+        Self::lock(&self.sessions).contains_key(&session_key(id))
     }
 
     pub fn logout(&self, id: &str) {
-        Self::lock(&self.sessions).remove(id);
+        Self::lock(&self.sessions).remove(&session_key(id));
     }
 
-    /// Ends every session except `keep`, and returns the ids that ended.
+    /// Ends every session except the one with the id `keep`, and returns the keys that ended.
     pub fn logout_all_except(&self, keep: Option<&str>) -> Vec<String> {
+        let keep = keep.map(session_key);
         let mut sessions = Self::lock(&self.sessions);
         let ended: Vec<String> = sessions
             .keys()
-            .filter(|id| Some(id.as_str()) != keep)
+            .filter(|key| Some(*key) != keep.as_ref())
             .cloned()
             .collect();
-        sessions.retain(|id, _| Some(id.as_str()) == keep);
+        sessions.retain(|key, _| Some(key) == keep.as_ref());
         ended
     }
 
-    /// Ends the session with this public handle, and returns its id.
+    /// Ends the session with this public handle, and returns its key.
     pub fn logout_handle(&self, handle: &str) -> Option<String> {
         let mut sessions = Self::lock(&self.sessions);
-        let id = sessions
+        let key = sessions
             .iter()
             .find(|(_, session)| session.handle == handle)
-            .map(|(id, _)| id.clone())?;
-        sessions.remove(&id);
-        Some(id)
+            .map(|(key, _)| key.clone())?;
+        sessions.remove(&key);
+        Some(key)
     }
 
     pub fn live_sessions(&self) -> usize {
@@ -544,33 +562,27 @@ impl Auth {
     }
 
     fn create_session(&self, address: &str, agent: &str) -> (String, Session) {
-        let now = Instant::now();
+        let now = SystemTime::now();
         let mut sessions = Self::lock(&self.sessions);
-        sessions.retain(|_, session| {
-            now.duration_since(session.seen) <= SESSION_IDLE
-                && now.duration_since(session.created) <= SESSION_MAX
-        });
+        sessions.retain(|_, session| session.live_at(now));
         if sessions.len() >= MAX_SESSIONS
             && let Some(oldest) = sessions
                 .iter()
-                .min_by_key(|(_, session)| session.seen)
-                .map(|(id, _)| id.clone())
+                .min_by_key(|(_, session)| session.last_used)
+                .map(|(key, _)| key.clone())
         {
             sessions.remove(&oldest);
         }
         let id = random_hex(32);
-        let wall = SystemTime::now();
         let session = Session {
             csrf: random_hex(32),
             handle: random_hex(16),
             address: address.to_owned(),
             agent: agent.chars().take(AGENT_MAX).collect(),
-            signed_in: wall,
-            last_used: wall,
-            created: now,
-            seen: now,
+            signed_in: now,
+            last_used: now,
         };
-        sessions.insert(id.clone(), session.clone());
+        sessions.insert(session_key(&id), session.clone());
         (id, session)
     }
 
@@ -1300,10 +1312,20 @@ mod tests {
                 .any(|s| s.address == "192.168.1.30" && s.agent == "Phone browser")
         );
         assert!(list.iter().all(|s| s.handle != first && s.handle != second));
-        assert_eq!(auth.logout_handle(&one.handle), Some(first.clone()));
+        assert_eq!(auth.logout_handle(&one.handle), Some(session_key(&first)));
         assert!(auth.session(&first).is_none());
         assert!(auth.session(&second).is_some());
         assert_eq!(auth.logout_handle("unknown"), None);
+    }
+
+    #[tokio::test]
+    async fn the_sessions_are_kept_by_a_hash_of_the_cookie() {
+        let (_dir, auth) = with_password();
+        let (id, _) = auth.login(GOOD, "a", "", true).await.unwrap();
+        let sessions = Auth::lock(&auth.sessions);
+        assert!(!sessions.contains_key(&id));
+        assert!(sessions.contains_key(&session_key(&id)));
+        assert!(sessions.keys().all(|key| key.len() == 64 && *key != id));
     }
 
     #[test]

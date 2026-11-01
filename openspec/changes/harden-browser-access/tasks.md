@@ -22,7 +22,7 @@
 
 ## 5. Sessions kept across restarts
 
-- [ ] 5.1 Move `Session` expiry to wall-clock times and key the map by the SHA-256 of the cookie value. Verified by the existing `auth` tests and a test that the map never holds a cookie value.
+- [x] 5.1 Move `Session` expiry to wall-clock times and key the map by the SHA-256 of the cookie value. Verified by the existing `auth` tests and a test that the map never holds a cookie value.
 - [ ] 5.2 Add the `server-sessions.json` store: load with expiry and the password fingerprint, write atomically with mode `0600` on sign-in, sign-out, sign-out-all, eviction and password change, uses written at most every 5 minutes, a damaged file set aside as `.bad`. Verified by tests: a session survives a new `Auth` over the same folder; a changed `server-auth.json` drops every session; an expired one is dropped on load; a damaged file starts empty and is kept aside; the file mode is `0600` on Unix; the file holds no cookie value.
 - [ ] 5.3 In `embed`, `begin_stop` (quit) keeps sessions and `stop` (switch off, port change) ends them. Verified by embed tests: sign in, `begin_stop`, start again, the cookie still works; sign in, `stop`, start again, the cookie is signed out.
 

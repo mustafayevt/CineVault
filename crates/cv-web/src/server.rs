@@ -526,7 +526,7 @@ async fn reset_finish(
     match finished {
         Ok(Ok((id, _))) => {
             // Every other browser's streams end with their sessions.
-            state.streams.close_all_except(&id);
+            state.streams.close_all_except(&auth::session_key(&id));
             let mut response = Json(json!({ "ok": true })).into_response();
             set_cookie(
                 &mut response,
@@ -606,7 +606,9 @@ async fn server_password(
     {
         Ok(()) => {
             state.auth.logout_all_except(Some(&session_id));
-            state.streams.close_all_except(&session_id);
+            state
+                .streams
+                .close_all_except(&auth::session_key(&session_id));
             Json(json!({ "ok": true })).into_response()
         }
         Err(error) => {
@@ -635,7 +637,9 @@ async fn server_sign_out_all(State(state): State<WebState>, headers: HeaderMap) 
             .into_response();
     }
     state.auth.logout_all_except(Some(&session_id));
-    state.streams.close_all_except(&session_id);
+    state
+        .streams
+        .close_all_except(&auth::session_key(&session_id));
     Json(json!({ "ok": true })).into_response()
 }
 
@@ -646,7 +650,7 @@ async fn logout(
 ) -> Response {
     if let Some(id) = auth::cookie(&headers, "cv_session") {
         state.auth.logout(&id);
-        state.streams.close_session(&id);
+        state.streams.close_session(&auth::session_key(&id));
     }
     let mut response = Json(json!({ "ok": true })).into_response();
     set_cookie(
@@ -911,7 +915,8 @@ async fn stream(
         .get("last-event-id")
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.parse::<u64>().ok());
-    let (replay, receiver) = state.streams.connect(&client, &session_id, last_event_id);
+    let key = auth::session_key(&session_id);
+    let (replay, receiver) = state.streams.connect(&client, &key, last_event_id);
     let stream =
         tokio_stream::iter(replay.into_iter().map(Ok)).chain(ReceiverStream::new(receiver));
     Sse::new(stream)
