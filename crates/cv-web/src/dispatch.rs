@@ -215,6 +215,84 @@ fn inside_roots(state: &WebState, path: &str) -> Result<(), Value> {
     }
 }
 
+/// The sentence a browser gets for a setting only the computer that runs CineVault may change.
+const HOST_SETTING: &str = "This setting is changed on the computer that runs CineVault.";
+
+/// The settings a browser may not change: the update channel and its key decide which installer
+/// the desktop trusts, and a tool's path and the player name programs the host runs. An entry
+/// ending in `.` is a prefix. A new setting whose value is a path, a program or a command needs a
+/// decision here (`every_path_setting_has_a_browser_decision`).
+const HOST_SETTINGS: &[&str] = &[
+    "general.update-channel",
+    "general.update-public-key",
+    "tools.path.",
+    "player.kind",
+    "player.path",
+    "player.custom-command",
+];
+
+/// Folders the host writes into, accepted from a browser only when empty or inside the roots.
+const HOST_FOLDERS: &[&str] = &["files.trash-folder", "metadata.nfo-collection-folder"];
+
+fn host_setting(key: &str) -> bool {
+    HOST_SETTINGS.iter().any(|entry| {
+        if entry.ends_with('.') {
+            key.starts_with(entry)
+        } else {
+            key == *entry
+        }
+    })
+}
+
+/// Refuses a host setting, and a host folder outside the folders this server may browse.
+fn guard_setting(state: &WebState, key: &str, value_json: &str) -> Result<(), String> {
+    if host_setting(key) {
+        return Err(HOST_SETTING.to_owned());
+    }
+    if !HOST_FOLDERS.contains(&key) {
+        return Ok(());
+    }
+    let folder = match serde_json::from_str::<Value>(value_json) {
+        Ok(Value::String(text)) => text,
+        Ok(Value::Null) => String::new(),
+        _ => return Err("The folder must be an absolute path.".to_owned()),
+    };
+    if folder.trim().is_empty()
+        || folder_inside_roots(&folder, &crate::server::allowed_roots(state))
+    {
+        Ok(())
+    } else {
+        Err("That folder is outside the folders this server may browse.".to_owned())
+    }
+}
+
+/// Whether a folder, which may not exist yet, is inside `roots`. Its deepest existing part is
+/// resolved, so `..` and links cannot leave the roots; what follows must be plain names.
+fn folder_inside_roots(text: &str, roots: &[std::path::PathBuf]) -> bool {
+    let path = Path::new(text.trim());
+    if !path.is_absolute() {
+        return false;
+    }
+    let mut existing = path;
+    let mut missing = Vec::new();
+    let resolved = loop {
+        if let Ok(resolved) = std::fs::canonicalize(existing) {
+            break resolved;
+        }
+        // `file_name` is `None` for a path that ends in `..`, which is refused.
+        let (Some(parent), Some(name)) = (existing.parent(), existing.file_name()) else {
+            return false;
+        };
+        missing.push(name);
+        existing = parent;
+    };
+    let full = missing
+        .iter()
+        .rev()
+        .fold(resolved, |folder, name| folder.join(name));
+    crate::server::path_inside_roots(&full, roots)
+}
+
 /// Where a browser may take an artwork image from: a web address, or a file it uploaded to the
 /// server's staging folder (`<data>/tmp/artwork-*`). Anything else, a `file:` address, another
 /// server path, a quoted or `..` path that only looks staged, is refused, so a command cannot
@@ -344,13 +422,16 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             let key: String = arg(args, "key")?;
             let value_json: String = arg(args, "valueJson")?;
             // The interface throws this as a sentence, so the answer is a plain message.
+            guard_setting(state, &key, &value_json).map_err(Value::String)?;
             cv_ipc::settings::set_setting(&commands.settings, key, value_json)
                 .await
                 .map_err(Value::String)
                 .and_then(to_value)
         }
         "reset_settings" => {
-            let keys: Vec<String> = arg(args, "keys")?;
+            let mut keys: Vec<String> = arg(args, "keys")?;
+            // "Reset to defaults" still works; the computer's own settings stay as they are.
+            keys.retain(|key| !host_setting(key));
             cv_ipc::settings::reset_settings(&commands.settings, keys)
                 .await
                 .map_err(Value::String)
@@ -2113,5 +2194,61 @@ mod tests {
         };
         assert_eq!(platform.busy_jobs(), 0);
         assert!(platform.open_url("https://example.com").is_err());
+    }
+
+    #[test]
+    fn the_host_settings_are_matched_by_key_and_prefix() {
+        for key in [
+            "general.update-channel",
+            "general.update-public-key",
+            "tools.path.ffmpeg",
+            "tools.path.mediainfo",
+            "player.kind",
+            "player.path",
+            "player.custom-command",
+        ] {
+            assert!(host_setting(key), "{key}");
+        }
+        for key in ["general.language", "tools.pathx", "files.trash-folder"] {
+            assert!(!host_setting(key), "{key}");
+        }
+    }
+
+    /// A host folder from a browser must stay inside the roots: a new folder inside is accepted,
+    /// a `..` walk and a folder elsewhere are not.
+    #[test]
+    fn a_host_folder_must_stay_inside_the_roots() {
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("media");
+        let outside = base.path().join("elsewhere");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        let roots = vec![root.clone()];
+        let inside = root.join("movies").join(".trash");
+        assert!(folder_inside_roots(inside.to_str().unwrap(), &roots));
+        assert!(folder_inside_roots(root.to_str().unwrap(), &roots));
+        let walk = format!("{}/../elsewhere", root.display());
+        let walk_new = format!("{}/new/../../elsewhere", root.display());
+        for text in [
+            outside.to_str().unwrap(),
+            walk.as_str(),
+            walk_new.as_str(),
+            "relative/trash",
+        ] {
+            assert!(!folder_inside_roots(text, &roots), "{text} must be refused");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_out_of_the_roots_is_refused() {
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("media");
+        let outside = base.path().join("elsewhere");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("link")).unwrap();
+        let through = root.join("link").join("trash");
+        assert!(!folder_inside_roots(through.to_str().unwrap(), &[root]));
     }
 }

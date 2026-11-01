@@ -205,6 +205,18 @@ async fn invoke(
     serde_json::from_str(&answer.body).unwrap()
 }
 
+async fn set_from_browser(
+    state: &WebState,
+    session: &(String, String),
+    key: &str,
+    value: &serde_json::Value,
+) -> serde_json::Value {
+    let args = serde_json::json!({ "key": key, "valueJson": value.to_string() });
+    invoke(state, session, "set_setting", args).await
+}
+
+const HOST_SETTING: &str = "This setting is changed on the computer that runs CineVault.";
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_browser_cannot_choose_a_tool_program() {
     let dir = tempfile::tempdir().unwrap();
@@ -226,6 +238,87 @@ async fn a_browser_cannot_choose_a_tool_program() {
         "A tool's path is set on the computer that runs CineVault."
     );
     assert_eq!(services.settings().get("tools.path.ffmpeg"), None);
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_browser_cannot_change_the_host_settings() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    set_password(&state);
+    let session = signed_in(&state).await;
+    for key in [
+        "general.update-channel",
+        "general.update-public-key",
+        "tools.path.ffmpeg",
+        "tools.path.mediainfo",
+        "player.kind",
+        "player.path",
+        "player.custom-command",
+    ] {
+        let value = serde_json::json!("https://updates.example.net/manifest.json");
+        let answer = set_from_browser(&state, &session, key, &value).await;
+        assert_eq!(answer["ok"], false, "{key}");
+        assert_eq!(answer["error"], HOST_SETTING, "{key}");
+        assert_eq!(services.settings().get(key), None, "{key}");
+    }
+
+    // Folders the host writes into: inside the roots (the data folder here) or nothing.
+    let inside = state.data_root.join("media").join(".trash");
+    let outside = dir.path().join("elsewhere");
+    std::fs::create_dir_all(&outside).unwrap();
+    let walk = format!(
+        "{}/../../elsewhere",
+        state.data_root.join("media").display()
+    );
+    for key in ["files.trash-folder", "metadata.nfo-collection-folder"] {
+        for refused in [outside.to_str().unwrap(), walk.as_str()] {
+            let answer = set_from_browser(&state, &session, key, &serde_json::json!(refused)).await;
+            assert_eq!(answer["ok"], false, "{key} {refused}");
+            assert_eq!(services.settings().get(key), None, "{key}");
+        }
+        let value = serde_json::json!(inside.to_str().unwrap());
+        let answer = set_from_browser(&state, &session, key, &value).await;
+        assert_eq!(answer["ok"], true, "{key}: {answer}");
+        assert_eq!(services.settings().get(key), Some(value), "{key}");
+        let cleared = set_from_browser(&state, &session, key, &serde_json::json!("")).await;
+        assert_eq!(cleared["ok"], true, "{key}: {cleared}");
+    }
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_browser_reset_keeps_the_host_settings() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    set_password(&state);
+    let channel = serde_json::json!("https://updates.example.net/manifest.json");
+    // Set at the computer.
+    services
+        .settings()
+        .set("general.update-channel", channel.clone())
+        .unwrap();
+    services
+        .settings()
+        .set("appearance.motion", serde_json::json!("reduce"))
+        .unwrap();
+    let session = signed_in(&state).await;
+    let keys = serde_json::json!(["general.update-channel", "appearance.motion"]);
+    let answer = invoke(
+        &state,
+        &session,
+        "reset_settings",
+        serde_json::json!({ "keys": keys }),
+    )
+    .await;
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert_eq!(services.settings().get("appearance.motion"), None);
+    assert_eq!(
+        services.settings().get("general.update-channel"),
+        Some(channel)
+    );
     services.shutdown();
 }
 
