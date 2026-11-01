@@ -53,7 +53,6 @@ pub mod settings;
 pub mod step_outcomes;
 pub mod title_guard;
 pub mod tools;
-pub mod top250;
 pub mod torrent_settings;
 pub mod torrents;
 pub mod trash_folders;

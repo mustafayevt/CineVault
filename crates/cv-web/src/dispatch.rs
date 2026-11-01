@@ -1153,13 +1153,6 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             .await?
             .and_then(to_value)
         }
-        "fetch_imdb_top250" => {
-            let list: cv_ipc::ratings::Top250ListDto = arg(args, "list")?;
-            cv_ipc::ratings::fetch_imdb_top250(library, list)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
         "count_rating_sweep" => {
             let scope: cv_ipc::ratings::RatingSweepScopeDto = arg(args, "scope")?;
             let provider: Option<String> = arg(args, "provider")?;
@@ -2015,18 +2008,13 @@ mod tests {
     }
 
     /// The commands a browser cannot perform answer `not_applicable` with a sentence; the
-    /// interface hides their controls. `fetch_imdb_top250` is served but not yet in the shared
-    /// table, so it is not desktop-only.
+    /// interface hides their controls.
     #[test]
     fn the_desktop_only_commands_answer_not_applicable() {
         let registry: BTreeSet<&str> = registry().iter().map(|command| command.name).collect();
         let dev = ["ping", "register_image_source", "start_sample_job"];
-        let served_elsewhere = ["fetch_imdb_top250"];
         for name in binding_commands() {
-            if registry.contains(name.as_str())
-                || dev.contains(&name.as_str())
-                || served_elsewhere.contains(&name.as_str())
-            {
+            if registry.contains(name.as_str()) || dev.contains(&name.as_str()) {
                 continue;
             }
             let body = arm(&name);

@@ -202,7 +202,6 @@ pub fn builder() -> Builder<tauri::Wry> {
             crate::providers_ipc::get_key_attention,
             crate::providers_ipc::test_provider_credentials,
             crate::providers_ipc::list_provider_attributions,
-            crate::ratings_ipc::fetch_imdb_top250,
             crate::ratings_ipc::open_rating_page,
             crate::ratings_ipc::count_rating_sweep,
             crate::ratings_ipc::start_rating_sweep,

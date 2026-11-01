@@ -1,13 +1,13 @@
-//! A site that asks for a human check (IMDb, fernsehserien.de, OFDb) cannot be reached by a
-//! program. Searches answer "unavailable right now" for it, not a failure with Retry; an
-//! ordinary request failure stays a failure.
+//! A site that asks for a human check (fernsehserien.de, OFDb) cannot be reached by a program.
+//! Searches answer "unavailable right now" for it, not a failure with Retry; an ordinary request
+//! failure stays a failure.
 
 use cv_app::artwork::stream::{SourceAnswer, UNAVAILABLE};
 use cv_providers::ProviderError;
 
 fn request(message: &str) -> ProviderError {
     ProviderError::Request {
-        provider: "IMDb".to_owned(),
+        provider: "OFDb".to_owned(),
         message: message.to_owned(),
     }
 }

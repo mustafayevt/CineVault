@@ -42,7 +42,6 @@
 //! - [`ratings`]: ratings per source with their scales, and the user rating, which no update or
 //!   scrape overwrites.
 //! - [`people`]: the actors and directors of the library found by name, for the command palette.
-//! - [`top250`]: the IMDb Top 250 position of movies and shows, stored from a fetched chart.
 //! - [`torrent_indexers`]: the indexers of the managed indexer service and how the last check left them.
 //! - [`torrent_landing`]: the library movies whose copy could be better and the newest additions,
 //!   for the Torrent search landing.
@@ -86,7 +85,6 @@ pub mod search;
 pub mod size_totals;
 pub mod step_outcome;
 pub mod table_facts;
-pub mod top250;
 pub mod torrent_indexers;
 pub mod torrent_landing;
 pub mod watched;
@@ -137,5 +135,4 @@ pub use ratings::{
     get_ratings, get_user_rating, rating_fetch_candidates, remove_rating, set_user_rating,
     upsert_ratings,
 };
-pub use top250::{Top250Report, apply_top250};
 pub use watched::{WatchState, get_watch_state, playable_in, set_watch_state};

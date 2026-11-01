@@ -33,13 +33,13 @@ fn jpeg(seed: u8) -> Vec<u8> {
     out.into_inner()
 }
 
-/// English posters with every kind of popularity, under a key that needs no credentials.
+/// English posters with every kind of popularity, posing as Fanart.tv, whose key the rig sets.
 struct Voted;
 
 #[async_trait]
 impl Provider for Voted {
     fn id(&self) -> &'static str {
-        "imdb"
+        "fanart"
     }
     fn name(&self) -> &'static str {
         "Voted"
@@ -111,6 +111,7 @@ fn rig() -> Rig {
     let providers = Arc::new(ProviderCredentialsService::with_resolver(
         resolver, registry,
     ));
+    providers.set("fanart", "api_key", "a-key").unwrap();
     let settings = Arc::new(SettingsService::in_memory(""));
     let fetcher = Arc::new(StaticFetcher::new());
     for (n, (name, ..)) in POSTERS.iter().enumerate() {

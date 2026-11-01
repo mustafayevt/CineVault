@@ -174,11 +174,6 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["tools"],
     },
     CommandInfo {
-        name: "fetch_imdb_top250",
-        module: "ratings",
-        args: &["list"],
-    },
-    CommandInfo {
         name: "fill_season_artwork",
         module: "artwork",
         args: &["itemId", "season"],
