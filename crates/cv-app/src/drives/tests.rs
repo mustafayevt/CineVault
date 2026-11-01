@@ -845,3 +845,121 @@ fn a_drive_counts_and_empties_only_the_trash_items_cinevault_recorded() {
     let row = db.read(move |c| get_entry(c, recorded)).unwrap().unwrap();
     assert_eq!(row.undo_state, UndoState::None);
 }
+
+// ---- network shares ----------------------------------------------------------------------------
+
+/// Volumes by the mount points they were given, the longest that holds the path.
+struct Mounts(Vec<Volume>);
+
+impl Volumes for Mounts {
+    fn locate(&self, path: &str) -> Option<Volume> {
+        self.0
+            .iter()
+            .filter(|v| path.starts_with(&v.key))
+            .max_by_key(|v| v.key.len())
+            .cloned()
+    }
+}
+
+#[test]
+fn folders_on_a_share_cinevault_connected_are_one_drive_named_after_the_share() {
+    use cv_db::repo::network_shares::{NewNetworkShare, insert_share};
+
+    let dir = tempfile::tempdir().unwrap();
+    let db = Arc::new(Database::open(dir.path().join("library.db")).unwrap());
+    let mac = "/Users/alex/CineVault Shares/nas/movies";
+    let gvfs = "/run/user/1000/gvfs/smb-share:server=nas,share=tv";
+    for (server, share, local_root) in [("nas", "movies", mac), ("nas", "tv", gvfs)] {
+        db.write(move |tx| {
+            insert_share(
+                tx,
+                &NewNetworkShare {
+                    server,
+                    share,
+                    user: "alex",
+                    local_root,
+                    remember: true,
+                },
+            )
+        })
+        .unwrap();
+    }
+    let paths = [
+        format!("{mac}/Films"),
+        "/Users/alex/Movies".to_owned(),
+        format!("{mac}/Series"),
+        format!("{gvfs}/Shows"),
+        format!("{gvfs}/Anime"),
+    ];
+    let ids: Vec<i64> = paths
+        .iter()
+        .map(|path| {
+            let path = path.clone();
+            db.write(move |tx| insert_source(tx, SourceKind::Movie, &path))
+                .unwrap()
+                .id
+        })
+        .collect();
+    let volumes = Arc::new(Mounts(vec![
+        volume("/", "Macintosh HD", DriveKind::Ssd, TB, 300 * GB),
+        volume(
+            mac,
+            "//alex@nas/movies",
+            DriveKind::Network,
+            16 * TB,
+            9 * TB,
+        ),
+        volume(
+            "/run/user/1000/gvfs",
+            "gvfsd-fuse",
+            DriveKind::Network,
+            0,
+            0,
+        ),
+    ]));
+    let answers = Arc::new(Answers(Mutex::new(
+        ids.iter().map(|id| (*id, true)).collect(),
+    )));
+    let service = DrivesService::with(db, volumes, answers);
+
+    let overview = service.overview().unwrap();
+    let found: Vec<(&str, &str, DriveKind, Vec<&str>)> = overview
+        .drives
+        .iter()
+        .map(|d| {
+            (
+                d.id.as_str(),
+                d.name.as_str(),
+                d.kind,
+                d.folders.iter().map(|f| f.path.as_str()).collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (
+                r"\\nas\movies",
+                r"\\nas\movies",
+                DriveKind::Network,
+                vec![paths[0].as_str(), paths[2].as_str()]
+            ),
+            ("/", "Macintosh HD", DriveKind::Ssd, vec![paths[1].as_str()]),
+            (
+                r"\\nas\tv",
+                r"\\nas\tv",
+                DriveKind::Network,
+                vec![paths[3].as_str(), paths[4].as_str()]
+            ),
+        ]
+    );
+    // The share's space is the mount's.
+    assert_eq!(
+        (
+            overview.drives[0].total_bytes,
+            overview.drives[0].free_bytes
+        ),
+        (16 * TB, 9 * TB)
+    );
+    assert!(overview.drives.iter().all(|d| d.online));
+}

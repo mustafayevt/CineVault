@@ -49,6 +49,7 @@ use cv_artwork::thumb_job::{build_after, default_parallelism as thumb_parallelis
 use cv_db::repo::clear_all_new;
 use cv_db::repo::data_sources::{get_source, list_sources};
 use cv_db::repo::media_info::{SourceCounts, pending_media_info, source_counts};
+use cv_db::repo::network_shares::NetworkShare;
 use cv_db::{Database, DbError};
 use cv_domain::{DataSource, ItemId, SourceKind};
 use cv_jobs::{JobManager, StoreError};
@@ -68,6 +69,7 @@ use crate::media_info::{
     default_parallelism as media_parallelism, reload_titles, submit_media_info, submit_named,
     tools_reader_source,
 };
+use crate::network_shares::{NetworkShareService, OfflineReason, ShareState};
 use crate::notices::{AppNotice, NoticeHub, NoticeLevel};
 
 /// Setting: clear the NEW flag of every title when a data-source update starts, so only what
@@ -209,6 +211,10 @@ pub struct SourceHealth {
     pub source: DataSource,
     pub state: SourceState,
     pub counts: SourceCounts,
+    /// Why an offline folder on a network share is offline ("Wrong password", …).
+    pub reason: Option<OfflineReason>,
+    /// The network share the folder is on, when CineVault connected one for it.
+    pub share: Option<NetworkShare>,
 }
 
 #[derive(Default)]
@@ -265,6 +271,8 @@ pub struct ScanService {
     probes: Mutex<HashMap<String, ProbeMemory>>,
     /// Announces the titles whose media info was read, so open pages refresh.
     changes: crate::changes::Changes,
+    /// The network shares, which say when a folder's share is still being connected.
+    shares: Mutex<Option<Arc<NetworkShareService>>>,
     me: Weak<ScanService>,
 }
 
@@ -304,6 +312,7 @@ impl ScanService {
             skips_announced: Mutex::new(HashMap::new()),
             probes: Mutex::new(HashMap::new()),
             changes: crate::changes::Changes::default(),
+            shares: Mutex::new(None),
             me: me.clone(),
         })
     }
@@ -311,6 +320,12 @@ impl ScanService {
     /// Connects the service to the hub that announces what changed to open pages.
     pub fn set_changes(&self, hub: Arc<crate::changes::ChangeHub>) {
         self.changes.set(hub);
+    }
+
+    /// Connects the service to the network shares, so a folder whose share is still being
+    /// connected at start is not probed as gone.
+    pub fn set_shares(&self, shares: Arc<NetworkShareService>) {
+        *locked(&self.shares) = Some(shares);
     }
 
     /// Replaces how media info is read. For tests, which have no MediaInfo library.
@@ -615,8 +630,10 @@ impl ScanService {
 
     /// Starts the scan work of a launch: the scan on startup (unless the previous session's scan
     /// was resumed instead or there is no data source), the watcher, and the media info that is
-    /// still pending. Must be called inside a tokio runtime.
-    pub fn startup(&self, resumed_rescans: usize) {
+    /// still pending. The library folders below `waiting` (the network shares being connected)
+    /// are left out; [`Self::folders_connected`] scans them when their share is done. Must be
+    /// called inside a tokio runtime.
+    pub fn startup(&self, resumed_rescans: usize, waiting: &[String]) {
         *locked(&self.runtime) = tokio::runtime::Handle::try_current().ok();
         let has_sources = self
             .db
@@ -625,7 +642,7 @@ impl ScanService {
         if self.background.load(Ordering::SeqCst)
             && resumed_rescans == 0
             && has_sources
-            && let Err(error) = self.rescan_all()
+            && let Err(error) = self.rescan_all_but(waiting)
         {
             tracing::warn!(%error, "the scan on startup could not be queued");
             self.notices.publish(
@@ -636,6 +653,62 @@ impl ScanService {
         }
         self.refresh_watcher();
         self.request_media_info();
+    }
+
+    /// The scan on startup: every target but the library folders below `waiting`.
+    fn rescan_all_but(&self, waiting: &[String]) -> Result<(), ScanError> {
+        let targets: Vec<RescanTarget> = rescan_targets(&self.db)?
+            .into_iter()
+            .filter(|target| match target {
+                RescanTarget::Source { path, .. } => !waiting.iter().any(|root| {
+                    cv_fs::paths::is_within_with(path, root, cv_fs::paths::CASE_SENSITIVE)
+                }),
+                RescanTarget::Detached => true,
+            })
+            .collect();
+        if targets.is_empty() {
+            return Ok(());
+        }
+        self.reset_new_if_asked()?;
+        self.submit(targets).map(drop)
+    }
+
+    /// The share of the library folders `ids` finished connecting (or gave up): they are scanned
+    /// and watched now, unless background scans are off. Callable from any thread once
+    /// [`Self::startup`] ran.
+    pub fn folders_connected(&self, ids: &[i64]) {
+        if ids.is_empty() || !self.background.load(Ordering::SeqCst) {
+            return;
+        }
+        let runtime = locked(&self.runtime)
+            .clone()
+            .or_else(|| tokio::runtime::Handle::try_current().ok());
+        let Some(runtime) = runtime else {
+            tracing::warn!("the folders of a network share need the async runtime to be scanned");
+            return;
+        };
+        let _inside = runtime.enter();
+        let targets = match self.db.read(|conn| list_sources(conn, None)) {
+            Ok(sources) => sources
+                .into_iter()
+                .filter(|source| ids.contains(&source.id))
+                .map(|source| RescanTarget::Source {
+                    id: source.id,
+                    kind: source.kind,
+                    path: source.path,
+                })
+                .collect::<Vec<_>>(),
+            Err(error) => {
+                tracing::warn!(%error, "cannot list the folders of a network share");
+                return;
+            }
+        };
+        if !targets.is_empty()
+            && let Err(error) = self.submit(targets)
+        {
+            tracing::warn!(%error, "the folders of a network share could not be scanned");
+        }
+        self.refresh_watcher();
     }
 
     /// Stops the watcher.
@@ -878,6 +951,7 @@ impl ScanService {
             sources.iter().map(|source| source.path.as_str()),
             PROBE_TIMEOUT,
         );
+        let shares = locked(&self.shares).clone();
         let mut memory = locked(&self.probes);
         let health: Vec<SourceHealth> = sources
             .into_iter()
@@ -885,11 +959,28 @@ impl ScanService {
             .map(|(source, answer)| {
                 let counts = self.db.read(|conn| source_counts(conn, &source.path))?;
                 let seen = memory.entry(source.path.clone()).or_default();
-                let state = seen.state(answer, &counts);
+                let share = shares.as_ref().and_then(|s| s.share_of(&source.path));
+                let held = share
+                    .as_ref()
+                    .zip(shares.as_ref())
+                    .and_then(|(share, s)| s.state_of(share));
+                let (state, reason) = match held {
+                    _ if answer == Some(true) => (seen.state(answer, &counts), None),
+                    // Its share is still connecting at start: not there yet is not gone.
+                    Some(ShareState::Connecting) => (seen.guess(&counts), None),
+                    // Its share did not connect: offline at once, saying why.
+                    Some(ShareState::Failed(reason)) => {
+                        seen.state(Some(false), &counts);
+                        (SourceState::Offline, Some(reason))
+                    }
+                    None => (seen.state(answer, &counts), None),
+                };
                 Ok(SourceHealth {
                     source,
                     state,
                     counts,
+                    reason,
+                    share,
                 })
             })
             .collect::<Result<_, DbError>>()?;
@@ -980,15 +1071,23 @@ impl ProbeMemory {
             }
             None => {
                 self.silent += 1;
-                if self.silent > 1 {
-                    false
-                } else {
-                    self.last
-                        .unwrap_or(counts.titles == 0 || counts.offline < counts.titles)
-                }
+                self.silent <= 1 && self.guess(counts) == SourceState::Online
             }
         };
         if online {
+            SourceState::Online
+        } else {
+            SourceState::Offline
+        }
+    }
+
+    /// The folder's state without an answer: its last answer, or, before it ever answered, what
+    /// the library last knew of its titles.
+    fn guess(&self, counts: &SourceCounts) -> SourceState {
+        if self
+            .last
+            .unwrap_or(counts.titles == 0 || counts.offline < counts.titles)
+        {
             SourceState::Online
         } else {
             SourceState::Offline

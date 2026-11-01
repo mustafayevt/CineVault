@@ -23,6 +23,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use sha2::{Digest, Sha256};
 
@@ -261,9 +262,13 @@ impl SecretBackend for MemoryBackend {
     }
 }
 
+/// Tells one store's accounts from another's in the redaction holders.
+static NEXT_STORE: AtomicU64 = AtomicU64::new(0);
+
 /// Secret storage used by the app services.
 pub struct SecretStore {
     backend: Box<dyn SecretBackend>,
+    id: u64,
 }
 
 impl fmt::Debug for SecretStore {
@@ -297,7 +302,13 @@ impl SecretStore {
     pub fn with_backend(backend: impl SecretBackend + 'static) -> Self {
         Self {
             backend: Box::new(backend),
+            id: NEXT_STORE.fetch_add(1, Ordering::Relaxed),
         }
+    }
+
+    /// The owner of an account's value in the redaction holders.
+    fn owner(&self, account: &str) -> String {
+        format!("secret-store-{}/{account}", self.id)
     }
 
     fn check_account(account: &str) -> Result<(), SecretError> {
@@ -316,7 +327,7 @@ impl SecretStore {
             ));
         }
         // Register first so the value is masked even if the store call logs an error.
-        redact::register_secret(value);
+        redact::hold_secret(&self.owner(account), value);
         self.backend.set(account, value)
     }
 
@@ -325,7 +336,7 @@ impl SecretStore {
         Self::check_account(account)?;
         let value = self.backend.get(account)?;
         if let Some(v) = &value {
-            redact::register_secret(v);
+            redact::hold_secret(&self.owner(account), v);
         }
         Ok(value.map(Secret))
     }
@@ -338,9 +349,7 @@ impl SecretStore {
     /// Removes a secret. Returns whether one existed.
     pub fn delete(&self, account: &str) -> Result<bool, SecretError> {
         Self::check_account(account)?;
-        if let Some(v) = self.backend.get(account)? {
-            redact::unregister_secret(&v);
-        }
+        redact::release_secret(&self.owner(account));
         self.backend.delete(account)
     }
 }

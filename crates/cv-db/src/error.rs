@@ -95,6 +95,10 @@ pub enum DbError {
     #[error("data source {0} does not exist")]
     SourceNotFound(i64),
 
+    /// The network share does not exist.
+    #[error("network share {0} does not exist")]
+    NetworkShareNotFound(i64),
+
     /// A reader connection was poisoned by a panic in another thread.
     #[error("the reader pool is unusable after a panic in another thread")]
     PoolPoisoned,

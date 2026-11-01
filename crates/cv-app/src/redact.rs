@@ -12,8 +12,9 @@
 //! reaches the log sink unredacted.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::io::{self, Write};
-use std::sync::{OnceLock, RwLock};
+use std::sync::{LazyLock, Mutex, OnceLock, RwLock};
 
 use regex::{Captures, Regex};
 use tracing_subscriber::fmt::MakeWriter;
@@ -25,6 +26,10 @@ pub const MASK: &str = "[REDACTED]";
 const MIN_KNOWN_LEN: usize = 6;
 
 static KNOWN: RwLock<Vec<String>> = RwLock::new(Vec::new());
+
+/// The value each owner holds ([`hold_secret`]), so one owner letting go does not unmask a value
+/// another still uses.
+static HELD: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(Mutex::default);
 
 /// Query / form parameter names whose values are credentials.
 const PARAM_NAMES: &str = "api[_-]?key|apikey|key|token|access[_-]?token|refresh[_-]?token|\
@@ -92,6 +97,32 @@ pub fn unregister_secret(value: &str) {
     let encoded = percent_encode(value);
     let mut known = KNOWN.write().unwrap_or_else(|e| e.into_inner());
     known.retain(|k| k != value && *k != encoded);
+}
+
+/// Registers `value` as the secret `owner` holds (a stored credential, a password kept in
+/// memory), replacing what `owner` held before. A value stays masked while any owner holds it.
+pub fn hold_secret(owner: &str, value: &str) {
+    register_secret(value);
+    let mut held = HELD.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(before) = held.insert(owner.to_owned(), value.to_owned())
+        && before != value
+    {
+        unregister_unheld(&held, &before);
+    }
+}
+
+/// Lets go of what `owner` held: the value is forgotten unless another owner holds it too.
+pub fn release_secret(owner: &str) {
+    let mut held = HELD.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(before) = held.remove(owner) {
+        unregister_unheld(&held, &before);
+    }
+}
+
+fn unregister_unheld(held: &HashMap<String, String>, value: &str) {
+    if !held.values().any(|other| other == value) {
+        unregister_secret(value);
+    }
 }
 
 /// Returns `text` with credentials masked. Borrows when nothing needed masking.

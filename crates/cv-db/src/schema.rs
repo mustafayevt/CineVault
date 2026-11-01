@@ -47,6 +47,16 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "reread_media_info",
         sql: include_str!("migrations/103_reread_media_info.sql"),
     },
+    Migration {
+        version: 104,
+        name: "network_share",
+        sql: include_str!("migrations/104_network_share.sql"),
+    },
+    Migration {
+        version: 105,
+        name: "network_share_connected_by_us",
+        sql: include_str!("migrations/105_network_share_connected_by_us.sql"),
+    },
 ];
 
 /// The schema version of this build: the last migration, or [`BASE_VERSION`] when there is none.
@@ -91,6 +101,7 @@ pub const TABLES: &[&str] = &[
     "torrent_indexers",
     "history_entry",
     "history_title",
+    "network_share",
 ];
 
 /// Every table of the current schema ([`TABLES`]).

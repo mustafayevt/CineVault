@@ -57,6 +57,7 @@ mod scan_ipc;
 mod scrape_preview_ipc;
 mod scrape_stream_ipc;
 mod settings_ipc;
+mod shares_ipc;
 mod sources_ipc;
 mod tools_ipc;
 mod torrent_indexer_ipc;
@@ -200,6 +201,7 @@ fn main() {
                 ),
             };
             app.manage(library);
+            app.manage(shares_ipc::SharesState::from_services(boot.services()));
             let images = img_ipc::ImageState::from_boot(&boot);
             app.manage(organize_ipc::OrganizeState::new(Arc::clone(
                 images.sources(),

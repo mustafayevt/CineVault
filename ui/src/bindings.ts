@@ -58,6 +58,19 @@ export const commands = {
 	 *  folder of the same library already uses is refused.
 	 */
 	renameDataSourceLabel: (id: number, label: string) => typedError<DataSourceDto, SourceCommandError>(__TAURI_INVOKE("rename_data_source_label", { id, label })),
+	/**
+	 *  What this computer can do with network shares: whether it can connect them at all, which
+	 *  system it is and where a connected share appears.
+	 */
+	networkShareSupport: () => typedError<ShareSupportDto, ShareCommandError>(__TAURI_INVOKE("network_share_support")),
+	/**  Connects the share with the login and adds the folder inside it as a library folder. */
+	connectNetworkShare: (input: ConnectShareInput) => typedError<ShareAddedDto, ShareCommandError>(__TAURI_INVOKE("connect_network_share", { input })),
+	/**  Connects a known share again with a new login ("Connect…"); its folders come online. */
+	connectNetworkShareAgain: (input: ReconnectShareInput) => typedError<NetworkShareDto, ShareCommandError>(__TAURI_INVOKE("connect_network_share_again", { input })),
+	/**  Stops the connect that is running. Returns false when none is. */
+	cancelNetworkShareConnect: () => __TAURI_INVOKE<boolean>("cancel_network_share_connect"),
+	/**  Every share CineVault connected. */
+	listNetworkShares: () => typedError<NetworkShareDto[], ShareCommandError>(__TAURI_INVOKE("list_network_shares")),
 	/**  Looks inside a folder and says whether it holds movies, TV shows or both. */
 	analyzeLibraryFolder: (path: string) => typedError<FolderAnalysisDto, OnboardingCommandError>(__TAURI_INVOKE("analyze_library_folder", { path })),
 	/**
@@ -1037,6 +1050,22 @@ export type ConflictDto = {
 	 *  Empty for an item the preview has no row for.
 	 */
 	suggestions: string[],
+};
+
+/**  What the Network share page sends to connect a share and add its folder. */
+export type ConnectShareInput = {
+	/**  `\\nas\movies\Films`, `//nas/movies/Films` or `smb://nas/movies/Films`. */
+	address: string,
+	/**
+	 *  The library the folder goes to; left out, what the folder holds decides, as "Add folder…"
+	 *  does.
+	 */
+	kind: SourceKindDto | null,
+	/**  With an optional `DOMAIN\` part. Empty takes the user an `smb://user@…` address names. */
+	user: string,
+	password: string,
+	/**  Keep the password in the system credential store. */
+	remember: boolean,
 };
 
 /**  The numbers above the diff list. */
@@ -2764,6 +2793,18 @@ export type MovieDetailDto = {
 	subtitles: DetailSubtitleDto[],
 };
 
+/**  One network share CineVault connected. It never holds the password. */
+export type NetworkShareDto = {
+	id: number,
+	/**  The share as it is written: `\\nas\movies`. */
+	address: string,
+	user: string,
+	/**  Whether the password is kept in the system credential store. */
+	remember: boolean,
+	/**  Why the last connect failed; nothing when it worked. */
+	reason: OfflineReasonDto | null,
+};
+
 /**  Which titles a flag change touched. */
 export type NewFlagReportDto = {
 	/**
@@ -2909,6 +2950,13 @@ export type NoticeDto = {
 
 /**  How serious a notice is; matches the notification centre's severities. */
 export type NoticeSeverityDto = "info" | "warning" | "error";
+
+/**  Why the folders of a share are offline. */
+export type OfflineReasonDto = "wrong_password" | "unreachable" | "share_not_found" | "password_needed" | 
+/**  Windows still holds a sign-in to the server with the earlier password. */
+"needs_restart" | 
+/**  Any other failure: another user connected, a locked account, the system's own message. */
+"not_connected";
 
 /**  A refusal: `message` is ready to show, `code` is stable. */
 export type OnboardingCommandError = {
@@ -3267,6 +3315,14 @@ export type RatingsCommandError = {
 export type ReasonCountDto = {
 	reason: string,
 	count: number,
+};
+
+/**  What the Network share page sends to connect a known share again ("Connect…"). */
+export type ReconnectShareInput = {
+	id: number,
+	user: string,
+	password: string,
+	remember: boolean,
 };
 
 /**  A title an operation did not handle. */
@@ -3648,6 +3704,47 @@ export type SettingsSnapshotDto = {
 	notice: string | null,
 };
 
+/**  A share connected and its folder added. */
+export type ShareAddedDto = {
+	share: NetworkShareDto,
+	source: DataSourceDto,
+};
+
+/**  Why a share command did not do what was asked. */
+export type ShareCommandError = {
+	/**
+	 *  Stable code: `invalid_address`, `invalid_user`, `invalid_password`, `wrong_login`,
+	 *  `unreachable`, `share_not_found`, `folder_not_found`, `other_user_connected`,
+	 *  `session_in_use`, `account_locked`, `in_use`, `no_user_mounting`, `cancelled`, `other`, the
+	 *  folder rules' codes (`already_added`, `inside_existing`, …), `no_keyring`,
+	 *  `credential_store`, `unknown_share`, `busy` or `storage`.
+	 */
+	code: string,
+	/**  Plain sentence for the user; the system's own message for `other`. */
+	message: string,
+};
+
+/**  What this computer can do with network shares. */
+export type ShareSupportDto = {
+	/**
+	 *  False on a Linux desktop without user-level share mounting: the page explains the
+	 *  system's own way instead of asking for a password.
+	 */
+	supported: boolean,
+	system: ShareSystemDto,
+	/**
+	 *  The folder a connected share appears in, on macOS and Linux; nothing on Windows, where a
+	 *  share keeps its network path.
+	 */
+	mount_base: string | null,
+};
+
+/**
+ *  The operating system, which decides where the page says a share appears and which credential
+ *  store keeps its password.
+ */
+export type ShareSystemDto = "windows" | "macos" | "linux";
+
 /**  Everything the show page and its season pages show. */
 export type ShowDetailDto = {
 	id: string,
@@ -3767,6 +3864,10 @@ export type SourceHealthDto = {
 	missing: number,
 	/**  Titles still waiting for their media info. */
 	pending_media_info: number,
+	/**  Why an offline folder on a network share is offline. */
+	reason: OfflineReasonDto | null,
+	/**  The network share the folder is on, when CineVault connected one for it. */
+	share: NetworkShareDto | null,
 };
 
 /**  Which library a folder feeds. */

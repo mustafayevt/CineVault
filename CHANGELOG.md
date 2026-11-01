@@ -31,6 +31,9 @@ What changed in each version of CineVault, newest first, in plain words. The app
 ### Changed
 
 - One Delete everywhere. It follows Settings › Deleted files; the separate Delete permanently item and Shift+Delete are gone, and a permanent delete asks Yes or No instead of making you type DELETE.
+### Added
+
+- Network shares: add a library folder from a NAS with its user name and password (Settings › Library folders › Network share…). CineVault keeps the password in your system's credential store and reconnects at start; the server installers set shares up for browser mode.
 
 ## [1.3.0] - 2026-10-31
 

@@ -29,6 +29,8 @@ function health(overrides: Partial<SourceHealth> = {}): SourceHealth {
     titles: 49,
     missing: 0,
     pending_media_info: 0,
+    reason: null,
+    share: null,
     ...overrides,
   };
 }
