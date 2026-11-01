@@ -104,6 +104,10 @@ jobs:
       - name: Changelog self-test
         run: node scripts/changelog.mjs --self-test
 
+      - name: Server installer self-test
+        if: runner.os == 'Linux'
+        run: sh scripts/install/install.sh --self-test
+
       - name: Site changelog is current
         run: bun run site:changelog -- --check
 

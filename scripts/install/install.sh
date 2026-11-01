@@ -14,9 +14,19 @@
 # settings and password are kept. It sends nothing anywhere: it only downloads from github.com and
 # ghcr.io (and from get.docker.com, only if you ask it to install Docker).
 #
+# A library folder can be on a network share: give //nas/movies, \\nas\movies or smb://nas/movies,
+# with a folder inside it if you like (//nas/movies/Films). The installer asks for the share's user
+# and password (the password is not shown) and never puts the password on a command line. On
+# Linux it mounts the share at /mnt/<server>-<share> with a systemd mount unit and keeps the login
+# in /etc/cinevault/shares, readable only by root; with Docker on Linux the container uses that
+# mount. With Docker Desktop on macOS it makes a CIFS volume, cinevault-<server>-<share>, which
+# keeps the login in Docker's volume options.
+#
 # Without questions (all optional except CINEVAULT_MEDIA on a first install):
 #   CINEVAULT_YES=1                         accept every default, never ask
-#   CINEVAULT_MEDIA="/srv/movies;/srv/tv"   library folders, separated by ";"
+#   CINEVAULT_MEDIA="/srv/movies;/srv/tv"   library folders, separated by ";" (shares too: //nas/movies)
+#   CINEVAULT_SHARE_USER=alex               the user for every share in CINEVAULT_MEDIA
+#   CINEVAULT_SHARE_PASSWORD_FILE=/root/nas-password   a file whose first line is that user's password
 #   CINEVAULT_PORT=8787                     the port to open in the browser
 #   CINEVAULT_NO_BROWSER=1                  do not open a browser at the end
 #   CINEVAULT_ACTION=install|update|folders|uninstall   (or pass it as an argument)
@@ -33,9 +43,11 @@ IMAGE="${CINEVAULT_IMAGE:-ghcr.io/mustafayevt/cinevault:latest}"
 ACTION="${CINEVAULT_ACTION:-install}"
 MODE=native
 [ -z "${CINEVAULT_DOCKER:-}" ] || MODE=docker
+SELF_TEST=""
 for arg in "$@"; do
     case "$arg" in
         --docker) MODE=docker ;;
+        --self-test) SELF_TEST=1 ;;
         *) ACTION=$arg ;;
     esac
 done
@@ -65,12 +77,14 @@ yes_no() { # yes_no "Question" y|n -> true when yes
 }
 
 OS=$(uname -s)
-case "$OS" in
-    Linux) ;;
-    Darwin) MODE=docker ;;
-    *) die "This script is for Linux and macOS. On Windows, open PowerShell and run: irm $SITE/install.ps1 | iex" ;;
-esac
-command -v curl >/dev/null 2>&1 || die "curl is needed. Install it with your package manager and run this again."
+if [ -z "$SELF_TEST" ]; then
+    case "$OS" in
+        Linux) ;;
+        Darwin) MODE=docker ;;
+        *) die "This script is for Linux and macOS. On Windows, open PowerShell and run: irm $SITE/install.ps1 | iex" ;;
+    esac
+    command -v curl >/dev/null 2>&1 || die "curl is needed. Install it with your package manager and run this again."
+fi
 
 # ---- shared -------------------------------------------------------------------------------------
 lan_ip() {
@@ -99,18 +113,25 @@ pick_port() {
     fi
 }
 
-add_media() { # checks a folder and adds its full path to MEDIA
+media_line() { # adds one line to MEDIA, once
+    if printf '%s\n' "$MEDIA" | grep -qxF -e "$1"; then return; fi
+    MEDIA="${MEDIA:+$MEDIA
+}$1"
+}
+
+add_media() { # checks a folder (or a network share) and adds its full path to MEDIA
     folder=$(printf '%s' "$1" | sed "s/^[\"']//; s/[\"']\$//; s#/*\$##")
+    if is_share "$folder"; then add_share "$folder"; return; fi
     case "$folder" in "~"*) folder="$HOME${folder#\~}" ;; esac
     [ -n "$folder" ] || folder=/
     if [ ! -d "$folder" ]; then say "  There is no folder $folder."; return 1; fi
     folder=$(cd "$folder" && pwd -P)
-    MEDIA="${MEDIA:+$MEDIA
-}$folder"
+    media_line "$folder"
 }
 
 ask_media() { # fills MEDIA with the library folders
     MEDIA=""
+    SHARES=""
     step "Your movie and TV folders"
     if [ -n "${CINEVAULT_MEDIA:-}" ]; then
         list=$(printf '%s\n' "$CINEVAULT_MEDIA" | tr ';' '\n')
@@ -122,6 +143,7 @@ EOF_MEDIA
     else
         [ -z "$YES" ] || die "Set CINEVAULT_MEDIA to your library folders, for example CINEVAULT_MEDIA=\"/srv/movies;/srv/tv\"."
         say "CineVault reads and renames the files in these folders, and writes artwork and NFO files next to them."
+        say "A folder on a network share works too: type it like //nas/movies or smb://nas/movies/Films."
         example=/srv/movies
         [ "$OS" = Darwin ] && example=/Volumes/Media/Movies
         while :; do
@@ -134,6 +156,290 @@ EOF_MEDIA
             add_media "$f" || true
         done
     fi
+}
+
+# ---- network shares -----------------------------------------------------------------------------
+# A share's password is read from the terminal without showing it (or from the first line of
+# CINEVAULT_SHARE_PASSWORD_FILE), kept in a shell variable and written only to the standard input
+# of the program that stores it, so it never appears in a command line or in this script's output.
+SHARE_DIR=/etc/cinevault/shares
+SHARE_MARK="# Written by the CineVault installer"
+SHARES=""   # Linux: the shares checked in this run, one "key|server|share|SMB version" per line
+SH_USER=""
+SH_PW=""
+
+is_share() { case "$1" in //* | \\\\* | [Ss][Mm][Bb]://*) return 0 ;; *) return 1 ;; esac; }
+
+share_key() { # share_key server share -> a name for files, folders and volumes: nas-movies
+    printf '%s-%s' "$1" "$2" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._-' '-' | sed 's/-*$//'
+}
+
+parse_share() { # parse_share address -> S_SERVER, S_SHARE, S_SUB (a folder inside it or ""), S_KEY, S_HINT
+    a=$(printf '%s' "$1" | tr '\134' '/')   # \134 is a backslash
+    case "$a" in [Ss][Mm][Bb]://*) a=${a#*://} ;; *) a=${a#//} ;; esac
+    a=$(printf '%s' "$a" | sed 's#//*#/#g; s#/$##')
+    S_SERVER=${a%%/*}
+    S_HINT=""   # the user in smb://alex@nas/movies
+    case "$S_SERVER" in *@*) S_HINT=${S_SERVER%@*}; S_SERVER=${S_SERVER##*@} ;; esac
+    rest=${a#*/}
+    [ "$rest" != "$a" ] || rest=""
+    S_SHARE=${rest%%/*}
+    S_SUB=${rest#*/}
+    [ "$S_SUB" != "$rest" ] || S_SUB=""
+    if ! printf '%s' "$S_SERVER" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
+        say "  $1 does not start with a server name or IPv4 address, like //nas/movies."
+        return 1
+    fi
+    if [ -z "$S_SHARE" ]; then say "  $1 names no share. Type it like //$S_SERVER/movies."; return 1; fi
+    if ! printf '%s' "$S_SHARE" | grep -Eq '^[A-Za-z0-9._$ -]{1,80}$'; then
+        say "  The share name \"$S_SHARE\" has a sign the installer cannot use (letters, digits, spaces, . _ - and \$ are fine)."
+        return 1
+    fi
+    case "/$S_SUB/" in */../* | */./*) say "  The folder inside the share may not have . or .. in its path."; return 1 ;; esac
+    if printf '%s' "$S_SUB" | grep -q '[[:cntrl:]]'; then say "  The folder inside the share has a control character."; return 1; fi
+    S_KEY=$(share_key "$S_SERVER" "$S_SHARE")
+}
+
+unit_name() { # unit_name key -> the systemd mount unit for /mnt/<key>, as systemd-escape --path names it
+    printf 'mnt-%s.mount' "$(printf '%s' "$1" | sed 's/-/\\x2d/g')"
+}
+
+unit_text() { # unit_text key server share version uid gid -> the mount unit
+    printf '%s\n' "$SHARE_MARK ($SITE/install.sh). Run it again to change or remove this." \
+        "[Unit]" \
+        "Description=CineVault network share //$2/$3" \
+        "Wants=network-online.target" \
+        "After=network-online.target" \
+        "" \
+        "[Mount]" \
+        "What=//$2/$3" \
+        "Where=/mnt/$1" \
+        "Type=cifs" \
+        "Options=credentials=$SHARE_DIR/$1.cred,uid=$5,gid=$6,file_mode=0664,dir_mode=0775,iocharset=utf8,vers=$4,_netdev,nofail" \
+        "TimeoutSec=30" \
+        "" \
+        "[Install]" \
+        "WantedBy=remote-fs.target"
+}
+
+cred_text() { # cred_text user password -> a mount.cifs credentials file (DOMAIN\user gives domain=)
+    case "$1" in
+        *\\*) printf 'username=%s\npassword=%s\ndomain=%s\n' "${1#*\\}" "$2" "${1%%\\*}" ;;
+        *) printf 'username=%s\npassword=%s\n' "$1" "$2" ;;
+    esac
+}
+
+json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+vol_body() { # vol_body name server share user password version uid gid -> Docker's body for a CIFS volume
+    v_user=$4
+    v_dom=""
+    case "$v_user" in *\\*) v_dom=",domain=${v_user%%\\*}"; v_user=${v_user#*\\} ;; esac
+    v_pw=$(printf '%s' "$5" | sed 's/,/,,/g')   # a comma in a mount option value is written twice
+    v_o="addr=$2,username=$v_user$v_dom,password=$v_pw,uid=$7,gid=$8,file_mode=0664,dir_mode=0775,vers=$6"
+    printf '{"Name":"%s","Driver":"local","DriverOpts":{"type":"cifs","device":"%s","o":"%s"},"Labels":{"cinevault.share":"%s","cinevault.key":"%s"}}\n' \
+        "$1" "$(json_str "//$2/$3")" "$(json_str "$v_o")" "$(json_str "//$2/$3")" "$(share_key "$2" "$3")"
+}
+
+share_mask() { sed 's/password=.*,uid=/password=********,uid=/'; }
+
+share_kind() { # share_kind "mount output" -> login, missing, noname or other
+    case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+        *"error(13)"* | *"permission denied"* | *"logon failure"*) echo login ;;
+        *"error(2)"* | *"no such file"*) echo missing ;;
+        *resolve*) echo noname ;;
+        *) echo other ;;
+    esac
+}
+
+share_error() { # share_error "mount output" -> why //S_SERVER/S_SHARE could not be mounted, in plain words
+    case "$(share_kind "$1")" in
+        login) echo "Wrong user name or password for //$S_SERVER/$S_SHARE." ;;
+        missing) echo "There is no share named $S_SHARE on $S_SERVER." ;;
+        noname) echo "$S_SERVER could not be reached. Check the name or address and that it is switched on." ;;
+        *)
+            case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+                *"error(112)"* | *"error(113)"* | *"error(110)"* | *"error(111)"* | *"host is down"* | *"no route"* | *"timed out"* | *unreachable*)
+                    echo "$S_SERVER could not be reached. Check the name or address and that it is switched on." ;;
+                *) echo "//$S_SERVER/$S_SHARE could not be mounted: $(printf '%s\n' "$1" | grep -i error | head -n 1 | share_mask)" ;;
+            esac ;;
+    esac
+}
+
+ask_secret() { # ask_secret "Question" -> SH_PW, read from the terminal without showing it
+    has_tty || die "No terminal to ask for the password on. Set CINEVAULT_SHARE_USER and CINEVAULT_SHARE_PASSWORD_FILE."
+    printf '%s: ' "$1" >/dev/tty
+    tty_saved=$(stty -g </dev/tty)
+    trap 'stty "$tty_saved" </dev/tty; printf "\n" >/dev/tty; exit 130' INT TERM
+    stty -echo </dev/tty
+    SH_PW=""
+    IFS= read -r SH_PW </dev/tty || true
+    stty "$tty_saved" </dev/tty
+    trap - INT TERM
+    printf '\n' >/dev/tty
+}
+
+ask_login() { # SH_USER and SH_PW for //S_SERVER/S_SHARE
+    if [ -n "$YES" ] || [ -n "${CINEVAULT_SHARE_PASSWORD_FILE:-}" ]; then
+        SH_USER=${CINEVAULT_SHARE_USER:-$S_HINT}
+        pw_file=${CINEVAULT_SHARE_PASSWORD_FILE:-}
+        if [ -z "$SH_USER" ] || [ -z "$pw_file" ]; then
+            die "For the share //$S_SERVER/$S_SHARE, set CINEVAULT_SHARE_USER and CINEVAULT_SHARE_PASSWORD_FILE (a file whose first line is the password)."
+        fi
+        [ -r "$pw_file" ] || die "The password file $pw_file cannot be read."
+        SH_PW=""
+        IFS= read -r SH_PW <"$pw_file" || true
+    else
+        prev_user=$SH_USER   # the user typed for the share before is offered again
+        SH_USER=""
+        while [ -z "$SH_USER" ]; do
+            SH_USER=$(ask "User for //$S_SERVER/$S_SHARE" "${CINEVAULT_SHARE_USER:-${S_HINT:-$prev_user}}")
+        done
+        ask_secret "Password for $SH_USER on $S_SERVER (it is not shown)"
+    fi
+    case "$SH_USER" in *,* | *=*) die "A user name with , or = cannot be used for a share." ;; esac
+    if printf '%s' "$SH_USER" | grep -q '[[:cntrl:]]' || printf '%s' "$SH_PW" | grep -q '[[:cntrl:]]'; then
+        die "The user name or password for //$S_SERVER/$S_SHARE has a control character."
+    fi
+}
+
+add_share() { # a share address: sets the share up (or reuses it) and adds its folder to MEDIA
+    parse_share "$1" || return 1
+    if [ "$OS" = Darwin ]; then d_share_volume; else host_share; fi
+}
+
+# Linux (the service, and Docker on Linux): the share is mounted by a systemd mount unit at
+# /mnt/<server>-<share>, with its login in a credentials file only root can read.
+need_cifs() {
+    if command -v mount.cifs >/dev/null 2>&1 || [ -x /sbin/mount.cifs ] || [ -x /usr/sbin/mount.cifs ]; then return; fi
+    yes_no "Network shares need the cifs-utils package. Install it now?" y || die "Install cifs-utils with your package manager and run this again."
+    step "Installing cifs-utils"
+    case "$(n_kind)" in
+        deb)
+            as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cifs-utils </dev/null || {
+                as_root apt-get update </dev/null &&
+                    as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cifs-utils </dev/null
+            } ;;
+        rpm)
+            if command -v dnf >/dev/null 2>&1; then as_root dnf install -y cifs-utils </dev/null
+            elif command -v yum >/dev/null 2>&1; then as_root yum install -y cifs-utils </dev/null
+            else as_root zypper --non-interactive install cifs-utils </dev/null; fi ;;
+        *) false ;;
+    esac || die "cifs-utils could not be installed. Install it with your package manager and run this again."
+}
+
+share_write_cred() { # writes SH_USER and SH_PW to <key>.new, a file only root can read from the start
+    as_root install -d -m 0700 "$SHARE_DIR" || die "$SHARE_DIR could not be made."
+    # shellcheck disable=SC2016 # expanded by the inner shell
+    cred_text "$SH_USER" "$SH_PW" | as_root sh -c 'umask 077; cat > "$1"' sh "$SHARE_DIR/$S_KEY.new" ||
+        die "The login for //$S_SERVER/$S_SHARE could not be saved."
+}
+
+share_mount_check() { # asks the login and mounts the share once with it, to check it and the folder
+    mnt=/mnt/$S_KEY
+    checked=$(printf '%s\n' "$SHARES" | awk -F '|' -v k="$S_KEY" '$1 == k { print $4 }')
+    if [ -n "$checked" ]; then
+        # A second folder on a share checked a moment ago: its login is saved already.
+        as_root mount -t cifs "//$S_SERVER/$S_SHARE" "$mnt" -o "credentials=$SHARE_DIR/$S_KEY.cred,vers=$checked" ||
+            die "//$S_SERVER/$S_SHARE could not be mounted again."
+        found=1
+        if [ -n "$S_SUB" ] && ! as_root test -d "$mnt/$S_SUB"; then say "  $S_SUB was not found on //$S_SERVER/$S_SHARE."; found=""; fi
+        as_root umount "$mnt" || die "$mnt could not be unmounted after the check."
+        [ -n "$found" ]
+        return
+    fi
+    tries=0
+    while :; do
+        ask_login
+        share_write_cred
+        SH_PW=""
+        as_root install -d -m 0755 "$mnt" || die "$mnt could not be made."
+        kind=other
+        # SMB 3.0 first; some older NAS units only speak 2.1.
+        for vers in 3.0 2.1; do
+            if out=$(as_root mount -t cifs "//$S_SERVER/$S_SHARE" "$mnt" -o "credentials=$SHARE_DIR/$S_KEY.new,vers=$vers" 2>&1); then
+                kind=ok
+                break
+            fi
+            kind=$(share_kind "$out")
+            [ "$kind" = other ] || break
+        done
+        [ "$kind" != ok ] || break
+        say "  $(share_error "$out")"
+        tries=$((tries + 1))
+        if [ "$kind" != login ] || [ -n "$YES" ] || [ -n "${CINEVAULT_SHARE_PASSWORD_FILE:-}" ] || [ "$tries" -ge 3 ]; then
+            share_drop_check
+            return 1
+        fi
+    done
+    found=1
+    if [ -n "$S_SUB" ] && ! as_root test -d "$mnt/$S_SUB"; then say "  $S_SUB was not found on //$S_SERVER/$S_SHARE."; found=""; fi
+    as_root umount "$mnt" || die "$mnt could not be unmounted after the check."
+    if [ -z "$found" ]; then share_drop_check; return 1; fi
+    as_root mv -f "$SHARE_DIR/$S_KEY.new" "$SHARE_DIR/$S_KEY.cred" || die "The login for //$S_SERVER/$S_SHARE could not be saved."
+    SHARES="${SHARES:+$SHARES
+}$S_KEY|$S_SERVER|$S_SHARE|$vers"
+}
+
+share_drop_check() { # removes what a failed check left: the new login, and the mount folder of a new share
+    as_root rm -f "$SHARE_DIR/$S_KEY.new"
+    if [ ! -f "/etc/systemd/system/$(unit_name "$S_KEY")" ] && ! mountpoint -q "/mnt/$S_KEY"; then
+        as_root rmdir "/mnt/$S_KEY" 2>/dev/null || true
+    fi
+}
+
+host_share() { # mounts //S_SERVER/S_SHARE (or reuses its mount) and adds its folder to MEDIA
+    has_systemd || die "Network shares are mounted at start-up by systemd, which this system does not run. Mount //$S_SERVER/$S_SHARE yourself and give its folder instead."
+    need_root
+    need_cifs
+    mnt=/mnt/$S_KEY
+    unit_file=/etc/systemd/system/$(unit_name "$S_KEY")
+    if [ -f "$unit_file" ] && ! mountpoint -q "$mnt"; then as_root systemctl start "$(unit_name "$S_KEY")" >/dev/null 2>&1 || true; fi
+    if mountpoint -q "$mnt"; then
+        if ! grep -q "^$SHARE_MARK" "$unit_file" 2>/dev/null; then
+            say "  Something else is mounted at $mnt. Give that folder instead of the share address."
+            return 1
+        fi
+        if [ -n "$S_SUB" ] && ! as_root test -d "$mnt/$S_SUB"; then say "  $S_SUB was not found on //$S_SERVER/$S_SHARE."; return 1; fi
+        say "  //$S_SERVER/$S_SHARE is mounted at $mnt already, with the login saved before."
+    else
+        share_mount_check || return 1
+    fi
+    if [ "$MODE" = docker ]; then media_line "$mnt"; else media_line "$mnt${S_SUB:+/$S_SUB}"; fi
+}
+
+shares_apply() { # shares_apply uid gid: writes and starts the mount units of the shares checked in this run
+    [ -n "$SHARES" ] || return 0
+    step "Mounting the network shares"
+    list=$SHARES
+    while IFS='|' read -r key server share vers; do
+        # shellcheck disable=SC2016 # expanded by the inner shell
+        unit_text "$key" "$server" "$share" "$vers" "$1" "$2" |
+            as_root sh -c 'umask 022; cat > "$1.new" && mv -f "$1.new" "$1"' sh "/etc/systemd/system/$(unit_name "$key")"
+    done <<EOF_UNITS
+$list
+EOF_UNITS
+    as_root systemctl daemon-reload
+    while IFS='|' read -r key server share vers; do
+        as_root systemctl enable --quiet "$(unit_name "$key")"
+        as_root systemctl start "$(unit_name "$key")" || true
+        if ! mountpoint -q "/mnt/$key"; then
+            as_root journalctl -u "$(unit_name "$key")" -n 10 --no-pager >&2 || true
+            die "//$server/$share could not be mounted at /mnt/$key. The lines above say why."
+        fi
+        say "//$server/$share is mounted at /mnt/$key (SMB $vers)."
+    done <<EOF_UNITS
+$list
+EOF_UNITS
+}
+
+share_units_of() { # share_units_of "folders" -> the installer's mount units they are on, separated by spaces
+    printf '%s\n' "$1" | while IFS= read -r f; do
+        case "$f" in /mnt/?*) ;; *) continue ;; esac
+        key=${f#/mnt/}
+        key=${key%%/*}
+        if grep -q "^$SHARE_MARK" "/etc/systemd/system/$(unit_name "$key")" 2>/dev/null; then unit_name "$key"; echo; fi
+    done | sort -u | paste -sd ' ' -
 }
 
 wait_url() { # waits until the server answers; $1 is a command that prints why it did not
@@ -198,7 +504,7 @@ DATA=/srv/cinevault
 as_root() { $SUDO "$@"; }
 
 need_root() {
-    if [ "$(id -u)" -ne 0 ]; then
+    if [ "$(id -u)" -ne 0 ] && [ -z "$SUDO" ]; then
         command -v sudo >/dev/null 2>&1 || die "Run this as root (sudo is not installed)."
         SUDO=sudo
         say "Installing a service needs administrator rights; sudo may ask for your password."
@@ -302,6 +608,15 @@ n_configure() { # the key, and a drop-in with the account, the folders and the p
     fi
     run_group=$(id -gn "$RUN_USER")
     as_root install -d -m 0755 /etc/cinevault
+    shares_apply "$(id -u "$RUN_USER")" "$(id -g "$RUN_USER")"
+    # The service only wants the share mounts: a NAS that is off never keeps CineVault from starting,
+    # and its folders read offline until the share is mounted again.
+    share_units=$(share_units_of "$MEDIA")
+    unit_section=""
+    [ -z "$share_units" ] || unit_section="[Unit]
+Wants=$share_units
+After=$share_units
+"
     if ! as_root test -s "$KEY"; then
         # shellcheck disable=SC2016 # expanded by the inner shell
         as_root sh -c 'umask 077; if command -v openssl >/dev/null 2>&1; then openssl rand -base64 32; else head -c 32 /dev/urandom | base64; fi > "$1"' sh "$KEY"
@@ -313,7 +628,7 @@ n_configure() { # the key, and a drop-in with the account, the folders and the p
     # shellcheck disable=SC2016 # expanded by the inner shell
     as_root sh -c 'cat > "$1"' sh "$DROPIN" <<EOF
 # Written by the CineVault installer ($SITE/install.sh). Run it again to change this.
-[Service]
+${unit_section}[Service]
 User=$RUN_USER
 Group=$run_group
 LoadCredential=cinevault_key:$KEY
@@ -362,6 +677,11 @@ n_finish() {
     lines=$(printf '%s\n' "$MEDIA" | sed 's/^/  /')
     finish "$1" "sudo systemctl restart $UNIT" "$lines"
     say "Logs: journalctl -u $UNIT   Stop: sudo systemctl stop $UNIT"
+    for m in $(printf '%s\n' "$MEDIA" | sed -n 's#^\(/mnt/[^/]*\).*#\1#p' | sort -u); do
+        if [ -n "$(share_units_of "$m")" ]; then
+            say "Network share at $m: mounted at start-up. If the NAS was off, mount it again with: sudo systemctl start $m"
+        fi
+    done
 }
 
 n_install() {
@@ -622,6 +942,78 @@ main() {
     if [ "$MODE" = docker ]; then prefix=d_; else prefix=n_; fi
     "$prefix$ACTION"
 }
+
+# ==== self-test (sh install.sh --self-test): the share parsing and the files the installer writes ===
+self_test() {
+    fails=0
+    expect() { # expect "what" "got" "expected"
+        if [ "$2" != "$3" ]; then
+            printf 'FAIL %s\n  expected: %s\n  got:      %s\n' "$1" "$3" "$2"
+            fails=$((fails + 1))
+        fi
+    }
+    parsed() { if parse_share "$1" >/dev/null; then printf '%s|%s|%s|%s|%s' "$S_SERVER" "$S_SHARE" "$S_SUB" "$S_KEY" "$S_HINT"; else printf refused; fi; }
+    shared() { if is_share "$1"; then printf yes; else printf no; fi; }
+
+    expect "share //nas/movies" "$(shared //nas/movies)" yes
+    expect "share \\\\nas\\movies" "$(shared '\\nas\movies')" yes
+    expect "share smb://nas/movies" "$(shared smb://nas/movies)" yes
+    expect "share SMB://nas/movies" "$(shared SMB://nas/movies)" yes
+    expect "local /srv/movies" "$(shared /srv/movies)" no
+    expect "local movies/Films" "$(shared movies/Films)" no
+
+    expect "parse //nas/movies" "$(parsed //nas/movies)" "nas|movies||nas-movies|"
+    expect "parse //nas/movies/Films" "$(parsed //nas/movies/Films)" "nas|movies|Films|nas-movies|"
+    expect "parse \\\\NAS\\Movies\\Films\\HD" "$(parsed '\\NAS\Movies\Films\HD')" "NAS|Movies|Films/HD|nas-movies|"
+    expect "parse smb://alex@nas.local/movies" "$(parsed smb://alex@nas.local/movies)" "nas.local|movies||nas.local-movies|alex"
+    expect "parse smb://192.168.1.5/Media Library/TV" "$(parsed 'smb://192.168.1.5/Media Library/TV')" "192.168.1.5|Media Library|TV|192.168.1.5-media-library|"
+    expect "parse //nas/movies\$" "$(parsed '//nas/movies$')" "nas|movies\$||nas-movies|"
+    expect "parse //nas//movies//Films" "$(parsed //nas//movies//Films)" "nas|movies|Films|nas-movies|"
+    expect "refuse //nas" "$(parsed //nas)" refused
+    expect "refuse //-nas/movies" "$(parsed //-nas/movies)" refused
+    expect "refuse //[::1]/movies" "$(parsed '//[::1]/movies')" refused
+    expect "refuse //nas/mo*vies" "$(parsed '//nas/mo*vies')" refused
+    expect "refuse //nas/mo%vies" "$(parsed '//nas/mo%vies')" refused
+    expect "refuse //nas/movies/../etc" "$(parsed //nas/movies/../etc)" refused
+    expect "refuse //nas/movies/./x" "$(parsed //nas/movies/./x)" refused
+
+    expect "unit name" "$(unit_name nas-movies)" 'mnt-nas\x2dmovies.mount'
+    expect "unit name with dots" "$(unit_name 192.168.1.5-media-library)" 'mnt-192.168.1.5\x2dmedia\x2dlibrary.mount'
+    if command -v systemd-escape >/dev/null 2>&1; then
+        expect "unit name as systemd names it" "$(unit_name 192.168.1.5-media-library)" \
+            "$(systemd-escape --path --suffix=mount /mnt/192.168.1.5-media-library)"
+    fi
+
+    expect "credentials" "$(cred_text alex 'pa ss,w"rd\x')" "username=alex
+password=pa ss,w\"rd\\x"
+    expect "credentials with a domain" "$(cred_text 'WORK\alex' secret)" "username=alex
+password=secret
+domain=WORK"
+
+    unit=$(unit_text nas-movies nas movies 2.1 1000 1001)
+    expect "unit marker" "$(printf '%s\n' "$unit" | head -n 1 | grep -c "^$SHARE_MARK")" 1
+    expect "unit What" "$(printf '%s\n' "$unit" | sed -n 's/^What=//p')" //nas/movies
+    expect "unit Where" "$(printf '%s\n' "$unit" | sed -n 's/^Where=//p')" /mnt/nas-movies
+    expect "unit Options" "$(printf '%s\n' "$unit" | sed -n 's/^Options=//p')" \
+        "credentials=/etc/cinevault/shares/nas-movies.cred,uid=1000,gid=1001,file_mode=0664,dir_mode=0775,iocharset=utf8,vers=2.1,_netdev,nofail"
+    expect "unit WantedBy" "$(printf '%s\n' "$unit" | sed -n 's/^WantedBy=//p')" remote-fs.target
+    expect "no password in the unit" "$(printf '%s\n' "$unit" | grep -c password)" 0
+
+    S_SERVER=nas S_SHARE=movies
+    expect "error wrong login" "$(share_error 'mount error(13): Permission denied')" "Wrong user name or password for //nas/movies."
+    expect "error no share" "$(share_error 'mount error(2): No such file or directory')" "There is no share named movies on nas."
+    expect "error no server" "$(share_error 'mount error: could not resolve address for nas: Unknown error')" \
+        "nas could not be reached. Check the name or address and that it is switched on."
+    expect "error host down" "$(share_error 'mount error(112): Host is down')" \
+        "nas could not be reached. Check the name or address and that it is switched on."
+    expect "error other" "$(share_error 'mount error(95): Operation not supported')" \
+        "//nas/movies could not be mounted: mount error(95): Operation not supported"
+    expect "retry with SMB 2.1 after" "$(share_kind 'mount error(95): Operation not supported')" other
+    expect "no retry after a wrong login" "$(share_kind 'mount error(13): Permission denied')" login
+
+    if [ "$fails" -eq 0 ]; then echo "install.sh self-test passed"; else echo "install.sh self-test: $fails failed"; exit 1; fi
+}
+if [ -n "$SELF_TEST" ]; then self_test; exit 0; fi
 
 # The whole script is read before anything runs, and no command it starts can read the rest of the
 # script from standard input (questions are read from the terminal).
