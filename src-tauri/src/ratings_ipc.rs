@@ -8,19 +8,8 @@ use tauri::ipc::Channel;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::boot::Boot;
-use crate::sources_ipc::LibraryState;
 
 pub use cv_ipc::ratings::*;
-
-/// Fetches the IMDb Top 250 chart and stores each title's position.
-#[tauri::command]
-#[specta::specta]
-pub async fn fetch_imdb_top250(
-    library: State<'_, LibraryState>,
-    list: Top250ListDto,
-) -> Result<Top250ReportDto, RatingsCommandError> {
-    cv_ipc::ratings::fetch_imdb_top250(&library, list).await
-}
 
 /// How many titles the ratings sweep of `scope` would fetch. With `provider` (`omdb` or
 /// `mdblist`) only the titles that lack that source's ratings count: what a new key unlocks.

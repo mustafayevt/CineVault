@@ -10,9 +10,9 @@ use cv_providers::http::ProviderLimits;
 use cv_providers::kodi::UnsupportedScraper;
 use cv_providers::{
     AnidbProvider, CredentialResolver, FanartProvider, FernsehserienProvider, HttpClient,
-    ImdbProvider, KodiCatalogue, MdbListProvider, MovieMeterProvider, MpdbProvider, OfdbProvider,
-    OmdbProvider, Provider, ProviderError, ProviderRegistry, TheSportsDbProvider, TmdbProvider,
-    TraktProvider, TvdbProvider, TvmazeProvider,
+    KodiCatalogue, MdbListProvider, MovieMeterProvider, MpdbProvider, OfdbProvider, OmdbProvider,
+    Provider, ProviderError, ProviderRegistry, TheSportsDbProvider, TmdbProvider, TraktProvider,
+    TvdbProvider, TvmazeProvider,
 };
 
 use crate::provider_credentials::{ProviderCredentialsService, SecretStoreCredentials};
@@ -76,11 +76,9 @@ pub fn register_providers(http: &HttpClient, resolver: &CredentialResolver) -> P
     let mut registry = ProviderRegistry::new();
     let tmdb = TmdbProvider::new(http.clone(), resolver.clone());
     let tvdb = TvdbProvider::new(http.clone(), resolver.clone());
-    let imdb = ImdbProvider::new(http.clone());
     let mpdb = MpdbProvider::new(http.clone(), resolver.clone());
     registry.register_metadata(Arc::new(tmdb.clone()));
     registry.register_metadata(Arc::new(tvdb.clone()));
-    registry.register_metadata(Arc::new(imdb.clone()));
     registry.register_metadata(Arc::new(TvmazeProvider::new(http.clone())));
     registry.register_metadata(Arc::new(OmdbProvider::new(http.clone(), resolver.clone())));
     registry.register_metadata(Arc::new(TraktProvider::new(http.clone(), resolver.clone())));
@@ -104,7 +102,6 @@ pub fn register_providers(http: &HttpClient, resolver: &CredentialResolver) -> P
         http.clone(),
         resolver.clone(),
     )));
-    registry.register_artwork(Arc::new(imdb));
     registry.register_artwork(Arc::new(mpdb));
     registry.register_artwork(Arc::new(tvdb));
     // MDBList is a rating source, not a title provider; it is registered so its key can be
@@ -212,7 +209,6 @@ mod tests {
             [
                 "tmdb",
                 "tvdb",
-                "imdb",
                 "tvmaze",
                 "omdb",
                 "trakt",
@@ -240,11 +236,8 @@ mod tests {
                 .map(|p| p.id())
                 .collect()
         };
-        assert_eq!(
-            ids(MediaKind::Movie),
-            ["tmdb", "fanart", "imdb", "mpdb", "tvdb"]
-        );
-        assert_eq!(ids(MediaKind::Show), ["tvdb", "fanart", "tmdb", "imdb"]);
+        assert_eq!(ids(MediaKind::Movie), ["tmdb", "fanart", "mpdb", "tvdb"]);
+        assert_eq!(ids(MediaKind::Show), ["tvdb", "fanart", "tmdb"]);
         // Fanart.tv offers artwork only, so it is not a metadata provider, but credential tests
         // find it.
         assert!(registry.get("fanart").is_some());
@@ -277,7 +270,6 @@ mod tests {
         assert_eq!(anidb_interval(), Duration::from_secs(2));
         assert_eq!(width("tmdb"), 4);
         assert_eq!(width("omdb"), 2);
-        assert_eq!(width("imdb"), 2);
         assert_eq!(width("thesportsdb"), 2);
         assert_eq!(width("fanart"), 2);
         for provider in registry.metadata_providers() {

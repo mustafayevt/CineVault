@@ -51,6 +51,7 @@ fn rig_with(registry: ProviderRegistry) -> Rig {
     let providers = Arc::new(ProviderCredentialsService::with_resolver(
         resolver, registry,
     ));
+    providers.set("fanart", "api_key", "a-key").unwrap();
     let settings = Arc::new(SettingsService::in_memory(""));
     let fetcher = Arc::new(StaticFetcher::new());
     fetcher.insert("https://img.test/set-poster.jpg", jpeg(1));
@@ -374,14 +375,14 @@ async fn cleanup_moves_collection_artwork_the_locations_no_longer_use_to_the_tra
 
 // ---- the artwork picker for a collection --------------------------------------------------------
 
-/// A provider with two posters and a fanart for a collection (and for a movie), under a key that
-/// needs no credentials.
+/// A provider with two posters and a fanart for a collection (and for a movie), posing as
+/// Fanart.tv, whose key the rig sets.
 struct CollectionImages;
 
 #[async_trait]
 impl Provider for CollectionImages {
     fn id(&self) -> &'static str {
-        "imdb"
+        "fanart"
     }
     fn name(&self) -> &'static str {
         "Collection images"

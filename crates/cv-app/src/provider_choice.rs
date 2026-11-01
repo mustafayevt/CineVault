@@ -174,10 +174,10 @@ mod tests {
             (METADATA_MOVIE_KEY, json!(" tmdb ")),
             (METADATA_SHOW_KEY, json!("tvdb")),
             (FALLBACK_ENABLED_KEY, json!(true)),
-            (FALLBACK_ORDER_KEY, json!(["ofdb", "ofdb", "", "imdb", 7])),
+            (FALLBACK_ORDER_KEY, json!(["ofdb", "ofdb", "", "omdb", 7])),
             (
                 UNIVERSAL_KEY,
-                json!({"search": "tmdb", "fields": {"plot": "imdb"}}),
+                json!({"search": "tmdb", "fields": {"plot": "omdb"}}),
             ),
         ]));
         assert_eq!(choices.movie.as_deref(), Some("tmdb"));
@@ -185,7 +185,7 @@ mod tests {
         assert!(choices.fallback_enabled);
         assert_eq!(
             choices.fallback_order,
-            Some(vec!["ofdb".to_owned(), "imdb".to_owned()])
+            Some(vec!["ofdb".to_owned(), "omdb".to_owned()])
         );
         assert_eq!(choices.universal.search, "tmdb");
         assert_eq!(choices.universal.fields.len(), 1);
