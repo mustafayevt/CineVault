@@ -6,7 +6,7 @@
 //! `cv-ipc`; nothing in this module decides what a command does.
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 
@@ -47,7 +47,7 @@ const STREAM_HISTORY: usize = 512;
 struct ClientStream {
     sender: SseSender,
     history: VecDeque<(u64, String)>,
-    /// The session that opened it; signing out ends the streams of that session.
+    /// The key of the session that opened it; signing out ends the streams of that session.
     session: String,
 }
 
@@ -396,4 +396,7 @@ pub(crate) struct WebState {
     pub(crate) ui: UiAssets,
     /// Refuse every peer outside the home network (the desktop's default).
     pub(crate) lan_only: bool,
+    /// Set once a request came through a proxy that is not trusted, so the warning is logged
+    /// once a run.
+    pub(crate) proxy_warned: Arc<AtomicBool>,
 }

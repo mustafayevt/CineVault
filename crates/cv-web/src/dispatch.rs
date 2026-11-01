@@ -215,6 +215,84 @@ fn inside_roots(state: &WebState, path: &str) -> Result<(), Value> {
     }
 }
 
+/// The sentence a browser gets for a setting only the computer that runs CineVault may change.
+const HOST_SETTING: &str = "This setting is changed on the computer that runs CineVault.";
+
+/// The settings a browser may not change: the update channel and its key decide which installer
+/// the desktop trusts, and a tool's path and the player name programs the host runs. An entry
+/// ending in `.` is a prefix. A new setting whose value is a path, a program or a command needs a
+/// decision here (`every_path_setting_has_a_browser_decision`).
+const HOST_SETTINGS: &[&str] = &[
+    "general.update-channel",
+    "general.update-public-key",
+    "tools.path.",
+    "player.kind",
+    "player.path",
+    "player.custom-command",
+];
+
+/// Folders the host writes into, accepted from a browser only when empty or inside the roots.
+const HOST_FOLDERS: &[&str] = &["files.trash-folder", "metadata.nfo-collection-folder"];
+
+fn host_setting(key: &str) -> bool {
+    HOST_SETTINGS.iter().any(|entry| {
+        if entry.ends_with('.') {
+            key.starts_with(entry)
+        } else {
+            key == *entry
+        }
+    })
+}
+
+/// Refuses a host setting, and a host folder outside the folders this server may browse.
+fn guard_setting(state: &WebState, key: &str, value_json: &str) -> Result<(), String> {
+    if host_setting(key) {
+        return Err(HOST_SETTING.to_owned());
+    }
+    if !HOST_FOLDERS.contains(&key) {
+        return Ok(());
+    }
+    let folder = match serde_json::from_str::<Value>(value_json) {
+        Ok(Value::String(text)) => text,
+        Ok(Value::Null) => String::new(),
+        _ => return Err("The folder must be an absolute path.".to_owned()),
+    };
+    if folder.trim().is_empty()
+        || folder_inside_roots(&folder, &crate::server::allowed_roots(state))
+    {
+        Ok(())
+    } else {
+        Err("That folder is outside the folders this server may browse.".to_owned())
+    }
+}
+
+/// Whether a folder, which may not exist yet, is inside `roots`. Its deepest existing part is
+/// resolved, so `..` and links cannot leave the roots; what follows must be plain names.
+fn folder_inside_roots(text: &str, roots: &[std::path::PathBuf]) -> bool {
+    let path = Path::new(text.trim());
+    if !path.is_absolute() {
+        return false;
+    }
+    let mut existing = path;
+    let mut missing = Vec::new();
+    let resolved = loop {
+        if let Ok(resolved) = std::fs::canonicalize(existing) {
+            break resolved;
+        }
+        // `file_name` is `None` for a path that ends in `..`, which is refused.
+        let (Some(parent), Some(name)) = (existing.parent(), existing.file_name()) else {
+            return false;
+        };
+        missing.push(name);
+        existing = parent;
+    };
+    let full = missing
+        .iter()
+        .rev()
+        .fold(resolved, |folder, name| folder.join(name));
+    crate::server::path_inside_roots(&full, roots)
+}
+
 /// Where a browser may take an artwork image from: a web address, or a file it uploaded to the
 /// server's staging folder (`<data>/tmp/artwork-*`). Anything else, a `file:` address, another
 /// server path, a quoted or `..` path that only looks staged, is refused, so a command cannot
@@ -344,13 +422,16 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             let key: String = arg(args, "key")?;
             let value_json: String = arg(args, "valueJson")?;
             // The interface throws this as a sentence, so the answer is a plain message.
+            guard_setting(state, &key, &value_json).map_err(Value::String)?;
             cv_ipc::settings::set_setting(&commands.settings, key, value_json)
                 .await
                 .map_err(Value::String)
                 .and_then(to_value)
         }
         "reset_settings" => {
-            let keys: Vec<String> = arg(args, "keys")?;
+            let mut keys: Vec<String> = arg(args, "keys")?;
+            // "Reset to defaults" still works; the computer's own settings stay as they are.
+            keys.retain(|key| !host_setting(key));
             cv_ipc::settings::reset_settings(&commands.settings, keys)
                 .await
                 .map_err(Value::String)
@@ -1255,7 +1336,7 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             let intent: String = arg(args, "intent")?;
             let password: String = arg(args, "password")?;
             if !DeleteGuard::enabled(&state.services)
-                || !state.auth.check_password(&password)
+                || !state.auth.check_password(&password).await
                 || !state.delete_guard.consume(&intent, &ids)
             {
                 return Err(json!({
@@ -1601,14 +1682,11 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             .await
             .map_err(command_error)
             .and_then(to_value),
-        "set_tool_path" => {
-            let tool: String = arg(args, "tool")?;
-            let path: Option<String> = arg(args, "path")?;
-            cv_ipc::tools::set_tool_path(&commands.tools, &commands.settings, tool, path)
-                .await
-                .map_err(command_error)
-                .and_then(to_value)
-        }
+        // A chosen path is run at once to read its version, so a browser must not name one.
+        // `install_tool` stays: it fetches only the pinned, checksummed downloads.
+        "set_tool_path" => Err(not_applicable(
+            "A tool's path is set on the computer that runs CineVault.",
+        )),
         "install_tool" => {
             let tool: String = arg(args, "tool")?;
             let stream = channel_arg(args, "onProgress")?;
@@ -2104,5 +2182,137 @@ mod tests {
         };
         assert_eq!(platform.busy_jobs(), 0);
         assert!(platform.open_url("https://example.com").is_err());
+    }
+
+    #[test]
+    fn the_host_settings_are_matched_by_key_and_prefix() {
+        for key in [
+            "general.update-channel",
+            "general.update-public-key",
+            "tools.path.ffmpeg",
+            "tools.path.mediainfo",
+            "player.kind",
+            "player.path",
+            "player.custom-command",
+        ] {
+            assert!(host_setting(key), "{key}");
+        }
+        for key in ["general.language", "tools.pathx", "files.trash-folder"] {
+            assert!(!host_setting(key), "{key}");
+        }
+    }
+
+    /// A host folder from a browser must stay inside the roots: a new folder inside is accepted,
+    /// a `..` walk and a folder elsewhere are not.
+    #[test]
+    fn a_host_folder_must_stay_inside_the_roots() {
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("media");
+        let outside = base.path().join("elsewhere");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        let roots = vec![root.clone()];
+        let inside = root.join("movies").join(".trash");
+        assert!(folder_inside_roots(inside.to_str().unwrap(), &roots));
+        assert!(folder_inside_roots(root.to_str().unwrap(), &roots));
+        let walk = format!("{}/../elsewhere", root.display());
+        let walk_new = format!("{}/new/../../elsewhere", root.display());
+        for text in [
+            outside.to_str().unwrap(),
+            walk.as_str(),
+            walk_new.as_str(),
+            "relative/trash",
+        ] {
+            assert!(!folder_inside_roots(text, &roots), "{text} must be refused");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_out_of_the_roots_is_refused() {
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("media");
+        let outside = base.path().join("elsewhere");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("link")).unwrap();
+        let through = root.join("link").join("trash");
+        assert!(!folder_inside_roots(through.to_str().unwrap(), &[root]));
+    }
+
+    /// The settings whose value is a path, a program, a command or an address the server uses.
+    /// They are not host settings, and were reviewed: patterns and names are text the scan and
+    /// the renamer read, and the torrent addresses reach the network, not a program or a file.
+    const REVIEWED_TEXT_SETTINGS: &[&str] = &[
+        "library.skip-patterns",
+        "library.bad-words",
+        "metadata.collection-name-replacement",
+        "renamer.unwanted-patterns",
+        "artwork.languages",
+        "torrents.torznab.url",
+        "torrents.indexer-service.solver-url",
+        "torrents.url.torrentio",
+        "torrents.url.yts",
+        "torrents.url.eztv",
+        "torrents.url.apibay",
+        "torrents.url.knaben",
+        "torrents.url.nyaa",
+    ];
+
+    /// The keys of the `mono` text settings (paths, programs, commands, patterns) declared in a
+    /// copy of `ui/src/features/settings/schema.ts`: each `setting(` call that has `mono: true`.
+    fn mono_settings(schema: &str) -> Vec<String> {
+        let mut keys = Vec::new();
+        let starts: Vec<usize> = schema
+            .match_indices("setting(")
+            .map(|(at, _)| at)
+            .filter(|at| {
+                schema[..*at]
+                    .chars()
+                    .next_back()
+                    .is_none_or(|before| !before.is_alphanumeric() && before != '_')
+            })
+            .collect();
+        for (index, start) in starts.iter().enumerate() {
+            let end = starts.get(index + 1).copied().unwrap_or(schema.len());
+            let call = &schema[*start..end];
+            let key = call.split('"').nth(1).unwrap_or_default();
+            if !key.is_empty() && call.contains("mono: true") {
+                keys.push(key.to_owned());
+            }
+        }
+        keys
+    }
+
+    fn undecided(schema: &str) -> Vec<String> {
+        mono_settings(schema)
+            .into_iter()
+            .filter(|key| {
+                !host_setting(key)
+                    && !HOST_FOLDERS.contains(&key.as_str())
+                    && !REVIEWED_TEXT_SETTINGS.contains(&key.as_str())
+            })
+            .collect()
+    }
+
+    /// Fails when a setting whose value is a path, a program or a command is added to the
+    /// interface without a decision: a host setting, a host folder or a reviewed text setting.
+    #[test]
+    fn every_path_setting_has_a_browser_decision() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../ui/src/features/settings/schema.ts"
+        );
+        let schema = std::fs::read_to_string(path).expect("the settings schema must exist");
+        let found = mono_settings(&schema);
+        assert!(found.contains(&"player.custom-command".to_owned()));
+        assert!(found.contains(&"files.trash-folder".to_owned()));
+        assert_eq!(undecided(&schema), Vec::<String>::new());
+
+        // A made-up key of that kind is caught.
+        let added = format!(
+            "{schema}\n  setting(\"player.example-path\", \"advanced\", {{ type: \"text\", mono: true }}, \"\"),\n"
+        );
+        assert_eq!(undecided(&added), vec!["player.example-path".to_owned()]);
     }
 }

@@ -130,8 +130,11 @@ and for Docker `CINEVAULT_DIR` (default `~/cinevault`, on Windows `%USERPROFILE%
 5. **Scan.** MediaInfo and FFmpeg download into the data folder the first time they are needed.
 
 Keep the server inside your home network. Never forward its port to the internet; to reach it from
-outside, use a VPN. For HTTPS behind a reverse proxy, set `CINEVAULT_WEB_TRUST_PROXY` to the proxy
-address so the sign-in cookie is marked secure.
+outside, use a VPN. For HTTPS behind a reverse proxy or a tunnel, set `CINEVAULT_WEB_TRUST_PROXY` to
+the proxy's address (`127.0.0.1` for a proxy on the same computer): CineVault then takes the
+visitor's address from the proxy and marks the sign-in cookie secure. Until it is set, a request
+that comes through a proxy counts as outside your home network, so the welcome page and **Forgot
+the password?** refuse it, and the log says so once.
 
 ## Everyday use
 
@@ -172,6 +175,17 @@ docker exec -it -u cinevault cinevault cinevault-server passwd
 
 Or clear it and choose a new one on the welcome page: add `--reset` after `passwd` (for Docker,
 without `-it`), restart CineVault as in the table and open the page.
+
+Browsers stay signed in when CineVault restarts or updates (for up to 30 days without use). A new
+password, set in Settings, with a PIN or with `passwd`, signs every browser out.
+
+**Your own MediaInfo or FFmpeg.** CineVault downloads its own copies. To use programs already on
+the server instead, set their paths on the server itself; a browser cannot choose a program the
+server runs. Stop CineVault, open `settings.json` in the data folder and add the path inside its
+`"values"` block, for example `"tools.path.ffmpeg": "/usr/bin/ffmpeg"` (or `tools.path.mediainfo`
+for the MediaInfo library), then start CineVault again. With Docker, the path is the one inside the
+container. The update channel and the player settings, which a browser cannot change either, mean
+nothing on the server.
 
 **Daily backups.** While it runs, CineVault keeps a checked copy of the library every day in the
 data folder's `backups` folder (`/srv/cinevault/backups`, or `backups` in the Docker `data` folder),
@@ -394,8 +408,11 @@ be able to read and write the library folders (`User=` above, or for example
 - **It keeps restarting or is unhealthy:** `journalctl -u cinevault-server -e` or
   `docker logs --tail 50 cinevault` says why.
   A data folder on an SMB or NFS share is the usual cause; keep it on a local disk.
-- **Signed out after an update:** the data folder changed. Use the same data folder every time; the
-  password and sessions live there.
+- **Signed out after an update:** the data folder changed, or the password did. Use the same data
+  folder every time; the password and the sessions (`server-sessions.json`) live there.
+- **"This setting is changed on the computer that runs CineVault":** the update channel, the tool
+  paths and the player cannot be changed from a browser. For the tools, see **Your own MediaInfo or
+  FFmpeg** under [Everyday use](#everyday-use).
 
 ## For maintainers
 

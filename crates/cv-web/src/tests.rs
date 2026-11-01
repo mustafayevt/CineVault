@@ -74,11 +74,13 @@ fn web_state(
         trust_proxy,
         ui: ui(),
         lan_only,
+        proxy_warned: Arc::default(),
     }
 }
 
 struct Answer {
     status: StatusCode,
+    headers: axum::http::HeaderMap,
     cookies: Vec<String>,
     body: String,
 }
@@ -124,6 +126,7 @@ async fn call(
         .await
         .unwrap();
     let status = response.status();
+    let headers = response.headers().clone();
     let cookies = response
         .headers()
         .get_all(header::SET_COOKIE)
@@ -135,6 +138,7 @@ async fn call(
         .unwrap();
     Answer {
         status,
+        headers,
         cookies,
         body: String::from_utf8_lossy(&bytes).into_owned(),
     }
@@ -152,6 +156,174 @@ fn pin_of(state: &WebState) -> String {
         .chars()
         .take(8)
         .collect()
+}
+
+/// Signs in from the home network; returns the cookie header and the page's CSRF token.
+async fn signed_in(state: &WebState) -> (String, String) {
+    let answer = call(
+        state,
+        "POST",
+        "/api/login",
+        "192.168.1.30",
+        &[],
+        Some(serde_json::json!({ "password": PASSWORD })),
+    )
+    .await;
+    let cookie = format!("cv_session={}", answer.session().expect("a session cookie"));
+    let page = call(
+        state,
+        "GET",
+        "/",
+        "192.168.1.30",
+        &[("cookie", &cookie)],
+        None,
+    )
+    .await;
+    let csrf = page
+        .body
+        .split("__CINEVAULT_CSRF__=\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("the page carries the token")
+        .to_owned();
+    (cookie, csrf)
+}
+
+/// One command from a signed-in browser; the answer's `{ok, data | error}`.
+async fn invoke(
+    state: &WebState,
+    (cookie, csrf): &(String, String),
+    cmd: &str,
+    args: serde_json::Value,
+) -> serde_json::Value {
+    let answer = call(
+        state,
+        "POST",
+        "/api/invoke",
+        "192.168.1.30",
+        &[("cookie", cookie), ("x-cinevault-csrf", csrf)],
+        Some(serde_json::json!({ "cmd": cmd, "args": args, "client": "t" })),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::OK, "{}", answer.body);
+    serde_json::from_str(&answer.body).unwrap()
+}
+
+async fn set_from_browser(
+    state: &WebState,
+    session: &(String, String),
+    key: &str,
+    value: &serde_json::Value,
+) -> serde_json::Value {
+    let args = serde_json::json!({ "key": key, "valueJson": value.to_string() });
+    invoke(state, session, "set_setting", args).await
+}
+
+const HOST_SETTING: &str = "This setting is changed on the computer that runs CineVault.";
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_browser_cannot_choose_a_tool_program() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    set_password(&state);
+    let session = signed_in(&state).await;
+    let answer = invoke(
+        &state,
+        &session,
+        "set_tool_path",
+        serde_json::json!({ "tool": "ffmpeg", "path": r"\\files\share\ffmpeg.exe" }),
+    )
+    .await;
+    assert_eq!(answer["ok"], false);
+    assert_eq!(answer["error"]["code"], "not_applicable");
+    assert_eq!(
+        answer["error"]["message"],
+        "A tool's path is set on the computer that runs CineVault."
+    );
+    assert_eq!(services.settings().get("tools.path.ffmpeg"), None);
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_browser_cannot_change_the_host_settings() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    set_password(&state);
+    let session = signed_in(&state).await;
+    for key in [
+        "general.update-channel",
+        "general.update-public-key",
+        "tools.path.ffmpeg",
+        "tools.path.mediainfo",
+        "player.kind",
+        "player.path",
+        "player.custom-command",
+    ] {
+        let value = serde_json::json!("https://updates.example.net/manifest.json");
+        let answer = set_from_browser(&state, &session, key, &value).await;
+        assert_eq!(answer["ok"], false, "{key}");
+        assert_eq!(answer["error"], HOST_SETTING, "{key}");
+        assert_eq!(services.settings().get(key), None, "{key}");
+    }
+
+    // Folders the host writes into: inside the roots (the data folder here) or nothing.
+    let inside = state.data_root.join("media").join(".trash");
+    let outside = dir.path().join("elsewhere");
+    std::fs::create_dir_all(&outside).unwrap();
+    let walk = format!(
+        "{}/../../elsewhere",
+        state.data_root.join("media").display()
+    );
+    for key in ["files.trash-folder", "metadata.nfo-collection-folder"] {
+        for refused in [outside.to_str().unwrap(), walk.as_str()] {
+            let answer = set_from_browser(&state, &session, key, &serde_json::json!(refused)).await;
+            assert_eq!(answer["ok"], false, "{key} {refused}");
+            assert_eq!(services.settings().get(key), None, "{key}");
+        }
+        let value = serde_json::json!(inside.to_str().unwrap());
+        let answer = set_from_browser(&state, &session, key, &value).await;
+        assert_eq!(answer["ok"], true, "{key}: {answer}");
+        assert_eq!(services.settings().get(key), Some(value), "{key}");
+        let cleared = set_from_browser(&state, &session, key, &serde_json::json!("")).await;
+        assert_eq!(cleared["ok"], true, "{key}: {cleared}");
+    }
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_browser_reset_keeps_the_host_settings() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    set_password(&state);
+    let channel = serde_json::json!("https://updates.example.net/manifest.json");
+    // Set at the computer.
+    services
+        .settings()
+        .set("general.update-channel", channel.clone())
+        .unwrap();
+    services
+        .settings()
+        .set("appearance.motion", serde_json::json!("reduce"))
+        .unwrap();
+    let session = signed_in(&state).await;
+    let keys = serde_json::json!(["general.update-channel", "appearance.motion"]);
+    let answer = invoke(
+        &state,
+        &session,
+        "reset_settings",
+        serde_json::json!({ "keys": keys }),
+    )
+    .await;
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert_eq!(services.settings().get("appearance.motion"), None);
+    assert_eq!(
+        services.settings().get("general.update-channel"),
+        Some(channel)
+    );
+    services.shutdown();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -496,6 +668,293 @@ async fn the_embedded_interface_is_served_with_the_session_token() {
     services.shutdown();
 }
 
+/// An invoke without `Origin` (a client that is not a browser) is judged by the CSRF token alone;
+/// one with a foreign `Origin` is refused even with the token.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn origin_and_token_protect_the_commands() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    set_password(&state);
+    let (cookie, csrf) = signed_in(&state).await;
+    let body = serde_json::json!({ "cmd": "library_counts", "args": {}, "client": "t" });
+    let send = |headers: Vec<(&'static str, String)>| {
+        let state = state.clone();
+        let body = body.clone();
+        async move {
+            let headers: Vec<(&str, &str)> = headers
+                .iter()
+                .map(|(name, value)| (*name, value.as_str()))
+                .collect();
+            call(
+                &state,
+                "POST",
+                "/api/invoke",
+                "192.168.1.30",
+                &headers,
+                Some(body),
+            )
+            .await
+        }
+    };
+    let with_token = send(vec![
+        ("cookie", cookie.clone()),
+        ("x-cinevault-csrf", csrf.clone()),
+    ])
+    .await;
+    assert_eq!(with_token.status, StatusCode::OK);
+    assert!(
+        with_token.body.contains("\"ok\":true"),
+        "{}",
+        with_token.body
+    );
+    let without_token = send(vec![("cookie", cookie.clone())]).await;
+    assert_eq!(without_token.status, StatusCode::FORBIDDEN);
+    let foreign = send(vec![
+        ("cookie", cookie.clone()),
+        ("x-cinevault-csrf", csrf.clone()),
+        ("origin", "https://evil.example".to_owned()),
+    ])
+    .await;
+    assert_eq!(foreign.status, StatusCode::FORBIDDEN);
+    services.shutdown();
+}
+
+/// Both framing headers, and a single policy.
+fn assert_no_framing(answer: &Answer, what: &str) {
+    assert_eq!(
+        answer.headers.get(header::X_FRAME_OPTIONS).unwrap(),
+        "DENY",
+        "{what}"
+    );
+    let policies: Vec<_> = answer
+        .headers
+        .get_all(header::CONTENT_SECURITY_POLICY)
+        .iter()
+        .collect();
+    assert_eq!(policies.len(), 1, "{what}");
+    assert!(
+        policies[0]
+            .to_str()
+            .unwrap()
+            .contains("frame-ancestors 'none'"),
+        "{what}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn no_response_may_be_framed() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    let welcome = call(&state, "GET", "/setup", "192.168.1.30", &[], None).await;
+    assert_eq!(welcome.status, StatusCode::OK);
+    assert_no_framing(&welcome, "welcome page");
+
+    set_password(&state);
+    let login = call(&state, "GET", "/login", "192.168.1.30", &[], None).await;
+    assert_no_framing(&login, "sign-in page");
+    let (cookie, _) = signed_in(&state).await;
+    let signed = [("cookie", cookie.as_str())];
+    let shell = call(&state, "GET", "/", "192.168.1.30", &signed, None).await;
+    assert_eq!(shell.status, StatusCode::OK);
+    assert_no_framing(&shell, "shell");
+    let image = call(&state, "GET", "/img/1/grid", "192.168.1.30", &signed, None).await;
+    assert_no_framing(&image, "image");
+    let missing = call(
+        &state,
+        "GET",
+        "/api/media/unknown/0",
+        "192.168.1.30",
+        &signed,
+        None,
+    )
+    .await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+    assert_no_framing(&missing, "404");
+
+    // A title with one small video file in a library folder.
+    let folder = state.data_root.join("media").join("Film (2019)");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("Film.mp4"), b"0123456789").unwrap();
+    let source = state.data_root.join("media").to_string_lossy().into_owned();
+    let directory = folder.to_string_lossy().into_owned();
+    let item: i64 = services
+        .db()
+        .write(move |tx| {
+            cv_db::repo::data_sources::insert_source(tx, cv_domain::SourceKind::Movie, &source)?;
+            tx.execute_batch("INSERT INTO item (kind, title) VALUES ('movie', 'Film')")?;
+            let item = tx.last_insert_rowid();
+            tx.execute(
+                "INSERT INTO media_file (item_id, kind, directory, filename) \
+                 VALUES (?1, 'video', ?2, 'Film.mp4')",
+                (item, directory),
+            )?;
+            Ok(item)
+        })
+        .unwrap();
+    let range = [("cookie", cookie.as_str()), ("range", "bytes=0-3")];
+    let media = call(
+        &state,
+        "GET",
+        &format!("/api/media/{item}/0"),
+        "192.168.1.30",
+        &range,
+        None,
+    )
+    .await;
+    assert_eq!(media.status, StatusCode::PARTIAL_CONTENT, "{}", media.body);
+    assert_eq!(media.body, "0123");
+    assert_no_framing(&media, "media range");
+    let policy = media.headers.get(header::CONTENT_SECURITY_POLICY).unwrap();
+    assert!(
+        policy
+            .to_str()
+            .unwrap()
+            .starts_with("sandbox allow-same-origin")
+    );
+    services.shutdown();
+}
+
+const FORWARDING_HEADERS: [&str; 7] = [
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+    "cf-connecting-ip",
+    "true-client-ip",
+];
+
+/// A reverse proxy or tunnel on the same computer connects from loopback. Without a trusted
+/// proxy, its visitors are not the home network: no welcome page, no setup, no PIN.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_request_through_an_untrusted_proxy_is_not_home() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    for name in FORWARDING_HEADERS {
+        let headers = [(name, "203.0.113.7")];
+        let page = call(&state, "GET", "/setup", "127.0.0.1", &headers, None).await;
+        assert_eq!(page.status, StatusCode::FORBIDDEN, "{name}");
+        assert!(page.body.contains("Finish setup from your home network"));
+        let body = serde_json::json!({ "password": PASSWORD, "confirm": PASSWORD });
+        let posted = call(
+            &state,
+            "POST",
+            "/api/setup",
+            "127.0.0.1",
+            &headers,
+            Some(body),
+        )
+        .await;
+        assert_eq!(posted.status, StatusCode::FORBIDDEN, "{name}");
+    }
+    assert!(!state.auth.has_password());
+
+    set_password(&state);
+    let reset = call(
+        &state,
+        "POST",
+        "/api/reset/start",
+        "127.0.0.1",
+        &[("x-real-ip", "203.0.113.7")],
+        None,
+    )
+    .await;
+    assert_eq!(reset.status, StatusCode::FORBIDDEN);
+    assert!(reset.body.contains("home network"));
+    assert!(!state.data_root.join(auth::PIN_FILE).exists());
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_trusted_proxy_and_a_port_mapping_are_home() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let trusted: Vec<IpNet> = vec!["127.0.0.1/32".parse().unwrap()];
+    let proxied = web_state(&services, HostMode::Server, false, trusted);
+    let page = call(
+        &proxied,
+        "GET",
+        "/setup",
+        "127.0.0.1",
+        &[("x-forwarded-for", "192.168.1.30")],
+        None,
+    )
+    .await;
+    assert_eq!(page.status, StatusCode::OK);
+
+    // A container's published port adds no header: the bridge address is the home network.
+    let mapped = web_state(&services, HostMode::Server, false, Vec::new());
+    let page = call(&mapped, "GET", "/setup", "172.17.0.1", &[], None).await;
+    assert_eq!(page.status, StatusCode::OK);
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn home_network_only_refuses_a_tunnel_on_the_same_computer() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let host = HostMode::Desktop {
+        computer: "STUDY-PC".to_owned(),
+    };
+    let state = web_state(&services, host, true, Vec::new());
+    set_password(&state);
+    let tunnel = call(
+        &state,
+        "GET",
+        "/login",
+        "127.0.0.1",
+        &[("x-forwarded-for", "198.51.100.4")],
+        None,
+    )
+    .await;
+    assert_eq!(tunnel.status, StatusCode::FORBIDDEN);
+    assert_eq!(tunnel.body, server::HOME_ONLY);
+    let local = call(&state, "GET", "/login", "127.0.0.1", &[], None).await;
+    assert_eq!(local.status, StatusCode::OK);
+    services.shutdown();
+}
+
+/// What the log receives, for the tests that check a warning.
+#[derive(Clone, Default)]
+struct Captured(Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_untrusted_proxy_is_logged_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    let captured = Captured::default();
+    let writer = captured.clone();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_writer(move || writer.clone())
+        .finish();
+    // The handlers run on this thread: `oneshot` is awaited here, not spawned.
+    let guard = tracing::subscriber::set_default(subscriber);
+    for _ in 0..3 {
+        let headers = [("x-forwarded-for", "203.0.113.7")];
+        call(&state, "GET", "/setup", "127.0.0.1", &headers, None).await;
+    }
+    drop(guard);
+    let log = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+    assert_eq!(log.matches("CINEVAULT_WEB_TRUST_PROXY").count(), 1, "{log}");
+    services.shutdown();
+}
+
 // --- The server inside the desktop app, over real TCP. ---
 
 /// A one-request HTTP/1.1 client: enough for the tests, with `Connection: close`.
@@ -682,7 +1141,7 @@ async fn start_sign_in_invoke_and_stop_closes_the_port() {
         "the port is closed after stop"
     );
 
-    // A new start begins with no sessions: the old cookie is signed out.
+    // Switching off ends the sessions: after a new start the old cookie is signed out.
     let again = embed::start(options(port), shared(&services)).expect("it starts again");
     let (status, _, _) = http(port, "GET", "/api/server/info", Some(&cookie), &[], None)
         .await
@@ -786,6 +1245,25 @@ async fn browsers_are_signed_out_one_by_one_or_all_together() {
         .unwrap();
     assert_eq!(status, 200);
     running.stop().await;
+    services.shutdown();
+}
+
+/// Quitting the app (an update, a restart) keeps the browsers signed in.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn quitting_keeps_the_sessions_for_the_next_start() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let root = services.location().root().to_path_buf();
+    embed::set_password(&root, PASSWORD, PASSWORD).unwrap();
+    let port = free_port();
+    let running = embed::start(options(port), shared(&services)).unwrap();
+    let cookie = sign_in(port).await;
+    running.begin_stop();
+    // The quitting server may still hold its port for a moment; the next start takes another.
+    let next = free_port();
+    let again = embed::start(options(next), shared(&services)).unwrap();
+    assert_eq!(futures_status(next, &cookie).await, 200);
+    again.stop().await;
     services.shutdown();
 }
 

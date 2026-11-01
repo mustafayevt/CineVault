@@ -4,8 +4,10 @@
 //! serves the app's own `AppServices`, image index, batch runner, drives service and move slot
 //! ([`Shared`]). It takes no owner file and opens no second library; the command line keeps
 //! forwarding to the app. [`start`] binds the port at once, so "port in use" is a typed error,
-//! and [`RunningServer::stop`] ends every session, closes every stream and the port, and stops the
-//! server's tasks.
+//! and [`RunningServer::stop`] (switching Browser access off, changing its port) ends every
+//! session, closes every stream and the port, and stops the server's tasks. Quitting the app
+//! ([`RunningServer::begin_stop`]) keeps the sessions, so a phone stays signed in across an
+//! update.
 //!
 //! The settings of the desktop's Browser access section live in `browser-access.json` in the data
 //! folder ([`BrowserAccessConfig`]), not in `settings.json`, so a browser cannot change them
@@ -178,6 +180,7 @@ pub fn start(options: EmbedOptions, shared: Shared) -> Result<RunningServer, Sta
         trust_proxy: Vec::new(),
         ui: options.ui,
         lan_only: options.lan_only,
+        proxy_warned: Arc::default(),
     };
     let feed = server::wire(&state);
     let app = server::router(state);
@@ -269,10 +272,10 @@ impl RunningServer {
         self.streams.close_all();
     }
 
-    /// Ends every session and stream and asks the server to close, without waiting: for a
-    /// process that is quitting anyway.
+    /// Closes every stream and asks the server to close, without waiting: for a process that is
+    /// quitting anyway. The sessions are kept on disk for the next start.
     pub fn begin_stop(self) {
-        self.auth.logout_all_except(None);
+        self.auth.flush();
         self.streams.close_all();
         self.feed.abort();
         self.shutdown.notify_one();
