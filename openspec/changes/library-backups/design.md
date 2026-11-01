@@ -74,4 +74,4 @@ Nothing to migrate. The first check after the update writes the first backup.
 
 ## Open Questions
 
-- Should a backup that keeps failing (for example, three days in a row) show a notice in the notification centre rather than only a log line? D5 logs only.
+None. Backups that keep failing were settled by the owner: after three days without a successful backup the notification centre says so ("Backups that keep failing are reported"), in addition to the log line of D5.
