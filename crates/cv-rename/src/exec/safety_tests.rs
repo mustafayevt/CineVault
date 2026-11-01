@@ -96,6 +96,7 @@ impl Fs for CaseSensitiveFs {
                 is_dir: content.is_none(),
                 len: content.as_ref().map_or(0, |c| c.len() as u64),
                 modified_ms: *modified_ms,
+                is_link: false,
             }))
     }
 

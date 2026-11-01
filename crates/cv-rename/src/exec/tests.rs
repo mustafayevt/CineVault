@@ -261,6 +261,24 @@ pub(super) fn case_scenario() -> (Tree, Vec<BatchItem>) {
     (tree, vec![item])
 }
 
+/// Makes `link` point at the folder `target`: a junction on Windows (no rights needed), a
+/// symbolic link elsewhere. False when the system will not.
+pub(super) fn folder_link(target: &Path, link: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(link)
+            .arg(target)
+            .output()
+            .is_ok_and(|o| o.status.success())
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link).is_ok()
+    }
+}
+
 // ---- fault injection -----------------------------------------------------------------------
 
 /// The shared fault-injection file system; a stop of it is the simulated crash.

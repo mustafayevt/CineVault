@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use super::run::part_path;
-use super::tests::{Crash, FaultFs, Logging};
+use super::tests::{Crash, FaultFs, Logging, folder_link};
 use super::*;
 
 /// Two data sources side by side in one temp folder.
@@ -244,6 +244,35 @@ fn a_corrupt_copy_fails_the_item_and_leaves_the_original_whole() {
     assert!(files_of(&sources.new).is_empty(), "nothing is left over");
     assert!(!sources.new.join("Heat (1995).cvpart").exists());
     assert_eq!(journal.all()[0].state, JournalState::Failed);
+}
+
+#[test]
+fn across_volumes_a_folder_holding_a_link_is_refused_and_nothing_moves() {
+    let sources = Sources::new();
+    sources.heat();
+    let elsewhere = sources.old.parent().unwrap().join("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    fs::write(elsewhere.join("other.mkv"), "not this title").unwrap();
+    if !folder_link(&elsewhere, &sources.old.join("Heat (1995)/linked")) {
+        eprintln!("skipped: this system will not make a folder link");
+        return;
+    }
+    let before = files_of(&sources.old);
+    let fs = FaultFs::across_volumes();
+    let mut journal = MemoryJournal::new();
+    let report = move_with(&fs, &mut journal, "b1", &[sources.the_move("Heat (1995)")]);
+
+    assert!(
+        matches!(&report.items[0].status, ItemStatus::Failed(why) if why.contains("link")),
+        "{report:?}"
+    );
+    assert_eq!(files_of(&sources.old), before);
+    assert_eq!(
+        fs::read_to_string(elsewhere.join("other.mkv")).unwrap(),
+        "not this title"
+    );
+    assert!(files_of(&sources.new).is_empty(), "nothing is copied");
+    assert!(!sources.new.join("Heat (1995).cvpart").exists());
 }
 
 #[test]
