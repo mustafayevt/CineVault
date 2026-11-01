@@ -154,6 +154,11 @@ impl OfflineReason {
     }
 }
 
+/// The owner of a share's password kept in memory, in the log redaction holders.
+fn memory_owner(id: i64) -> String {
+    format!("network-share-memory.{id}")
+}
+
 /// The credential-store account of a share's remembered password.
 #[must_use]
 pub fn secret_account(id: i64) -> String {
@@ -619,6 +624,7 @@ impl NetworkShareService {
         if remember && !password.expose().is_empty() {
             self.secrets.set(&account, password.expose())?;
             locked(&self.unsaved).remove(&id);
+            redact::release_secret(&memory_owner(id));
             return Ok(());
         }
         if let Err(error) = self.secrets.delete(&account) {
@@ -626,8 +632,10 @@ impl NetworkShareService {
         }
         if remember {
             locked(&self.unsaved).remove(&id);
+            redact::release_secret(&memory_owner(id));
         } else {
             locked(&self.unsaved).insert(id, password.clone());
+            redact::hold_secret(&memory_owner(id), password.expose());
         }
         Ok(())
     }
@@ -645,9 +653,8 @@ impl NetworkShareService {
         if let Err(error) = self.secrets.delete(&secret_account(id)) {
             tracing::debug!(%error, "no stored share password to remove");
         }
-        if let Some(password) = locked(&self.unsaved).remove(&id) {
-            redact::unregister_secret(password.expose());
-        }
+        locked(&self.unsaved).remove(&id);
+        redact::release_secret(&memory_owner(id));
         if let Err(error) = self.db.write(move |tx| rows::delete_share(tx, id)) {
             tracing::warn!(%error, "a network share row could not be removed");
         }
@@ -696,9 +703,8 @@ impl NetworkShareService {
             tracing::warn!(%error, "the password of an unused network share could not be deleted; trying later");
             return false;
         }
-        if let Some(password) = locked(&self.unsaved).remove(&share.id) {
-            redact::unregister_secret(password.expose());
-        }
+        locked(&self.unsaved).remove(&share.id);
+        redact::release_secret(&memory_owner(share.id));
         let id = share.id;
         match self.db.write(move |tx| rows::delete_share(tx, id)) {
             Ok(_) => {
