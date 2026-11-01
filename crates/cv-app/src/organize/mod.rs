@@ -10,7 +10,9 @@
 //!    ([`cv_rename::conflict::detect`]), the user's resolutions (keep as versions, skip, edit) are
 //!    applied and detection runs again. The result is a [`Preview`]: a diff row per item that
 //!    changes, the conflicts with the resolutions on offer, the counts (will change, already tidy,
-//!    conflicts, locked) and three live examples. Nothing touches the disk.
+//!    conflicts, locked) and three live examples. Copies of one movie whose names would clash get
+//!    a ` - <label>` of their own first ([`cv_rename::conflict::copies`]). Nothing touches the
+//!    disk.
 //! 3. **Apply** ([`OrganizeService::apply`]): the same plan is made again from the same request (so
 //!    a disk that changed after the preview is noticed), the checked items that are free of
 //!    conflicts run through the [`cv_rename::exec::Executor`] and one journal batch is written.
@@ -24,6 +26,7 @@
 //! validator.
 
 mod check;
+mod copies;
 mod examples;
 mod file_example;
 mod load;
@@ -48,7 +51,7 @@ pub use model::{
 pub use numbered::{numbered_names, numbered_names_on};
 pub use patterns::PatternSet;
 pub(crate) use service::record_rename_from_journal;
-pub use service::{ChangedHook, OrganizeService};
+pub use service::{ChangedHook, OrganizeService, PlainNames};
 pub use startup::{
     DEFERRED_RECOVERY_INTERVAL, recover_interrupted_batches, retry_deferred_recovery,
 };

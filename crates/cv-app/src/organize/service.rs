@@ -23,6 +23,7 @@ use cv_rename::{
 };
 
 use super::check::{FindingSeverity, check_pattern};
+use super::copies::{group_of_movies, separate_copies};
 use super::examples::{episode_example, examples};
 use super::load::{Loaded, LoadedMovie, load, scope_ids};
 use super::model::{
@@ -51,6 +52,35 @@ pub struct OrganizeService {
     bin: Option<Arc<dyn crate::library_ops::SystemBin>>,
     /// Settings › Deleted files: where a rename's leftovers go.
     choice: Arc<dyn crate::deleted_files::DeletedFilesSource>,
+}
+
+/// A movie's names without a copy label, next to the names it has now (relative to its data
+/// source root): what [`OrganizeService::plan_plain`] gives.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlainNames {
+    /// The folder the naming templates render.
+    pub folder: String,
+    /// The video base name the naming templates render.
+    pub base: String,
+    pub current_folder: String,
+    pub current_base: String,
+}
+
+impl PlainNames {
+    /// The copy label the movie carries but no longer needs: its folder or video base name is the
+    /// plain one followed by ` - <label>`.
+    #[must_use]
+    pub fn label_to_drop(&self) -> Option<String> {
+        let suffix = |current: &str, plain: &str| {
+            current
+                .strip_prefix(plain)?
+                .strip_prefix(" - ")
+                .filter(|label| !label.is_empty())
+                .map(str::to_owned)
+        };
+        suffix(&self.current_folder, &self.folder)
+            .or_else(|| suffix(&self.current_base, &self.base))
+    }
 }
 
 /// Called with the ids of the titles an apply or an undo changed.
@@ -780,6 +810,40 @@ impl OrganizeService {
 
     // ---- planning ---------------------------------------------------------------------------
 
+    /// The names `id` renders under `profile` without a copy label, and its names now; `None`
+    /// for a title that is not a movie or cannot be planned. Nothing touches the disk.
+    ///
+    /// # Errors
+    /// The library cannot be read.
+    pub fn plan_plain(
+        &self,
+        profile: &cv_rename::RenameProfile,
+        id: ItemId,
+    ) -> Result<Option<PlainNames>, OrganizeError> {
+        let Some(Loaded::Movie(movie)) = load(&self.db, &[id])?.into_iter().next() else {
+            return Ok(None);
+        };
+        let input = MovieInput {
+            item: &movie.item,
+            set: movie.set.as_ref(),
+            folder: &movie.folder,
+            files: &movie.files,
+        };
+        let Ok(plan) = MovieRenamer::new(profile.movie.clone()).plan(&input) else {
+            return Ok(None);
+        };
+        let current_base = std::path::Path::new(&main_video_name(&movie.files))
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        Ok(Some(PlainNames {
+            folder: plan.new_folder,
+            base: plan.base_name,
+            current_folder: movie.folder,
+            current_base,
+        }))
+    }
+
     fn plan(&self, request: &PreviewRequest) -> Result<Planned, OrganizeError> {
         let profile = &request.profile;
         let ids = scope_ids(&self.db, &request.scope)?;
@@ -836,6 +900,14 @@ impl OrganizeService {
             self.db
                 .read(|c| cv_db::repo::lifecycle::scraped_items(c, &ids))?
         };
+        // Copies of a movie are planned even when their names match: a twin may need them to
+        // carry a label (see `super::copies`).
+        let copy_group_of = if has_movies {
+            group_of_movies(&self.db)?
+        } else {
+            BTreeMap::new()
+        };
+        let mut copy_facts = BTreeMap::new();
 
         let mut items: Vec<BatchItem> = Vec::new();
         for entry in &loaded {
@@ -932,12 +1004,19 @@ impl OrganizeService {
                         folder: &movie.folder,
                         files: &movie.files,
                     };
+                    let is_copy = copy_group_of.contains_key(&movie.id);
                     match renamer.plan(&input) {
-                        Ok(plan) if !plan.needs_rename() => {
+                        Ok(plan) if !plan.needs_rename() && !is_copy => {
                             planned.counts.tidy += 1;
                             planned.tidy.insert(key);
                         }
                         Ok(plan) => {
+                            if is_copy {
+                                copy_facts.insert(
+                                    key.clone(),
+                                    crate::copies::label_attributes(&movie.item),
+                                );
+                            }
                             let mut item = BatchItem::from_movie(&key, &movie.root, &plan);
                             if let Some(label) = version_label(movie) {
                                 item = item.with_version_label(label);
@@ -1052,6 +1131,28 @@ impl OrganizeService {
         let mut options = ConflictOptions::native();
         options.name_options = profile.movie.name.clone();
         options.space = profile.movie.folder_space.clone();
+
+        // Copies whose names clash get a label of their own first; a labelled copy whose names
+        // already carry its label has nothing to change.
+        let held = separate_copies(
+            &self.db,
+            &mut items,
+            &copy_group_of,
+            &copy_facts,
+            &movie_renamer,
+            &options,
+        )?;
+        planned.media_unread.extend(held);
+        let (unchanged, changing): (Vec<BatchItem>, Vec<BatchItem>) =
+            items.into_iter().partition(is_unchanged);
+        items = changing;
+        for item in unchanged {
+            planned.listed.retain(|id| *id != item.id);
+            planned.infos.remove(&item.id);
+            planned.counts.tidy += 1;
+            planned.tidy.insert(item.id);
+        }
+
         let db = &*self.db;
         let owner = |root: &str, path: &str| owner_of(db, root, path);
         let disk = FsDisk::new().with_owner(&owner);
@@ -1106,6 +1207,12 @@ impl OrganizeService {
         planned.examples.extend(episode_example(&tv_renamer));
         Ok(planned)
     }
+}
+
+/// Whether a planned item changes nothing on the disk.
+fn is_unchanged(item: &BatchItem) -> bool {
+    item.folder_change == cv_rename::FolderChange::Unchanged
+        && item.files.iter().all(cv_rename::PlannedFile::is_unchanged)
 }
 
 fn run_batch(
