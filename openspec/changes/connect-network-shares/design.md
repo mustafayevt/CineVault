@@ -83,7 +83,7 @@ CineVault never disconnects or unmounts a connection the user made (their drive 
 
 A share that is already connected when the page connects it is used as it is: the system did not check the login then (connecting again would only fail with 1219 on Windows). So a new share keeps no password (`remember` off, nothing in memory) and asks for one if that connection ends; a known share keeps the login it had; neither claims the connection. On Windows only a connection without a drive letter counts (D2): with just the user's drive letter in place, CineVault makes its own connection without one, and only that one is ever cancelled; the drive letter stays.
 
-A connect stopped by Esc or by its time limit disconnects exactly that share again (it was not connected before the attempt), as the system may have finished connecting after the tool was stopped.
+Connecting a share for a folder, "Connect…", forgetting a share and the start-up clean-up of mount folders (D11) run one at a time under one lock, so the clean-up never takes the folder of a share being connected for a leftover, and a forget never removes a row a connect is writing. A connect stopped by Esc or by its time limit disconnects exactly that share again (it was not connected before the attempt), as the system may have finished connecting after the tool was stopped.
 
 ### D10. Browser mode: connected on the host by the installer
 

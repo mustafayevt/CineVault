@@ -61,6 +61,9 @@
 //!
 //! Connecting writes, moves and deletes nothing on the share. A share this service connected for
 //! a folder that could not be added is disconnected again; one it found connected is left so.
+//!
+//! Connecting a share for a folder, connecting one again, forgetting one and the clean-up of mount
+//! folders run one at a time, so none of them sees the half-done work of another.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -240,6 +243,9 @@ pub struct NetworkShareService {
     unsaved: Mutex<HashMap<i64, Password>>,
     /// The shares being connected at start.
     connecting: Mutex<HashSet<i64>>,
+    /// Held while a share is connected for a folder or connected again, while one is forgotten,
+    /// and while the mount folders are cleaned up: one of them at a time.
+    work: Mutex<()>,
     after_connect: Mutex<Option<AfterConnect>>,
     busy: Mutex<Option<Busy>>,
     /// Where CineVault mounts shares itself (`~/CineVault Shares` on macOS), and how to tell a
@@ -283,6 +289,7 @@ impl NetworkShareService {
             secrets,
             unsaved: Mutex::new(HashMap::new()),
             connecting: Mutex::new(HashSet::new()),
+            work: Mutex::new(()),
             after_connect: Mutex::new(None),
             reconnect_limit: RECONNECT_LIMIT,
             busy: Mutex::new(None),
@@ -335,6 +342,7 @@ impl NetworkShareService {
         let password = request.login.password();
         // Masked in every log line from here on, whatever happens next.
         redact::register_secret(password.expose());
+        let _work = locked(&self.work);
         let share = &request.address.share;
         let connected = self.connector.connect(share, &request.login, cancel)?;
         let local_root = connected.root.to_string_lossy().into_owned();
@@ -447,8 +455,10 @@ impl NetworkShareService {
                 let (server, name) = (address.server().to_owned(), address.share().to_owned());
                 let user = login.user().to_owned();
                 let local_root = connected.root.to_string_lossy().into_owned();
+                // The whole row in one write: nothing is written after the password is kept, so a
+                // failure can never leave a row or a password behind.
                 let share = self.db.write(move |tx| {
-                    rows::insert_share(
+                    let share = rows::insert_share(
                         tx,
                         &NewNetworkShare {
                             server: &server,
@@ -457,25 +467,22 @@ impl NetworkShareService {
                             local_root: &local_root,
                             remember,
                         },
-                    )
+                    )?;
+                    let share = NetworkShare {
+                        last_connected_ms: Some(now_ms()),
+                        connected_by_us: made,
+                        ..share
+                    };
+                    rows::update_share(tx, &share)?;
+                    rows::set_connected_by_us(tx, share.id, made)?;
+                    Ok(share)
                 })?;
                 if checked
                     && let Err(error) = self.keep_password(share.id, remember, login.password())
                 {
-                    let id = share.id;
-                    self.db.write(move |tx| rows::delete_share(tx, id))?;
+                    self.forget_row(share.id);
                     return Err(ShareConnectError::Credential(error));
                 }
-                let share = NetworkShare {
-                    last_connected_ms: Some(now_ms()),
-                    connected_by_us: made,
-                    ..share
-                };
-                let row = share.clone();
-                self.db.write(move |tx| {
-                    rows::update_share(tx, &row)?;
-                    rows::set_connected_by_us(tx, row.id, made)
-                })?;
                 Ok(share)
             }
         }
@@ -497,22 +504,26 @@ impl NetworkShareService {
         cancel: &Cancel,
     ) -> Result<NetworkShare, ShareConnectError> {
         redact::register_secret(login.password().expose());
-        let share = self
-            .db
-            .read(move |c| rows::get_share(c, id))?
-            .ok_or(ShareConnectError::UnknownShare)?;
-        let address = address_of(&share)?;
-        let connected = match self.connector.connect(&address, login, cancel) {
-            Ok(connected) => connected,
-            Err(error) => {
-                if error.kind() != ShareErrorKind::Cancelled {
-                    self.record_failure(&share, error.kind().code());
+        let share = {
+            let _work = locked(&self.work);
+            let share = self
+                .db
+                .read(move |c| rows::get_share(c, id))?
+                .ok_or(ShareConnectError::UnknownShare)?;
+            let address = address_of(&share)?;
+            let connected = match self.connector.connect(&address, login, cancel) {
+                Ok(connected) => connected,
+                Err(error) => {
+                    if error.kind() != ShareErrorKind::Cancelled {
+                        self.record_failure(&share, error.kind().code());
+                    }
+                    return Err(error.into());
                 }
-                return Err(error.into());
-            }
+            };
+            let share = self.keep_login(Some(share), &address, &connected, login, remember)?;
+            tracing::info!(share = %address, user = %share.user, "network share connected again");
+            share
         };
-        let share = self.keep_login(Some(share), &address, &connected, login, remember)?;
-        tracing::info!(share = %address, user = %share.user, "network share connected again");
         self.hand_over(&share);
         Ok(share)
     }
@@ -795,6 +806,7 @@ impl NetworkShareService {
     /// password; any other failure to delete it keeps the share for a later try, before anything
     /// was disconnected.
     fn forget(&self, share: &NetworkShare) -> bool {
+        let _work = locked(&self.work);
         // A folder added on it since it was marked keeps it.
         if self
             .folders_of(share)
@@ -862,6 +874,8 @@ impl NetworkShareService {
         let Some(base) = &self.mount_folders else {
             return;
         };
+        // Not while a share is being connected: its folder has no row yet.
+        let _work = locked(&self.work);
         let Ok(shares) = self.list() else {
             return;
         };

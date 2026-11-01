@@ -1111,3 +1111,50 @@ fn a_folder_added_while_a_share_is_forgotten_keeps_the_share() {
     assert!(!kept.remember, "its password is gone, so it asks for one");
     assert_eq!(disconnects(&rig.fake), 0);
 }
+
+#[test]
+fn the_mount_folder_clean_up_waits_for_a_connect_in_progress() {
+    let rig = rig();
+    let base = rig.dir.path().join("shares");
+    let mut service = NetworkShareService::new(
+        DataSourceService::new(
+            Arc::clone(&rig.db),
+            SourceGuard::new(
+                PathStyle::current(),
+                SystemFolders::new(PathStyle::current()),
+            ),
+        ),
+        Arc::clone(&rig.fake) as Arc<dyn ShareConnector>,
+        Arc::clone(&rig.secrets),
+    );
+    service.mount_folders = Some(base);
+    service.is_mounted = Arc::new(|_: &Path| false);
+    let service = Arc::new(service);
+    rig.fake.set_delay(Duration::from_millis(500));
+
+    let connecting = Arc::clone(&service);
+    let worker = std::thread::spawn(move || {
+        connecting.connect_and_add(&request(r"\\nas\movies", PASSWORD, true), &Cancel::new())
+    });
+    // The connect is under way (its tool is running) when the clean-up starts.
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    while !rig
+        .fake
+        .calls()
+        .iter()
+        .any(|call| matches!(call, FakeCall::Connect { .. }))
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the connect did not start"
+        );
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    service.clean_mount_folders();
+
+    // The clean-up ran only once the connect was done and its share had a row, so the new
+    // share's folder was never taken for a leftover.
+    assert_eq!(service.list().unwrap().len(), 1);
+    let added = worker.join().unwrap().unwrap();
+    assert!(Path::new(&added.share.local_root).is_dir());
+}
