@@ -23,7 +23,7 @@
 - **Scan → Scrape → Rename.** Every title moves through three stages: New, Scraped, Renamed. Scan finds the movies and shows in your folders, Scrape matches each one online, Rename tidies folders and files from a template.
 - **NFO and artwork for Kodi, Jellyfin and Emby.** Each Scrape writes complete NFO files and every artwork type (poster, fanart, logo, clear art, banner, disc art, thumb) in the formats your media centre reads.
 - **TV shows.** Show, season and episode pages with missing and unaired episodes, specials and season artwork.
-- **Ratings side by side.** TMDB, plus IMDb, Rotten Tomatoes, Metacritic, Letterboxd and Trakt with your own free OMDb or MDBList key.
+- **Ratings side by side.** TMDB and IMDb with no key, plus Rotten Tomatoes, Metacritic, Letterboxd and Trakt with your own free OMDb or MDBList key.
 - **Search as you type.** Type in the search box and matching titles appear at once, grouped, with your recent searches and See all results. Punctuation, spacing, accents and small typos do not matter; messy release names still match, with a confidence score for every candidate.
 - **Library your way.** A poster grid with a size you choose, or a table with a Stage column whose columns you can move and resize.
 - **Copies of a movie.** If the same movie is in the library twice (a 4K and a 1080p download, say), the Copies filter lists them, Compare puts them side by side with the better value of each row marked, and Keep this one deletes the other the way Delete always does. Keep both leaves them alone, and Rename gives each its own name, such as `- 2160p` and `- 1080p`.
