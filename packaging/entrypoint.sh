@@ -37,11 +37,27 @@ if [ "$(id -u)" -eq 0 ]; then
         usermod -o -u "$PUID" cinevault
     fi
 
-    # The data volume belongs to the mapped user. The media volumes are left alone: their files
-    # may live on a NAS share with ownership that must not be rewritten on every start.
-    chown -R "$PUID:$PGID" /data
+    # The data volume belongs to the mapped user. It is walked only when its top folder has another
+    # owner (a first start, or a changed PUID/PGID), because a large thumbnail cache makes a
+    # recursive chown on every start slow. The media volumes are left alone: their files may live
+    # on a NAS share with ownership that must not be rewritten on every start.
+    if [ "$(stat -c '%u:%g' /data)" != "$PUID:$PGID" ]; then
+        chown -R "$PUID:$PGID" /data
+    fi
     export HOME=/data
 
+    # Supplementary groups that the container was started with (`--group-add`, or `group_add` in
+    # Compose) are kept, so the server can reach NAS folders that are group-readable. Group 0 is
+    # dropped: the server never gets root's group. The image's cinevault user has no other groups.
+    extra_groups=""
+    for group in $(id -G); do
+        if [ "$group" != 0 ]; then
+            extra_groups="${extra_groups:+$extra_groups,}$group"
+        fi
+    done
+    if [ -n "$extra_groups" ]; then
+        exec setpriv --reuid "$PUID" --regid "$PGID" --groups "$extra_groups" "$@"
+    fi
     exec setpriv --reuid "$PUID" --regid "$PGID" --clear-groups "$@"
 fi
 
