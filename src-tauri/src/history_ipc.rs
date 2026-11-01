@@ -144,8 +144,7 @@ pub async fn delete_titles(
     Ok(report)
 }
 
-/// Delete permanently: erases the titles' files for good. `confirm` is what the person typed in
-/// the confirmation dialog; anything but exactly `DELETE` erases nothing.
+/// Delete permanently: erases the titles' files for good. The dialog has asked the person.
 #[tauri::command]
 #[specta::specta]
 pub async fn erase_titles(
@@ -153,9 +152,8 @@ pub async fn erase_titles(
     library: State<'_, LibraryState>,
     history: State<'_, HistoryState>,
     ids: Vec<String>,
-    confirm: String,
 ) -> Result<EraseTitlesDto, HistoryCommandError> {
-    let report = cv_ipc::history::erase_titles(&library, &history, ids, confirm).await?;
+    let report = cv_ipc::history::erase_titles(&library, &history, ids).await?;
     if let Some(id) = report
         .entry_id
         .as_deref()

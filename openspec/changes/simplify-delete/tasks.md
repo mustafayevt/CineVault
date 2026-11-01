@@ -1,6 +1,6 @@
 ## 1. Backend
 
-- [ ] 1.1 `erase_titles` and `empty_drives_trash` drop the typed-word argument and the `ERASE_CONFIRMATION` and `EMPTY_CONFIRMATION` constants, in `cv-app`, `cv-ipc`, `src-tauri` and `cv-web` (the browser keeps the password and one-time intent); `ui/src/bindings.ts` regenerated. Verified by `cargo test --workspace` (the erase and empty tests, the browser intent tests) and `generated_bindings_are_up_to_date`.
+- [x] 1.1 `erase_titles` and `empty_drives_trash` drop the typed-word argument and the `ERASE_CONFIRMATION` and `EMPTY_CONFIRMATION` constants, in `cv-app`, `cv-ipc`, `src-tauri` and `cv-web` (the browser keeps the password and one-time intent); `ui/src/bindings.ts` regenerated. Verified by `cargo test --workspace` (the erase and empty tests, the browser intent tests) and `generated_bindings_are_up_to_date`.
 
 ## 2. One Delete
 

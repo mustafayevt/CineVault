@@ -538,8 +538,7 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
         }
         "empty_drives_trash" => {
             let drive_id: Option<String> = arg(args, "driveId")?;
-            let confirm: String = arg(args, "confirm")?;
-            cv_ipc::drives::empty_drives_trash(commands.drives.clone(), drive_id, confirm)
+            cv_ipc::drives::empty_drives_trash(commands.drives.clone(), drive_id)
                 .await
                 .map_err(command_error)
                 .and_then(to_value)
@@ -1258,7 +1257,6 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
         }
         "erase_titles" => {
             let ids: Vec<String> = arg(args, "ids")?;
-            let confirm: String = arg(args, "confirm")?;
             let intent: String = arg(args, "intent")?;
             let password: String = arg(args, "password")?;
             if !DeleteGuard::enabled(&state.services)
@@ -1270,7 +1268,7 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
                     "message": "Permanent delete needs the current password and a fresh confirmation."
                 }));
             }
-            cv_ipc::history::erase_titles(library, &commands.history, ids, confirm)
+            cv_ipc::history::erase_titles(library, &commands.history, ids)
                 .await
                 .map_err(command_error)
                 .and_then(to_value)

@@ -1,17 +1,17 @@
-//! Permanent delete: Shift+Delete with the typed confirmation (spec `title-deletion` "Shift+Delete
-//! asks for a typed confirmation", "Permanent delete erases only what it listed").
+//! Permanent delete: Delete while Settings › Deleted files is Delete permanently, after the Yes or
+//! No (spec `title-deletion` "A permanent delete asks Yes or No", "Permanent delete erases only
+//! what it listed").
 //!
 //! The one place CineVault erases user files for good, so every guard is here again, whatever
 //! the caller checked:
 //!
-//! 1. the caller passes the literal confirmation [`ERASE_CONFIRMATION`] the person typed;
-//! 2. a title on a drive that is offline, a path outside its library folder, a path that is a
+//! 1. a title on a drive that is offline, a path outside its library folder, a path that is a
 //!    library folder's root or holds one, and a folder other titles share (only the title's own
 //!    files go, with the files named after its videos) are refused;
-//! 3. the History entry is written first, with every path it is about to erase;
-//! 4. titles are erased one by one, file by file, with the short retries of `cv-fs`; a title stops
+//! 2. the History entry is written first, with every path it is about to erase;
+//! 3. titles are erased one by one, file by file, with the short retries of `cv-fs`; a title stops
 //!    at its first file that cannot be erased and keeps the rest, the other titles go on;
-//! 5. the entry then lists what was erased and what was left, and only titles erased whole leave
+//! 4. the entry then lists what was erased and what was left, and only titles erased whole leave
 //!    the library (the one user-confirmed exception to "never delete library rows").
 
 use std::io;
@@ -26,9 +26,6 @@ use super::move_plan::{EntryKind, enumerate};
 use super::removal::{Loaded, label, paths_to_trash, row_of};
 use super::{FolderUse, LibraryOpsError, Problem, RemovalService, parts_below};
 use crate::history::{HistoryKind, NewEntry, NewTitle, record_in, titles_word};
-
-/// What the person types to confirm a permanent delete.
-pub const ERASE_CONFIRMATION: &str = "DELETE";
 
 /// Erases files and empty folders. A trait so tests can make a file "in use".
 pub trait EraseFs: Send + Sync {
@@ -106,19 +103,12 @@ impl RemovalService {
         self
     }
 
-    /// Erases the titles' files for good (see the module documentation). `confirm` must be the
-    /// literal [`ERASE_CONFIRMATION`] the person typed.
+    /// Erases the titles' files for good (see the module documentation). The caller has asked
+    /// the person.
     ///
     /// # Errors
-    /// The confirmation is not exactly `DELETE` (nothing is touched), or the library cannot be
-    /// read or written.
-    pub fn erase(&self, ids: &[ItemId], confirm: &str) -> Result<EraseReport, LibraryOpsError> {
-        if confirm != ERASE_CONFIRMATION {
-            return Err(LibraryOpsError::rejected(
-                "confirmation",
-                "Type DELETE to delete permanently. Nothing was deleted.",
-            ));
-        }
+    /// The library cannot be read or written.
+    pub fn erase(&self, ids: &[ItemId]) -> Result<EraseReport, LibraryOpsError> {
         // Held for the whole erase, so no NFO or artwork write lands in a folder that is going
         // (it would be left behind, or stop the title at a folder that is no longer empty).
         let (_held, ids, mut busy) = self.hold_titles(ids)?;

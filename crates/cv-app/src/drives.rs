@@ -664,19 +664,14 @@ impl DrivesService {
     }
 
     /// Erases the trash folders and the recorded bin items of the drive `id` (every drive when
-    /// `None`), after the typed confirmation. History follows (see [`crate::trash_folders`]).
+    /// `None`); the caller has asked the person. History follows (see [`crate::trash_folders`]).
     ///
     /// # Errors
-    /// The confirmation is not exactly `DELETE` (nothing is touched), or the library cannot be
-    /// read.
+    /// The library cannot be read.
     pub fn empty_trash(
         &self,
         id: Option<&str>,
-        confirm: &str,
     ) -> Result<crate::trash_folders::EmptyReport, EmptyError> {
-        if confirm != crate::trash_folders::EMPTY_CONFIRMATION {
-            return Err(EmptyError::Confirmation);
-        }
         let contents = self.trash_contents(id)?;
         let custom = self.custom_folder();
         let mut report = crate::trash_folders::EmptyReport::default();
@@ -774,8 +769,6 @@ impl DrivesService {
 /// Why an Empty did not run.
 #[derive(Debug, thiserror::Error)]
 pub enum EmptyError {
-    #[error("Type DELETE to empty the trash. Nothing was erased.")]
-    Confirmation,
     #[error("the library could not be read: {0}")]
     Db(#[from] DbError),
 }

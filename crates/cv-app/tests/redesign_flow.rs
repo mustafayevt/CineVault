@@ -341,18 +341,10 @@ async fn the_whole_life_of_a_title_scan_scrape_rename_move_delete_restore_undo_a
             .is_empty()
     );
 
-    // ---- Permanent delete, with the typed confirmation ------------------------------------
+    // ---- Permanent delete -------------------------------------------------------------
     let sends_before = fake.sends();
-    let before_erase = kit::tree(&heat_dir);
-    assert_eq!(before_erase, ["heat.1995.1080p.mkv"]);
-    for typed in ["", "delete", "DELETE ", "yes"] {
-        let refused = removal.erase(&[heat], typed).unwrap_err();
-        assert_eq!(refused.code(), "confirmation");
-    }
-    assert_eq!(kit::tree(&heat_dir), before_erase, "nothing was deleted");
-    assert!(services.db().read(move |c| item_exists(c, heat)).unwrap());
-
-    let erased = removal.erase(&[heat], "DELETE").unwrap();
+    assert_eq!(kit::tree(&heat_dir), ["heat.1995.1080p.mkv"]);
+    let erased = removal.erase(&[heat]).unwrap();
     assert_eq!(erased.erased.len(), 1, "{erased:?}");
     assert!(erased.stopped.is_empty() && erased.problems.is_empty());
     assert!(

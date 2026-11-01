@@ -97,10 +97,10 @@ export const commands = {
 	drivesTrashContents: (driveId: string | null) => typedError<TrashContentsDto, DrivesCommandError>(__TAURI_INVOKE("drives_trash_contents", { driveId })),
 	/**
 	 *  Empties the trash of the drive `drive_id` (every drive when `None`): erases its trash folders'
-	 *  batches and what CineVault sent to the Recycle Bin from it. `confirm` must be the literal
-	 *  `DELETE` the person typed. History entries whose files were erased lose their Undo.
+	 *  batches and what CineVault sent to the Recycle Bin from it. The dialog has asked the person.
+	 *  History entries whose files were erased lose their Undo.
 	 */
-	emptyDrivesTrash: (driveId: string | null, confirm: string) => typedError<EmptyReportDto, DrivesCommandError>(__TAURI_INVOKE("empty_drives_trash", { driveId, confirm })),
+	emptyDrivesTrash: (driveId: string | null) => typedError<EmptyReportDto, DrivesCommandError>(__TAURI_INVOKE("empty_drives_trash", { driveId })),
 	/**
 	 *  Reads the media info of the titles that are still waiting for it, for example after MediaInfo
 	 *  was installed. `missing` means it is still not installed.
@@ -469,11 +469,8 @@ export const commands = {
 	 *  the titles out of the library, with one History entry for Undo. Nothing is erased.
 	 */
 	deleteTitles: (ids: string[]) => typedError<DeleteTitlesDto, HistoryCommandError>(__TAURI_INVOKE("delete_titles", { ids })),
-	/**
-	 *  Delete permanently: erases the titles' files for good. `confirm` is what the person typed in
-	 *  the confirmation dialog; anything but exactly `DELETE` erases nothing.
-	 */
-	eraseTitles: (ids: string[], confirm: string) => typedError<EraseTitlesDto, HistoryCommandError>(__TAURI_INVOKE("erase_titles", { ids, confirm })),
+	/**  Delete permanently: erases the titles' files for good. The dialog has asked the person. */
+	eraseTitles: (ids: string[]) => typedError<EraseTitlesDto, HistoryCommandError>(__TAURI_INVOKE("erase_titles", { ids })),
 	/**  Everything the movie detail page shows. */
 	getMovieDetail: (id: string) => typedError<MovieDetailDto, LibraryCommandError>(__TAURI_INVOKE("get_movie_detail", { id })),
 	/**

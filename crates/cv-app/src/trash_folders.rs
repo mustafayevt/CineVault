@@ -8,7 +8,7 @@
 //! * The **bin items** of a drive are the paths CineVault itself sent to the Recycle Bin / Trash,
 //!   as History recorded them (`binned` in an entry's detail, with the bin's own id), that are
 //!   still there. Nothing else in the bin is ever listed or touched.
-//! * **Emptying** erases, after the typed confirmation `DELETE`, the batches of a drive's trash
+//! * **Emptying** erases, after the caller's Yes or No, the batches of a drive's trash
 //!   folders and its bin items. A path is erased only when it is a top entry of a trash folder
 //!   (its parent is the trash folder, its name a plain name) and the trash folder is no link; the
 //!   walk removes links themselves, never what they point to. Bin items are erased by their
@@ -35,9 +35,6 @@ use cv_rename::exec::TRASH_DIR;
 use serde_json::Value;
 
 use crate::library_ops::{BinnedItem, FOLDER_PREFIX, SystemBin, is_erased};
-
-/// What the person types to empty a trash folder.
-pub const EMPTY_CONFIRMATION: &str = "DELETE";
 
 /// The Undo reason of an entry whose files were emptied from a trash folder.
 pub const EMPTIED_FOLDER: &str = "Its files were emptied from the trash folder";

@@ -123,14 +123,13 @@ pub async fn drives_trash_contents(
 }
 
 /// Empties the trash of the drive `drive_id` (every drive when `None`): erases its trash folders'
-/// batches and what CineVault sent to the Recycle Bin from it. `confirm` must be the literal
-/// `DELETE` the person typed. History entries whose files were erased lose their Undo.
+/// batches and what CineVault sent to the Recycle Bin from it. The dialog has asked the person.
+/// History entries whose files were erased lose their Undo.
 #[tauri::command]
 #[specta::specta]
 pub async fn empty_drives_trash(
     state: State<'_, DrivesState>,
     drive_id: Option<String>,
-    confirm: String,
 ) -> Result<EmptyReportDto, DrivesCommandError> {
-    cv_ipc::drives::empty_drives_trash(state.service(), drive_id, confirm).await
+    cv_ipc::drives::empty_drives_trash(state.service(), drive_id).await
 }

@@ -461,13 +461,7 @@ fn a_drive_shows_its_trash_folder_and_what_cinevault_sent_to_the_bin_and_empties
     assert_eq!(contents.bin.len(), 1);
     assert_eq!(contents.bytes(), 100);
 
-    assert!(matches!(
-        service.empty_trash(None, "delete"),
-        Err(EmptyError::Confirmation)
-    ));
-    assert_eq!(service.overview().unwrap().drives[0].trash_bytes, 40);
-
-    let report = service.empty_trash(Some(&drive.id), "DELETE").unwrap();
+    let report = service.empty_trash(Some(&drive.id)).unwrap();
     assert_eq!(
         (report.batches, report.bin_items, report.bytes),
         (1, 1, 100)
@@ -552,7 +546,7 @@ fn emptying_never_touches_the_persons_own_files_in_the_custom_trash_folder() {
     // The listing and Empty all name and erase CineVault's batch only.
     let contents = service.trash_contents(None).unwrap();
     assert_eq!(contents.batches.len(), 1, "{:?}", contents.batches);
-    let report = service.empty_trash(None, "DELETE").unwrap();
+    let report = service.empty_trash(None).unwrap();
     assert_eq!(report.batches, 1);
     assert!(!Path::new(&place).exists());
     assert!(
@@ -656,7 +650,7 @@ fn a_bin_empty_that_stops_part_way_switches_off_the_undo_of_what_it_erased_only(
         .unwrap();
         entries.push(entry);
     }
-    let report = service.empty_trash(None, "DELETE").unwrap();
+    let report = service.empty_trash(None).unwrap();
     assert_eq!(report.bin_items, 1, "{report:?}");
     assert_eq!(report.entries.len(), 1);
     assert_eq!(report.problems.len(), 1);
@@ -839,7 +833,7 @@ fn a_drive_counts_and_empties_only_the_trash_items_cinevault_recorded() {
     let contents = service.trash_contents(None).unwrap();
     assert_eq!(contents.bin.len(), 2);
 
-    let report = service.empty_trash(None, "DELETE").unwrap();
+    let report = service.empty_trash(None).unwrap();
     assert_eq!((report.bin_items, report.bytes), (2, 100));
     assert!(report.problems.is_empty(), "{:?}", report.problems);
     assert_eq!(service.overview().unwrap().drives[0].bin_bytes, 0);

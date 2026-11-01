@@ -663,7 +663,6 @@ struct DeleteIntentBody {
 #[derive(Debug, Deserialize)]
 struct DeleteEraseBody {
     ids: Vec<String>,
-    confirm: String,
     intent: String,
     password: String,
 }
@@ -740,13 +739,8 @@ async fn delete_erase(
         )
             .into_response();
     }
-    match cv_ipc::history::erase_titles(
-        &state.commands.library,
-        &state.commands.history,
-        body.ids,
-        body.confirm,
-    )
-    .await
+    match cv_ipc::history::erase_titles(&state.commands.library, &state.commands.history, body.ids)
+        .await
     {
         Ok(report) => Json(report).into_response(),
         Err(error) => (
