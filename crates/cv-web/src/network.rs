@@ -2,10 +2,13 @@
 //!
 //! "Home network" means the same computer or a network that is not routed on the internet:
 //! loopback, the private ranges, link-local and carrier-grade NAT (which some VPN meshes use).
-//! The welcome page, the password reset and the desktop's "Only devices on my home network"
-//! guard all use this one rule.
+//! The welcome page, the password reset, the sign-in ceiling and the desktop's "Only devices on
+//! my home network" guard all use this one rule, and none of them counts a request that came
+//! through a proxy that is not trusted.
 
 use std::net::{IpAddr, Ipv4Addr, UdpSocket};
+
+use axum::http::HeaderMap;
 
 /// True for loopback, `10/8`, `172.16/12`, `192.168/16`, `169.254/16`, `100.64/10`, `::1`,
 /// `fc00::/7`, `fe80::/10`, and the IPv4-mapped IPv6 forms of the IPv4 ranges.
@@ -29,6 +32,26 @@ fn is_home_v4(ip: Ipv4Addr) -> bool {
         || ip.is_private()
         || ip.is_link_local()
         || (a == 100 && (64..128).contains(&b))
+}
+
+/// The headers reverse proxies and tunnel clients add to name the client they forward.
+const FORWARDING_HEADERS: &[&str] = &[
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+    "cf-connecting-ip",
+    "true-client-ip",
+];
+
+/// Whether a request carries a forwarding header: it came through a proxy or a tunnel, so its
+/// socket peer (often `127.0.0.1`) says nothing about where the client is.
+#[must_use]
+pub fn forwarded(headers: &HeaderMap) -> bool {
+    FORWARDING_HEADERS
+        .iter()
+        .any(|name| headers.contains_key(*name))
 }
 
 /// Adapter names that belong to virtual machines, containers or VPN plumbing rather than the
@@ -143,6 +166,17 @@ mod tests {
             "::ffff:8.8.8.8",
         ] {
             assert!(!is_home_address(ip(text)), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_forwarding_header_marks_a_proxied_request() {
+        use axum::http::HeaderValue;
+        assert!(!forwarded(&HeaderMap::new()));
+        for name in FORWARDING_HEADERS {
+            let mut headers = HeaderMap::new();
+            headers.insert(*name, HeaderValue::from_static("203.0.113.7"));
+            assert!(forwarded(&headers), "{name}");
         }
     }
 

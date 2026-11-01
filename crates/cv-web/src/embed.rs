@@ -178,6 +178,7 @@ pub fn start(options: EmbedOptions, shared: Shared) -> Result<RunningServer, Sta
         trust_proxy: Vec::new(),
         ui: options.ui,
         lan_only: options.lan_only,
+        proxy_warned: Arc::default(),
     };
     let feed = server::wire(&state);
     let app = server::router(state);

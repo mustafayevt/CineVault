@@ -7,6 +7,7 @@
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use crate::state::{DeleteGuard, UiAssets, WebState, random_token};
 use crate::{auth, dispatch, network};
@@ -81,14 +82,14 @@ pub(crate) fn router(state: WebState) -> Router {
 pub(crate) const HOME_ONLY: &str = "Browser access is limited to your home network.";
 
 /// Refuses every peer outside the home network when the state asks for it. The socket peer
-/// decides; the desktop trusts no proxy.
+/// decides, and a forwarded request is outside; the desktop trusts no proxy.
 async fn home_network_guard(
     State(state): State<WebState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
-    if state.lan_only && !network::is_home_address(peer.ip()) {
+    if state.lan_only && !from_home_network(&state, request.headers(), peer.ip()) {
         return (StatusCode::FORBIDDEN, HOME_ONLY).into_response();
     }
     next.run(request).await
@@ -275,9 +276,18 @@ fn user_agent(headers: &HeaderMap) -> String {
 }
 
 /// Whether the request comes from the home network: the socket peer, or the forwarded client
-/// address only when the peer is a trusted proxy.
-fn from_home_network(headers: &HeaderMap, peer: IpAddr, trust: &[IpNet]) -> bool {
-    network::is_home_address(client_ip(headers, peer, trust))
+/// address only when the peer is a trusted proxy. A request that came through a proxy that is not
+/// trusted is outside, because every visitor of a local proxy or tunnel arrives from loopback.
+fn from_home_network(state: &WebState, headers: &HeaderMap, peer: IpAddr) -> bool {
+    if !from_trusted_proxy(peer, &state.trust_proxy) && network::forwarded(headers) {
+        if !state.proxy_warned.swap(true, Ordering::Relaxed) {
+            tracing::warn!(
+                "A request came through a proxy that is not in CINEVAULT_WEB_TRUST_PROXY; it is treated as outside the home network."
+            );
+        }
+        return false;
+    }
+    network::is_home_address(client_ip(headers, peer, &state.trust_proxy))
 }
 
 async fn setup_page(
@@ -288,7 +298,7 @@ async fn setup_page(
     if !state.auth.needs_setup() {
         return Redirect::to("/login").into_response();
     }
-    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+    if !from_home_network(&state, &headers, peer.ip()) {
         return (
             StatusCode::FORBIDDEN,
             axum::response::Html(auth::away_page()),
@@ -368,7 +378,7 @@ async fn setup(
     headers: HeaderMap,
     Json(body): Json<SetupBody>,
 ) -> Response {
-    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+    if !from_home_network(&state, &headers, peer.ip()) {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({ "message": auth::AuthError::NotHomeNetwork.to_string() })),
@@ -428,7 +438,7 @@ async fn reset_start(
         let message = auth::AuthError::DesktopReset(computer.clone()).to_string();
         return (StatusCode::FORBIDDEN, Json(json!({ "message": message }))).into_response();
     }
-    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+    if !from_home_network(&state, &headers, peer.ip()) {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({ "message": RESET_AWAY })),
@@ -482,7 +492,7 @@ async fn reset_finish(
         let message = auth::AuthError::DesktopReset(computer.clone()).to_string();
         return (StatusCode::FORBIDDEN, Json(json!({ "message": message }))).into_response();
     }
-    if !from_home_network(&headers, peer.ip(), &state.trust_proxy) {
+    if !from_home_network(&state, &headers, peer.ip()) {
         return (
             StatusCode::FORBIDDEN,
             Json(json!({ "message": RESET_AWAY })),

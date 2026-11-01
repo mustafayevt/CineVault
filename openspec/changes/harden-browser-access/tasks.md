@@ -9,7 +9,7 @@
 
 ## 2. Home network behind a proxy
 
-- [ ] 2.1 Add `network::forwarded(headers)` and use it in `from_home_network` and `home_network_guard`, with the one-time warning. Verified by `cv-web` tests: welcome, setup and reset refused from `127.0.0.1` with each header, accepted with a trusted proxy, accepted with no header from `172.17.0.1`, the desktop guard refusing a forwarded loopback request, and one log line for three requests.
+- [x] 2.1 Add `network::forwarded(headers)` and use it in `from_home_network` and `home_network_guard`, with the one-time warning. Verified by `cv-web` tests: welcome, setup and reset refused from `127.0.0.1` with each header, accepted with a trusted proxy, accepted with no header from `172.17.0.1`, the desktop guard refusing a forwarded loopback request, and one log line for three requests.
 
 ## 3. Sign-in limits
 

@@ -75,6 +75,7 @@ pub async fn run(options: Options) -> Result<(), Box<dyn std::error::Error>> {
         trust_proxy: server::parse_trust_proxy(),
         ui: UiAssets::Folder(ui_dir.clone()),
         lan_only: false,
+        proxy_warned: Arc::default(),
     };
     let _feed = server::wire(&state);
     let app = server::router(state.clone());

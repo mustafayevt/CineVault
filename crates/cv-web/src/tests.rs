@@ -74,6 +74,7 @@ fn web_state(
         trust_proxy,
         ui: ui(),
         lan_only,
+        proxy_warned: Arc::default(),
     }
 }
 
@@ -661,6 +662,145 @@ async fn the_embedded_interface_is_served_with_the_session_token() {
     )
     .await;
     assert!(!traversal.body.contains("argon2"));
+    services.shutdown();
+}
+
+const FORWARDING_HEADERS: [&str; 7] = [
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+    "cf-connecting-ip",
+    "true-client-ip",
+];
+
+/// A reverse proxy or tunnel on the same computer connects from loopback. Without a trusted
+/// proxy, its visitors are not the home network: no welcome page, no setup, no PIN.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_request_through_an_untrusted_proxy_is_not_home() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    for name in FORWARDING_HEADERS {
+        let headers = [(name, "203.0.113.7")];
+        let page = call(&state, "GET", "/setup", "127.0.0.1", &headers, None).await;
+        assert_eq!(page.status, StatusCode::FORBIDDEN, "{name}");
+        assert!(page.body.contains("Finish setup from your home network"));
+        let body = serde_json::json!({ "password": PASSWORD, "confirm": PASSWORD });
+        let posted = call(
+            &state,
+            "POST",
+            "/api/setup",
+            "127.0.0.1",
+            &headers,
+            Some(body),
+        )
+        .await;
+        assert_eq!(posted.status, StatusCode::FORBIDDEN, "{name}");
+    }
+    assert!(!state.auth.has_password());
+
+    set_password(&state);
+    let reset = call(
+        &state,
+        "POST",
+        "/api/reset/start",
+        "127.0.0.1",
+        &[("x-real-ip", "203.0.113.7")],
+        None,
+    )
+    .await;
+    assert_eq!(reset.status, StatusCode::FORBIDDEN);
+    assert!(reset.body.contains("home network"));
+    assert!(!state.data_root.join(auth::PIN_FILE).exists());
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_trusted_proxy_and_a_port_mapping_are_home() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let trusted: Vec<IpNet> = vec!["127.0.0.1/32".parse().unwrap()];
+    let proxied = web_state(&services, HostMode::Server, false, trusted);
+    let page = call(
+        &proxied,
+        "GET",
+        "/setup",
+        "127.0.0.1",
+        &[("x-forwarded-for", "192.168.1.30")],
+        None,
+    )
+    .await;
+    assert_eq!(page.status, StatusCode::OK);
+
+    // A container's published port adds no header: the bridge address is the home network.
+    let mapped = web_state(&services, HostMode::Server, false, Vec::new());
+    let page = call(&mapped, "GET", "/setup", "172.17.0.1", &[], None).await;
+    assert_eq!(page.status, StatusCode::OK);
+    services.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn home_network_only_refuses_a_tunnel_on_the_same_computer() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let host = HostMode::Desktop {
+        computer: "STUDY-PC".to_owned(),
+    };
+    let state = web_state(&services, host, true, Vec::new());
+    set_password(&state);
+    let tunnel = call(
+        &state,
+        "GET",
+        "/login",
+        "127.0.0.1",
+        &[("x-forwarded-for", "198.51.100.4")],
+        None,
+    )
+    .await;
+    assert_eq!(tunnel.status, StatusCode::FORBIDDEN);
+    assert_eq!(tunnel.body, server::HOME_ONLY);
+    let local = call(&state, "GET", "/login", "127.0.0.1", &[], None).await;
+    assert_eq!(local.status, StatusCode::OK);
+    services.shutdown();
+}
+
+/// What the log receives, for the tests that check a warning.
+#[derive(Clone, Default)]
+struct Captured(Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_untrusted_proxy_is_logged_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let state = web_state(&services, HostMode::Server, false, Vec::new());
+    let captured = Captured::default();
+    let writer = captured.clone();
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_writer(move || writer.clone())
+        .finish();
+    // The handlers run on this thread: `oneshot` is awaited here, not spawned.
+    let guard = tracing::subscriber::set_default(subscriber);
+    for _ in 0..3 {
+        let headers = [("x-forwarded-for", "203.0.113.7")];
+        call(&state, "GET", "/setup", "127.0.0.1", &headers, None).await;
+    }
+    drop(guard);
+    let log = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+    assert_eq!(log.matches("CINEVAULT_WEB_TRUST_PROXY").count(), 1, "{log}");
     services.shutdown();
 }
 
