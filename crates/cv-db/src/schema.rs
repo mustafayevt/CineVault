@@ -47,6 +47,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "reread_media_info",
         sql: include_str!("migrations/103_reread_media_info.sql"),
     },
+    Migration {
+        version: 104,
+        name: "copies_kept",
+        sql: include_str!("migrations/104_copies_kept.sql"),
+    },
 ];
 
 /// The schema version of this build: the last migration, or [`BASE_VERSION`] when there is none.
@@ -91,6 +96,7 @@ pub const TABLES: &[&str] = &[
     "torrent_indexers",
     "history_entry",
     "history_title",
+    "copies_kept",
 ];
 
 /// Every table of the current schema ([`TABLES`]).
