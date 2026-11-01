@@ -111,7 +111,7 @@ fn reports_pass_fail_and_pending_per_fixture() {
     assert!(text.contains("FAIL     stacking/stacking-1"), "{text}");
     assert!(text.contains("PENDING  id-parsing/id-parsing-1"), "{text}");
     assert!(
-        text.contains("10 fixtures: 2 passed, 2 failed, 6 pending"),
+        text.contains("11 fixtures: 2 passed, 2 failed, 7 pending"),
         "{text}"
     );
 }

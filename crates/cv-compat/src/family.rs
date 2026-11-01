@@ -13,6 +13,7 @@ pub enum Family {
     RenameTrees,
     RenameDestinationsTv,
     RenameTreesTv,
+    RenameCopies,
 }
 
 /// Where a family's inputs and expected outputs live, relative to `fixtures/` and `expected/`.
@@ -31,7 +32,7 @@ pub enum Layout {
 }
 
 impl Family {
-    pub const ALL: [Family; 10] = [
+    pub const ALL: [Family; 11] = [
         Family::Classification,
         Family::TitleParsing,
         Family::IdParsing,
@@ -42,6 +43,7 @@ impl Family {
         Family::RenameTrees,
         Family::RenameDestinationsTv,
         Family::RenameTreesTv,
+        Family::RenameCopies,
     ];
 
     /// Stable name used in reports.
@@ -57,6 +59,7 @@ impl Family {
             Family::RenameTrees => "rename-trees",
             Family::RenameDestinationsTv => "rename-destinations-tv",
             Family::RenameTreesTv => "rename-trees-tv",
+            Family::RenameCopies => "rename-copies",
         }
     }
 
@@ -105,6 +108,10 @@ impl Family {
             Family::RenameTreesTv => Layout::Json {
                 fixture: "rename/trees-tv.json",
                 expected: "rename/trees-tv.json",
+            },
+            Family::RenameCopies => Layout::Json {
+                fixture: "rename/copies.json",
+                expected: "rename/copies.json",
             },
         }
     }
