@@ -185,6 +185,7 @@ function rowOf(fixture: CopyFixture, best: boolean): CopyRow {
     file_name: fixture.file,
     source_label: fixture.sourceLabel,
     best,
+    same_file: false,
   };
 }
 
@@ -207,6 +208,7 @@ export function createSyntheticCopies(): CopiesBackend {
         copies: ordered.map((fixture) => rowOf(fixture, fixture === members[0])),
         kept: kept.has(own.group),
         look_same: false,
+        same_file: false,
       });
     },
     keepAll: (ids) => {

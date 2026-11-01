@@ -1,6 +1,8 @@
 //! The copies service: what the Library, the Movie page and the Compare copies page ask for.
 
+use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use cv_db::repo::CopyMember;
 use cv_db::repo::copies::{
@@ -63,6 +65,8 @@ pub struct CopyRow {
     pub source_label: String,
     /// The suggested copy ("Best quality").
     pub best: bool,
+    /// The copy's video may be the same file as another copy's (see [`Comparison::same_file`]).
+    pub same_file: bool,
 }
 
 /// The Compare copies page of one movie.
@@ -72,8 +76,12 @@ pub struct Comparison {
     pub copies: Vec<CopyRow>,
     /// The "keep both" decision covering the group, when the user made one.
     pub kept: Option<KeptSetId>,
-    /// Every copy shows the same Resolution, HDR, Audio and Source.
+    /// Every copy shows the same Resolution, HDR, Audio and Source, and no two may be one file.
     pub look_same: bool,
+    /// Two of the copies may be one file reached through two library folders (a network share
+    /// of a local folder, a mapped drive, a link): deleting one would delete the other, so the
+    /// page offers no "Keep this one".
+    pub same_file: bool,
 }
 
 /// The source of a copy as the compare rows and the copy labels name it: `BluRay`, `WEB-DL`,
@@ -201,6 +209,8 @@ impl CopiesService {
             Ok((items, copy_sizes(conn, &order)?, labels))
         })?;
 
+        let shared = may_share_a_file(&items);
+        let same_file = shared.iter().any(|shared| *shared);
         let qualities: Vec<Option<Quality>> = items.iter().map(quality).collect();
         let marked = best(&qualities);
         let copies: Vec<CopyRow> = items
@@ -221,21 +231,16 @@ impl CopiesService {
                         .unwrap_or_default(),
                     source_label: labels[index].clone(),
                     best: marked == Some(index),
+                    same_file: shared[index],
                 }
             })
             .collect();
-        let look_same = copies.iter().all(|c| c.media.is_some())
-            && copies.windows(2).all(|pair| {
-                let (a, b) = (&pair[0], &pair[1]);
-                let (ma, mb) = (a.media.as_ref(), b.media.as_ref());
-                ma.map(|m| (&m.resolution, &m.hdr_formats, &m.audio))
-                    == mb.map(|m| (&m.resolution, &m.hdr_formats, &m.audio))
-                    && a.source == b.source
-            });
+        let look_same = !same_file && look_alike(&copies);
         Ok(Some(Comparison {
             copies,
             kept: group.kept,
             look_same,
+            same_file,
         }))
     }
 
@@ -280,6 +285,68 @@ impl CopiesService {
     }
 }
 
+/// Every copy has read media info with the same Resolution, HDR, Audio and Source.
+fn look_alike(copies: &[CopyRow]) -> bool {
+    let Some(media) = copies
+        .iter()
+        .map(|c| c.media.as_ref())
+        .collect::<Option<Vec<_>>>()
+    else {
+        return false;
+    };
+    copies.windows(2).zip(media.windows(2)).all(|(pair, m)| {
+        (&m[0].resolution, &m[0].hdr_formats, &m[0].audio)
+            == (&m[1].resolution, &m[1].hdr_formats, &m[1].audio)
+            && pair[0].source == pair[1].source
+    })
+}
+
+/// For each copy, whether its main video may be the same file as another copy's. A copy without
+/// a video it can name cannot be told apart, so it counts as maybe the same.
+fn may_share_a_file(items: &[Item]) -> Vec<bool> {
+    let videos: Vec<_> = items
+        .iter()
+        .map(|item| main_video(item).map(cv_domain::MediaFile::path))
+        .collect();
+    let mut shared = vec![false; videos.len()];
+    for a in 0..videos.len() {
+        for b in a + 1..videos.len() {
+            let same = match (&videos[a], &videos[b]) {
+                (Some(first), Some(second)) => may_be_same_file(first, second),
+                _ => true,
+            };
+            if same {
+                shared[a] = true;
+                shared[b] = true;
+            }
+        }
+    }
+    shared
+}
+
+/// Whether `a` and `b` may be one file reached two ways, such as a file under `D:\Cinema` and
+/// the same file under the network share of that folder. The file system answers first; when it
+/// does not say so, the same file name, size and modified time on both paths still count as
+/// maybe the same, because a share does not always report the identity of the disk behind it. A
+/// file that cannot be read cannot be told apart either.
+fn may_be_same_file(a: &Path, b: &Path) -> bool {
+    if same_file::is_same_file(a, b).unwrap_or(false) {
+        return true;
+    }
+    let (Ok(first), Ok(second)) = (std::fs::metadata(a), std::fs::metadata(b)) else {
+        return true;
+    };
+    let name = |path: &Path| path.file_name().map(|n| n.to_string_lossy().to_lowercase());
+    // Some file systems keep modified times to two seconds only.
+    let close_in_time = match (first.modified(), second.modified()) {
+        (Ok(x), Ok(y)) => {
+            x.duration_since(y).unwrap_or_else(|e| e.duration()) <= Duration::from_secs(2)
+        }
+        _ => true,
+    };
+    name(a) == name(b) && first.len() == second.len() && close_in_time
+}
+
 fn original_language(item: &Item) -> &str {
     &item.core.original_language
 }
@@ -316,7 +383,7 @@ mod tests {
     use super::*;
 
     struct Lab {
-        _dir: tempfile::TempDir,
+        dir: tempfile::TempDir,
         db: Arc<Database>,
         service: Arc<CopiesService>,
     }
@@ -326,35 +393,51 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let db = Arc::new(Database::open(dir.path().join("library.db")).unwrap());
             let service = CopiesService::new(Arc::clone(&db));
-            Self {
-                _dir: dir,
-                db,
-                service,
-            }
+            Self { dir, db, service }
         }
 
-        /// A copy of Example Movie (2020); `width` 0 leaves its media info unread.
-        fn copy(
+        /// A copy of Example Movie (2020) in its own folder `name` of the media folder, with a
+        /// tiny video named after the folder; `width` 0 leaves its media info unread.
+        fn copy(&self, name: &str, width: u32, source: MediaSource, audio: (&str, u32)) -> ItemId {
+            let folder = self.dir.path().join("media").join(name);
+            self.copy_in(
+                &folder,
+                &format!("Example Movie {name}.mkv"),
+                width,
+                source,
+                audio,
+            )
+        }
+
+        /// A copy whose video is `folder/file`; the file is written when it is not there yet.
+        fn copy_in(
             &self,
-            folder: &str,
+            folder: &std::path::Path,
+            file: &str,
             width: u32,
             source: MediaSource,
             audio: (&str, u32),
         ) -> ItemId {
+            std::fs::create_dir_all(folder).unwrap();
+            if !folder.join(file).exists() {
+                std::fs::write(folder.join(file), file).unwrap();
+            }
+            let folder = folder.to_string_lossy().into_owned();
             let mut item = Item::movie("Example Movie");
             item.core.year = 2020;
-            item.core.path = folder.into();
+            item.core.path = folder.clone();
             item.core.ids.set("tmdb", "1");
             if let ItemDetail::Movie(movie) = &mut item.detail {
                 movie.media_source = source;
             }
-            let mut video = MediaFile::new(MediaFileType::Video, folder, "Example Movie.mkv");
+            let mut video = MediaFile::new(MediaFileType::Video, &folder, file);
             video.size_bytes = u64::from(width) * 1000;
             if width > 0 {
                 video.container_format = "Matroska".into();
                 video.width = width;
                 video.height = width * 9 / 16;
                 video.video_bitrate_kbps = width * 5;
+                video.duration_secs = 6000;
                 video.audio_streams.push(AudioStream {
                     codec: audio.0.into(),
                     channels: audio.1,
@@ -366,16 +449,29 @@ mod tests {
         }
     }
 
+    /// Makes `link` point at the folder `target`: a junction on Windows (no rights needed), a
+    /// symbolic link elsewhere. False when the system will not.
+    fn folder_link(target: &std::path::Path, link: &std::path::Path) -> bool {
+        #[cfg(windows)]
+        {
+            std::process::Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(link)
+                .arg(target)
+                .output()
+                .is_ok_and(|o| o.status.success())
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(target, link).is_ok()
+        }
+    }
+
     #[test]
     fn the_compare_rows_put_the_opened_copy_first_and_mark_the_best() {
         let lab = Lab::new();
-        let web = lab.copy("D:/Movies/dl-1", 1920, MediaSource::WebDl, ("AAC", 6));
-        let disc = lab.copy(
-            "E:/Films/dl-2",
-            3840,
-            MediaSource::Bluray,
-            ("TrueHD Atmos", 8),
-        );
+        let web = lab.copy("dl-1", 1920, MediaSource::WebDl, ("AAC", 6));
+        let disc = lab.copy("dl-2", 3840, MediaSource::Bluray, ("TrueHD Atmos", 8));
 
         let page = lab.service.compare(disc).unwrap().unwrap();
 
@@ -393,7 +489,8 @@ mod tests {
         assert_eq!(second.source, "WEB-DL");
         assert_eq!(second.media.as_ref().unwrap().resolution, "1080p");
         assert_eq!(first.size_bytes, 3_840_000);
-        assert_eq!(second.folder, "D:/Movies/dl-1");
+        assert!(second.folder.ends_with("dl-1"));
+        assert!(!page.same_file && !first.same_file);
         assert!(!page.look_same);
         assert_eq!(page.kept, None);
     }
@@ -401,8 +498,8 @@ mod tests {
     #[test]
     fn an_unread_copy_shows_not_read_yet_and_nothing_is_marked() {
         let lab = Lab::new();
-        let read = lab.copy("D:/Movies/a", 3840, MediaSource::Bluray, ("AAC", 6));
-        let unread = lab.copy("D:/Movies/b", 0, MediaSource::Unknown, ("", 0));
+        let read = lab.copy("a", 3840, MediaSource::Bluray, ("AAC", 6));
+        let unread = lab.copy("b", 0, MediaSource::Unknown, ("", 0));
 
         let page = lab.service.compare(read).unwrap().unwrap();
 
@@ -415,8 +512,8 @@ mod tests {
     #[test]
     fn identical_copies_look_the_same() {
         let lab = Lab::new();
-        let a = lab.copy("D:/Movies/a", 1920, MediaSource::WebDl, ("AAC", 6));
-        lab.copy("D:/Movies/b", 1920, MediaSource::WebDl, ("AAC", 6));
+        let a = lab.copy("a", 1920, MediaSource::WebDl, ("AAC", 6));
+        lab.copy("b", 1920, MediaSource::WebDl, ("AAC", 6));
 
         let page = lab.service.compare(a).unwrap().unwrap();
 
@@ -427,8 +524,8 @@ mod tests {
     #[test]
     fn keep_all_closes_the_group_and_ask_again_opens_it() {
         let lab = Lab::new();
-        let a = lab.copy("D:/Movies/a", 1920, MediaSource::WebDl, ("AAC", 6));
-        let b = lab.copy("D:/Movies/b", 3840, MediaSource::Bluray, ("AAC", 6));
+        let a = lab.copy("a", 1920, MediaSource::WebDl, ("AAC", 6));
+        let b = lab.copy("b", 3840, MediaSource::Bluray, ("AAC", 6));
         assert_eq!(lab.service.counts().unwrap(), 2);
 
         let set = lab.service.keep_all(&[a, b]).unwrap();
@@ -449,9 +546,9 @@ mod tests {
     #[test]
     fn the_listing_ranks_each_open_group_best_first() {
         let lab = Lab::new();
-        let unread = lab.copy("D:/Movies/a", 0, MediaSource::Unknown, ("", 0));
-        let hd = lab.copy("D:/Movies/b", 1920, MediaSource::WebDl, ("AAC", 6));
-        let uhd = lab.copy("D:/Movies/c", 3840, MediaSource::Bluray, ("AAC", 6));
+        let unread = lab.copy("a", 0, MediaSource::Unknown, ("", 0));
+        let hd = lab.copy("b", 1920, MediaSource::WebDl, ("AAC", 6));
+        let uhd = lab.copy("c", 3840, MediaSource::Bluray, ("AAC", 6));
 
         let members = lab.service.listing().unwrap();
         let order: Vec<(ItemId, u32)> = members.iter().map(|m| (m.id, m.rank)).collect();
@@ -465,10 +562,96 @@ mod tests {
     #[test]
     fn a_movie_without_copies_has_no_group_and_no_page() {
         let lab = Lab::new();
-        let a = lab.copy("D:/Movies/a", 1920, MediaSource::WebDl, ("AAC", 6));
+        let a = lab.copy("a", 1920, MediaSource::WebDl, ("AAC", 6));
 
         assert_eq!(lab.service.group_of(a).unwrap(), None);
         assert_eq!(lab.service.compare(a).unwrap(), None);
         assert_eq!(lab.service.counts().unwrap(), 0);
+    }
+
+    #[test]
+    fn one_file_through_two_library_folders_is_marked_and_does_not_look_the_same() {
+        let lab = Lab::new();
+        let real = lab.dir.path().join("Cinema");
+        let share = lab.dir.path().join("D-Cinema");
+        std::fs::create_dir_all(&real).unwrap();
+        if !folder_link(&real, &share) {
+            return;
+        }
+        let file = "Example Movie (2020).mkv";
+        let local = lab.copy_in(
+            &real.join("Example Movie"),
+            file,
+            1920,
+            MediaSource::WebDl,
+            ("AAC", 6),
+        );
+        lab.copy_in(
+            &share.join("Example Movie"),
+            file,
+            1920,
+            MediaSource::WebDl,
+            ("AAC", 6),
+        );
+
+        let page = lab.service.compare(local).unwrap().unwrap();
+
+        assert!(page.same_file);
+        assert!(page.copies.iter().all(|c| c.same_file));
+        assert!(!page.look_same, "never suggest keeping one of one file");
+    }
+
+    #[test]
+    fn same_name_size_and_time_on_two_paths_may_be_the_same_file() {
+        let lab = Lab::new();
+        let file = "Example Movie (2020).mkv";
+        let a = lab.copy_in(
+            &lab.dir.path().join("one"),
+            file,
+            1920,
+            MediaSource::WebDl,
+            ("AAC", 6),
+        );
+        let b = lab.copy_in(
+            &lab.dir.path().join("two"),
+            file,
+            3840,
+            MediaSource::Bluray,
+            ("AAC", 6),
+        );
+        let when = std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+        for folder in ["one", "two"] {
+            let path = lab.dir.path().join(folder).join(file);
+            std::fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(when)
+                .unwrap();
+        }
+
+        let page = lab.service.compare(a).unwrap().unwrap();
+        assert!(page.same_file);
+
+        // Another modified time tells them apart.
+        let path = lab.dir.path().join("two").join(file);
+        let later = when + Duration::from_secs(60);
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(later)
+            .unwrap();
+        assert!(!lab.service.compare(b).unwrap().unwrap().same_file);
+    }
+
+    #[test]
+    fn a_copy_whose_video_cannot_be_read_cannot_be_told_apart() {
+        let lab = Lab::new();
+        let a = lab.copy("a", 1920, MediaSource::WebDl, ("AAC", 6));
+        lab.copy("b", 3840, MediaSource::Bluray, ("AAC", 6));
+        std::fs::remove_file(lab.dir.path().join("media/b/Example Movie b.mkv")).unwrap();
+
+        assert!(lab.service.compare(a).unwrap().unwrap().same_file);
     }
 }

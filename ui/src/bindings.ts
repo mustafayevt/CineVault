@@ -676,6 +676,11 @@ export const commands = {
 	kept: boolean,
 	/**  Every copy shows the same Resolution, HDR, Audio and Source. */
 	look_same: boolean,
+	/**
+	 *  Two copies may be one file reached through two library folders: the page offers no
+	 *  "Keep this one".
+	 */
+	same_file: boolean,
 } | null, LibraryCommandError>(__TAURI_INVOKE("compare_copies", { id })),
 	/**  "Keep both" / "Keep all": the user keeps every one of `ids` as copies. No file changes. */
 	keepAllCopies: (ids: string[]) => typedError<null, LibraryCommandError>(__TAURI_INVOKE("keep_all_copies", { ids })),
@@ -1044,6 +1049,11 @@ export type ComparisonDto = {
 	kept: boolean,
 	/**  Every copy shows the same Resolution, HDR, Audio and Source. */
 	look_same: boolean,
+	/**
+	 *  Two copies may be one file reached through two library folders: the page offers no
+	 *  "Keep this one".
+	 */
+	same_file: boolean,
 };
 
 /**  A title that Accept all confident scraped. */
@@ -1133,6 +1143,8 @@ export type CopyRowDto = {
 	source_label: string,
 	/**  The suggested copy ("Best quality"). */
 	best: boolean,
+	/**  The video may be the same file as another copy's. */
+	same_file: boolean,
 };
 
 /**  The numbers above the diff list. */
@@ -3848,8 +3860,8 @@ export type ShowOrderingsDto = {
 export type SourceCommandError = {
 	/**
 	 *  Stable code: `empty`, `not_absolute`, `invalid_characters`, `system_folder`,
-	 *  `already_added`, `inside_existing`, `contains_existing`, `unchanged`, `unknown_source`,
-	 *  `not_reachable`, `bad_order`, `label_taken`, `label_empty` or `storage`.
+	 *  `already_added`, `same_folder`, `inside_existing`, `contains_existing`, `unchanged`,
+	 *  `unknown_source`, `not_reachable`, `bad_order`, `label_taken`, `label_empty` or `storage`.
 	 */
 	code: string,
 	/**  Plain sentence for the user. */

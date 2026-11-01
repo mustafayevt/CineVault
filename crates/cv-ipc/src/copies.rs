@@ -81,6 +81,8 @@ pub struct CopyRowDto {
     pub source_label: String,
     /// The suggested copy ("Best quality").
     pub best: bool,
+    /// The video may be the same file as another copy's.
+    pub same_file: bool,
 }
 
 #[allow(clippy::cast_precision_loss)]
@@ -101,6 +103,7 @@ impl From<CopyRow> for CopyRowDto {
             file_name: row.file_name,
             source_label: row.source_label,
             best: row.best,
+            same_file: row.same_file,
         }
     }
 }
@@ -114,6 +117,9 @@ pub struct ComparisonDto {
     pub kept: bool,
     /// Every copy shows the same Resolution, HDR, Audio and Source.
     pub look_same: bool,
+    /// Two copies may be one file reached through two library folders: the page offers no
+    /// "Keep this one".
+    pub same_file: bool,
 }
 
 fn service(library: &LibraryState) -> Result<std::sync::Arc<CopiesService>, LibraryCommandError> {
@@ -148,6 +154,7 @@ pub async fn compare_copies(
             copies: page.copies.into_iter().map(Into::into).collect(),
             kept: page.kept.is_some(),
             look_same: page.look_same,
+            same_file: page.same_file,
         }))
     })
     .await

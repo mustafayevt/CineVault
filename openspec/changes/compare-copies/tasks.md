@@ -10,6 +10,7 @@
 - [x] 2.1 The best-quality rank as a pure function over resolution label, best HDR format, lead audio track (channels, then codec rank) and video bitrate, with no mark on a tie or on an unread top copy. Verified by `cargo test -p cv-app --lib copies::rank` (the spec's scenarios and each step of the order).
 - [x] 2.2 `CopiesService`: `counts` (added to `LifecycleCounts` as `copies`), `group_of`, `compare` (the rows of "What the compare rows show", "Not read yet" when media info is missing, the opened copy first), `keep_all` and `ask_again`. Verified by `cargo test -p cv-app --lib copies` and `cargo test -p cv-app --lib lifecycle`.
 - [x] 2.3 The Library list query takes `copies = true` (open groups only, copies together, best first, groups in the chosen sort) and its rows carry the open group size. Verified by `cargo test -p cv-db --lib` list tests for the filter, its combination with Drive and search, and the order.
+- [x] 2.4 Copies that may be one file: `compare` marks `same_file` (the file system's answer, else the same name, size and modified time, or an unreadable video), and `look_same` is false then; `SourceGuard::check_with_links` refuses a library folder that is, lies inside or contains an existing one reached another way (`same_folder`). Verified by `cargo test -p cv-app --lib copies` (one file through a junction, same name, size and time, an unreadable video) and `cargo test -p cv-scan --lib sources` (a junction to a library folder, a folder inside it, one containing it, a remap onto the link).
 
 ## 3. Copy labels in Rename
 
@@ -35,6 +36,7 @@
 - [x] 6.3 "Keep both" / "Keep all" with an Undo toast, and "Ask again" on a kept group. Verified by `bun run test` (count and badges drop, Undo and Ask again bring them back).
 - [x] 6.4 After Keep this one, the toast's "Rename to drop the '- <label>' label?" when the kept copy carries a label that no longer clashes, opening the Rename preview for that movie. Verified by `bun run test` (offered for "- copy 2" and "- 2160p", absent for a plain name, opens the preview with the plain name, renames nothing by itself).
 - [x] 6.5 `CHANGELOG.md` line under the unreleased version and `bun run site:changelog`; README and landing page wording; screenshots in `.github/assets/` and `site/img/` (dark and light) showing the chip, the Compare copies page and a labelled Rename preview. Verified by `bun run site:changelog -- --check` and the refreshed images.
+- [x] 6.6 The page offers no "Keep this one" and explains why when the copies may be one file. Verified by `bun run test` (`compare.test.tsx`).
 
 ## 7. Integration
 

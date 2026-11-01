@@ -48,6 +48,7 @@ function copy(id: string, over: Partial<CopyRow> = {}): CopyRow {
     file_name: `Example.Movie.2020.${id}.mkv`,
     source_label: "Media (D:)",
     best: false,
+    same_file: false,
     ...over,
   };
 }
@@ -169,7 +170,7 @@ const cards = () => screen.findAllByRole("article");
 
 describe("the Compare copies page", () => {
   it("shows one card per copy, the opened copy first, with the values and the labels", async () => {
-    backend({ copies: [disc, web], kept: false, look_same: false });
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
     await renderPage();
 
     const [first, second] = await cards();
@@ -195,7 +196,7 @@ describe("the Compare copies page", () => {
   });
 
   it("marks the better value of each row and Best quality on one card only", async () => {
-    backend({ copies: [disc, web], kept: false, look_same: false });
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
     await renderPage();
     const [first, second] = (await cards()) as [HTMLElement, HTMLElement];
 
@@ -214,7 +215,7 @@ describe("the Compare copies page", () => {
   });
 
   it("offers Keep this one on every card, marked or not, and Keep both once", async () => {
-    backend({ copies: [disc, web], kept: false, look_same: false });
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
     await renderPage();
     const [first, second] = (await cards()) as [HTMLElement, HTMLElement];
 
@@ -225,7 +226,7 @@ describe("the Compare copies page", () => {
   });
 
   it("explains where the other copies go and links Settings › Deleted files", async () => {
-    backend({ copies: [disc, web], kept: false, look_same: false });
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
     await renderPage();
     await cards();
 
@@ -241,7 +242,7 @@ describe("the Compare copies page", () => {
       values: { "files.deleted-mode": "folder" },
       status: "ready",
     });
-    backend({ copies: [disc, web, third], kept: false, look_same: false });
+    backend({ copies: [disc, web, third], kept: false, look_same: false, same_file: false });
     await renderPage();
     await cards();
 
@@ -253,7 +254,7 @@ describe("the Compare copies page", () => {
   });
 
   it("lays out three copies and says Keep all", async () => {
-    backend({ copies: [disc, web, third], kept: false, look_same: false });
+    backend({ copies: [disc, web, third], kept: false, look_same: false, same_file: false });
     await renderPage();
 
     expect(await cards()).toHaveLength(3);
@@ -262,9 +263,29 @@ describe("the Compare copies page", () => {
     expect(screen.getAllByRole("button", { name: /^Keep this one/ })).toHaveLength(3);
   });
 
+  it("offers no Keep this one when the copies may be one file reached two ways", async () => {
+    const local = copy("1", { same_file: true });
+    const share = copy("2", { same_file: true, folder: "\\\\SERVER\\D-Cinema\\copy-1" });
+    backend({ copies: [local, share], kept: false, look_same: false, same_file: true });
+    await renderPage();
+    await cards();
+
+    expect(screen.queryByRole("button", { name: /^Keep this one/ })).toBeNull();
+    expect(
+      screen.getByText(/^These may be the same file reached through two library folders\./),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "Settings › Library folders" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("section=folders"),
+    );
+    // Nothing on the page talks about deleting; keeping both still records a decision only.
+    expect(screen.queryByRole("link", { name: "Settings › Deleted files" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Keep both" })).toBeEnabled();
+  });
+
   it("says when the copies look the same, and what keeping one frees", async () => {
     const twin = copy("2", { size_bytes: 6.1 * GB });
-    backend({ copies: [copy("1"), twin], kept: false, look_same: true });
+    backend({ copies: [copy("1"), twin], kept: false, look_same: true, same_file: false });
     await renderPage();
     await cards();
 
@@ -275,7 +296,7 @@ describe("the Compare copies page", () => {
 
   it("says Not read yet for a copy whose media info is missing and marks no winner", async () => {
     const unread = copy("2", { media: null, source: "" });
-    backend({ copies: [copy("1"), unread], kept: false, look_same: false });
+    backend({ copies: [copy("1"), unread], kept: false, look_same: false, same_file: false });
     await renderPage();
     const [, second] = (await cards()) as [HTMLElement, HTMLElement];
 
@@ -299,7 +320,7 @@ describe("the Compare copies page", () => {
 
   it("returns to where it was opened from with Esc and with Cancel", async () => {
     const user = userEvent.setup();
-    backend({ copies: [disc, web], kept: false, look_same: false });
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
     const router = await renderPage();
     await cards();
 
@@ -321,7 +342,12 @@ describe("Keep this one", () => {
   it("asks first, then deletes only the other copy with the usual Delete and offers Undo", async () => {
     const user = userEvent.setup();
     const { deleteTitles, eraseTitles } = spiedHistory();
-    const copies = backend({ copies: [disc, web], kept: false, look_same: false });
+    const copies = backend({
+      copies: [disc, web],
+      kept: false,
+      look_same: false,
+      same_file: false,
+    });
     const router = await renderPage();
     const [first] = (await cards()) as [HTMLElement];
 
@@ -347,7 +373,7 @@ describe("Keep this one", () => {
     const user = userEvent.setup();
     const { deleteTitles } = spiedHistory();
     useSettingsStore.setState({ values: { "delete.confirm": false }, status: "ready" });
-    backend({ copies: [disc, web], kept: false, look_same: false });
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
     const router = await renderPage();
     const [, second] = (await cards()) as [HTMLElement, HTMLElement];
 
@@ -362,7 +388,7 @@ describe("Keep this one", () => {
     const user = userEvent.setup();
     const { deleteTitles, eraseTitles } = spiedHistory();
     useSettingsStore.setState({ values: { "files.deleted-mode": "erase" }, status: "ready" });
-    backend({ copies: [disc, web], kept: false, look_same: false });
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
     const router = await renderPage();
     const [first] = (await cards()) as [HTMLElement];
 
@@ -384,7 +410,7 @@ describe("Keep this one", () => {
     spiedHistory();
     useSettingsStore.setState({ values: { "delete.confirm": false }, status: "ready" });
     const copies = backend(
-      { copies: [disc, web], kept: false, look_same: false },
+      { copies: [disc, web], kept: false, look_same: false, same_file: false },
       { labelToDrop: vi.fn(() => Promise.resolve<string | null>("copy 2")) },
     );
     const router = await renderPage();
@@ -407,7 +433,7 @@ describe("Keep this one", () => {
     const user = userEvent.setup();
     spiedHistory();
     useSettingsStore.setState({ values: { "delete.confirm": false }, status: "ready" });
-    backend({ copies: [disc, web], kept: false, look_same: false });
+    backend({ copies: [disc, web], kept: false, look_same: false, same_file: false });
     await renderPage();
     const [first] = (await cards()) as [HTMLElement];
 
@@ -421,7 +447,12 @@ describe("Keep this one", () => {
 describe("Keep both and Ask again", () => {
   it("records the decision with an Undo toast and leaves the page", async () => {
     const user = userEvent.setup();
-    const copies = backend({ copies: [disc, web], kept: false, look_same: false });
+    const copies = backend({
+      copies: [disc, web],
+      kept: false,
+      look_same: false,
+      same_file: false,
+    });
     const router = await renderPage();
     await cards();
 
@@ -440,7 +471,7 @@ describe("Keep both and Ask again", () => {
 
   it("says a group was kept and asks again on request", async () => {
     const user = userEvent.setup();
-    const copies = backend({ copies: [disc, web], kept: true, look_same: false });
+    const copies = backend({ copies: [disc, web], kept: true, look_same: false, same_file: false });
     await renderPage();
     await cards();
 

@@ -483,3 +483,72 @@ fn check_with_links_refuses_a_folder_that_resolves_into_a_protected_one() {
         "system_folder"
     );
 }
+
+/// Makes `link` point at the folder `target`: a junction on Windows (no rights needed), a
+/// symbolic link elsewhere. False when the system will not.
+fn folder_link(target: &Path, link: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(link)
+            .arg(target)
+            .output()
+            .is_ok_and(|o| o.status.success())
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link).is_ok()
+    }
+}
+
+#[test]
+fn check_with_links_refuses_a_library_folder_reached_another_way() {
+    let dir = tempfile::tempdir().unwrap();
+    let cinema = dir.path().join("Cinema");
+    std::fs::create_dir_all(cinema.join("Action")).unwrap();
+    // Stands in for the network share of D:\Cinema: the same folder under another path.
+    let share = dir.path().join("D-Cinema");
+    if !folder_link(&cinema, &share) {
+        return;
+    }
+    let guard = SourceGuard::new(
+        PathStyle::current(),
+        SystemFolders::new(PathStyle::current()),
+    );
+    let text = |path: &Path| path.to_string_lossy().into_owned();
+    let existing = [src(1, &text(&cinema))];
+
+    // The text check sees three unrelated folders.
+    assert!(guard.check(&text(&share), &existing, None).is_ok());
+    let same = guard.check_with_links(&text(&share), &existing, None);
+    assert_eq!(code(same.clone()), "same_folder");
+    assert!(
+        same.unwrap_err()
+            .to_string()
+            .contains("reached another way")
+    );
+    assert_eq!(
+        code(guard.check_with_links(&text(&share.join("Action")), &existing, None)),
+        "inside_existing"
+    );
+    let inner = [src(2, &text(&share.join("Action")))];
+    assert_eq!(
+        code(guard.check_with_links(&text(&cinema), &inner, None)),
+        "contains_existing"
+    );
+    // Remapping a library folder onto another path of itself is allowed.
+    assert!(
+        guard
+            .check_with_links(&text(&share), &existing, Some(1))
+            .is_ok()
+    );
+    // A folder beside it is not refused.
+    let other = dir.path().join("Other");
+    std::fs::create_dir_all(&other).unwrap();
+    assert!(
+        guard
+            .check_with_links(&text(&other), &existing, None)
+            .is_ok()
+    );
+}

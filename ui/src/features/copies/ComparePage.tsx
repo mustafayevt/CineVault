@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Award, Check, Copy, HardDrive, Network } from "lucide-react";
+import { AlertTriangle, Award, Check, Copy, HardDrive, Network } from "lucide-react";
 
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
@@ -108,7 +108,8 @@ function CopyCard({
   card: Card;
   index: number;
   count: number;
-  onKeep: () => void;
+  /** `null` when the page offers no Keep this one (the copies may be one file). */
+  onKeep: (() => void) | null;
 }) {
   const { copy } = card;
   return (
@@ -165,17 +166,19 @@ function CopyCard({
         </div>
       ))}
 
-      <div className="mt-auto flex flex-col gap-2 border-t border-solid border-line-section px-4 py-3.5">
-        <Button
-          variant={copy.best ? "primary" : "default"}
-          size="lg"
-          className="w-full"
-          aria-label={t("copies.keep.aria", { title: copyName(copy), summary: card.heading })}
-          onClick={onKeep}
-        >
-          {t("copies.keep")}
-        </Button>
-      </div>
+      {onKeep !== null && (
+        <div className="mt-auto flex flex-col gap-2 border-t border-solid border-line-section px-4 py-3.5">
+          <Button
+            variant={copy.best ? "primary" : "default"}
+            size="lg"
+            className="w-full"
+            aria-label={t("copies.keep.aria", { title: copyName(copy), summary: card.heading })}
+            onClick={onKeep}
+          >
+            {t("copies.keep")}
+          </Button>
+        </div>
+      )}
     </article>
   );
 }
@@ -261,6 +264,21 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
 
       <div className="flex flex-col gap-5 px-6 pt-5 pb-6">
         <div className="flex flex-col gap-1">
+          {page.same_file && (
+            <p
+              role="note"
+              className="m-0 flex max-w-[760px] items-start gap-2 text-(length:--fs-14) leading-normal"
+            >
+              <Icon icon={AlertTriangle} size={16} className="mt-0.5 shrink-0 text-warn" />
+              <span>
+                {t("copies.page.sameFile.before")}
+                <Link to="/settings" search={{ section: "folders" }} className="cv-link">
+                  {t("copies.page.sameFile.link")}
+                </Link>
+                {t("copies.page.sameFile.after")}
+              </span>
+            </p>
+          )}
           {page.look_same && (
             <p className="m-0 flex items-center gap-2 text-(length:--fs-14) leading-normal">
               <Icon icon={Copy} size={16} className="text-gold" />
@@ -272,14 +290,18 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
               </span>
             </p>
           )}
-          <p className="m-0 max-w-[760px] text-(length:--fs-14) leading-normal">
-            {t("copies.page.intro.before")}
-            <Link to="/settings" search={{ section: "deleted-files" }} className="cv-link">
-              {t("copies.page.intro.link")}
-            </Link>
-            {t("copies.page.intro.after")}
-          </p>
-          <p className="m-0 text-(length:--fs-12) text-text-muted">{destination}</p>
+          {!page.same_file && (
+            <>
+              <p className="m-0 max-w-[760px] text-(length:--fs-14) leading-normal">
+                {t("copies.page.intro.before")}
+                <Link to="/settings" search={{ section: "deleted-files" }} className="cv-link">
+                  {t("copies.page.intro.link")}
+                </Link>
+                {t("copies.page.intro.after")}
+              </p>
+              <p className="m-0 text-(length:--fs-12) text-text-muted">{destination}</p>
+            </>
+          )}
         </div>
 
         <div
@@ -294,7 +316,7 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
               card={card}
               index={index}
               count={count}
-              onKeep={() => keep(card.copy.id)}
+              onKeep={page.same_file ? null : () => keep(card.copy.id)}
             />
           ))}
         </div>

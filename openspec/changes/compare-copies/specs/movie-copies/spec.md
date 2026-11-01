@@ -147,6 +147,28 @@ When the copies of a group show the same values in Resolution, HDR, Audio and So
 - **WHEN** two copies are both 1080p SDR WEB-DL with AAC 5.1
 - **THEN** the page says "These two copies look the same." and suggests keeping one
 
+### Requirement: Copies that may be one file
+Two copies SHALL count as maybe one file when the file system reports their videos as the same file (one folder reached through a network share, a mapped drive, a link or a substituted drive letter), when their videos have the same file name, size and modified time, or when one of their videos cannot be read.
+
+#### Scenario: One folder through its network share
+- **WHEN** `D:\Movies` and `\SERVER\Movies`, the network share of the same folder, are both library folders and Example Movie (2020) shows as two copies, one under each
+- **THEN** the two copies count as maybe one file
+
+#### Scenario: Same name, size and time
+- **WHEN** two copies' videos are both `Example Movie (2020).mkv` with the same size and modified time, and the file system cannot tell whether they are one file
+- **THEN** the two copies count as maybe one file
+
+#### Scenario: Two different files
+- **WHEN** two copies' videos are different files with different modified times on two drives
+- **THEN** they do not count as maybe one file
+
+### Requirement: No Keep this one for copies that may be one file
+When any two copies of a group may be one file, the Compare copies page SHALL offer "Keep this one" on no card, SHALL NOT say that the copies look the same, and SHALL say "These may be the same file reached through two library folders. CineVault won't delete either from here; check the folders under Settings › Library folders." "Keep both" SHALL stay available.
+
+#### Scenario: Copies through a network share
+- **WHEN** the user opens Compare copies for the two copies of Example Movie (2020) under `D:\Movies` and `\SERVER\Movies`
+- **THEN** no card offers "Keep this one" and the page says "These may be the same file reached through two library folders. CineVault won't delete either from here; check the folders under Settings › Library folders."
+
 ### Requirement: Keep this one
 Each card SHALL offer "Keep this one", which deletes every other copy of the group exactly as Delete does for those titles: it follows Settings › Deleted files, with the same confirmation, toast, History entry and Undo. The kept copy, its folder and its files SHALL NOT change. Cancelling a confirmation SHALL delete nothing.
 

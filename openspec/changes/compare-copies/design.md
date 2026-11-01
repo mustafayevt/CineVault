@@ -69,6 +69,13 @@ The page calls `requestDelete(otherCopies, { onDone })` with the other copies as
 
 The kept copy keeps its own NFO, artwork, subtitles and folder untouched. The deleted copies' NFO and artwork go with them by the existing rules: their whole folder when they have their own, or their own files and the files named after their video in a shared folder (`Deleting never touches other titles` and `Delete takes the files named after the title` in `title-deletion`). Two copies in one folder therefore never take each other's files.
 
+### One file through two library folders
+
+The same folder can be in the library twice under two paths: `D:\Movies` and the network share of it, a mapped drive, a junction or a `subst` drive. Its movies then look like copies, and "Keep this one" would delete the kept copy's own files through the other path. Two guards close this:
+
+- `compare` resolves each copy's main video and marks two copies as maybe one file when `same_file::is_same_file` says so, or, as a fallback for shares that do not report the identity of the disk behind them, when the file name (ignoring case), size and modified time (within two seconds) agree, or when either video cannot be read. `Comparison::same_file` (and `CopyRow::same_file`) carry the mark; the page then hides every "Keep this one", never says "look the same", and points at Settings › Library folders. The fallback can mark two real copies made with a copy tool that keeps the modified time; they are still deleted one by one with Delete. Being wrong that way loses nothing.
+- Adding or remapping a library folder (`SourceGuard::check_with_links`) resolves the new folder and each reachable library folder of the same library: the same folder (`same_file` on the folders, or the same `canonicalize` result) is refused as `same_folder`, and a folder whose ancestor is an existing one, or that is an ancestor of one, as `inside_existing` / `contains_existing`. A library folder that cannot be reached is compared by text only, as before.
+
 ### The Compare copies page
 
 Route `/movies/$movieId/copies`, built like the other picker pages: a header with Back (Esc), "Compare copies" and the film's title, then one card per copy in a row (wrapping at narrow widths; three or more copies scroll sideways inside the page). Each card has the poster, a "Best quality" tag when marked, the rows of the spec in a label/value grid with the winning value of each row emphasised, the folder path with Open folder, and "Keep this one" as its primary button. Under the cards: "Keep both" / "Keep all", or for a kept group the note "You chose to keep these copies" with "Ask again". Design tokens and `lucide-react` icons only; every button keyboard reachable. The visual design comes from the separate mock-up.
