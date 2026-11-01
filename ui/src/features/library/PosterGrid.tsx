@@ -198,6 +198,7 @@ export function PosterGrid({
                       stage={stageBadgeOf(card)}
                       {...(note === null ? {} : { stageLabel: note })}
                       selected={selection.isSelected(key)}
+                      {...(card.copies > 0 ? { copies: card.copies } : {})}
                       {...(art === undefined ? {} : { poster: art })}
                       tabIndex={-1}
                       onClick={(event) => {

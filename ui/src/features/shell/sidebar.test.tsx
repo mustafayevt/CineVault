@@ -40,6 +40,7 @@ function counts(overrides: Partial<LifecycleCountsDto>): LifecycleCountsDto {
     locked: 0,
     missing: 0,
     checking: 0,
+    copies: 0,
     ...overrides,
   };
 }

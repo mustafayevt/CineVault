@@ -1,11 +1,13 @@
-import { Check } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
+import { t } from "../i18n/catalog";
 import { cx } from "../lib/cx";
 import { PlaceholderPoster } from "./PlaceholderPoster";
 import { QualityBadge } from "./QualityBadge";
 import type { QualityTier } from "./QualityBadge";
 import { StageBadge } from "./StageBadge";
+import { Tooltip } from "./Tooltip";
 import type { StageBadgeKind } from "./StageBadge";
 
 type PosterTileProps = Omit<ComponentProps<"button">, "children" | "title"> & {
@@ -23,6 +25,8 @@ type PosterTileProps = Omit<ComponentProps<"button">, "children" | "title"> & {
   selected?: boolean;
   /** The artwork (a cached image). Without it the tile draws the generated poster for the title. */
   poster?: ReactNode;
+  /** The copies of the movie in an open group: a small badge in the poster's bottom-left corner. */
+  copies?: number;
 };
 
 /**
@@ -41,6 +45,7 @@ export function PosterTile({
   stageLabel,
   selected = false,
   poster,
+  copies,
   className,
   type = "button",
   ...rest
@@ -68,6 +73,21 @@ export function PosterTile({
         <span className="absolute top-[7px] right-[7px] flex size-5 items-center justify-center rounded-(--r-pill) bg-badge-scrim backdrop-blur-[4px]">
           <StageBadge stage={stage} label={stageLabel} />
         </span>
+        {copies !== undefined && copies > 0 && (
+          <Tooltip content={t("copies.badge.tip", { count: copies })}>
+            <span
+              data-testid="copies-badge"
+              className={cx(
+                "absolute bottom-[7px] left-[7px] inline-flex h-5 items-center gap-1 rounded-(--r-pill)",
+                "bg-badge-scrim pr-[7px] pl-1.5 text-(length:--fs-11) leading-none font-(weight:--fw-600)",
+                "text-text tabular-nums backdrop-blur-[4px]",
+              )}
+            >
+              <Copy size={11} strokeWidth={1.75} aria-hidden="true" className="text-text-2" />
+              {t("copies.badge", { count: copies })}
+            </span>
+          </Tooltip>
+        )}
         {selected && (
           <span
             data-testid="poster-check"

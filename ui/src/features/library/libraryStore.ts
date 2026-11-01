@@ -22,6 +22,8 @@ export interface LibraryFilters {
   drive: string | null;
   quality: QualityChoice;
   problems: ProblemChoice;
+  /** Only the movies in open groups of copies (`movie-copies`); movies only. */
+  copies: boolean;
 }
 
 const NO_FILTERS: LibraryFilters = {
@@ -29,6 +31,7 @@ const NO_FILTERS: LibraryFilters = {
   drive: null,
   quality: "any",
   problems: "any",
+  copies: false,
 };
 
 const DEFAULT_SORT: readonly LibrarySortKey[] = [{ field: "title", descending: false }];
@@ -235,6 +238,7 @@ export function filterChips(filters: LibraryFilters): LibraryChip[] {
   if (filters.stage !== "all") chips.push(chip("stage", [filters.stage]));
   if (filters.drive !== null) chips.push(chip("library_source", [filters.drive]));
   if (filters.quality !== "any") chips.push(chip("resolution", QUALITY_VALUES[filters.quality]));
+  if (filters.copies) chips.push(flag("copies"));
   return chips;
 }
 
