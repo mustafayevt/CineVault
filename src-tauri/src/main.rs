@@ -234,8 +234,8 @@ fn main() {
             let taskbar: Arc<dyn jobs_ipc::Taskbar> = Arc::new(app.handle().clone());
             let handle = app.handle().clone();
             let background = app.handle().clone();
-            // The background work (job failure watcher, daily backups, resuming the jobs of
-            // the previous session) needs the async runtime.
+            // The background work (job failure watcher, the daily library backup check,
+            // resuming the jobs of the previous session) needs the async runtime.
             tauri::async_runtime::spawn(async move {
                 // Settle what a crash left half done before anything scans the library folders
                 // (the startup scan begins in `start_background`). It looks at the folders, so it

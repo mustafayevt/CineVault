@@ -44,6 +44,19 @@
 2. **Add your folders and a free TMDB key.** The first-run screen asks where your movies and shows are, then for a [TMDB API key](https://www.themoviedb.org/settings/api) (free; the only key needed to Scrape).
 3. **Scan, Scrape, Rename.** Scanning starts on its own. Scrape your titles, check the Rename preview, apply. Everything can be undone from History.
 
+## Backups
+
+Your library, its History and everything Undo needs live in `library.db` in CineVault's data folder (`%APPDATA%\CineVault` on Windows, `~/.local/share/CineVault` on Linux, the `data` folder beside a portable copy, or the folder you chose in Settings). While CineVault runs it keeps a checked copy of it every day in the `backups` folder there, as `library-YYYY-MM-DD.db`, and keeps the last seven. If backups keep failing for three days, the notification centre says so.
+
+To bring one back:
+
+1. Quit CineVault (or stop the server).
+2. In the data folder, rename `library.db` to `library-before-restore.db`, and move `library.db-wal` and `library.db-shm` aside if they are there.
+3. Copy `backups/library-YYYY-MM-DD.db` to the data folder as `library.db`.
+4. Start CineVault.
+
+The library, History and Undo go back to that day. Files renamed or moved after it are found again by the next scan, but those changes cannot be undone from CineVault. To go back to where you were, swap the files the same way.
+
 ## Use it in a browser (beta)
 
 Use your library from any phone, tablet, TV or computer at home.
