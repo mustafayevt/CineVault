@@ -181,3 +181,67 @@ fn a_movie_without_copies_has_no_copy_note() {
 
     assert_eq!(row(&preview, alone).copy, None);
 }
+
+#[test]
+fn a_copy_whose_folder_holds_its_twin_moves_only_its_own_files() {
+    let lib = Lib::new();
+    let uhd = copy(&lib, "dl", "example.2160p", 3840);
+    let hd = copy(&lib, "dl/other copy", "example.1080p", 1920);
+    let mut request = lib.request(Scope::Everything);
+    // Movie folders straight under the library folder, so both copies aim at one name.
+    request.profile.movie.keep_subfolders = false;
+
+    let preview = lib.service.preview(&request).unwrap();
+    assert_eq!(preview.counts.conflicts, 0, "{preview:?}");
+    assert_eq!(row(&preview, uhd).after, "Example Movie (2020) - 2160p");
+    assert_eq!(row(&preview, hd).after, "Example Movie (2020) - 1080p");
+
+    let applied = lib
+        .service
+        .apply(&ApplyRequest {
+            preview: request,
+            include: ids(&[uhd, hd]),
+        })
+        .unwrap();
+    assert_eq!(applied.done(), 2, "{applied:?}");
+    // Each copy's files reached its own folder; renaming `dl` would have carried the 1080p copy.
+    assert!(lib.exists("Example Movie (2020) - 2160p/Example Movie (2020) - 2160p.mkv"));
+    assert!(lib.exists("Example Movie (2020) - 1080p/Example Movie (2020) - 1080p.mkv"));
+    assert!(lib.exists("Example Movie (2020) - 1080p/Example Movie (2020) - 1080p.nfo"));
+    assert!(
+        !lib.exists("Example Movie (2020) - 2160p/other copy"),
+        "{:?}",
+        walk(&lib.root)
+    );
+}
+
+#[test]
+fn a_copy_renamed_alone_does_not_move_into_its_twins_folder() {
+    let lib = Lib::new();
+    // The older row keeps the plain name, but its twin already uses it.
+    let older = copy(&lib, "dl", "example", 1920);
+    let twin = copy(&lib, "Example Movie (2020)", "Example Movie (2020)", 1920);
+
+    let alone = lib
+        .service
+        .preview(&lib.request(Scope::Items(vec![older])))
+        .unwrap();
+    let status = &row(&alone, older).status;
+    assert!(
+        matches!(status, RowStatus::Unplanned(why)
+            if why == "Its other copy is in Example Movie (2020) now. Rename both copies together."),
+        "{status:?}"
+    );
+    assert_eq!(alone.counts.change, 0);
+    assert!(lib.exists("dl/example.mkv"));
+
+    // Together, the twin makes way and nothing waits for it.
+    let together = lib
+        .service
+        .preview(&lib.request(Scope::Items(vec![older, twin])))
+        .unwrap();
+    assert!(
+        !matches!(&row(&together, older).status, RowStatus::Unplanned(_)),
+        "{together:?}"
+    );
+}

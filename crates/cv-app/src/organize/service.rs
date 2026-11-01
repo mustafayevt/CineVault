@@ -1146,6 +1146,10 @@ impl OrganizeService {
             &options,
         )?;
         planned.media_unread.extend(separated.held);
+        for (key, reason) in separated.blocked {
+            planned.unplanned.insert(key, reason);
+            planned.counts.unplanned += 1;
+        }
         planned.copy_notes = copy_notes(&copy_group_of, &separated.labels);
         let (unchanged, changing): (Vec<BatchItem>, Vec<BatchItem>) =
             items.into_iter().partition(is_unchanged);

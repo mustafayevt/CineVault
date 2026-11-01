@@ -38,6 +38,9 @@ pub(super) struct Separated {
     pub held: BTreeSet<String>,
     /// The label ` - <label>` given to each labelled item, by id.
     pub labels: BTreeMap<String, String>,
+    /// The batch items that would land in the folder a copy outside the batch is in now, with
+    /// the reason; they are removed from the items until both copies are renamed together.
+    pub blocked: BTreeMap<String, String>,
 }
 
 /// Labels the clashing copies among `items`. `attributes` holds the label facts of the batch's
@@ -136,7 +139,58 @@ pub(super) fn separate_copies(
     if !labels.is_empty() {
         tracing::debug!(labelled = labels.len(), "copies told apart by labels");
     }
-    all.retain(|item| !fixed_ids.contains(&item.id) && !held.contains(&item.id));
+    let blocked = into_twins_folder(
+        &all,
+        &fixed_ids,
+        &|key| id_of(key).and_then(|id| group_of.get(&id)).copied(),
+        options,
+    );
+    all.retain(|item| {
+        !fixed_ids.contains(&item.id) && !held.contains(&item.id) && !blocked.contains_key(&item.id)
+    });
     *items = all;
-    Ok(Separated { held, labels })
+    Ok(Separated {
+        held,
+        labels,
+        blocked,
+    })
+}
+
+/// The batch items whose new folder is the folder a copy of their group outside the batch is in
+/// now (two identical copies, the plain name going to the older one): renaming one alone would
+/// move it into its twin's folder. Each with the reason it waits.
+fn into_twins_folder(
+    all: &[BatchItem],
+    fixed_ids: &BTreeSet<String>,
+    group_of: &dyn Fn(&str) -> Option<ItemId>,
+    options: &ConflictOptions,
+) -> BTreeMap<String, String> {
+    let twins: Vec<(&BatchItem, ItemId, String)> = all
+        .iter()
+        .filter(|item| fixed_ids.contains(&item.id) && !item.old_folder.is_empty())
+        .filter_map(|item| {
+            let group = group_of(&item.id)?;
+            Some((item, group, options.key(&item.root, &item.old_folder)))
+        })
+        .collect();
+    let mut blocked = BTreeMap::new();
+    for item in all.iter().filter(|item| !fixed_ids.contains(&item.id)) {
+        let (Some(group), false) = (group_of(&item.id), item.new_folder.is_empty()) else {
+            continue;
+        };
+        let target = options.key(&item.root, &item.new_folder);
+        let own = options.key(&item.root, &item.old_folder);
+        if let Some((twin, _, _)) = twins.iter().find(|(_, twin_group, folder)| {
+            *twin_group == group && *folder == target && *folder != own
+        }) {
+            blocked.insert(
+                item.id.clone(),
+                format!(
+                    "Its other copy is in {} now. Rename both copies together.",
+                    twin.old_folder
+                ),
+            );
+        }
+    }
+    blocked
 }

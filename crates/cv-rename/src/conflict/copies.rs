@@ -22,7 +22,7 @@ use cv_domain::MediaFileType;
 use super::resolve::{change_base, change_folder};
 use super::{BatchItem, ConflictOptions};
 use crate::clean::{Place, create_destination};
-use crate::plan::Fate;
+use crate::plan::{Fate, FolderChange};
 
 /// What a copy's label is chosen from, as short names (`2160p`, `DV`, `WEB-DL`, `TrueHD 7.1`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -84,11 +84,35 @@ pub fn label_copies(
                     continue;
                 }
                 apply(&mut items[*index], &label, *folder_too);
+                if *folder_too && holds_a_copy(items, *index, indices, opts) {
+                    // Renaming the folder would carry the other copy along: move only this
+                    // copy's own files into its labelled folder.
+                    items[*index].folder_change = FolderChange::MoveFiles;
+                }
                 labels.insert(items[*index].id.clone(), label);
             }
         }
     }
     labels
+}
+
+/// Whether another copy of the group lives inside the old folder of `items[index]` (a copy kept
+/// in a subfolder of its twin's folder).
+fn holds_a_copy(
+    items: &[BatchItem],
+    index: usize,
+    group: &[usize],
+    opts: &ConflictOptions,
+) -> bool {
+    let item = &items[index];
+    if item.folder_change != FolderChange::Rename || item.old_folder.is_empty() {
+        return false;
+    }
+    let folder = format!("{}/", opts.key(&item.root, &item.old_folder));
+    group.iter().filter(|&&other| other != index).any(|&other| {
+        let other = &items[other];
+        format!("{}/", opts.key(&other.root, &other.old_folder)).starts_with(&folder)
+    })
 }
 
 /// The sets of copies of one group that clash, each member with whether its folder clashes too
@@ -223,7 +247,7 @@ mod tests {
     use super::*;
     use crate::movie::{MovieInput, MovieRenamer};
     use crate::options::MovieSettings;
-    use crate::plan::{FolderChange, PlanFile};
+    use crate::plan::PlanFile;
 
     const ROOT: &str = "D:/Movies";
 
@@ -239,6 +263,16 @@ mod tests {
 
     /// Example Movie (2020) planned by the real planner from `folder/<video>`.
     fn planned(id: &str, root: &str, folder: &str, video: &str) -> BatchItem {
+        planned_by(MovieSettings::default(), id, root, folder, video)
+    }
+
+    fn planned_by(
+        settings: MovieSettings,
+        id: &str,
+        root: &str,
+        folder: &str,
+        video: &str,
+    ) -> BatchItem {
         let mut movie = Item::movie("Example Movie");
         movie.core.year = 2020;
         let stem = video.trim_end_matches(".mkv");
@@ -247,7 +281,7 @@ mod tests {
             PlanFile::new(format!("{folder}/{stem}.nfo"), MediaFileType::Nfo),
             PlanFile::new(format!("{folder}/{stem}.srt"), MediaFileType::Subtitle),
         ];
-        let plan = MovieRenamer::new(MovieSettings::default())
+        let plan = MovieRenamer::new(settings)
             .plan(&MovieInput {
                 item: &movie,
                 set: None,
@@ -511,5 +545,33 @@ mod tests {
 
         assert!(labels.is_empty());
         assert_eq!(items[0].new_folder, "Example Movie (2020)");
+    }
+
+    #[test]
+    fn a_copy_whose_folder_holds_its_twin_moves_its_own_files_only() {
+        // Movie folders straight under the library folder, wherever they were.
+        let flat = |id: &str, folder: &str| {
+            let settings = MovieSettings {
+                keep_subfolders: false,
+                ..MovieSettings::default()
+            };
+            planned_by(settings, id, ROOT, folder, "movie.mkv")
+        };
+        let mut items = vec![flat("1", "dl"), flat("2", "dl/other copy")];
+        // Alone, the outer copy would rename its folder, and the twin inside would go with it.
+        assert_eq!(items[0].folder_change, FolderChange::Rename);
+        labelled(
+            &mut items,
+            &[
+                ("1", facts("2160p", "SDR", "BluRay", "AAC 5.1")),
+                ("2", facts("1080p", "SDR", "WEB-DL", "AAC 5.1")),
+            ],
+        );
+
+        assert_eq!(items[0].new_folder, "Example Movie (2020) - 2160p");
+        assert_eq!(items[0].folder_change, FolderChange::MoveFiles);
+        assert_eq!(items[1].new_folder, "Example Movie (2020) - 1080p");
+        assert_ne!(items[1].folder_change, FolderChange::MoveFiles);
+        assert!(detect(&items, &MemoryDisk::new(true), &opts()).is_empty());
     }
 }

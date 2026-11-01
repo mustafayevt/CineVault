@@ -162,7 +162,7 @@ When the copies of a group show the same values in Resolution, HDR, Audio and So
 Two copies SHALL count as maybe one file when the file system reports their videos as the same file (one folder reached through a network share, a mapped drive, a link or a substituted drive letter), when their videos have the same file name, size and modified time, or when one of their videos cannot be read.
 
 #### Scenario: One folder through its network share
-- **WHEN** `D:\Movies` and `\SERVER\Movies`, the network share of the same folder, are both library folders and Example Movie (2020) shows as two copies, one under each
+- **WHEN** `D:\Movies` and `\\SERVER\Movies`, the network share of the same folder, are both library folders and Example Movie (2020) shows as two copies, one under each
 - **THEN** the two copies count as maybe one file
 
 #### Scenario: Same name, size and time
@@ -177,7 +177,7 @@ Two copies SHALL count as maybe one file when the file system reports their vide
 When any two copies of a group may be one file, the Compare copies page SHALL offer "Keep this one" on no card, SHALL NOT say that the copies look the same, and SHALL say "These may be the same file reached through two library folders. CineVault won't delete either from here; check the folders under Settings › Library folders." "Keep both" SHALL stay available.
 
 #### Scenario: Copies through a network share
-- **WHEN** the user opens Compare copies for the two copies of Example Movie (2020) under `D:\Movies` and `\SERVER\Movies`
+- **WHEN** the user opens Compare copies for the two copies of Example Movie (2020) under `D:\Movies` and `\\SERVER\Movies`
 - **THEN** no card offers "Keep this one" and the page says "These may be the same file reached through two library folders. CineVault won't delete either from here; check the folders under Settings › Library folders."
 
 ### Requirement: Lengths far apart
@@ -255,6 +255,17 @@ Rename SHALL keep each copy in a folder of its own and SHALL never move the file
 #### Scenario: Two copies, two folders
 - **WHEN** two copies of Example Movie (2020) in `D:\Movies\dl-1` and `D:\Movies\dl-2` are renamed together
 - **THEN** they end in two folders, never in one
+
+#### Scenario: A copy inside its twin's folder
+- **WHEN** one copy of Example Movie (2020) is in `D:\Movies\dl` and the other in `D:\Movies\dl\other copy`, and both are renamed with labels
+- **THEN** the outer copy's own files move to its labelled folder and the inner copy reaches its own labelled folder, instead of travelling inside the renamed outer folder
+
+### Requirement: A copy renamed alone stays out of its twin's folder
+When a copy is renamed without the other copies of its group and its new folder is the folder another copy of the group is in now, Rename SHALL NOT rename it, and its preview row SHALL say "Its other copy is in <folder> now. Rename both copies together." Renaming the copies together SHALL lift this.
+
+#### Scenario: Identical copies, the older one renamed alone
+- **WHEN** two identical copies of Example Movie (2020) are in `D:\Movies\dl` (the older row) and `D:\Movies\Example Movie (2020)`, and only the older one is renamed
+- **THEN** its row says "Its other copy is in Example Movie (2020) now. Rename both copies together." and nothing moves
 
 ### Requirement: Copy label when names clash
 When two or more copies of one group would end at the same folder or video path under the naming templates, Rename SHALL add " - <label>" after the name of the folder and of the video, and the files that follow the video's base name (NFO, artwork named after the video, subtitles) SHALL follow it. A movie whose name clashes with no copy SHALL keep its normal name.
