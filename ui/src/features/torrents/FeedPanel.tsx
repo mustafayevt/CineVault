@@ -181,6 +181,8 @@ export function FeedPanel({
       }
       className={cx(
         "flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-solid border-line-section bg-surface-card",
+        // Narrow panes have no room beside the table: the panel lies over it, at most pane wide.
+        "@max-[860px]/pane:absolute @max-[860px]/pane:inset-y-0 @max-[860px]/pane:right-0 @max-[860px]/pane:z-10 @max-[860px]/pane:max-w-full @max-[860px]/pane:shadow-floating",
         entering && "cv-slide-up",
       )}
     >

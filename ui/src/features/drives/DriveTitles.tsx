@@ -16,6 +16,7 @@ import type { TableColumn, TableSort } from "../../components/Table";
 import { useListSelection } from "../../components/useListSelection";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { usePaneWidth } from "../../lib/usePaneWidth";
 import { usePreferOriginalTitle } from "../library/displayTitle";
 import { TitleContextMenu } from "../library/TitleContextMenu";
 import { useLibraryActions } from "../library/useLibraryActions";
@@ -70,6 +71,13 @@ function headingOf(drive: Drive): { name: string; where: string } {
  * multi-select, the right-click menu and a floating selection bar whose Move to… opens the shared
  * Move to menu with the space before and after. A running move shows its progress in the header.
  */
+/** The columns a phone keeps, by id: those that tell the titles apart and show what is big. */
+const PHONE_COLUMNS: readonly string[] = ["select", "title", "year", "size"];
+
+/** Below this pane width the titles take the whole pane under the drive cards. */
+const NARROW_PANE = 860;
+const PHONE_PANE = 640;
+
 export function DriveTitles({ drive }: { drive: Drive }) {
   const navigate = useNavigate();
   const format = useFormat();
@@ -119,7 +127,10 @@ export function DriveTitles({ drive }: { drive: Drive }) {
     [targets, byId],
   );
 
-  const columns = useMemo<TableColumn<DriveTitle>[]>(
+  // Narrow panes (the browser on a tablet or phone) fit the columns to the width; a phone drops
+  // the quality and the folder. The desktop widths keep the table as it is.
+  const { ref: frame, width: pane } = usePaneWidth();
+  const allColumns = useMemo<TableColumn<DriveTitle>[]>(
     () => [
       {
         id: "select",
@@ -206,6 +217,26 @@ export function DriveTitles({ drive }: { drive: Drive }) {
     ],
     [selection, keys.length],
   );
+  const columns = useMemo(() => {
+    if (pane === null || pane > NARROW_PANE) return allColumns;
+    const kept =
+      pane < PHONE_PANE
+        ? allColumns.filter((column) => PHONE_COLUMNS.includes(column.id))
+        : allColumns;
+    // The title starts at the room the others leave (it still grows), so nothing scrolls sideways.
+    const others = kept.reduce(
+      (sum, column) => (column.id === "title" ? sum : sum + column.width),
+      0,
+    );
+    return kept.map((column) =>
+      column.id === "title"
+        ? {
+            ...column,
+            width: Math.min(column.width, Math.max(column.minWidth ?? 0, pane - others - 24)),
+          }
+        : column,
+    );
+  }, [allColumns, pane]);
 
   const bar: SelectionBarAction[] = [
     {
@@ -237,8 +268,8 @@ export function DriveTitles({ drive }: { drive: Drive }) {
         : t("drivesPage.titles.none");
 
   return (
-    <div className="relative flex min-w-0 flex-1 flex-col">
-      <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6">
+    <div ref={frame} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6 @max-[640px]/pane:px-4">
         <span
           aria-hidden="true"
           className="absolute right-0 bottom-0 left-0 h-px bg-line-section"
