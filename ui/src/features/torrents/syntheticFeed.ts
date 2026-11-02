@@ -329,6 +329,7 @@ function rowOf(spec: Spec, source: string, index: number): TorrentFeedRowDto {
     hdr: spec.hdr ?? null,
     audio: null,
     pack: null,
+    episodes: null,
     flags: spec.cam === true ? [{ kind: "cam", text: "Camera recording" }] : [],
     upgrade: spec.owned?.upgrade ?? null,
     matching: true,

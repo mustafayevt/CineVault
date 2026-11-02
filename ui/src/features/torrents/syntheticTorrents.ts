@@ -20,6 +20,7 @@ import {
   SHOW_EPISODES,
   SOURCES,
   catalogTitle,
+  libraryCopiesOf,
   syntheticLanding,
   syntheticReleases,
 } from "./syntheticCatalog";
@@ -330,8 +331,9 @@ export function createSyntheticTorrentBackend(
         rating: entry.rating,
         genres: [...entry.genres],
         overview: entry.overview,
-        libraryCopy: entry.copy === undefined ? null : { ...entry.copy },
+        libraryCopies: libraryCopiesOf(entry),
         heldEpisodes: (entry.held ?? []).map((episode) => ({ ...episode })),
+        missingEpisodes: (entry.missing ?? []).map((episode) => ({ ...episode })),
       };
       return Promise.resolve(details);
     },

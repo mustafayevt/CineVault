@@ -4150,6 +4150,18 @@ export type TorrentEpisodeRefDto = {
 	episode: number,
 };
 
+/**
+ *  What a release's name covers of a show. A season pack has no episodes; the whole show has
+ *  neither seasons nor episodes.
+ */
+export type TorrentEpisodeSpanDto = {
+	firstSeason: number | null,
+	lastSeason: number | null,
+	/**  The episodes of the one season covered, when the name gives them. */
+	firstEpisode: number | null,
+	lastEpisode: number | null,
+};
+
 /**  What a source sends on the stream: rows, then (in its final answer) where it stands. */
 export type TorrentFeedItemDto = { type: "row"; row: TorrentFeedRowDto } | 
 /**  `more`, `done` or `unsupported`. */
@@ -4263,14 +4275,24 @@ export type TorrentLandingTitleDto = {
 	added: number | null,
 };
 
-/**  A movie's copy in the library: "1080p WEB-DL · 5.6 GB · <file name>". */
+/**  A movie's copy in the library: "2160p · DV · HEVC · TrueHD Atmos 7.1 · Remux · 58 GB". */
 export type TorrentLibraryCopyDto = {
+	/**  The library movie, as text. */
+	itemId: string,
 	/**  `2160p`, `1080p`, `720p`, `480p` or `unknown` (media info not read yet). */
 	resolution: string,
 	/**  `Remux`, `BluRay`, `WEB-DL`, ... or none. */
 	source: string | null,
 	/**  `DV`, `HDR10+`, `HDR10` or `HLG`. */
 	hdr: string | null,
+	/**  `HEVC`, `AVC`, `AV1` as the media info names it; none when not read. */
+	codec: string | null,
+	/**  The lead audio track: `TrueHD Atmos 7.1`; none when not read. */
+	audio: string | null,
+	/**  `Extended Edition`; none when the movie has no edition. */
+	edition: string | null,
+	/**  The languages of the audio tracks, ISO 639 codes as stored. */
+	languages: string[],
 	size: number | null,
 	fileName: string,
 };
@@ -4306,6 +4328,8 @@ export type TorrentReleaseDto = {
 	audio: string | null,
 	/**  `episodes`, `season`, `seasons` or `complete` for a pack. */
 	pack: string | null,
+	/**  What the name covers of a show; none for a movie. */
+	episodes: TorrentEpisodeSpanDto | null,
 	flags: FlagDto[],
 	/**  `better`, `same` or `worse` against the library copy; none when not in the library. */
 	upgrade: string | null,
@@ -4395,10 +4419,15 @@ export type TorrentTitleDetailsDto = {
 	/**  The genres as words. */
 	genres: string[],
 	overview: string | null,
-	/**  The copy of a movie the library holds. */
-	libraryCopy: TorrentLibraryCopyDto | null,
+	/**
+	 *  Every copy of a movie the library holds, best first: releases are compared with the
+	 *  first.
+	 */
+	libraryCopies: TorrentLibraryCopyDto[],
 	/**  The episodes of a show the library holds, in aired order. */
 	heldEpisodes: TorrentEpisodeRefDto[],
+	/**  The aired episodes of a show the library has no video of, in aired order. */
+	missingEpisodes: TorrentEpisodeRefDto[],
 };
 
 /**  A movie or show found on TMDB. */

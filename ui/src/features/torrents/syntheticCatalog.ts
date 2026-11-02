@@ -31,14 +31,25 @@ export interface CatalogTitle {
   /** How the library lists it, when it holds it. */
   inLibrary: string | null;
   /** The movie's copy in the library. */
-  copy?: TorrentLibraryCopyDto;
+  copy?: CopyFacts;
+  /** More copies of the movie (one movie held more than once). */
+  moreCopies?: readonly CopyFacts[];
   /** The episodes of a show the library holds. */
   held?: readonly TorrentEpisodeRefDto[];
+  /** The aired episodes of a show the library has no video of. */
+  missing?: readonly TorrentEpisodeRefDto[];
   /** When the library added it, days before the fixtures' "now". */
   addedDaysAgo?: number;
   /** What the release search does: answer (default), fail everywhere, never finish, find nothing. */
   behaviour?: "normal" | "failing" | "slow" | "empty";
 }
+
+/** What a fixture says of a copy; the rest of the DTO is filled in. */
+export type CopyFacts = Pick<
+  TorrentLibraryCopyDto,
+  "resolution" | "source" | "hdr" | "size" | "fileName"
+> &
+  Partial<Pick<TorrentLibraryCopyDto, "codec" | "audio" | "edition" | "languages">>;
 
 const BLADE_RUNNER_PLOT =
   "Thirty years after the events of the first film, a new blade runner, LAPD Officer K, unearths a long-buried secret that has the potential to plunge what's left of society into chaos. His discovery leads him on a quest to find Rick Deckard, a former blade runner who has been missing for thirty years.";
@@ -68,6 +79,9 @@ export const CATALOG: readonly CatalogTitle[] = [
       resolution: "1080p",
       source: "WEB-DL",
       hdr: null,
+      codec: "AVC",
+      audio: "E-AC-3 5.1",
+      languages: ["en"],
       size: 5.6 * GB,
       fileName: "Blade.Runner.2049.2017.1080p.WEB-DL.DD5.1.H264-FGT.mkv",
     },
@@ -112,6 +126,19 @@ export const CATALOG: readonly CatalogTitle[] = [
       size: 4.4 * GB,
       fileName: "Heat.1995.720p.BluRay.x264-SiNNERS.mkv",
     },
+    moreCopies: [
+      {
+        resolution: "1080p",
+        source: "BluRay",
+        hdr: null,
+        codec: "AVC",
+        audio: "DTS-HD MA 5.1",
+        edition: "Remastered",
+        languages: ["en", "fr"],
+        size: 14.2 * GB,
+        fileName: "Heat.1995.Remastered.1080p.BluRay.x264-AMIABLE.mkv",
+      },
+    ],
     addedDaysAgo: 120,
   },
   {
@@ -365,6 +392,7 @@ export const CATALOG: readonly CatalogTitle[] = [
       { season: 2, episode: 2 },
       { season: 2, episode: 3 },
     ],
+    missing: Array.from({ length: 7 }, (_, index) => ({ season: 2, episode: index + 4 })),
     addedDaysAgo: 1,
   },
   {
@@ -894,6 +922,43 @@ function rowsOf(entry: CatalogTitle, target: SyntheticTarget): { row: Row; stem:
   return [...packs, ...EPISODE_ROWS.map((row) => ({ row, stem: episode }))];
 }
 
+/** What a show release's name stem covers: `S02E05`, `S02`, `S01-S02` or the whole show. */
+function spanOf(stem: string): TorrentReleaseDto["episodes"] {
+  const none = { firstSeason: null, lastSeason: null, firstEpisode: null, lastEpisode: null };
+  const range = /\.S(\d+)-S(\d+)$/.exec(stem);
+  if (range !== null) {
+    return { ...none, firstSeason: Number(range[1]), lastSeason: Number(range[2]) };
+  }
+  const episode = /\.S(\d+)E(\d+)$/.exec(stem);
+  if (episode !== null) {
+    const season = Number(episode[1]);
+    const number = Number(episode[2]);
+    return { firstSeason: season, lastSeason: season, firstEpisode: number, lastEpisode: number };
+  }
+  const season = /\.S(\d+)$/.exec(stem);
+  if (season !== null) {
+    return { ...none, firstSeason: Number(season[1]), lastSeason: Number(season[1]) };
+  }
+  return none;
+}
+
+/** The copies of a library movie as the title details send them, best first. */
+export function libraryCopiesOf(entry: CatalogTitle): TorrentLibraryCopyDto[] {
+  const facts = [...(entry.copy === undefined ? [] : [entry.copy]), ...(entry.moreCopies ?? [])];
+  const rank = (copy: CopyFacts) =>
+    ({ "2160p": 4, "1080p": 3, "720p": 2, "480p": 1 })[copy.resolution] ?? 0;
+  return facts
+    .map((copy, index) => ({
+      itemId: `${entry.tmdbId}${index === 0 ? "" : `-${index + 1}`}`,
+      codec: null,
+      audio: null,
+      edition: null,
+      languages: [],
+      ...copy,
+    }))
+    .sort((a, b) => rank(b) - rank(a) || (b.size ?? 0) - (a.size ?? 0));
+}
+
 /** The releases of a target, as the sources return them. */
 export function syntheticReleases(
   target: SyntheticTarget,
@@ -935,6 +1000,7 @@ export function syntheticReleases(
       hdr: row.hdr,
       audio: row.audio,
       pack: row.pack ?? null,
+      episodes: entry.kind === "show" ? spanOf(stem) : null,
       flags: (row.flags ?? []).map((flag) => ({ ...flag })),
       upgrade: entry.inLibrary === null ? null : (row.upgrade ?? null),
       matching: row.other === undefined,

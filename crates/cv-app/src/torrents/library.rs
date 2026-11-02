@@ -3,8 +3,15 @@
 
 use cv_db::Database;
 use cv_db::repo::{children_of, get_item, items_by_provider_id};
-use cv_domain::{Item, ItemDetail, ItemId, MediaFile, MediaFileType, MediaSource};
+use std::cmp::Reverse;
+
+use cv_domain::{CalendarDate, Item, ItemDetail, ItemId, MediaFile, MediaFileType, MediaSource};
+use cv_template::tokens::{audio_channels_dot, edition_label};
 use cv_torrent::model::{Hdr, LibraryCopy, MediaKind, Resolution, Scope};
+use cv_torrent::rank::copy_rank;
+
+use crate::collections::today;
+use crate::hero_audio::hero_audio;
 
 /// A library title, for the "In library" badge.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,20 +116,64 @@ pub fn copy_of(item: &Item) -> Option<LibraryCopy> {
 /// What the library holds of a title, for the Torrent search header.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LibraryHolding {
-    /// A movie's copy: its largest video with media info.
-    Movie(MovieCopy),
-    /// The episodes of a show that have a video, as `(season, episode)` in aired order.
-    Show(Vec<(u16, u16)>),
+    /// Every copy of a movie (each library movie with its TMDB ID that has a video), best first:
+    /// the first is the one releases are compared with.
+    Movie(Vec<MovieCopy>),
+    Show(ShowHolding),
 }
 
-/// A movie's copy as the header names it: "1080p WEB-DL · 5.6 GB · <file name>".
+/// The episodes of a show the library holds and misses, as `(season, episode)` in aired order.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ShowHolding {
+    /// The episodes that have a video.
+    pub held: Vec<(u16, u16)>,
+    /// The aired episodes the provider lists that have no video in the library.
+    pub missing: Vec<(u16, u16)>,
+}
+
+/// A movie's copy as the header names it: "2160p · DV · HEVC · TrueHD Atmos 7.1 · Remux · 58 GB".
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MovieCopy {
+    /// The library movie this copy is.
+    pub item: ItemId,
     pub resolution: Resolution,
     pub source: MediaSource,
     pub hdr: Hdr,
+    /// The video codec as the media info names it (`HEVC`, `AVC`, `AV1`); empty when not read.
+    pub codec: String,
+    /// The lead audio track: `TrueHD Atmos 7.1`; empty when not read.
+    pub audio: String,
+    /// `Extended Edition`; empty when the movie has none.
+    pub edition: String,
+    /// The languages of the audio tracks (ISO 639 codes as stored), in file order, once each.
+    pub languages: Vec<String>,
     pub size_bytes: u64,
     pub file_name: String,
+}
+
+impl MovieCopy {
+    /// The copy as the release comparison sees it.
+    #[must_use]
+    pub fn compared(&self) -> LibraryCopy {
+        LibraryCopy {
+            resolution: self.resolution,
+            source: self.source.clone(),
+            hdr: self.hdr,
+        }
+    }
+}
+
+/// "TrueHD Atmos 7.1": the codec and channels of the track a viewer would hear first.
+fn audio_of(video: &MediaFile, original_language: &str) -> String {
+    let Some(stream) = hero_audio(&video.audio_streams, original_language) else {
+        return String::new();
+    };
+    let text = if stream.channels == 0 {
+        stream.codec.clone()
+    } else {
+        format!("{} {}", stream.codec, audio_channels_dot(stream.channels))
+    };
+    text.trim().to_owned()
 }
 
 /// The copy of a movie: its largest video, with the resolution when its media info was read.
@@ -134,102 +185,193 @@ pub fn movie_copy_of(item: &Item) -> Option<MovieCopy> {
         .iter()
         .filter(|f| f.kind == MediaFileType::Video)
         .max_by_key(|f| f.size_bytes)?;
+    let mut languages: Vec<String> = Vec::new();
+    for stream in &video.audio_streams {
+        let language = stream.language.trim();
+        if !language.is_empty() && !languages.iter().any(|known| known == language) {
+            languages.push(language.to_owned());
+        }
+    }
+    let edition = match &item.detail {
+        ItemDetail::Movie(movie) => edition_label(&movie.edition),
+        _ => String::new(),
+    };
     Some(MovieCopy {
+        item: item.id?,
         resolution: resolution_of(video.width, video.height),
         source: source_of(item),
         hdr: hdr_of(&video.hdr_formats),
+        codec: video.video_codec.trim().to_owned(),
+        audio: audio_of(video, &item.core.original_language),
+        edition,
+        languages,
         size_bytes: video.size_bytes,
         file_name: video.filename.clone(),
     })
 }
 
-/// What the library holds of a linked title: a movie's copy, or the episodes of a show that have
-/// a video. `None` when a movie has no video.
+/// Best first: the order [`copy_rank`] gives, then the larger file.
+fn sort_best_first(copies: &mut [MovieCopy]) {
+    copies.sort_by_key(|copy| Reverse((copy_rank(&copy.compared()), copy.size_bytes)));
+}
+
+/// Every library movie with this TMDB ID.
+fn movies_with(db: &Database, tmdb_id: u64) -> Result<Vec<Item>, cv_db::DbError> {
+    let mut movies = Vec::new();
+    for id in db.read(|c| items_by_provider_id(c, "tmdb", &tmdb_id.to_string()))? {
+        if let Some(item) = db.read(|c| get_item(c, id))?
+            && matches!(item.detail, ItemDetail::Movie(_))
+        {
+            movies.push(item);
+        }
+    }
+    Ok(movies)
+}
+
+/// The copies of a movie, best first.
+fn movie_copies(db: &Database, tmdb_id: u64) -> Result<Vec<MovieCopy>, cv_db::DbError> {
+    let mut copies: Vec<MovieCopy> = movies_with(db, tmdb_id)?
+        .iter()
+        .filter_map(movie_copy_of)
+        .collect();
+    sort_best_first(&mut copies);
+    Ok(copies)
+}
+
+/// The episode items of a show that have a video, with their aired numbers, in aired order.
+fn held_episodes(db: &Database, show: ItemId) -> Result<Vec<(u16, u16, Item)>, cv_db::DbError> {
+    let mut held = Vec::new();
+    for season_id in db.read(|c| children_of(c, show))? {
+        for episode_id in db.read(|c| children_of(c, season_id))? {
+            let Some(episode) = db.read(|c| get_item(c, episode_id))? else {
+                continue;
+            };
+            let ItemDetail::Episode(fields) = &episode.detail else {
+                continue;
+            };
+            let has_video = episode
+                .core
+                .media_files
+                .iter()
+                .any(|f| f.kind == MediaFileType::Video);
+            let number = fields.numbers.display(&cv_domain::EpisodeGroup::aired());
+            if let (true, Some(number)) = (has_video, number)
+                && let (Ok(season), Ok(number)) =
+                    (u16::try_from(number.season), u16::try_from(number.episode))
+            {
+                held.push((season, number, episode));
+            }
+        }
+    }
+    held.sort_by_key(|(season, episode, _)| (*season, *episode));
+    Ok(held)
+}
+
+/// The aired episodes of a show's provider list that the library holds no video of.
+fn missing_of(show: &Item, held: &[(u16, u16)], today: CalendarDate) -> Vec<(u16, u16)> {
+    let ItemDetail::Show(fields) = &show.detail else {
+        return Vec::new();
+    };
+    let mut missing: Vec<(u16, u16)> = fields
+        .missing_episodes
+        .iter()
+        .filter(|episode| episode.first_aired.is_some_and(|aired| aired <= today))
+        .filter_map(|episode| {
+            let number = episode.numbers.display(&cv_domain::EpisodeGroup::aired())?;
+            Some((
+                u16::try_from(number.season).ok()?,
+                u16::try_from(number.episode).ok()?,
+            ))
+        })
+        .filter(|number| held.binary_search(number).is_err())
+        .collect();
+    missing.sort_unstable();
+    missing.dedup();
+    missing
+}
+
+/// What the library holds of a linked title: every copy of the movie with its TMDB ID, or the
+/// episodes of a show that have a video and the aired ones it misses. `None` when a movie has
+/// no video.
 pub(super) fn holding_of(
     db: &Database,
     link: &LibraryLink,
+    tmdb_id: u64,
 ) -> Result<Option<LibraryHolding>, cv_db::DbError> {
     let Some(item) = db.read(|c| get_item(c, link.item))? else {
         return Ok(None);
     };
     match &item.detail {
-        ItemDetail::Movie(_) => Ok(movie_copy_of(&item).map(LibraryHolding::Movie)),
+        ItemDetail::Movie(_) => {
+            let copies = movie_copies(db, tmdb_id)?;
+            Ok((!copies.is_empty()).then_some(LibraryHolding::Movie(copies)))
+        }
         ItemDetail::Show(_) => {
-            let mut held = Vec::new();
-            for season_id in db.read(|c| children_of(c, link.item))? {
-                for episode_id in db.read(|c| children_of(c, season_id))? {
-                    let Some(episode) = db.read(|c| get_item(c, episode_id))? else {
-                        continue;
-                    };
-                    let ItemDetail::Episode(fields) = &episode.detail else {
-                        continue;
-                    };
-                    let has_video = episode
-                        .core
-                        .media_files
-                        .iter()
-                        .any(|f| f.kind == MediaFileType::Video);
-                    let number = fields.numbers.display(&cv_domain::EpisodeGroup::aired());
-                    if let (true, Some(number)) = (has_video, number)
-                        && let (Ok(season), Ok(episode)) =
-                            (u16::try_from(number.season), u16::try_from(number.episode))
-                    {
-                        held.push((season, episode));
-                    }
-                }
-            }
-            held.sort_unstable();
+            let mut held: Vec<(u16, u16)> = held_episodes(db, link.item)?
+                .into_iter()
+                .map(|(season, episode, _)| (season, episode))
+                .collect();
             held.dedup();
-            Ok(Some(LibraryHolding::Show(held)))
+            let missing = missing_of(&item, &held, today());
+            Ok(Some(LibraryHolding::Show(ShowHolding { held, missing })))
         }
         _ => Ok(None),
     }
 }
 
-/// The copy of a movie, or of an episode of a show, that the library holds for the scope
-/// searched. A whole show or a season has no single copy.
+/// The quality most of these copies share; of equally many, the lower one.
+fn shared_quality(copies: impl IntoIterator<Item = LibraryCopy>) -> Option<LibraryCopy> {
+    let mut counts: Vec<(LibraryCopy, usize)> = Vec::new();
+    for copy in copies {
+        match counts.iter_mut().find(|(known, _)| *known == copy) {
+            Some((_, count)) => *count += 1,
+            None => counts.push((copy, 1)),
+        }
+    }
+    counts
+        .into_iter()
+        .max_by_key(|(copy, count)| (*count, Reverse(copy_rank(copy))))
+        .map(|(copy, _)| copy)
+}
+
+/// The copy the library holds for the scope searched, the one releases are compared with: the
+/// best copy of a movie, the copy of an episode, or for a whole show or a season the quality
+/// most of its held episodes share.
 pub(super) fn library_copy(
     db: &Database,
     link: Option<&LibraryLink>,
+    tmdb_id: Option<u64>,
     scope: Scope,
 ) -> Result<Option<LibraryCopy>, cv_db::DbError> {
     let Some(link) = link else {
         return Ok(None);
     };
-    match scope {
-        Scope::Movie => Ok(db
-            .read(|c| get_item(c, link.item))?
-            .and_then(|i| copy_of(&i))),
-        Scope::Episode(season, episode) => {
-            let seasons = db.read(|c| children_of(c, link.item))?;
-            for season_id in seasons {
-                let Some(season_item) = db.read(|c| get_item(c, season_id))? else {
-                    continue;
-                };
-                let ItemDetail::Season(fields) = &season_item.detail else {
-                    continue;
-                };
-                if fields.season != u32::from(season) {
-                    continue;
-                }
-                for episode_id in db.read(|c| children_of(c, season_id))? {
-                    let Some(item) = db.read(|c| get_item(c, episode_id))? else {
-                        continue;
-                    };
-                    if let ItemDetail::Episode(fields) = &item.detail
-                        && fields
-                            .numbers
-                            .display(&cv_domain::EpisodeGroup::aired())
-                            .is_some_and(|n| n.episode == u32::from(episode))
-                    {
-                        return Ok(copy_of(&item));
-                    }
-                }
-            }
-            Ok(None)
+    if scope == Scope::Movie {
+        let mut copies: Vec<LibraryCopy> = match tmdb_id {
+            Some(tmdb_id) => movies_with(db, tmdb_id)?
+                .iter()
+                .filter_map(copy_of)
+                .collect(),
+            None => Vec::new(),
+        };
+        if copies.is_empty() {
+            // The linked movie itself, when no TMDB ID is known.
+            copies.extend(
+                db.read(|c| get_item(c, link.item))?
+                    .and_then(|i| copy_of(&i)),
+            );
         }
-        Scope::Show | Scope::Season(_) => Ok(None),
+        return Ok(copies.into_iter().max_by_key(copy_rank));
     }
+    let in_scope = held_episodes(db, link.item)?
+        .into_iter()
+        .filter(|(season, episode, _)| match scope {
+            Scope::Episode(s, e) => *season == s && *episode == e,
+            Scope::Season(s) => *season == s,
+            Scope::Show | Scope::Movie => true,
+        })
+        .filter_map(|(_, _, item)| copy_of(&item));
+    Ok(shared_quality(in_scope))
 }
 
 #[cfg(test)]
@@ -292,5 +434,60 @@ mod tests {
         assert_eq!(copy.resolution, Resolution::R2160);
         assert_eq!(copy.hdr, Hdr::Hdr10);
         assert_eq!(copy.source, MediaSource::Bluray);
+    }
+
+    fn missing(
+        season: u32,
+        episode: u32,
+        aired: Option<CalendarDate>,
+    ) -> cv_domain::MissingEpisode {
+        let mut numbers = cv_domain::EpisodeNumbers::new();
+        numbers.set(cv_domain::EpisodeNumber::aired(season, episode));
+        cv_domain::MissingEpisode {
+            title: String::new(),
+            numbers,
+            first_aired: aired,
+            plot: String::new(),
+        }
+    }
+
+    #[test]
+    fn missing_episodes_are_the_aired_ones_without_a_video() {
+        let day = |y, m, d| CalendarDate::new(y, m, d);
+        let mut show = Item::show("Example Show");
+        if let ItemDetail::Show(fields) = &mut show.detail {
+            fields.missing_episodes = vec![
+                missing(4, 6, day(2026, 3, 1)),
+                missing(4, 5, day(2026, 2, 22)),
+                missing(4, 9, day(2027, 1, 1)),
+                missing(4, 10, None),
+                missing(1, 2, day(2020, 1, 1)),
+            ];
+        }
+        let held = [(1, 1), (1, 2)];
+        let today = day(2026, 11, 3).expect("a date");
+        assert_eq!(
+            missing_of(&show, &held, today),
+            [(4, 5), (4, 6)],
+            "unaired, undated and held episodes are not missing"
+        );
+    }
+
+    #[test]
+    fn a_show_is_compared_with_the_quality_most_episodes_share() {
+        let copy = |resolution| LibraryCopy {
+            resolution,
+            source: MediaSource::WebDl,
+            hdr: Hdr::None,
+        };
+        let shared = shared_quality([
+            copy(Resolution::R1080),
+            copy(Resolution::R720),
+            copy(Resolution::R1080),
+        ]);
+        assert_eq!(shared, Some(copy(Resolution::R1080)));
+        let tie = shared_quality([copy(Resolution::R2160), copy(Resolution::R720)]);
+        assert_eq!(tie, Some(copy(Resolution::R720)), "a tie goes to the lower");
+        assert_eq!(shared_quality([]), None);
     }
 }

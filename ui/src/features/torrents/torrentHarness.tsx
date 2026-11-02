@@ -142,6 +142,7 @@ export function release(overrides: Partial<TorrentRelease> = {}): TorrentRelease
     hdr: "DV",
     audio: "Atmos",
     pack: null,
+    episodes: null,
     flags: [],
     upgrade: null,
     matching: true,

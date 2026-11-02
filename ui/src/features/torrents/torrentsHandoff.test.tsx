@@ -22,7 +22,7 @@ afterEach(() => {
 const grid = () => screen.findByRole("grid", { name: "Releases" });
 const dataRows = async () => (await within(await grid()).findAllByRole("row")).slice(1);
 describe("the copy you own", () => {
-  it("shows the Yours line and a Same, Better or Worse hint on each release", async () => {
+  it("shows the You have this card and a Same, Better or Worse hint on each release", async () => {
     await renderTorrents(
       "/torrents?title=movie:1",
       backendWith([
@@ -33,11 +33,15 @@ describe("the copy you own", () => {
       ]),
     );
     const rows = await dataRows();
-    await waitFor(() => expect(screen.getByText(/Yours:/)).toBeVisible());
-    expect(screen.getByText(/1080p WEB-DL|1080p/, { selector: "span.truncate" })).toHaveTextContent(
-      /Yours: Blade Runner 2049 \(2017\) · 1080p · 5\.6 GB/,
-    );
+    const card = await screen.findByRole("region", { name: "You have this" });
+    expect(within(card).getByRole("link", { name: "Blade Runner 2049 (2017)" })).toBeVisible();
+    expect(card).toHaveTextContent("1080p · AVC · E-AC-3 5.1 · WEB-DL");
+    expect(card).toHaveTextContent("5.6 GB");
     expect(within(rows[0] as HTMLElement).getByText("Better")).toBeVisible();
+    expect(within(rows[0] as HTMLElement).getByTestId("compare-tag")).toHaveAttribute(
+      "title",
+      "Better: 2160p Dolby Vision vs your 1080p SDR",
+    );
     expect(within(rows[1] as HTMLElement).getByText("Worse")).toBeVisible();
     expect(within(rows[2] as HTMLElement).getByText("Same as yours")).toBeVisible();
     expect(within(rows[3] as HTMLElement).queryByText(/Better|Worse|Same as yours/)).toBeNull();
