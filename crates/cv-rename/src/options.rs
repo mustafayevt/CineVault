@@ -225,6 +225,8 @@ pub struct TvSettings {
     pub multi_episode_style: MultiEpisodeStyle,
     /// Season 0 is the folder `Specials`.
     pub special_season: bool,
+    /// Move NFOs of other writers to the trash instead of leaving them where they are.
+    pub nfo_cleanup: bool,
     pub cleanup_unwanted: bool,
     pub unwanted_patterns: Vec<String>,
     /// Names of the show NFO (`TV_SHOW`).
@@ -272,6 +274,7 @@ impl Default for TvSettings {
             },
             multi_episode_style: MultiEpisodeStyle::Repeat,
             special_season: true,
+            nfo_cleanup: false,
             cleanup_unwanted: false,
             unwanted_patterns: DEFAULT_UNWANTED
                 .iter()

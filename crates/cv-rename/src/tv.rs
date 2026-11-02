@@ -836,7 +836,11 @@ impl TvContext<'_> {
                 let fate = match file.kind {
                     MediaFileType::Nfo => {
                         if !file.nfo_valid {
-                            Fate::LeftBehind
+                            if s.nfo_cleanup {
+                                Fate::Trash
+                            } else {
+                                Fate::LeftBehind
+                            }
                         } else if nfo_winner != Some(index) {
                             Fate::Trash
                         } else {
@@ -920,7 +924,11 @@ impl TvContext<'_> {
                 let fate = match file.kind {
                     MediaFileType::Nfo => {
                         if !file.nfo_valid {
-                            Fate::LeftBehind
+                            if s.nfo_cleanup {
+                                Fate::Trash
+                            } else {
+                                Fate::LeftBehind
+                            }
                         } else if nfo_winner != Some(index) {
                             Fate::Trash
                         } else {
@@ -1089,7 +1097,11 @@ impl TvContext<'_> {
                         }
                         MediaFileType::Nfo => {
                             if !file.nfo_valid {
-                                Fate::LeftBehind
+                                if s.nfo_cleanup {
+                                    Fate::Trash
+                                } else {
+                                    Fate::LeftBehind
+                                }
                             } else if nfo_winner != Some(index) {
                                 Fate::Trash
                             } else if s

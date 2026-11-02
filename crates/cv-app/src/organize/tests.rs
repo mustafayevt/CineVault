@@ -1204,8 +1204,19 @@ fn a_show_is_previewed_applied_and_undone_with_its_seasons_and_episodes() {
 /// What a download's info file holds: plain text about the video, no NFO.
 const INFO_FILE: &str = "---GENERAL---\r\nCodec....: HEVC\r\nSubtitles: English, German\r\n";
 
+/// Where the info file went: the trash folder of the library folder, untouched, and nowhere else.
+fn info_file_set_aside(lib: &Lib, name: &str) {
+    let copies: Vec<String> = walk(&lib.root)
+        .into_iter()
+        .filter(|f| f.ends_with(&format!("/{name}")))
+        .collect();
+    assert_eq!(copies.len(), 1, "{:?}", walk(&lib.root));
+    assert!(copies[0].contains("/.deletedByCineVault/"), "{copies:?}");
+    assert_eq!(fs::read_to_string(&copies[0]).unwrap(), INFO_FILE);
+}
+
 #[test]
-fn a_downloaded_info_file_keeps_its_name_and_leaves_the_nfo_name_free() {
+fn a_downloaded_info_file_is_set_aside_and_leaves_the_nfo_name_free() {
     let lib = Lib::new();
     let base = "Der.Untergang.2004.2160p.UHD.BluRay-HDT";
     let id = lib.movie("Der.Untergang.2004", base, "Downfall", 2004);
@@ -1221,9 +1232,11 @@ fn a_downloaded_info_file_keeps_its_name_and_leaves_the_nfo_name_free() {
 
     assert_eq!(applied.done(), 1, "{applied:?}");
     assert!(lib.exists("Downfall (2004)/Downfall (2004).mkv"));
-    // Left behind where it was, untouched.
-    let kept = lib.root.join(format!("Der.Untergang.2004/{base}.nfo"));
-    assert_eq!(fs::read_to_string(kept).unwrap(), INFO_FILE);
+    info_file_set_aside(&lib, &format!("{base}.nfo"));
+    assert!(
+        !lib.exists("Der.Untergang.2004"),
+        "no old folder is left behind"
+    );
     assert!(
         !lib.exists("Downfall (2004)/Downfall (2004).nfo"),
         "the NFO name is left for CineVault's NFO: {:?}",
@@ -1254,12 +1267,12 @@ fn a_newer_info_file_never_takes_the_place_of_cinevaults_nfo() {
     assert_eq!(applied.done(), 1, "{applied:?}");
     let nfo = fs::read_to_string(lib.root.join("Heat (1995)/Heat (1995).nfo")).unwrap();
     assert!(nfo.contains("<title>"), "CineVault's NFO is carried: {nfo}");
-    let info = fs::read_to_string(lib.root.join("heat.1995/heat-info.nfo")).unwrap();
-    assert_eq!(info, INFO_FILE);
+    info_file_set_aside(&lib, "heat-info.nfo");
+    assert!(!lib.exists("heat.1995"));
 }
 
 #[test]
-fn an_episode_info_file_keeps_its_name() {
+fn an_episode_info_file_is_set_aside() {
     let lib = Lib::new();
     let source = lib.root_text();
     let show_path = lib.root.join("Show.Name.2020");
@@ -1313,7 +1326,7 @@ fn an_episode_info_file_keeps_its_name() {
             .any(|f| f.ends_with("Season 01/Show Name - S01E01 - Pilot.nfo")),
         "the info file never takes the episode NFO's name: {files:?}"
     );
-    assert!(files.iter().any(|f| f.ends_with("/ep1.nfo")), "{files:?}");
+    info_file_set_aside(&lib, "ep1.nfo");
 }
 
 #[test]
