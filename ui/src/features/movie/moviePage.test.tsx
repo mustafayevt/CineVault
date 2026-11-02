@@ -177,6 +177,36 @@ describe("the Movie page header", () => {
   });
 });
 
+describe("the Movie page on a narrow pane", () => {
+  it("keeps the desktop poster width as a variable the phone layout can override", async () => {
+    renderMovie();
+    const poster = await screen.findByTestId("title-poster");
+    expect(poster.style.getPropertyValue("--poster-w")).toBe("172px");
+    expect(poster.className).toContain("@max-[640px]/pane:w-[132px]");
+  });
+
+  it("puts the Technical card after the facts and before the cast in reading order", async () => {
+    renderMovie();
+    const cast = (await screen.findAllByTestId("cast-person"))[0];
+    const technical = document.querySelector("[data-tech-toggle]");
+    const facts = document.querySelector('[data-fact="director"]');
+    expect(cast).toBeDefined();
+    expect(technical).not.toBeNull();
+    expect(facts).not.toBeNull();
+    const follows = (a: Node, b: Node) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(follows(facts as Node, technical as Node)).toBe(true);
+    expect(follows(technical as Node, cast as Node)).toBe(true);
+  });
+
+  it("lets the header actions wrap so Play stays first on a phone", async () => {
+    renderMovie();
+    const toolbar = await screen.findByRole("toolbar", { name: /actions/i });
+    expect(toolbar.className).toContain("@max-[860px]/pane:flex-wrap");
+    expect(toolbar.querySelector("button")).toHaveAttribute("data-action", "play");
+  });
+});
+
 describe("the Movie page artwork buttons", () => {
   it("opens the picker on the poster from the poster's floating button, reachable by keyboard", async () => {
     const user = userEvent.setup();

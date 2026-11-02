@@ -401,7 +401,7 @@ export function IdsControl({ fieldKey, label }: { fieldKey: string; label: strin
               options={sources(pair.key)}
               value={pair.key}
               onValueChange={(key) => set(pairs.map((p, i) => (i === index ? { ...p, key } : p)))}
-              className="w-44 shrink-0"
+              className="w-44 shrink-0 @max-[640px]/pane:w-32"
             />
             <Field
               aria-label={t("edit.ids.value", { row: index + 1 })}
@@ -454,12 +454,12 @@ export function RatingsControl({ fieldKey, label }: { fieldKey: string; label: s
           <p className="type-small m-0 text-text-muted">{t("edit.ratings.empty")}</p>
         ) : null}
         {rows.map((row, index) => (
-          <div key={index} className="flex items-center gap-2">
+          <div key={index} className="flex items-center gap-2 @max-[640px]/pane:flex-wrap">
             <Field
               aria-label={t("edit.ratings.source", { row: index + 1 })}
               list={listId}
               value={row.source}
-              className="w-44 shrink-0"
+              className="w-44 shrink-0 @max-[640px]/pane:w-full"
               onChange={(event) =>
                 patch(index, { source: event.target.value.trim().toLowerCase() })
               }
@@ -470,7 +470,7 @@ export function RatingsControl({ fieldKey, label }: { fieldKey: string; label: s
               step="any"
               min={0}
               value={row.value === null ? "" : String(row.value)}
-              className="w-24"
+              className="w-24 @max-[640px]/pane:w-16"
               onChange={(event) =>
                 patch(index, {
                   value: event.target.value === "" ? null : Number(event.target.value),
@@ -550,7 +550,7 @@ export function PeopleControl({
           <p className="type-small m-0 text-text-muted">{t("edit.people.empty")}</p>
         ) : null}
         {people.map((person, index) => (
-          <div key={index} className="flex items-center gap-2">
+          <div key={index} className="flex items-center gap-2 @max-[640px]/pane:flex-wrap">
             {crew ? (
               <Select
                 aria-label={t("edit.people.job", { who, row: index + 1 })}
@@ -563,7 +563,7 @@ export function PeopleControl({
                 onValueChange={(kind) =>
                   set(people.map((p, i) => (i === index ? { ...p, kind } : p)))
                 }
-                className="w-36 shrink-0"
+                className="w-36 shrink-0 @max-[640px]/pane:w-full"
               />
             ) : null}
             <Field

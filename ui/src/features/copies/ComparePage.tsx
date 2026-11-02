@@ -46,7 +46,7 @@ const ROW_HEIGHT = "h-[52px]";
 /** The label column: each row's name with a plain hint under it. */
 function Labels() {
   return (
-    <div aria-hidden="true" className="w-[188px] shrink-0 pt-[106px]">
+    <div aria-hidden="true" className="w-[188px] shrink-0 pt-[106px] @max-[640px]/pane:hidden">
       {ROW_IDS.map((id) => (
         <div key={id} className={cx("flex flex-col justify-center gap-px", ROW_HEIGHT)}>
           <span className="font-(weight:--fw-500) text-text">{t(ROW_LABEL[id][0])}</span>
@@ -138,6 +138,7 @@ function CopyCard({
       data-best={copy.best ? "true" : undefined}
       className={cx(
         "flex min-w-[260px] max-w-[400px] flex-1 flex-col overflow-hidden rounded-(--r-10)",
+        "@max-[640px]/pane:max-w-none @max-[640px]/pane:min-w-0",
         "border border-solid bg-surface-card",
         copy.best ? "border-gold-tint-edge" : "border-line-section",
       )}
@@ -177,6 +178,13 @@ function CopyCard({
             rowIndex > 0 && "border-t border-solid border-line-row",
           )}
         >
+          {/* A phone-wide pane has no label column: each row names itself. */}
+          <span
+            aria-hidden="true"
+            className="hidden w-[88px] shrink-0 pl-2 text-(length:--fs-12) text-text-muted @max-[640px]/pane:block"
+          >
+            {t(ROW_LABEL[cell.row][0])}
+          </span>
           <Value cell={cell} />
         </div>
       ))}
@@ -348,7 +356,7 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
         <div
           role="group"
           aria-label={t("copies.chip")}
-          className="flex items-stretch gap-4 overflow-x-auto"
+          className="flex items-stretch gap-4 overflow-x-auto @max-[640px]/pane:flex-col"
         >
           <Labels />
           {cards.map((card, index) => (
@@ -363,7 +371,7 @@ function Page({ page, movieId }: { page: Comparison; movieId: string }) {
           ))}
         </div>
 
-        <div className="flex items-center gap-3 pl-[204px]">
+        <div className="flex items-center gap-3 pl-[204px] @max-[640px]/pane:flex-wrap @max-[640px]/pane:pl-0">
           {page.kept ? (
             <>
               <span className="text-(length:--fs-14) text-text">{t("copies.kept")}</span>

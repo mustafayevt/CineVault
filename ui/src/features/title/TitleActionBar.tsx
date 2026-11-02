@@ -14,7 +14,11 @@ import type { TitleActions } from "./titleActions";
  */
 export function TitleActionBar({ actions, label }: { actions: TitleActions; label: string }) {
   return (
-    <div role="toolbar" aria-label={label} className="flex items-center gap-2">
+    <div
+      role="toolbar"
+      aria-label={label}
+      className="flex items-center gap-2 @max-[860px]/pane:flex-wrap"
+    >
       {actions.header.map((action) => (
         <Button
           key={action.id}
