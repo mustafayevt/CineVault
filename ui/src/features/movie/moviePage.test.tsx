@@ -177,6 +177,22 @@ describe("the Movie page header", () => {
   });
 });
 
+describe("the Movie page on a narrow pane", () => {
+  it("keeps the desktop poster width as a variable the phone layout can override", async () => {
+    renderMovie();
+    const poster = await screen.findByTestId("title-poster");
+    expect(poster.style.getPropertyValue("--poster-w")).toBe("172px");
+    expect(poster.className).toContain("@max-[640px]/pane:w-[132px]");
+  });
+
+  it("lets the header actions wrap so Play stays first on a phone", async () => {
+    renderMovie();
+    const toolbar = await screen.findByRole("toolbar", { name: /actions/i });
+    expect(toolbar.className).toContain("@max-[860px]/pane:flex-wrap");
+    expect(toolbar.querySelector("button")).toHaveAttribute("data-action", "play");
+  });
+});
+
 describe("the Movie page artwork buttons", () => {
   it("opens the picker on the poster from the poster's floating button, reachable by keyboard", async () => {
     const user = userEvent.setup();

@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Image as ImageIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import type { LifecycleDto, PosterDto } from "../../bindings";
 import { Icon } from "../../components/Icon";
@@ -146,11 +146,13 @@ export function TitleHeader({
           withText
         />
       </span>
-      <div className="relative flex items-end gap-7 px-(--inset) pt-(--title-lead) pb-[26px]">
+      {/* Narrow panes (phones and tablets): the show's facts wrap under the header, and on a phone
+          the poster, the text and the actions stack in one column. */}
+      <div className="relative flex items-end gap-7 px-(--inset) pt-(--title-lead) pb-[26px] @max-[860px]/pane:flex-wrap @max-[860px]/pane:gap-y-5 @max-[640px]/pane:flex-col @max-[640px]/pane:items-stretch">
         <div
           data-testid="title-poster"
-          style={{ width: posterWidth }}
-          className="relative aspect-[2/3] shrink-0 overflow-hidden rounded-(--r-10) bg-surface-raised shadow-floating"
+          style={{ "--poster-w": `${posterWidth}px` } as CSSProperties}
+          className="relative aspect-[2/3] w-(--poster-w) shrink-0 overflow-hidden rounded-(--r-10) bg-surface-raised shadow-floating @max-[640px]/pane:w-[132px]"
         >
           {poster === null ? (
             <PlaceholderPoster title={title} />
@@ -165,8 +167,8 @@ export function TitleHeader({
             />
           </span>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5 pb-0.5">
-          <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-2.5 pb-0.5 @max-[860px]/pane:basis-[320px] @max-[640px]/pane:basis-auto">
+          <div className="flex items-center gap-2.5 @max-[640px]/pane:flex-wrap @max-[640px]/pane:gap-y-1">
             <Tag variant={tag.variant}>{tag.label}</Tag>
             {context === undefined ? null : (
               <span className="text-(length:--fs-12) font-(weight:--fw-500) text-text">
@@ -182,7 +184,11 @@ export function TitleHeader({
           {ratings === undefined ? null : <div className="mt-1">{ratings}</div>}
           <div className="mt-2.5">{actions}</div>
         </div>
-        {aside === undefined ? null : <div className="w-[300px] shrink-0 pb-1">{aside}</div>}
+        {aside === undefined ? null : (
+          <div className="w-[300px] shrink-0 pb-1 @max-[860px]/pane:w-full @max-[860px]/pane:max-w-[560px]">
+            {aside}
+          </div>
+        )}
       </div>
     </header>
   );

@@ -32,7 +32,8 @@ function SpecRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[86px_minmax(0,1fr)] gap-3 border-t border-solid border-line-row px-4 py-3">
+    <div className="grid grid-cols-[86px_minmax(0,1fr)] gap-3 border-t border-solid border-line-row px-4 py-3 @max-[640px]/pane:grid-cols-1 @max-[640px]/pane:gap-1">
+      {/* A phone-wide pane puts the label above its value, so the value gets the card's width. */}
       <span className="pt-px text-text-muted">
         {label}
         {count === undefined ? null : <span className="ml-1">{count}</span>}

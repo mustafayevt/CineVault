@@ -16,8 +16,14 @@ import { EpisodePanel } from "./EpisodePanel";
 import { distinctSize, onDisk, rowsOf } from "./showModel";
 import type { ShowRow } from "./showModel";
 
-/** Episode columns: #, title, aired, runtime, quality, size, status. */
-const COLUMNS = "grid-cols-[44px_minmax(0,1fr)_110px_70px_120px_80px_110px]";
+/**
+ * Episode columns: #, title, aired, runtime, quality, size, status. A phone-wide pane keeps #, title
+ * and status; the episode's panel still shows the rest.
+ */
+const COLUMNS =
+  "grid-cols-[44px_minmax(0,1fr)_110px_70px_120px_80px_110px] @max-[640px]/pane:grid-cols-[28px_minmax(0,1fr)_96px]";
+/** A column that a phone-wide pane leaves out. */
+const WIDE_ONLY = "@max-[640px]/pane:hidden";
 
 function runtime(minutes: number): string {
   return minutes > 0 ? t("detail.runtime.minutes", { minutes }) : "–";
@@ -94,10 +100,16 @@ function EpisodeList({ detail, season, openId, onOpen }: EpisodeListProps) {
       >
         <span role="columnheader">#</span>
         <span role="columnheader">{t("show.col.title")}</span>
-        <span role="columnheader">{t("show.col.aired")}</span>
-        <span role="columnheader">{t("show.col.runtime")}</span>
-        <span role="columnheader">{t("show.col.quality")}</span>
-        <span role="columnheader" className="text-right">
+        <span role="columnheader" className={WIDE_ONLY}>
+          {t("show.col.aired")}
+        </span>
+        <span role="columnheader" className={WIDE_ONLY}>
+          {t("show.col.runtime")}
+        </span>
+        <span role="columnheader" className={WIDE_ONLY}>
+          {t("show.col.quality")}
+        </span>
+        <span role="columnheader" className={cx("text-right", WIDE_ONLY)}>
           {t("show.col.size")}
         </span>
         <span role="columnheader" className="text-right">
@@ -166,16 +178,16 @@ function EpisodeList({ detail, season, openId, onOpen }: EpisodeListProps) {
                 </span>
               )}
             </span>
-            <span className="truncate text-text-2">
+            <span className={cx("truncate text-text-2", WIDE_ONLY)}>
               {date === null ? "–" : format.date(`${date}T00:00:00`)}
             </span>
-            <span className="text-text-2">
+            <span className={cx("text-text-2", WIDE_ONLY)}>
               {episode === null ? "–" : runtime(episode.runtime_minutes)}
             </span>
-            <span className="truncate text-text-2">
+            <span className={cx("truncate text-text-2", WIDE_ONLY)}>
               {episode === null || episode.resolution === "" ? "–" : episode.resolution}
             </span>
-            <span className="text-right tabular-nums">
+            <span className={cx("text-right tabular-nums", WIDE_ONLY)}>
               {episode === null || episode.size_bytes === null || !onDisk(episode)
                 ? "–"
                 : format.size(episode.size_bytes)}
@@ -274,11 +286,15 @@ export function SeasonSection({
           aria-expanded={open}
           aria-controls={panelId}
           onClick={onToggle}
-          className="cv-hoverable flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-(--r-6) bg-transparent text-left text-inherit"
+          className="cv-hoverable flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-(--r-6) bg-transparent text-left text-inherit @max-[640px]/pane:gap-2"
         >
           <Icon icon={open ? ChevronDown : ChevronRight} />
-          <span className="text-(length:--fs-14) font-(weight:--fw-700)">{title}</span>
-          <span className="text-text-muted">{note}</span>
+          <span className="text-(length:--fs-14) font-(weight:--fw-700) @max-[640px]/pane:shrink-0 @max-[640px]/pane:whitespace-nowrap">
+            {title}
+          </span>
+          <span className="text-text-muted @max-[640px]/pane:min-w-0 @max-[640px]/pane:truncate">
+            {note}
+          </span>
           {season.missing > 0 ? (
             <Tag variant="warn">{t("show.season.missing", { count: season.missing })}</Tag>
           ) : season.episodes > 0 ? (
@@ -287,7 +303,9 @@ export function SeasonSection({
             <Tag>{t("show.season.notOnDisk")}</Tag>
           )}
           <span className="flex-1" />
-          {size === null ? null : <span className="text-text-muted">{format.size(size)}</span>}
+          {size === null ? null : (
+            <span className={cx("text-text-muted", WIDE_ONLY)}>{format.size(size)}</span>
+          )}
         </button>
         {season.number === 0 ? null : (
           <Button

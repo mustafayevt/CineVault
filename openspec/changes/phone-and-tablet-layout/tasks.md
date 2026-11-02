@@ -11,7 +11,7 @@
 
 ## 3. Title pages
 
-- [ ] 3.1 Movie, Show, Season, Episode and Edit pages stack their header, facts and Technical card on narrow widths, with the header actions wrapping. Verify: `bun run shots:compact` passes for these routes; `bun run check:facts` still passes; title page tests pass.
+- [x] 3.1 Movie, Show, Season, Episode and Edit pages stack their header, facts and Technical card on narrow widths, with the header actions wrapping. Verify: `bun run shots:compact` passes for these routes; `bun run check:facts` still passes; title page tests pass.
 
 ## 4. Pickers and other pages
 

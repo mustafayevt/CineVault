@@ -132,20 +132,26 @@ function MovieView({ detail }: { detail: MovieDetail }) {
         actions={<TitleActionBar actions={actions} label={t("movie.actions.label")} />}
       />
 
-      <div className="relative flex gap-7 px-(--inset) pt-1.5">
-        <div className="flex min-w-0 flex-[1.25] flex-col gap-6">
-          {filesState === null ? null : <FilesNotice state={filesState} folder={detail.folder} />}
-          {detail.plot === "" ? (
-            <p className="cv-plot text-text-muted">{t("movie.plot.none")}</p>
-          ) : (
-            <p className="cv-plot">{detail.plot}</p>
-          )}
-          <MovieFacts detail={detail} format={format} />
-          <CopiesLine movieId={detail.id} />
-          <MovieTags tags={detail.tags} />
-          <CastSection credits={detail.credits} />
+      {/* Narrow panes (phones and tablets): one column, with the Technical card right under the
+          plot and facts and the copies, tags and cast after it. */}
+      <div className="relative flex gap-7 px-(--inset) pt-1.5 @max-[860px]/pane:flex-col @max-[860px]/pane:gap-6">
+        <div className="flex min-w-0 flex-[1.25] flex-col gap-6 @max-[860px]/pane:contents">
+          <div className="flex min-w-0 flex-col gap-6">
+            {filesState === null ? null : <FilesNotice state={filesState} folder={detail.folder} />}
+            {detail.plot === "" ? (
+              <p className="cv-plot text-text-muted">{t("movie.plot.none")}</p>
+            ) : (
+              <p className="cv-plot">{detail.plot}</p>
+            )}
+            <MovieFacts detail={detail} format={format} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-6 empty:hidden @max-[860px]/pane:order-2">
+            <CopiesLine movieId={detail.id} />
+            <MovieTags tags={detail.tags} />
+            <CastSection credits={detail.credits} />
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 @max-[860px]/pane:order-1 @max-[860px]/pane:flex-none">
           <TechnicalCard
             detail={detail}
             nfo={nfo.data}
