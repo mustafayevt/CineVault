@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, Image } from "lucide-react";
+import type { Ref } from "react";
 
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
@@ -44,6 +45,7 @@ function searchText(title: string, year: number): string {
 interface CollectionPaneProps {
   /** The row of the collection in the list: its name, counts and size. */
   row: LibraryRow;
+  ref?: Ref<HTMLElement>;
 }
 
 /**
@@ -52,7 +54,7 @@ interface CollectionPaneProps {
  * 103.6 GB", its overview, and "Films in this set": owned films open their page, missing ones are
  * muted with Search torrents (spec library-browsing "Collections view").
  */
-export function CollectionPane({ row }: CollectionPaneProps) {
+export function CollectionPane({ row, ref }: CollectionPaneProps) {
   const navigate = useNavigate();
   const format = useFormat();
   const id = row.card.id;
@@ -75,8 +77,13 @@ export function CollectionPane({ row }: CollectionPaneProps) {
 
   return (
     <aside
+      ref={ref}
       aria-label={name}
-      className="flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-solid border-line-section bg-surface-card"
+      className={cx(
+        "flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-solid border-line-section bg-surface-card",
+        // A phone has no room beside the grid: the pane follows it, full width, in one scroll.
+        "@max-[860px]/pane:w-[320px] @max-[640px]/pane:w-full @max-[640px]/pane:overflow-y-visible @max-[640px]/pane:border-t @max-[640px]/pane:border-l-0",
+      )}
     >
       <div className="relative h-[150px] shrink-0 overflow-hidden bg-surface-window">
         {poster !== null && (

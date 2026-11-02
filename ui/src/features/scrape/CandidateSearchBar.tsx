@@ -5,6 +5,7 @@ import type { KeyboardEvent } from "react";
 import { Field } from "../../components/Field";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { t } from "../../i18n/catalog";
+import { cx } from "../../lib/cx";
 import type { ScrapeKind } from "./scrapeBackend";
 import type { CandidateSearch } from "./useCandidateSearch";
 
@@ -43,7 +44,13 @@ export function CandidateSearchBar({
     }
   };
   return (
-    <div className={className ?? "flex items-center gap-2"}>
+    <div
+      className={cx(
+        className ?? "flex items-center gap-2",
+        // On a phone the search field takes its own line under the kind switch and the year.
+        "@max-[640px]/pane:flex-wrap",
+      )}
+    >
       <SegmentedControl<ScrapeKind>
         aria-label={t("scrapePage.kind.label")}
         value={search.kind}
@@ -65,11 +72,11 @@ export function CandidateSearchBar({
         value={search.text}
         onChange={(event) => search.setText(event.target.value)}
         onKeyDown={onKeyDown}
-        className="min-w-0 flex-1"
+        className="min-w-0 flex-1 @max-[640px]/pane:order-last @max-[640px]/pane:basis-full"
         trailing={
           <span
             title={t("scrapePage.search.hintTip")}
-            className="text-(length:--fs-12) whitespace-nowrap text-text-muted select-none"
+            className="text-(length:--fs-12) whitespace-nowrap text-text-muted select-none @max-[640px]/pane:hidden"
           >
             {t("scrapePage.search.hint")}
           </span>
@@ -87,7 +94,7 @@ export function CandidateSearchBar({
         disabled={search.isLink}
         onChange={(event) => search.setYearText(event.target.value.replace(/\D/g, ""))}
         onKeyDown={onKeyDown}
-        className="w-[84px] shrink-0"
+        className="w-[84px] shrink-0 @max-[640px]/pane:ml-auto"
       />
     </div>
   );

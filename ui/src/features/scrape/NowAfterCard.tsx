@@ -82,7 +82,7 @@ export function NowAfterCard({ subject, hit, sameMatch }: NowAfterCardProps) {
       {sameMatch ? (
         <p className="m-0 text-text-2">{t("scrapePage.change.sameMatch")}</p>
       ) : (
-        <dl className="m-0 grid grid-cols-[92px_minmax(0,1fr)_minmax(0,1fr)] gap-x-2.5 gap-y-1">
+        <dl className="m-0 grid grid-cols-[92px_minmax(0,1fr)_minmax(0,1fr)] gap-x-2.5 gap-y-1 @max-[640px]/pane:grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)]">
           <dt />
           <dd className="m-0 text-(length:--fs-12) text-text-muted">
             {t("matchPicker.compare.now")}

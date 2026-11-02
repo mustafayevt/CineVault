@@ -28,10 +28,10 @@ import { syntheticDrives } from "./syntheticDrives";
 function renderDrives() {
   const root = createRootRoute({
     component: () => (
-      <>
+      <main>
         <MoveToHost />
         <Outlet />
-      </>
+      </main>
     ),
   });
   const page = createRoute({ getParentRoute: () => root, path: "/drives", component: DrivesPage });
@@ -119,6 +119,29 @@ describe("the titles of a drive", () => {
       .slice(1, 6)
       .map((row) => Number(row.querySelector("[data-bytes]")?.getAttribute("data-bytes")));
     expect([...sizes].sort((a, b) => b - a)).toEqual(sizes);
+  });
+
+  it("keeps the title, year and size columns on a phone", async () => {
+    // The work pane (`main`) of a phone; everything else keeps the stubbed layout.
+    const element = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.tagName === "MAIN" ? 374 : 1400;
+      },
+    });
+    try {
+      renderDrives();
+      await screen.findByRole("grid", { name: "Titles on D: Media" });
+      for (const name of ["Title", "Year", "Size"]) {
+        expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
+      }
+      expect(screen.queryByRole("columnheader", { name: "Quality" })).toBeNull();
+      expect(screen.queryByRole("columnheader", { name: "Folder" })).toBeNull();
+    } finally {
+      if (element !== undefined)
+        Object.defineProperty(HTMLElement.prototype, "clientWidth", element);
+    }
   });
 
   it("shows the selection bar with the count and size, Move to and Delete", async () => {

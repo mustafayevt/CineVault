@@ -8,7 +8,8 @@
 }
 [role="row"]:hover .tr-send,
 [role="row"][data-current="true"] .tr-send,
-.tr-send:focus-visible {
+.tr-send:focus-visible,
+:root[data-touch="true"] .tr-send {
   opacity: 1;
 }
 :root[data-motion="reduced"] .tr-send {

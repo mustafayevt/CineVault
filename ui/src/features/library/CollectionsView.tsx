@@ -156,6 +156,20 @@ export function CollectionsView() {
     [currentIndex, listing.version],
   );
 
+  // On a phone the pane sits under the grid: a tap on a tile scrolls it into view. Beside the grid
+  // (tablet and desktop) its top is already on screen and nothing moves.
+  const paneRef = useRef<HTMLElement>(null);
+  const revealPane = () => {
+    requestAnimationFrame(() => {
+      const pane = paneRef.current;
+      if (pane === null) return;
+      if (pane.getBoundingClientRect().top >= window.innerHeight - 1) {
+        const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+        pane.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+      }
+    });
+  };
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
     // Choosing is the one action: Enter, Space and the range keys have nothing to do here.
@@ -165,7 +179,13 @@ export function CollectionsView() {
 
   /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
   return (
-    <div className="flex min-h-0 flex-1">
+    <div
+      className={cx(
+        "flex min-h-0 flex-1",
+        // A phone: the grid and then the chosen collection, one under the other in one scroll.
+        "@max-[640px]/pane:flex-col @max-[640px]/pane:overflow-x-hidden @max-[640px]/pane:overflow-y-auto",
+      )}
+    >
       <div
         ref={scrollRef}
         role="group"
@@ -174,7 +194,10 @@ export function CollectionsView() {
         aria-activedescendant={currentIndex >= 0 ? `collection-${currentIndex}` : undefined}
         tabIndex={0}
         onKeyDown={onKeyDown}
-        className="cv-collection-grid min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pt-[18px] pb-6 outline-none select-none"
+        className={cx(
+          "cv-collection-grid min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pt-[18px] pb-6 outline-none select-none",
+          "@max-[640px]/pane:flex-none @max-[640px]/pane:overflow-y-visible",
+        )}
       >
         {total === 0 && !listing.loading ? (
           <div className="flex flex-col items-start gap-2 py-8">
@@ -206,8 +229,9 @@ export function CollectionsView() {
                   selected={selection.isSelected(key)}
                   current={index === currentIndex}
                   onSelect={() => {
-                    scrollRef.current?.focus();
+                    scrollRef.current?.focus({ preventScroll: true });
                     selection.click(key);
+                    revealPane();
                   }}
                 />
               );
@@ -215,7 +239,7 @@ export function CollectionsView() {
           </div>
         )}
       </div>
-      {chosen !== undefined && <CollectionPane key={chosen.card.id} row={chosen} />}
+      {chosen !== undefined && <CollectionPane key={chosen.card.id} row={chosen} ref={paneRef} />}
     </div>
   );
 }

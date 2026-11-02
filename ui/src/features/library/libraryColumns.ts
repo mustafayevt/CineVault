@@ -1,6 +1,7 @@
 import type { MessageKey } from "../../i18n/catalog";
 
 import type { LibrarySortField } from "./libraryBackend";
+import type { PaneFit } from "./usePaneFit";
 
 /** The columns of the Library table in their default order; Stage is the 34px column after the checkbox. */
 const LIBRARY_COLUMN_IDS = [
@@ -66,6 +67,27 @@ export const DESCENDING_FIRST: ReadonlySet<LibraryColumnId> = new Set([
   "added",
   "modified",
 ]);
+
+/**
+ * The columns a tablet's narrower pane leaves out, whatever the Columns menu says: the folder,
+ * the runtime and the two dates. The rest still fits beside a title that can be read.
+ */
+const NARROW_LEFT_OUT: ReadonlySet<LibraryColumnId> = new Set([
+  "folder",
+  "runtime",
+  "added",
+  "modified",
+]);
+
+/** On a phone the table is a list: the title (with its year), the quality and the stage. */
+const PHONE_COLUMNS: ReadonlySet<LibraryColumnId> = new Set(["title", "quality", "stage"]);
+
+/** Whether the table shows column `id` at all in a pane of this fit. */
+export function columnFits(id: LibraryColumnId, fit: PaneFit): boolean {
+  if (fit === "phone") return PHONE_COLUMNS.has(id);
+  if (fit === "narrow") return !NARROW_LEFT_OUT.has(id);
+  return true;
+}
 
 /** The column a sort field belongs to, or null for a field no column has. */
 export function columnOfField(field: LibrarySortField): LibraryColumnId | null {

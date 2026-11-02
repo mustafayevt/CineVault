@@ -34,7 +34,7 @@ export function NetworkShareButton({ children, onOpen }: NetworkShareButtonProps
     <Popover
       aria-label={t("networkShare.browser.label")}
       align="start"
-      className="flex w-[420px] flex-col gap-3 p-3.5"
+      className="flex w-[420px] max-w-[calc(100vw-32px)] flex-col gap-3 p-3.5"
       trigger={<Button icon={Network}>{children}</Button>}
     >
       <div className="flex items-center gap-2">

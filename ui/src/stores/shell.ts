@@ -24,10 +24,7 @@ interface ShellState {
   sidebarOverride: SidebarOverride | null;
   /** Flips the sidebar between full and rail, whatever the window width. */
   toggleSidebar: () => void;
-  /** Whether the window is narrower than {@link SIDEBAR_HIDE_BREAKPOINT} (kept by the shell). */
-  companionWindow: boolean;
-  setCompanionWindow: (companion: boolean) => void;
-  /** The navigation sheet of the companion layout is open over the page. */
+  /** The navigation drawer of the compact layout is open over the page. */
   navSheetOpen: boolean;
   setNavSheetOpen: (open: boolean) => void;
 }
@@ -64,11 +61,6 @@ export const useShellStore = create<ShellState>((set, get) => ({
     // Crossing the breakpoint drops a manual choice. Before the stored settings are read the
     // saved choice must survive, because the window's first measurement is not a crossing.
     if (state.sidebarOverride !== null) persistSidebar(null);
-  },
-  companionWindow: false,
-  setCompanionWindow: (companion) => {
-    if (get().companionWindow === companion) return;
-    set({ companionWindow: companion, navSheetOpen: false });
   },
   navSheetOpen: false,
   setNavSheetOpen: (open) => set({ navSheetOpen: open }),

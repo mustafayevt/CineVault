@@ -119,7 +119,10 @@ export function SettingsPage() {
   };
 
   return (
-    <section aria-label={t("settingsPage.region")} className="relative flex h-full min-h-0">
+    <section
+      aria-label={t("settingsPage.region")}
+      className="relative flex h-full min-h-0 @max-[640px]/pane:flex-col"
+    >
       <h1 className="sr-only">{t("settingsPage.region")}</h1>
       <SettingsNav
         entries={SECTIONS.map((section) => ({ id: section.id, label: section.label() }))}
@@ -129,7 +132,7 @@ export function SettingsPage() {
         }}
       />
       <div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-y-auto">
-        <div className="flex max-w-[860px] flex-col gap-[26px] px-6 py-6">
+        <div className="flex max-w-[860px] flex-col gap-[26px] px-6 py-6 @max-[640px]/pane:px-4 @max-[640px]/pane:py-4">
           {SECTIONS.map(({ id, Body }) => (
             <Body key={id} />
           ))}
