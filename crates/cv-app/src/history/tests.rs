@@ -81,7 +81,13 @@ impl Lab {
         ] {
             let path = root.join(folder).join(&name);
             fs::create_dir_all(path.parent().unwrap()).unwrap();
-            fs::write(&path, name.as_bytes()).unwrap();
+            // An NFO is one CineVault wrote (it has a title), so the rename carries it.
+            let content = if kind == MediaFileType::Nfo {
+                format!("<movie><title>{name}</title></movie>")
+            } else {
+                name.clone()
+            };
+            fs::write(&path, content).unwrap();
             let mut file = MediaFile::new(kind, item.core.path.clone(), name);
             file.size_bytes = 10;
             item.core.media_files.push(file);
