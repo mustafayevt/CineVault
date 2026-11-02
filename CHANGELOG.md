@@ -2,6 +2,12 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.0] - unreleased
+
+### Fixed
+
+- Rename no longer gives a downloaded info file (a plain-text `.nfo` about the video, named like it) the movie's NFO name. Before, CineVault could then never write its own NFO for that movie, and when the movie already had one, the info file could push it into the trash. The info file now stays where it was under its own name.
+
 ## [1.4.0] - 2026-11-02
 
 ### Added

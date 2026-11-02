@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use cv_db::Database;
 use cv_db::repo::data_sources::insert_source;
-use cv_db::repo::{get_item, insert_item};
+use cv_db::repo::{get_item, insert_item, update_item};
 use cv_domain::{EpisodeNumber, Item, ItemDetail, ItemId, MediaFile, MediaFileType, SourceKind};
 use cv_rename::{Preset, RenameProfile};
 use tempfile::TempDir;
@@ -56,10 +56,20 @@ impl Lib {
         }
     }
 
+    /// A file on disk whose content is its path; an NFO is one CineVault wrote (it has a title).
     fn put(&self, rel: &str) {
+        let content = if rel.ends_with(".nfo") {
+            format!("<movie><title>{rel}</title></movie>")
+        } else {
+            rel.to_owned()
+        };
+        self.put_text(rel, &content);
+    }
+
+    fn put_text(&self, rel: &str, content: &str) {
         let path = self.root.join(rel);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, rel).unwrap();
+        fs::write(path, content).unwrap();
     }
 
     fn exists(&self, rel: &str) -> bool {
@@ -1189,6 +1199,121 @@ fn a_show_is_previewed_applied_and_undone_with_its_seasons_and_episodes() {
     let undone = lib.service.undo(&applied.batch_id.unwrap()).unwrap();
     assert!(undone.is_complete(), "{undone:?}");
     assert!(lib.exists("Show.Name.2020/S1/ep1.mkv"));
+}
+
+/// What a download's info file holds: plain text about the video, no NFO.
+const INFO_FILE: &str = "---GENERAL---\r\nCodec....: HEVC\r\nSubtitles: English, German\r\n";
+
+#[test]
+fn a_downloaded_info_file_keeps_its_name_and_leaves_the_nfo_name_free() {
+    let lib = Lib::new();
+    let base = "Der.Untergang.2004.2160p.UHD.BluRay-HDT";
+    let id = lib.movie("Der.Untergang.2004", base, "Downfall", 2004);
+    lib.put_text(&format!("Der.Untergang.2004/{base}.nfo"), INFO_FILE);
+
+    let applied = lib
+        .service
+        .apply(&ApplyRequest {
+            preview: lib.request(Scope::Everything),
+            include: ids(&[id]),
+        })
+        .unwrap();
+
+    assert_eq!(applied.done(), 1, "{applied:?}");
+    assert!(lib.exists("Downfall (2004)/Downfall (2004).mkv"));
+    // Left behind where it was, untouched.
+    let kept = lib.root.join(format!("Der.Untergang.2004/{base}.nfo"));
+    assert_eq!(fs::read_to_string(kept).unwrap(), INFO_FILE);
+    assert!(
+        !lib.exists("Downfall (2004)/Downfall (2004).nfo"),
+        "the NFO name is left for CineVault's NFO: {:?}",
+        walk(&lib.root)
+    );
+}
+
+#[test]
+fn a_newer_info_file_never_takes_the_place_of_cinevaults_nfo() {
+    let lib = Lib::new();
+    let id = lib.movie("heat.1995", "heat", "Heat", 1995);
+    lib.put_text("heat.1995/heat-info.nfo", INFO_FILE);
+    let mut item = lib.item(id);
+    let mut info = MediaFile::new(MediaFileType::Nfo, item.core.path.clone(), "heat-info.nfo");
+    // Newer than CineVault's NFO, so it would win as the newest NFO if it counted as one.
+    info.modified_ms = i64::MAX;
+    item.core.media_files.push(info);
+    lib.db.write(move |tx| update_item(tx, &item)).unwrap();
+
+    let applied = lib
+        .service
+        .apply(&ApplyRequest {
+            preview: lib.request(Scope::Everything),
+            include: ids(&[id]),
+        })
+        .unwrap();
+
+    assert_eq!(applied.done(), 1, "{applied:?}");
+    let nfo = fs::read_to_string(lib.root.join("Heat (1995)/Heat (1995).nfo")).unwrap();
+    assert!(nfo.contains("<title>"), "CineVault's NFO is carried: {nfo}");
+    let info = fs::read_to_string(lib.root.join("heat.1995/heat-info.nfo")).unwrap();
+    assert_eq!(info, INFO_FILE);
+}
+
+#[test]
+fn an_episode_info_file_keeps_its_name() {
+    let lib = Lib::new();
+    let source = lib.root_text();
+    let show_path = lib.root.join("Show.Name.2020");
+    let mut show = Item::show("Show Name");
+    mark_scraped(&mut show);
+    show.core.year = 2020;
+    show.core.ids.set("tvdb", "1");
+    show.core.last_scraper_id = "tvdb".to_owned();
+    show.core.data_source = source.clone();
+    show.core.path = show_path.to_string_lossy().into_owned();
+    let show_id = lib.db.write(move |tx| insert_item(tx, &show)).unwrap();
+
+    let mut episode = Item::episode(show_id, "Pilot");
+    episode.core.data_source = source;
+    episode.core.path = show_path.join("S1").to_string_lossy().into_owned();
+    if let ItemDetail::Episode(fields) = &mut episode.detail {
+        fields.numbers.set(EpisodeNumber::aired(1, 1));
+    }
+    lib.put("Show.Name.2020/S1/ep1.mkv");
+    lib.put_text("Show.Name.2020/S1/ep1.nfo", INFO_FILE);
+    for (name, kind) in [
+        ("ep1.mkv", MediaFileType::Video),
+        ("ep1.nfo", MediaFileType::Nfo),
+    ] {
+        episode
+            .core
+            .media_files
+            .push(MediaFile::new(kind, episode.core.path.clone(), name));
+    }
+    lib.db.write(move |tx| insert_item(tx, &episode)).unwrap();
+
+    let applied = lib
+        .service
+        .apply(&ApplyRequest {
+            preview: lib.request(Scope::Items(vec![show_id])),
+            include: ids(&[show_id]),
+        })
+        .unwrap();
+
+    assert_eq!(applied.done(), 1, "{applied:?}");
+    let files = walk(&lib.root);
+    assert!(
+        files
+            .iter()
+            .any(|f| f.ends_with("Season 01/Show Name - S01E01 - Pilot.mkv")),
+        "{files:?}"
+    );
+    assert!(
+        !files
+            .iter()
+            .any(|f| f.ends_with("Season 01/Show Name - S01E01 - Pilot.nfo")),
+        "the info file never takes the episode NFO's name: {files:?}"
+    );
+    assert!(files.iter().any(|f| f.ends_with("/ep1.nfo")), "{files:?}");
 }
 
 #[test]
