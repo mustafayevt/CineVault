@@ -276,6 +276,10 @@ export function ArtworkPicker({
         data-dragging={drop.over ? "true" : undefined}
         className={cx(
           "group relative flex min-h-0 flex-1",
+          // Narrow panes: the types run across the top; the preview sits beside the images on a
+          // tablet and under them, compact, on a phone.
+          "@max-[860px]/pane:grid @max-[860px]/pane:grid-cols-[minmax(0,1fr)_300px] @max-[860px]/pane:grid-rows-[auto_minmax(0,1fr)]",
+          "@max-[640px]/pane:grid-cols-1 @max-[640px]/pane:grid-rows-[auto_minmax(0,1fr)_auto]",
           "data-[art-over]:outline-2 data-[art-over]:-outline-offset-2 data-[art-over]:outline-gold",
           "data-[dragging=true]:outline-2 data-[dragging=true]:-outline-offset-2 data-[dragging=true]:outline-gold",
         )}
@@ -288,8 +292,8 @@ export function ArtworkPicker({
           currents={currents}
           width={batchMode ? 180 : 196}
         />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-[46px] shrink-0 items-center gap-2 border-b border-solid border-line-section px-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex h-[46px] shrink-0 items-center gap-2 border-b border-solid border-line-section px-6 @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:px-4 @max-[640px]/pane:py-2">
             <SegmentedControl<string>
               aria-label={t("artworkPicker.language")}
               value={language}
@@ -319,7 +323,7 @@ export function ArtworkPicker({
               </MenuRadioGroup>
             </Menu>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 @max-[640px]/pane:px-4">
             <div
               ref={gridRef}
               role="listbox"

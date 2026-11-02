@@ -67,7 +67,7 @@ function ThemePanel({ theme }: { theme: Theme }) {
       ref={setContainer}
       data-theme={theme}
       aria-label={label}
-      className="flex min-w-0 flex-col gap-8 rounded-(--r-14) bg-surface-window p-6 text-(length:--fs-13) text-text"
+      className="flex min-w-0 flex-col gap-8 rounded-(--r-14) bg-surface-window p-6 text-(length:--fs-13) text-text @max-[640px]/pane:p-2"
     >
       <GalleryThemeContext value={theme}>
         <FloatingContainerContext value={container}>
@@ -88,7 +88,7 @@ function ThemePanel({ theme }: { theme: Theme }) {
 export function GalleryPage() {
   return (
     <TooltipProvider>
-      <div className="flex min-h-full flex-col gap-8 bg-surface-window p-8 text-text">
+      <div className="flex min-h-full flex-col gap-8 bg-surface-window p-8 text-text @max-[640px]/pane:p-4">
         <header className="flex flex-col gap-1">
           <h1 className="m-0 text-(length:--fs-28) font-(weight:--fw-600)">Component gallery</h1>
           <p className="m-0 text-(length:--fs-13) text-text-2">

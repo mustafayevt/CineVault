@@ -124,7 +124,12 @@ export function LatestFeed({ view, onView, onSearch, onCount }: LatestFeedProps)
   // Before the first measure (and in tests without layout) hide what the panel repeats anyway.
   const hiddenColumns = useMemo(
     () =>
-      panelOpen ? (width > 0 ? columnsBesidePanel(width) : new Set(["source", "age"])) : undefined,
+      // A narrow pane lays the panel over the table, so the table keeps its columns.
+      panelOpen && !(width > 0 && width <= 860)
+        ? width > 0
+          ? columnsBesidePanel(width)
+          : new Set(["source", "age"])
+        : undefined,
     [panelOpen, width],
   );
   // Esc closes the details panel first (a menu that is open takes the key before it gets here).
@@ -256,7 +261,7 @@ export function LatestFeed({ view, onView, onSearch, onCount }: LatestFeedProps)
 
   return (
     <div data-testid="latest-feed" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-3 pb-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-3 pb-2 @max-[640px]/pane:px-4">
         <SegmentedControl
           aria-label={t("torrentsFeed.kind")}
           value={view.kind}
@@ -323,13 +328,13 @@ export function LatestFeed({ view, onView, onSearch, onCount }: LatestFeedProps)
           />
         </span>
       </div>
-      <div ref={area} className="flex min-h-0 flex-1">
+      <div ref={area} className="relative flex min-h-0 flex-1">
         <div aria-busy={feed.loading} className="flex min-h-0 min-w-0 flex-1 flex-col">
           {body}
           {feed.firstLoad || feed.rows.length === 0 ? null : (
             <div
               data-testid="feed-status"
-              className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-t border-solid border-line-section px-6 py-2 text-(length:--fs-12) text-text-muted"
+              className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-t border-solid border-line-section px-6 py-2 text-(length:--fs-12) text-text-muted @max-[640px]/pane:px-4"
             >
               {feed.loading ? (
                 <span role="status" className="flex items-center gap-1.5">

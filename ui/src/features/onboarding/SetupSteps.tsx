@@ -57,7 +57,10 @@ export function Stepper({ step }: { step: Step }) {
               >
                 {done ? <Icon icon={Check} size={12} /> : n}
               </span>
-              {t(STEP_LABELS[n])}
+              {/* A phone names only the step it is on; the others keep their number. */}
+              <span className={current ? undefined : "@max-[640px]/pane:sr-only"}>
+                {t(STEP_LABELS[n])}
+              </span>
               {done ? <span className="sr-only">{t("setup.step.done")}</span> : null}
             </span>
           </li>
@@ -194,6 +197,7 @@ export function FoldersStep({
         data-drop={over ? "over" : undefined}
         className={cx(
           "mx-[14px] mt-1.5 mb-4 flex h-16 items-center justify-center gap-2.5 rounded-(--r-10) border-[1.5px] border-dashed text-text-2",
+          "@max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:px-3 @max-[640px]/pane:py-3",
           over ? "border-gold bg-gold-tint" : "border-line-kbd",
         )}
       >
@@ -290,7 +294,7 @@ export function RatingsStep({
             key={row.id}
             className="flex flex-col gap-1.5 border-t border-solid border-line-row px-6 py-3.5"
           >
-            <div className="flex items-baseline gap-2">
+            <div className="flex flex-wrap items-baseline gap-2">
               <span className="font-(weight:--fw-600)">{row.name}</span>
               <Tag>{t("setup.ratings.optional")}</Tag>
               <span className="text-(length:--fs-12) text-text-muted">{t(row.adds)}</span>
@@ -363,7 +367,7 @@ export function NamingStep({
       <div
         role="group"
         aria-label={t("setup.naming.styles")}
-        className="grid grid-cols-3 gap-2.5 px-[14px] pb-3"
+        className="grid grid-cols-3 gap-2.5 px-[14px] pb-3 @max-[640px]/pane:grid-cols-1"
       >
         {profiles.map((profile) => {
           const on = profile.id === selected;

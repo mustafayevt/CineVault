@@ -67,7 +67,7 @@ function Notice() {
     <section
       aria-label={t("torrentsPage.region")}
       data-testid="torrents-page"
-      className="flex h-full min-h-0 flex-col gap-4 px-6 pt-4"
+      className="flex h-full min-h-0 flex-col gap-4 px-6 pt-4 @max-[640px]/pane:px-4"
     >
       <h1 className="sr-only">{t("torrentsPage.region")}</h1>
       <TorrentNotice />
@@ -321,7 +321,7 @@ function TorrentsContent() {
       className="relative flex h-full min-h-0 flex-col"
     >
       <h1 className="sr-only">{t("torrentsPage.region")}</h1>
-      <div className="relative flex shrink-0 flex-col gap-2.5 px-6 pt-4 pb-3">
+      <div className="relative flex shrink-0 flex-col gap-2.5 px-6 pt-4 pb-3 @max-[640px]/pane:px-4">
         <span
           aria-hidden="true"
           className="absolute right-0 bottom-0 left-0 h-px bg-line-section"
@@ -408,7 +408,13 @@ function TorrentsContent() {
             field.current?.focus();
           }}
         />
-        <div className={ref === null ? "hidden" : "flex h-6 items-center gap-1.5"}>
+        <div
+          className={
+            ref === null
+              ? "hidden"
+              : "flex h-6 items-center gap-1.5 @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:gap-y-2"
+          }
+        >
           <div
             role="group"
             aria-label={t("torrentsPage.chips")}
@@ -434,7 +440,7 @@ function TorrentsContent() {
               </Chip>
             ))}
           </div>
-          <span className="grow" />
+          <span className="grow @max-[640px]/pane:hidden" />
           {ownedLine}
         </div>
       </div>
@@ -453,7 +459,7 @@ function TorrentsContent() {
       </div>
       <p
         data-testid="torrent-responsibility"
-        className="m-0 shrink-0 border-t border-solid border-line-section px-6 py-1.5 text-(length:--fs-12) text-text-muted"
+        className="m-0 shrink-0 border-t border-solid border-line-section px-6 py-1.5 text-(length:--fs-12) text-text-muted @max-[640px]/pane:px-4"
       >
         {t("torrentsPage.responsibility")}
       </p>
