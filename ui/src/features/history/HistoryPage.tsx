@@ -57,6 +57,8 @@ function TitleLine({ title }: { title: HistoryTitle }) {
     <li
       className={cx(
         "grid grid-cols-[minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-2 font-mono text-(length:--fs-12) leading-6",
+        // A phone puts the new name under the old one.
+        "@max-[640px]/pane:grid-cols-[18px_minmax(0,1fr)] @max-[640px]/pane:gap-y-0",
         undone && "text-text-disabled line-through",
       )}
     >
@@ -66,7 +68,10 @@ function TitleLine({ title }: { title: HistoryTitle }) {
         </span>
       ) : (
         <>
-          <span className="cv-selectable truncate text-text-muted" title={title.before}>
+          <span
+            className="cv-selectable truncate text-text-muted @max-[640px]/pane:col-span-2"
+            title={title.before}
+          >
             {title.before === "" ? title.title : title.before}
           </span>
           <Icon icon={ArrowRight} size={12} className="text-text-muted" />
@@ -91,7 +96,7 @@ function Titles({ entry }: { entry: HistoryEntry }) {
   const shown = all && full.data !== undefined ? full.data : entry.preview;
   const more = entry.titles_total - entry.preview.length;
   return (
-    <div className="px-3 pt-0 pb-3 pl-14">
+    <div className="px-3 pt-0 pb-3 pl-14 @max-[640px]/pane:pl-12">
       <ul className="m-0 flex list-none flex-col p-0">
         {shown.map((title) => (
           <TitleLine key={title.id} title={title} />
@@ -230,10 +235,11 @@ function EntryRow({ entry }: { entry: HistoryEntry }) {
         undone && "text-text-disabled",
       )}
     >
-      <div className="grid min-h-[52px] grid-cols-[32px_minmax(0,1fr)_120px_120px] items-center gap-3 px-3">
+      <div className="grid min-h-[52px] grid-cols-[32px_minmax(0,1fr)_120px_120px] items-center gap-3 px-3 @max-[640px]/pane:grid-cols-[32px_minmax(0,1fr)_auto] @max-[640px]/pane:gap-x-2.5 @max-[640px]/pane:gap-y-0 @max-[640px]/pane:py-2">
         <span
           className={cx(
             "grid size-[30px] place-items-center rounded-(--r-6) bg-surface-active text-text-2",
+            "@max-[640px]/pane:row-span-2",
             permanent && "text-danger",
           )}
         >
@@ -257,10 +263,11 @@ function EntryRow({ entry }: { entry: HistoryEntry }) {
         ) : (
           <div className="min-w-0">{summary}</div>
         )}
-        <span className="text-right text-text-2">
+        {/* A phone shows the time under the summary, so the action keeps its room. */}
+        <span className="text-right text-text-2 @max-[640px]/pane:col-start-2 @max-[640px]/pane:row-start-2 @max-[640px]/pane:text-left @max-[640px]/pane:text-(length:--fs-12) @max-[640px]/pane:text-text-muted">
           {entry.at === null ? "" : format.time(entry.at)}
         </span>
-        <span className="justify-self-end">
+        <span className="justify-self-end @max-[640px]/pane:col-start-3 @max-[640px]/pane:row-span-2 @max-[640px]/pane:row-start-1">
           <ActionCell entry={entry} busy={busy} onUndo={undo} />
         </span>
       </div>
@@ -331,14 +338,17 @@ export function HistoryPage() {
   return (
     <section aria-label={t("history.region")} className="flex h-full min-h-0 flex-col">
       <h1 className="sr-only">{t("history.region")}</h1>
-      <div className="px-6">
-        <div className="flex h-12 items-center gap-2.5 border-b border-solid border-line-section">
-          <SegmentedControl<HistoryFilter>
-            aria-label={t("history.tabs")}
-            value={filter}
-            onChange={setFilter}
-            options={TABS.map((tab) => ({ value: tab.value, label: t(tab.label) }))}
-          />
+      <div className="px-6 @max-[640px]/pane:px-4">
+        <div className="flex h-12 items-center gap-2.5 border-b border-solid border-line-section @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:py-2">
+          {/* The tabs scroll sideways where they do not fit. */}
+          <div className="contents @max-[640px]/pane:block @max-[640px]/pane:max-w-full @max-[640px]/pane:overflow-x-auto @max-[640px]/pane:[scrollbar-width:none]">
+            <SegmentedControl<HistoryFilter>
+              aria-label={t("history.tabs")}
+              value={filter}
+              onChange={setFilter}
+              options={TABS.map((tab) => ({ value: tab.value, label: t(tab.label) }))}
+            />
+          </div>
           <span className="flex-1" />
           {bin.data !== null && bin.data !== undefined && (
             <span
@@ -351,7 +361,7 @@ export function HistoryPage() {
           )}
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-6 pb-4">
+      <div className="min-h-0 flex-1 overflow-auto px-6 pb-4 @max-[640px]/pane:px-4">
         {list.isPending ? (
           <div
             aria-busy="true"
