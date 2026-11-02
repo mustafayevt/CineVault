@@ -1,6 +1,8 @@
 import type { MovieDetail, MovieDetailBackend, NfoPreview } from "./detailBackend";
 import { syntheticLifecycle, syntheticScrapedLifecycle } from "../lifecycle/syntheticLifecycle";
 import { DetailRequestError } from "./detailBackend";
+import { copyFixtureAt } from "../copies/syntheticCopies";
+import type { CopyFixture } from "../copies/syntheticCopies";
 
 /**
  * A fixture movie for a plain browser (no desktop backend) and for tests. It is
@@ -578,6 +580,74 @@ export function syntheticStaleNfo(): NfoPreview {
   };
 }
 
+/**
+ * A movie of one of the pairs of copies (`syntheticCopies`): its own title, folder, file and
+ * streams, so the Movie page and its copy tabs agree.
+ */
+function syntheticCopy(movie: MovieDetail, copy: CopyFixture): MovieDetail {
+  const video = movie.videos[0];
+  if (video === undefined) return movie;
+  const name = copy.file.replace(/\.[^.]+$/, "");
+  const audio = copy.audio.split(" ").slice(0, -1).join(" ");
+  return {
+    ...movie,
+    title: copy.title,
+    year: copy.year,
+    edition: "",
+    media_source: copy.source,
+    collection: null,
+    folder: copy.folder,
+    tech: movie.tech.flatMap((fact) => {
+      if (fact.facet === "video_format") {
+        return [{ ...fact, label: copy.resolution, values: [copy.resolution] }];
+      }
+      if (fact.facet === "hdr_format") {
+        // The first HDR fact stands for all of the copy's formats.
+        return fact.values[0] !== "Dolby Vision"
+          ? []
+          : copy.hdrFormats.map((format) => ({ ...fact, label: format, values: [format] }));
+      }
+      if (fact.facet === "video_bitrate") {
+        const mbps = Math.round(copy.bitrateKbps / 1000);
+        return [{ ...fact, label: `${mbps} Mb/s`, number: copy.bitrateKbps }];
+      }
+      if (fact.facet === "audio_codec") return [{ ...fact, label: copy.audio, values: [audio] }];
+      if (fact.facet === "media_source") return [{ ...fact, label: copy.source }];
+      return [fact];
+    }),
+    source_label: copy.sourceLabel,
+    hero_audio:
+      movie.hero_audio === null
+        ? null
+        : { ...movie.hero_audio, label: copy.audio, codec: audio, channels: copy.audioChannels },
+    videos: [
+      {
+        ...video,
+        name: copy.file,
+        folder: copy.folder,
+        size_bytes: copy.sizeBytes,
+        duration_secs: copy.durationMinutes * 60,
+        streams: video.streams.map((stream, index) => {
+          if (stream.kind === "video") {
+            return {
+              ...stream,
+              width: copy.width,
+              height: copy.height,
+              bitrate_kbps: copy.bitrateKbps,
+              hdr: copy.hdrFormats,
+              hdr_details: copy.hdrFormats.length === 0 ? null : stream.hdr_details,
+            };
+          }
+          return index === 1 ? { ...stream, codec: audio, channels: copy.audioChannels } : stream;
+        }),
+      },
+    ],
+    files: movie.files.map((file) =>
+      file.kind === "nfo" ? { ...file, name: `${name}.nfo` } : file,
+    ),
+  };
+}
+
 /** A backend over the fixture movie. Watched changes are kept for the session. */
 export function createSyntheticDetailBackend(): MovieDetailBackend {
   let watched = false;
@@ -590,6 +660,8 @@ export function createSyntheticDetailBackend(): MovieDetailBackend {
     }
     const movie = { ...syntheticMovieDetail(), id, watched, play_count: playCount };
     if (id === "2") return syntheticMixedRatings(movie);
+    const copy = copyFixtureAt(Number(id) - 1);
+    if (copy !== undefined) return syntheticCopy(movie, copy);
     if (id === SYNTHETIC_NO_ARTWORK_ID) return syntheticNoArtwork(movie);
     return id === SYNTHETIC_LONG_FACTS_ID ? syntheticLongFacts(movie) : movie;
   };

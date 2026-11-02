@@ -107,6 +107,8 @@ interface TechnicalCardProps {
   read: MediaInfoRead;
   renamed: RenamedFrom | null;
   onUndoRename: () => void;
+  /** A movie with copies: the copy tabs in place of the title and the Copies row at the end. */
+  copies?: { tabs: ReactNode; actions: ReactNode } | null;
 }
 
 /**
@@ -125,6 +127,7 @@ export function TechnicalCard({
   read,
   renamed,
   onUndoRename,
+  copies = null,
 }: TechnicalCardProps) {
   const format = useFormat();
   const summary = techSummary(detail, format);
@@ -137,14 +140,18 @@ export function TechnicalCard({
   return (
     <Card className="overflow-hidden px-0 py-0" aria-label={t("movie.tech.title")}>
       <div className="flex items-center px-4 pt-3">
-        <SectionLabel className="mb-3 flex-1">{t("movie.tech.title")}</SectionLabel>
+        {copies === null ? (
+          <SectionLabel className="mb-3 flex-1">{t("movie.tech.title")}</SectionLabel>
+        ) : (
+          copies.tabs
+        )}
         <button
           type="button"
           aria-expanded={expanded}
           aria-controls={detailsId}
           data-tech-toggle=""
           onClick={onToggleDetails}
-          className="cv-link mb-3 inline-flex items-center gap-1 text-(length:--fs-12)"
+          className="cv-link mb-3 inline-flex shrink-0 items-center gap-1 text-(length:--fs-12) whitespace-nowrap"
         >
           {expanded ? t("movie.tech.hide") : t("movie.tech.showAll")}
           <Icon
@@ -271,6 +278,12 @@ export function TechnicalCard({
               {t("movie.tech.undo")}
             </Button>
           </div>
+        </SpecRow>
+      )}
+
+      {copies === null ? null : (
+        <SpecRow label={t("copies.tabs.row")} spec="copies">
+          {copies.actions}
         </SpecRow>
       )}
     </Card>
