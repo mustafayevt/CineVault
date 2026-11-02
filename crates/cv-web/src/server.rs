@@ -1469,6 +1469,7 @@ fn ui_mime(path: &str) -> &'static str {
         "js" => "text/javascript; charset=utf-8",
         "css" => "text/css; charset=utf-8",
         "json" => "application/json",
+        "webmanifest" => "application/manifest+json",
         "svg" => "image/svg+xml",
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -1534,6 +1535,19 @@ async fn read_ui_file(ui: &UiAssets, requested: &str) -> Option<(Vec<u8>, String
     }
 }
 
+/// The interface files with fixed names that a browser fetches without the session cookie: the
+/// icons, the manifest an installed app starts from (browsers fetch it without cookies), and
+/// `robots.txt`.
+const PUBLIC_FILES: [&str; 7] = [
+    "favicon.ico",
+    "favicon.svg",
+    "apple-touch-icon.png",
+    "icon-192.png",
+    "icon-512.png",
+    "manifest.webmanifest",
+    "robots.txt",
+];
+
 async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap) -> Response {
     let requested = uri.path().trim_start_matches('/');
     // Nothing but a plain relative path may reach the file system. `..`, an absolute path and a
@@ -1547,15 +1561,13 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
     {
         return StatusCode::NOT_FOUND.into_response();
     }
-    // Only the hashed build files are public; they hold no library data. Everything else needs
-    // a session, including a page opened by a deep link.
-    let is_asset = relative
+    // Only the hashed build files and the files that install the app are public; they hold no
+    // library data. Everything else needs a session, including a page opened by a deep link.
+    let is_hashed = relative
         .components()
         .next()
-        .is_some_and(|component| component.as_os_str() == "assets")
-        || requested == "favicon.ico"
-        || requested == "favicon.svg"
-        || requested == "robots.txt";
+        .is_some_and(|component| component.as_os_str() == "assets");
+    let is_asset = is_hashed || PUBLIC_FILES.contains(&requested);
     let session = if is_asset {
         None
     } else {
@@ -1582,15 +1594,19 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
             .map(|(_, session)| session.csrf.as_str())
             .unwrap_or("");
         let marker = format!(
-            "<script>window.__CINEVAULT_TRANSPORT__=\"server\";window.__CINEVAULT_CSRF__=\"{csrf}\";</script>"
+            "{install}<script>window.__CINEVAULT_TRANSPORT__=\"server\";window.__CINEVAULT_CSRF__=\"{csrf}\";</script>",
+            install = auth::INSTALL_HEAD,
         );
         let text = String::from_utf8_lossy(&body).replace("</head>", &format!("{marker}</head>"));
         body = text.into_bytes();
     }
     let cache = if is_index {
         "no-store"
-    } else if is_asset {
+    } else if is_hashed {
         "public, max-age=31536000, immutable"
+    } else if is_asset {
+        // The same name may hold a new file after an update, so for a day only.
+        "public, max-age=86400"
     } else {
         "no-store"
     };

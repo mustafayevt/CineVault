@@ -668,6 +668,84 @@ async fn the_embedded_interface_is_served_with_the_session_token() {
     services.shutdown();
 }
 
+/// The files a phone installs the app from are fetched without the session cookie, so they are
+/// public; the browser shell and the sign-in page link them, and nothing else becomes public.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_app_can_be_installed_from_a_browser() {
+    let dir = tempfile::tempdir().unwrap();
+    let services = boot(dir.path());
+    let mut state = web_state(&services, HostMode::Server, true, Vec::new());
+    state.ui = UiAssets::Embedded(Arc::new(|path: &str| match path {
+        "manifest.webmanifest" => Some(UiFile {
+            bytes: br#"{"name":"CineVault","display":"standalone"}"#.to_vec(),
+            mime: String::new(),
+        }),
+        "apple-touch-icon.png" | "icon-192.png" | "icon-512.png" => Some(UiFile {
+            bytes: b"png".to_vec(),
+            mime: "image/png".to_owned(),
+        }),
+        "assets/app.js" => Some(UiFile {
+            bytes: b"console.log(1)".to_vec(),
+            mime: "text/javascript".to_owned(),
+        }),
+        _ => Some(UiFile {
+            bytes: INDEX.as_bytes().to_vec(),
+            mime: "text/html".to_owned(),
+        }),
+    }));
+    set_password(&state);
+
+    let manifest = call(
+        &state,
+        "GET",
+        "/manifest.webmanifest",
+        "192.168.1.30",
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(manifest.status, StatusCode::OK);
+    assert!(manifest.body.contains("standalone"));
+    assert_eq!(
+        manifest.headers[header::CONTENT_TYPE],
+        "application/manifest+json"
+    );
+    // Not hashed, so a new version reaches the phone within a day.
+    assert_eq!(
+        manifest.headers[header::CACHE_CONTROL],
+        "public, max-age=86400"
+    );
+    for icon in ["/apple-touch-icon.png", "/icon-192.png", "/icon-512.png"] {
+        let answer = call(&state, "GET", icon, "192.168.1.30", &[], None).await;
+        assert_eq!(answer.status, StatusCode::OK, "{icon}");
+        assert_eq!(answer.body, "png", "{icon}");
+    }
+    let script = call(&state, "GET", "/assets/app.js", "192.168.1.30", &[], None).await;
+    assert_eq!(
+        script.headers[header::CACHE_CONTROL],
+        "public, max-age=31536000, immutable"
+    );
+    // Any other file still needs a session.
+    let other = call(&state, "GET", "/icon-1024.png", "192.168.1.30", &[], None).await;
+    assert_eq!(other.status, StatusCode::SEE_OTHER);
+
+    let login = call(&state, "GET", "/login", "192.168.1.30", &[], None).await;
+    assert!(login.body.contains(auth::INSTALL_HEAD));
+    let (cookie, _) = signed_in(&state).await;
+    let page = call(
+        &state,
+        "GET",
+        "/",
+        "192.168.1.30",
+        &[("cookie", &cookie)],
+        None,
+    )
+    .await;
+    assert!(page.body.contains(auth::INSTALL_HEAD));
+    assert!(page.body.contains("__CINEVAULT_TRANSPORT__=\"server\""));
+    services.shutdown();
+}
+
 /// An invoke without `Origin` (a client that is not a browser) is judged by the CSRF token alone;
 /// one with a foreign `Origin` is refused even with the token.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

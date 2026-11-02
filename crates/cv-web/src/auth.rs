@@ -34,6 +34,22 @@ pub const SESSIONS_FILE: &str = "server-sessions.json";
 /// The file the password-reset PIN is written to, inside the data folder.
 pub const PIN_FILE: &str = "password-reset-pin.txt";
 const VERSION: u32 = 1;
+
+/// The head tags that let a phone or a browser install CineVault as an app (Add to Home Screen
+/// on iOS, Install app on Android and desktop browsers): the manifest, the icons, the full-screen
+/// mode and the colour of the window ground. The browser shell and the server's own pages carry
+/// them, since people often add the app from the sign-in page.
+pub const INSTALL_HEAD: &str = concat!(
+    r#"<link rel="manifest" href="/manifest.webmanifest">"#,
+    r#"<link rel="icon" href="/favicon.svg" type="image/svg+xml">"#,
+    r#"<link rel="apple-touch-icon" href="/apple-touch-icon.png">"#,
+    r#"<meta name="mobile-web-app-capable" content="yes">"#,
+    r#"<meta name="apple-mobile-web-app-capable" content="yes">"#,
+    r#"<meta name="apple-mobile-web-app-status-bar-style" content="black">"#,
+    r#"<meta name="apple-mobile-web-app-title" content="CineVault">"#,
+    r##"<meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">"##,
+    r##"<meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)">"##,
+);
 /// A setup claim that is not used for this long lapses, so an abandoned tab cannot hold setup.
 const CLAIM_LAPSE: Duration = Duration::from_secs(30 * 60);
 const SESSION_IDLE: Duration = Duration::from_secs(30 * 24 * 60 * 60);
@@ -1064,7 +1080,7 @@ pub fn login_page(plain_http: bool, host: &HostMode) -> String {
         r#"<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sign in to CineVault</title>
-<style>{style}</style></head>
+{install}<style>{style}</style></head>
 <body><main>
 <div class="mark">CineVault</div>
 <h1>Sign in</h1>
@@ -1096,6 +1112,7 @@ form.onsubmit = async (event) => {{
 {reset_script}
 </script>
 </body></html>"#,
+        install = INSTALL_HEAD,
         style = PAGE_STYLE,
         warning = match host {
             HostMode::Desktop { .. } if plain_http => DESKTOP_PLAIN_HTTP,
@@ -1121,13 +1138,14 @@ pub fn away_page() -> String {
         r#"<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Finish setup from your home network</title>
-<style>{style}</style></head>
+{install}<style>{style}</style></head>
 <body><main>
 <div class="mark">CineVault</div>
 <h1>Finish setup from your home network</h1>
 <p class="lead">This server has no password yet. For safety, the password can only be created from a browser on the same computer or the same home network as the server.</p>
 <p class="hint">Or run <code>cinevault-server passwd</code> on the server.</p>
 </main></body></html>"#,
+        install = INSTALL_HEAD,
         style = PAGE_STYLE
     )
 }
@@ -1137,7 +1155,7 @@ pub fn setup_page(plain_http: bool) -> String {
         r#"<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Welcome to CineVault</title>
-<style>{style}</style></head>
+{install}<style>{style}</style></head>
 <body><main>
 <div class="mark">CineVault</div>
 <h1>Welcome</h1>
@@ -1173,6 +1191,7 @@ form.onsubmit = async (event) => {{
 }};
 </script>
 </body></html>"#,
+        install = INSTALL_HEAD,
         style = PAGE_STYLE,
         warning = plain_http_warning(plain_http),
         safe_next = SAFE_NEXT
@@ -1487,6 +1506,23 @@ mod tests {
         for page in [login_page(false, &HostMode::Server), setup_page(false)] {
             assert!(page.contains("target.origin === location.origin"));
             assert!(!page.contains("startsWith('//')"));
+        }
+    }
+
+    #[test]
+    fn every_server_page_can_install_the_app() {
+        let desktop = HostMode::Desktop {
+            computer: "STUDY-PC".to_owned(),
+        };
+        for page in [
+            login_page(true, &HostMode::Server),
+            login_page(false, &desktop),
+            setup_page(false),
+            away_page(),
+        ] {
+            let head = page.split("</head>").next().unwrap();
+            assert!(head.contains(INSTALL_HEAD));
+            assert!(head.contains(r#"rel="manifest" href="/manifest.webmanifest""#));
         }
     }
 
