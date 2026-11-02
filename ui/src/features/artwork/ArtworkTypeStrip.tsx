@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
@@ -33,8 +35,11 @@ export function ArtworkTypeStrip({
   return (
     <nav
       aria-label={t("artworkPicker.types")}
-      style={{ width }}
-      className="flex shrink-0 flex-col gap-0.5 border-r border-solid border-line-section px-2 py-3"
+      style={{ "--strip-w": `${width}px` } as CSSProperties}
+      className={cx(
+        "flex w-(--strip-w) shrink-0 flex-col gap-0.5 border-r border-solid border-line-section px-2 py-3",
+        "@max-[860px]/pane:col-span-full @max-[860px]/pane:w-full @max-[860px]/pane:flex-row @max-[860px]/pane:gap-1 @max-[860px]/pane:overflow-x-auto @max-[860px]/pane:[scrollbar-width:thin] @max-[860px]/pane:border-r-0 @max-[860px]/pane:border-b @max-[860px]/pane:px-4 @max-[860px]/pane:py-2",
+      )}
     >
       {slots.map((slot) => {
         const on = slot === active;
@@ -49,6 +54,7 @@ export function ArtworkTypeStrip({
             onClick={() => onSelect(slot)}
             className={cx(
               "cv-hoverable flex h-10 w-full items-center gap-2.5 rounded-(--r-6) border-0 px-2.5 text-left",
+              "@max-[860px]/pane:w-auto @max-[860px]/pane:shrink-0",
               "text-(length:--fs-13)",
               on
                 ? "bg-surface-active font-(weight:--fw-600) text-text shadow-[inset_2px_0_0_var(--gold)]"
@@ -65,7 +71,9 @@ export function ArtworkTypeStrip({
                 <DetailImage image={current.image} size="list" className="object-cover" />
               )}
             </span>
-            <span className="min-w-0 flex-1 truncate">{typeName(slot)}</span>
+            <span className="min-w-0 flex-1 truncate @max-[860px]/pane:flex-none">
+              {typeName(slot)}
+            </span>
             <span
               className="min-w-[2ch] text-right text-(length:--fs-12) font-normal text-text-muted tabular-nums"
               aria-label={

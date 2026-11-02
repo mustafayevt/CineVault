@@ -163,10 +163,10 @@ export function RenamePage() {
   return (
     <section aria-label={t("renamePage.region")} className="relative flex h-full min-h-0 flex-col">
       <h1 className="sr-only">{t("renamePage.region")}</h1>
-      <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6">
+      <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6 @max-[640px]/pane:px-4">
         <span
           aria-hidden="true"
-          className="absolute right-6 bottom-0 left-6 h-px bg-line-section"
+          className="absolute right-6 bottom-0 left-6 h-px bg-line-section @max-[640px]/pane:right-4 @max-[640px]/pane:left-4"
         />
         <SegmentedControl<Family>
           aria-label={t("renamePage.tabs")}
@@ -183,7 +183,8 @@ export function RenamePage() {
         />
         <span className="grow" />
         {patternsOf === null ? null : (
-          <>
+          // A phone has no room for the patterns; Edit in Settings shows them.
+          <span className="contents @max-[640px]/pane:hidden">
             <Pattern
               label={t("renamePage.folder")}
               text={family === "movies" ? patternsOf.movie_folder : patternsOf.show_folder}
@@ -193,7 +194,7 @@ export function RenamePage() {
               label={t("renamePage.file")}
               text={family === "movies" ? patternsOf.movie_file : patternsOf.episode_file}
             />
-          </>
+          </span>
         )}
         <Link
           to="/settings"
@@ -230,7 +231,7 @@ export function RenamePage() {
       ) : (
         <>
           <div
-            className={`grid h-[30px] shrink-0 items-center border-b border-solid border-line-section px-6 text-(length:--fs-12) font-(weight:--fw-600) text-text-muted ${ROW_COLUMNS}`}
+            className={`grid h-[30px] shrink-0 items-center border-b border-solid border-line-section px-6 text-(length:--fs-12) font-(weight:--fw-600) text-text-muted @max-[860px]/pane:gap-x-2 @max-[640px]/pane:px-4 ${ROW_COLUMNS}`}
           >
             <span>
               <Checkbox
@@ -242,7 +243,7 @@ export function RenamePage() {
               />
             </span>
             <span>{t("renamePage.col.title")}</span>
-            <span>{t("renamePage.col.now")}</span>
+            <span className="@max-[860px]/pane:hidden">{t("renamePage.col.now")}</span>
             <span className="text-right">{t("renamePage.col.files")}</span>
           </div>
           <div ref={scroller} className="min-h-0 flex-1 overflow-auto">

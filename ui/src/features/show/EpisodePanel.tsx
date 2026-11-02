@@ -122,8 +122,10 @@ export function EpisodePanel({ episodeId, showId }: EpisodePanelProps) {
 
   return (
     <div data-testid="episode-panel" data-show={showId} className="px-4 pb-4">
-      <div className="flex gap-5 pt-4">
-        <div className="relative aspect-video w-[240px] shrink-0 overflow-hidden rounded-(--r-10) bg-surface-raised">
+      {/* Narrow panes: a smaller still and one fact per row; on a phone the still, the facts and
+          the buttons stack. */}
+      <div className="flex gap-5 pt-4 @max-[640px]/pane:flex-col @max-[640px]/pane:gap-4">
+        <div className="relative aspect-video w-[240px] shrink-0 overflow-hidden rounded-(--r-10) bg-surface-raised @max-[860px]/pane:w-[180px] @max-[640px]/pane:w-full">
           {detail.thumb === null ? (
             <PlaceholderStill title={detail.show_title} index={detail.number} />
           ) : (
@@ -134,7 +136,7 @@ export function EpisodePanel({ episodeId, showId }: EpisodePanelProps) {
           <p className="m-0 leading-[1.55]">
             {detail.plot === "" ? t("show.episode.noPlot") : detail.plot}
           </p>
-          <dl className="m-0 grid grid-cols-[96px_minmax(0,1fr)_96px_minmax(0,1fr)] gap-x-3 gap-y-[5px]">
+          <dl className="m-0 grid grid-cols-[96px_minmax(0,1fr)_96px_minmax(0,1fr)] gap-x-3 gap-y-[5px] @max-[860px]/pane:grid-cols-[96px_minmax(0,1fr)]">
             <Fact label={t("show.episode.directed")}>{format.list(detail.directors) || "–"}</Fact>
             <Fact label={t("show.episode.written")}>{format.list(detail.writers) || "–"}</Fact>
             <Fact label={t("movie.tech.video")}>{videoLine(detail) || "–"}</Fact>
@@ -165,7 +167,7 @@ export function EpisodePanel({ episodeId, showId }: EpisodePanelProps) {
             </div>
           )}
         </div>
-        <div className="flex w-[132px] shrink-0 flex-col gap-1.5">
+        <div className="flex w-[132px] shrink-0 flex-col gap-1.5 @max-[640px]/pane:w-full @max-[640px]/pane:flex-row @max-[640px]/pane:flex-wrap @max-[640px]/pane:items-center">
           <Button
             size="sm"
             icon={Play}

@@ -107,6 +107,7 @@ export function DriveCard({ drive, selected, now, onSelect, onEmpty }: DriveCard
       onKeyDown={onKeyDown}
       className={cx(
         "cv-hoverable flex w-full cursor-pointer flex-col gap-[9px] overflow-hidden rounded-(--r-10)",
+        "@max-[860px]/pane:w-[310px] @max-[860px]/pane:shrink-0 @max-[640px]/pane:w-[86%]",
         "border border-solid border-line-section px-3.5 pt-3.5 pb-3 text-left",
         selected
           ? "bg-surface-raised shadow-[inset_2px_0_0_var(--gold)]"

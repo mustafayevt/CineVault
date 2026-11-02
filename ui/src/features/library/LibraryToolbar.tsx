@@ -6,6 +6,7 @@ import { Menu, MenuRadioGroup, MenuRadioItem } from "../../components/Menu";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { cx } from "../../lib/cx";
 import { ReloadMediaInfoButton } from "../mediainfo/ReloadMediaInfoButton";
 import type { LibrarySortKey } from "./libraryBackend";
 import { SORT_CHOICES, SORT_KEYS, SORT_LABEL, sortChoiceOf } from "./sortChoices";
@@ -14,12 +15,15 @@ import type { LibraryType, LibraryView } from "./libraryStore";
 import type { PosterSize } from "./gridGeometry";
 import { LibraryColumnItems } from "./LibraryColumnItems";
 import type { ColumnChoice } from "./LibraryColumnItems";
+import type { PaneFit } from "./usePaneFit";
 
 interface LibraryToolbarProps {
   type: LibraryType;
   /** The three counts of the type switch; undefined while unknown. */
   counts: { movies?: number; tv?: number; collections?: number };
   onType: (type: LibraryType) => void;
+  /** How much room the pane has; on a phone the table view sorts from the sort menu too. */
+  fit?: PaneFit;
   view: LibraryView;
   onView: (view: LibraryView) => void;
   /** How wide the grid's posters are; the control shows only in the grid view. */
@@ -38,12 +42,15 @@ interface LibraryToolbarProps {
  * The toolbar: the Movies | TV shows | Collections
  * switch with counts, then at the right the sort menu (grid) or the Columns menu (table), the
  * grid and table switch, Reload media info and the scan button. 48px high with the section hairline under it, on the
- * 24px content inset, controls on one centre line.
+ * 24px content inset, controls on one centre line. In a phone-wide pane it takes two rows: the type
+ * switch across the width, then the sort menu at the left and the view switch and buttons at the
+ * right; the poster size gives way there (two posters fill the row at any size but L).
  */
 export function LibraryToolbar({
   type,
   counts,
   onType,
+  fit = "wide",
   view,
   onView,
   posterSize,
@@ -60,14 +67,22 @@ export function LibraryToolbar({
     value === undefined ? undefined : format.number(value);
   const choice = sortChoiceOf(sort);
   const titles = type !== "collections";
+  // On a phone the table keeps only the title, quality and stage: the sort menu sorts by the rest.
+  const sortMenu = titles && (view === "grid" || fit === "phone");
   return (
-    <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6">
+    <div
+      className={cx(
+        "relative flex h-12 shrink-0 items-center gap-2.5 px-6",
+        "@max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:gap-y-2 @max-[640px]/pane:py-2",
+      )}
+    >
       {/* The section hairline starts and ends at the content inset. */}
       <span aria-hidden="true" className="absolute right-6 bottom-0 left-6 h-px bg-line-section" />
       <SegmentedControl<LibraryType>
         aria-label={t("library.type.label")}
         value={type}
         onChange={onType}
+        className="@max-[640px]/pane:flex @max-[640px]/pane:w-full @max-[640px]/pane:[&>button]:flex-1"
         options={[
           { value: "movies", label: t("library.type.movies"), count: count(counts.movies) },
           { value: "tv", label: t("library.type.tv"), count: count(counts.tv) },
@@ -78,9 +93,9 @@ export function LibraryToolbar({
           },
         ]}
       />
-      <span className="grow" />
+      <span className="grow @max-[640px]/pane:hidden" />
 
-      {titles && view === "grid" && (
+      {sortMenu && (
         <Menu
           align="end"
           aria-label={t("library.sortBy.label")}
@@ -102,7 +117,7 @@ export function LibraryToolbar({
           </MenuRadioGroup>
         </Menu>
       )}
-      {titles && view === "table" && (
+      {titles && view === "table" && !sortMenu && (
         <Menu
           align="end"
           aria-label={t("library.columns.label")}
@@ -123,10 +138,14 @@ export function LibraryToolbar({
 
       {titles && (
         <>
-          <span aria-hidden="true" className="h-[18px] w-px bg-line-section" />
+          <span
+            aria-hidden="true"
+            className="h-[18px] w-px bg-line-section @max-[640px]/pane:ml-auto"
+          />
           {view === "grid" && (
             <SegmentedControl<PosterSize>
               aria-label={t("library.posterSize.label")}
+              className="@max-[640px]/pane:hidden"
               value={posterSize}
               onChange={onPosterSize}
               options={[
@@ -153,6 +172,7 @@ export function LibraryToolbar({
         aria-label={t("library.scan")}
         disabled={scanning}
         onClick={onScan}
+        {...(titles ? {} : { className: "@max-[640px]/pane:ml-auto" })}
       />
     </div>
   );

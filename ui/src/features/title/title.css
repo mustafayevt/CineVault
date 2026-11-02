@@ -130,3 +130,10 @@
     transition-duration: 0s !important;
   }
 }
+/* Narrow panes (phones and tablets, where a touch has no hover): the artwork buttons stay visible,
+   so a tap reaches them. The desktop pane is never this narrow. */
+@container pane (max-width: 860px) {
+  .cv-art-btn {
+    opacity: 1;
+  }
+}

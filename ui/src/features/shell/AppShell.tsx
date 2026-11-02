@@ -2,6 +2,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { MotionConfig } from "motion/react";
 import { useMemo } from "react";
 
+import { cx } from "../../lib/cx";
 import { WhatsNewCard } from "../changelog/WhatsNewCard";
 import { useWhatsNew } from "../changelog/useWhatsNew";
 import { DeleteConfirmDialog } from "../delete/DeleteConfirmDialog";
@@ -28,8 +29,10 @@ import { BACKDROP_SLOT_ID } from "../title/backdropSlot";
 import { useDesktopGuards } from "./desktopGuards";
 import { detectPlatform } from "./platform";
 import type { Platform } from "./platform";
+import { NavDrawer } from "./NavDrawer";
 import { SidebarPanel } from "./SidebarPanel";
 import { TitleBar } from "./TitleBar";
+import { useCompactLayout, useTouchTargets } from "./useCompactLayout";
 import { useNavigationHistory } from "./useNavigationHistory";
 import { useShellDemo } from "./shellDemo";
 import { usePageScrollReset } from "./usePageScrollReset";
@@ -57,6 +60,10 @@ interface AppShellProps {
  * ground with an equal 8px gutter above, left of and below it and 8px to the content; the title
  * bar and the page sit flat on the ground in the column to its right. Pages cross-fade
  * (`.cv-page`) when the address changes page, and toasts stack at the bottom right.
+ *
+ * In the browser version on a phone or tablet (narrower than 1024px) the compact layout takes
+ * over: no panel, the title bar holds the menu button that opens the panel as a drawer, and the
+ * frame keeps clear of the notch and the home indicator (`env(safe-area-inset-*)`).
  */
 export function AppShell({ platform = defaultPlatform, windowApi }: AppShellProps) {
   useJobProgressStream();
@@ -81,12 +88,19 @@ export function AppShell({ platform = defaultPlatform, windowApi }: AppShellProp
   const motion = useSetting<MotionPreference>("appearance.motion");
   const api = useMemo(() => (windowApi === undefined ? tauriWindowApi() : windowApi), [windowApi]);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const compact = useCompactLayout();
+  useTouchTargets();
   return (
     <MotionConfig reducedMotion={MOTION_CONFIG[motion]}>
       <div
         data-platform={platform}
         data-testid="app-frame"
-        className="relative flex h-full bg-surface-window text-text"
+        data-layout={compact ? "compact" : "full"}
+        className={cx(
+          "relative flex h-full bg-surface-window text-text",
+          compact &&
+            "pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]",
+        )}
       >
         {/* The layer title pages draw their hero backdrop into: it bleeds under the panel and the
             title bar, and the panel and the column paint above it. */}
@@ -95,11 +109,15 @@ export function AppShell({ platform = defaultPlatform, windowApi }: AppShellProp
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden"
         />
-        <div className="relative flex shrink-0 p-(--gutter)">
-          <SidebarPanel platform={platform} />
-        </div>
+        {compact ? (
+          <NavDrawer platform={platform} />
+        ) : (
+          <div className="relative flex shrink-0 p-(--gutter)">
+            <SidebarPanel platform={platform} />
+          </div>
+        )}
         <div className="relative flex min-w-0 flex-1 flex-col">
-          <TitleBar platform={platform} windowApi={api} />
+          <TitleBar platform={platform} windowApi={api} compact={compact} />
           {/* The one main landmark: every page renders inside it, flat on the window ground.
               It is the containing block for positioned content, so nothing inside a page can
               stretch the window past its height. */}

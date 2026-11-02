@@ -135,6 +135,23 @@
   --lift: -2px;
 }
 
+/* Touch sizes (spec ui-design-system "Touch targets"): the browser version on a touch screen
+   (`data-touch`, set by the shell) raises the control heights: small buttons, segments and chips
+   to 36px, buttons to 40px, and nav rows, menu items, fields and large buttons to 44px. */
+:root[data-touch="true"] {
+  --h-btn-sm: 36px;
+  --h-btn: 40px;
+  --h-btn-lg: 44px;
+  --h-field: 44px;
+  --h-search: 44px;
+  --h-seg: 36px;
+  --h-chip: 36px;
+  --h-nav: 44px;
+  --h-row: 48px;
+  --h-thead: 36px;
+  --h-menu-item: 44px;
+}
+
 /* Tailwind utilities: bg-surface-card, text-text-muted, border-line-edge, bg-gold ... follow the
    active theme. */
 

@@ -15,6 +15,7 @@ import { useListSelection } from "../../components/useListSelection";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
+import { usePaneWidth } from "../../lib/usePaneWidth";
 import { sourceText, tierOf } from "./releaseSort";
 import { copyMagnet, openRelease } from "./torrentActions";
 import type { SourceInfo, TorrentRelease } from "./torrentBackend";
@@ -59,6 +60,17 @@ interface ReleaseTableProps {
 /** The actions column fits its buttons at every window width: they never shrink or clip. */
 export const SEND_COLUMN_WIDTH = 116;
 export const ACTIONS_COLUMN_WIDTH = 148;
+
+/** Below this pane width (a tablet) the source and age are left out; the release says them. */
+const NARROW_PANE = 860;
+/** Below this one (a phone) the quality moves into the name and the seeders go too. */
+const PHONE_PANE = 640;
+const NARROW_HIDDEN: readonly string[] = ["source", "age"];
+const PHONE_HIDDEN: readonly string[] = ["quality", "seeders", "source", "age"];
+/** The actions column of a phone: the Send icon alone. */
+const PHONE_ACTIONS_WIDTH = 52;
+/** A phone row holds the name over its marks. */
+const PHONE_ROW_HEIGHT = 52;
 
 /** How a release compares with the copy the library holds, or null when there is none. */
 function Compare({ release, owned }: { release: TorrentRelease; owned: OwnedCopy | null }) {
@@ -105,6 +117,9 @@ export function ReleaseTable({
   storageKey = "torrent-releases",
 }: ReleaseTableProps) {
   const format = useFormat();
+  const { ref: frame, width: pane } = usePaneWidth();
+  const narrow = pane !== null && pane <= NARROW_PANE;
+  const phone = pane !== null && pane < PHONE_PANE;
   const keys = useMemo(() => releases.map((release) => release.id), [releases]);
   const byId = useMemo(() => new Map(releases.map((release) => [release.id, release])), [releases]);
   const open = useCallback(
@@ -159,15 +174,29 @@ export function ReleaseTable({
         width: 200,
         minWidth: 160,
         grow: true,
-        cell: (release) => (
-          <span className="flex min-w-0 items-center">
-            <span className="cv-selectable min-w-0 truncate font-mono text-(length:--fs-13)">
-              {release.name}
+        cell: (release) =>
+          phone ? (
+            // A phone has no room for a line of marks after the name: they go under it, after
+            // the quality.
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="cv-selectable min-w-0 truncate font-mono text-(length:--fs-13)">
+                {release.name}
+              </span>
+              <span className="flex min-w-0 items-center overflow-hidden">
+                <QualityBadge quality={tierOf(release)} />
+                {nameExtra?.(release)}
+                <Compare release={release} owned={owned} />
+              </span>
             </span>
-            {nameExtra?.(release)}
-            <Compare release={release} owned={owned} />
-          </span>
-        ),
+          ) : (
+            <span className="flex min-w-0 items-center">
+              <span className="cv-selectable min-w-0 truncate font-mono text-(length:--fs-13)">
+                {release.name}
+              </span>
+              {nameExtra?.(release)}
+              <Compare release={release} owned={owned} />
+            </span>
+          ),
       },
       {
         id: "size",
@@ -218,7 +247,11 @@ export function ReleaseTable({
         id: "actions",
         label: t("torrentsPage.actions"),
         header: <span className="sr-only">{t("torrentsPage.actions")}</span>,
-        width: onDetails === undefined ? SEND_COLUMN_WIDTH : ACTIONS_COLUMN_WIDTH,
+        width: phone
+          ? PHONE_ACTIONS_WIDTH + (onDetails === undefined ? 0 : 36)
+          : onDetails === undefined
+            ? SEND_COLUMN_WIDTH
+            : ACTIONS_COLUMN_WIDTH,
         resizable: false,
         fixed: true,
         bare: true,
@@ -252,21 +285,37 @@ export function ReleaseTable({
               }}
               onDoubleClick={(event) => event.stopPropagation()}
             >
-              {t("torrentsPage.send.short")}
+              {phone ? null : t("torrentsPage.send.short")}
             </Button>
           </span>
         ),
       },
     ],
-    [owned, sources, format, onDetails, qualitySortable, nameExtra],
+    [owned, sources, format, onDetails, qualitySortable, nameExtra, phone],
   );
-  const shownColumns = useMemo(
-    () =>
-      hiddenColumns === undefined
-        ? columns
-        : columns.filter((column) => !hiddenColumns.has(column.id)),
-    [columns, hiddenColumns],
-  );
+  const shownColumns = useMemo(() => {
+    const kept = columns.filter(
+      (column) =>
+        hiddenColumns?.has(column.id) !== true &&
+        !(phone ? PHONE_HIDDEN : narrow ? NARROW_HIDDEN : []).includes(column.id),
+    );
+    if (!narrow || pane === null) return kept;
+    // A narrow pane starts the name at the room the others leave (it still grows), so the table
+    // never scrolls sideways.
+    const others = kept.reduce(
+      (sum, column) => (column.id === "name" ? sum : sum + column.width),
+      0,
+    );
+    return kept.map((column) =>
+      column.id === "name"
+        ? {
+            ...column,
+            minWidth: phone ? 120 : (column.minWidth ?? 0),
+            width: Math.min(column.width, Math.max(phone ? 120 : 160, pane - others - 24)),
+          }
+        : column,
+    );
+  }, [columns, hiddenColumns, narrow, phone, pane]);
 
   const menu = (
     <>
@@ -304,18 +353,22 @@ export function ReleaseTable({
   );
 
   return (
-    <Table
-      aria-label={ariaLabel}
-      rows={releases}
-      rowKey={(release) => release.id}
-      columns={shownColumns}
-      selection={selection}
-      storageKey={storageKey}
-      {...(onVisibleRange === undefined ? {} : { onVisibleRange })}
-      sort={sort}
-      onSortChange={onSort}
-      menu={menu}
-      className="min-h-0 flex-1"
-    />
+    // The frame only tells the pane width; it takes no room of its own.
+    <div ref={frame} className="contents">
+      <Table
+        aria-label={ariaLabel}
+        rows={releases}
+        rowKey={(release) => release.id}
+        columns={shownColumns}
+        selection={selection}
+        storageKey={storageKey}
+        {...(phone ? { rowHeight: PHONE_ROW_HEIGHT } : {})}
+        {...(onVisibleRange === undefined ? {} : { onVisibleRange })}
+        sort={sort}
+        onSortChange={onSort}
+        menu={menu}
+        className="min-h-0 flex-1"
+      />
+    </div>
   );
 }

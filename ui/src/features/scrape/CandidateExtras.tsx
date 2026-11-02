@@ -81,7 +81,7 @@ export function CandidateExtras({ rows }: CandidateExtrasProps) {
     <div className="flex flex-col gap-4" data-testid="candidate-extras">
       {filled(tagline) ? <p className="m-0 text-text-muted italic">{tagline.incoming}</p> : null}
       {facts.length > 0 ? (
-        <dl className="m-0 grid max-w-[880px] grid-cols-[110px_minmax(0,1fr)_110px_minmax(0,1fr)] gap-x-3 gap-y-[9px]">
+        <dl className="m-0 grid max-w-[880px] grid-cols-[110px_minmax(0,1fr)_110px_minmax(0,1fr)] gap-x-3 gap-y-[9px] @max-[640px]/pane:grid-cols-[96px_minmax(0,1fr)]">
           {facts.map((row) => (
             <div key={row.field} className="contents">
               <dt className="text-text-muted">{fieldLabel(row.field)}</dt>

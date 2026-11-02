@@ -66,7 +66,10 @@ export function DrivesPage() {
         })();
 
   return (
-    <section aria-label={t("drivesPage.region")} className="relative flex h-full min-h-0">
+    <section
+      aria-label={t("drivesPage.region")}
+      className="relative flex h-full min-h-0 @max-[860px]/pane:flex-col"
+    >
       <h1 className="sr-only">{t("drivesPage.region")}</h1>
       {overview.isPending ? (
         <div
@@ -89,7 +92,7 @@ export function DrivesPage() {
           <div
             role="group"
             aria-label={t("drivesPage.cards")}
-            className="flex w-[380px] shrink-0 flex-col gap-2.5 overflow-y-auto border-r border-solid border-line-section px-6 py-4"
+            className="flex w-[380px] shrink-0 flex-col gap-2.5 overflow-y-auto border-r border-solid border-line-section px-6 py-4 @max-[860px]/pane:w-full @max-[860px]/pane:overflow-visible @max-[860px]/pane:border-r-0 @max-[860px]/pane:border-b @max-[860px]/pane:pb-3 @max-[640px]/pane:px-4"
           >
             <div className="flex items-center gap-2">
               <span className="type-section-label grow">{headerText(drives)}</span>
@@ -113,16 +116,19 @@ export function DrivesPage() {
                 </MenuItem>
               </Menu>
             </div>
-            {drives.map((entry) => (
-              <DriveCard
-                key={entry.id}
-                drive={entry}
-                selected={entry.id === drive?.id}
-                now={now}
-                onSelect={() => setChosen(entry.id)}
-                onEmpty={() => setEmptying(entry.id)}
-              />
-            ))}
+            {/* The cards stack in the column; narrow panes lay them in a row to swipe through. */}
+            <div className="contents @max-[860px]/pane:-mx-6 @max-[860px]/pane:flex @max-[860px]/pane:items-start @max-[860px]/pane:gap-2.5 @max-[860px]/pane:overflow-x-auto @max-[860px]/pane:px-6 @max-[860px]/pane:pb-1 @max-[860px]/pane:[scrollbar-width:thin] @max-[640px]/pane:-mx-4 @max-[640px]/pane:px-4">
+              {drives.map((entry) => (
+                <DriveCard
+                  key={entry.id}
+                  drive={entry}
+                  selected={entry.id === drive?.id}
+                  now={now}
+                  onSelect={() => setChosen(entry.id)}
+                  onEmpty={() => setEmptying(entry.id)}
+                />
+              ))}
+            </div>
           </div>
           {drive === undefined ? null : <DriveTitles key={drive.id} drive={drive} />}
         </>

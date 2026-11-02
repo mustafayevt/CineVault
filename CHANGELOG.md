@@ -6,7 +6,8 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ### Added
 
-- Browser mode: CineVault can be added to a phone's home screen (Safari › Share › Add to Home Screen on iPhone, Install app in Chrome on Android) and opens full screen with its own icon. You sign in once more inside the home-screen app. The layout is still the desktop one for now.
+- Browser mode: CineVault can be added to a phone's home screen (Safari › Share › Add to Home Screen on iPhone, Install app in Chrome on Android) and opens full screen with its own icon. You sign in once more inside the home-screen app.
+- Browser mode on phones and tablets: below 1024px wide the sidebar opens as a drawer from the menu button at the top left, next to Back and the search, every page fits the width without scrolling sideways, buttons and menu items are bigger on touch screens, and a long press opens the menu that a right-click opens on a computer.
 - Browser mode over HTTPS: CineVault starts faster from what it already downloaded, and says "Can't reach CineVault" with Try again when the server doesn't answer, instead of the browser's error page.
 
 ## [1.4.0] - 2026-11-02

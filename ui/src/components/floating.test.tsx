@@ -263,6 +263,22 @@ describe("ContextMenu", () => {
     expect(onTarget).toHaveBeenLastCalledWith(screen.getByText("Heat"));
     expect(screen.getByRole("menu")).toBeInTheDocument();
   });
+
+  it("opens on a touch long-press after telling which item the finger was on", () => {
+    vi.useFakeTimers();
+    try {
+      const onTarget = vi.fn();
+      render(<Rows onTarget={onTarget} />);
+      const heat = screen.getByText("Heat");
+      // iOS sends no `contextmenu` for a long-press: only the pointer going down and staying.
+      fireEvent.pointerDown(heat, { pointerType: "touch", clientX: 10, clientY: 10 });
+      act(() => vi.advanceTimersByTime(800));
+      expect(screen.getByRole("menu", { name: "Title actions" })).toBeInTheDocument();
+      expect(onTarget).toHaveBeenCalledWith(heat);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("Tooltip", () => {
