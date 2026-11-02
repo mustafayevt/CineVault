@@ -191,7 +191,7 @@ function Inputs() {
         />
       </Row>
       <Row label="On a floating surface (well colour)">
-        <div className="flex items-center gap-2 rounded-(--r-10) border border-solid border-line-edge bg-surface-floating p-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-(--r-10) border border-solid border-line-edge bg-surface-floating p-3">
           <Field aria-label="In a menu" floating placeholder="Filter" className="w-40" />
           <Select
             aria-label="Sort in a menu"

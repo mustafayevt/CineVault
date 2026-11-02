@@ -107,7 +107,7 @@ interface RowProps {
 /** A row of the form: the label in a 150px column, the control beside it. */
 function Row({ label, htmlFor, children }: RowProps) {
   return (
-    <div className="grid grid-cols-[150px_minmax(0,1fr)] items-start gap-5 border-t border-solid border-line-row px-4 py-3 first:border-t-0">
+    <div className="grid grid-cols-[150px_minmax(0,1fr)] items-start gap-5 border-t border-solid border-line-row px-4 py-3 first:border-t-0 @max-[640px]/pane:grid-cols-1 @max-[640px]/pane:gap-1.5">
       <label htmlFor={htmlFor} className="pt-1.5 font-(weight:--fw-500)">
         {label}
       </label>
@@ -129,10 +129,10 @@ function Banner({
   return (
     <div
       role="alert"
-      className="flex items-center gap-2.5 rounded-(--r-10) bg-warn-tint px-3 py-2.5"
+      className="flex items-center gap-2.5 rounded-(--r-10) bg-warn-tint px-3 py-2.5 @max-[640px]/pane:flex-wrap"
     >
       <Icon icon={icon} className="shrink-0 self-start text-warn" />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         <div className="font-(weight:--fw-600)">{problem.title}</div>
         {problem.body === undefined ? null : <div className="text-text-2">{problem.body}</div>}
       </div>
@@ -297,7 +297,7 @@ export function NetworkShareForm({
             </p>
           </div>
         </Card>
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button size="lg" shortcut="Esc" onClick={onCancel}>
             {t("networkShare.cancel")}
           </Button>
@@ -424,7 +424,7 @@ export function NetworkShareForm({
             onChange={(event) => setPassword(event.target.value)}
           />
         </Row>
-        <div className="grid grid-cols-[150px_minmax(0,1fr)] items-start gap-5 border-t border-solid border-line-row px-4 py-3">
+        <div className="grid grid-cols-[150px_minmax(0,1fr)] items-start gap-5 border-t border-solid border-line-row px-4 py-3 @max-[640px]/pane:grid-cols-1 @max-[640px]/pane:gap-1.5">
           <span aria-hidden="true" />
           <div>
             <Checkbox checked={remember} disabled={busy} onCheckedChange={setRemember}>
@@ -454,7 +454,7 @@ export function NetworkShareForm({
           }
         />
       ) : null}
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button size="lg" shortcut="Esc" onClick={escape}>
           {t("networkShare.cancel")}
         </Button>

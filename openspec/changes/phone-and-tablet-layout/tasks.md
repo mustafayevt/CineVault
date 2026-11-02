@@ -15,7 +15,7 @@
 
 ## 4. Pickers and other pages
 
-- [ ] 4.1 Scrape queue and match picker, Artwork, Rename preview, Drives, Torrents, History, Settings, Release notes and the gallery fit 390 and 820 widths. Verify: `bun run shots:compact` passes for these routes; their tests pass.
+- [x] 4.1 Scrape queue and match picker, Artwork, Rename preview, Drives, Torrents, History, Settings, Release notes and the gallery fit 390 and 820 widths. Verify: `bun run shots:compact` passes for these routes; their tests pass.
 
 ## 5. Integration
 

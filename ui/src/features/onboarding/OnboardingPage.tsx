@@ -367,7 +367,8 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
         ) : null}
       </header>
       <div data-testid="onboarding-scroll" className="flex min-h-0 flex-1 overflow-y-auto">
-        <main className="m-auto flex w-[728px] max-w-full flex-col gap-[22px] px-6 py-6">
+        {/* The first-run page is outside the shell: its column is the `pane` its steps respond to. */}
+        <main className="@container/pane m-auto flex w-[728px] max-w-full flex-col gap-[22px] px-6 py-6">
           <Stepper step={step} />
           <section
             aria-label={t("setup.region")}
@@ -413,7 +414,7 @@ export function OnboardingPage({ onFinished, windowApi }: OnboardingPageProps) {
               />
             ) : null}
             {sharing ? null : (
-              <div className="flex items-center gap-2 border-t border-solid border-line-section bg-surface-floating px-4 py-3.5">
+              <div className="flex items-center gap-2 border-t border-solid border-line-section bg-surface-floating px-4 py-3.5 @max-[480px]/pane:flex-wrap">
                 <Button
                   variant="ghost"
                   disabled={building}

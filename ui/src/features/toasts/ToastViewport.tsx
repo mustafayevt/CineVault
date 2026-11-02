@@ -57,7 +57,8 @@ function ToastItem({ entry, shortcut }: ToastItemProps) {
       onDismiss={onDismiss}
       onUndo={hasUndo ? onUndo : undefined}
       undoShortcut={shortcut}
-      className="pointer-events-auto"
+      // A phone keeps the toast inside the window, 16px from each edge; its words wrap.
+      className="pointer-events-auto max-w-[calc(100vw-32px)]"
     />
   );
 }
