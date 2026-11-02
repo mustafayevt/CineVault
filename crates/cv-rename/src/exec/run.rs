@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use cv_domain::MediaFileType;
-use cv_nfo::ownership::classify_nfo_file;
+use cv_nfo::ownership::{NfoOwnership, classify_nfo_file};
 use regex::Regex;
 
 use super::fs::{Fs, Patient, is_within, same_path};
@@ -876,12 +876,15 @@ impl<'a> Executor<'a> {
         {
             return Ok(Applied::NothingToDo);
         }
+        // A foreign NFO (a downloaded info file) the plan sets aside goes to the trash like any
+        // leftover, so only CineVault's NFO stays with the title; a pointer file holds the ID the
+        // title was found by and stays.
         if file_type == MediaFileType::Nfo {
             let ownership =
                 classify_nfo_file(path).map_err(|e| io_fail("cannot read", path, &e))?;
-            if !ownership.is_managed() {
+            if ownership == NfoOwnership::Pointer {
                 return Ok(Applied::Skipped(format!(
-                    "{} is not an NFO CineVault wrote; left in place",
+                    "{} holds only an ID; left in place",
                     path.display()
                 )));
             }

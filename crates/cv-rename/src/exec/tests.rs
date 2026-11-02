@@ -1104,10 +1104,11 @@ fn write_source(tree: &Tree, name: &str) -> PathBuf {
 // ---- NFO ownership -------------------------------------------------------------------------
 
 #[test]
-fn only_nfos_that_the_app_wrote_are_trashed() {
+fn nfos_set_aside_go_to_the_trash_but_a_pointer_file_stays() {
     let tree = Tree::new();
     tree.write("M/old.nfo", MANAGED_NFO);
     tree.write("M/release.nfo", FOREIGN_NFO);
+    tree.write("M/id.nfo", "https://www.themoviedb.org/movie/949");
     let item = batch_item(
         &tree,
         "1",
@@ -1117,14 +1118,16 @@ fn only_nfos_that_the_app_wrote_are_trashed() {
         vec![
             trash_file("M/old.nfo", NFO),
             trash_file("M/release.nfo", NFO),
+            trash_file("M/id.nfo", NFO),
         ],
     );
     let mut journal = MemoryJournal::new();
     let report = run(&tree, &mut journal, &[item]);
     assert_eq!(report.done(), 1);
     assert!(!tree.exists("M/old.nfo"));
-    assert_eq!(tree.read("M/release.nfo"), FOREIGN_NFO);
-    assert_eq!(report.items[0].trashed, 1);
+    assert!(!tree.exists("M/release.nfo"));
+    assert!(tree.exists("M/id.nfo"));
+    assert_eq!(report.items[0].trashed, 2);
     assert_eq!(report.items[0].notes.len(), 1);
 }
 

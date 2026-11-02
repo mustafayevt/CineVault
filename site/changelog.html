@@ -52,6 +52,15 @@
       <h1>What's new in CineVault</h1>
       <p class="section-lede">What changed in each version, newest first.</p>
     </header>
+    <article class="log-entry" id="v1.5.0">
+      <div class="log-meta"><h2>1.5.0</h2><span class="pill">Coming next</span></div>
+      <div class="log-body">
+<h3>Fixed</h3>
+<ul>
+<li>Rename no longer gives a downloaded info file (a plain-text <code>.nfo</code> about the video, named like it) the movie's NFO name. Before, CineVault could then never write its own NFO for that movie, and when the movie already had one, the info file could push it into the trash. Now a rename sets the info file aside with the other leftovers (Undo brings it back), so only CineVault's NFO stays with the title.</li>
+</ul>
+      </div>
+    </article>
     <article class="log-entry" id="v1.4.0">
       <div class="log-meta"><h2>1.4.0</h2><time datetime="2026-11-02">2 November 2026</time></div>
       <div class="log-body">

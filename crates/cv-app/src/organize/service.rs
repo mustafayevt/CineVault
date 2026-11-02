@@ -395,7 +395,7 @@ impl OrganizeService {
 
         let mut journal = self.journal_store();
         let fs = Arc::clone(&self.disk);
-        let profile = &request.preview.profile;
+        let profile = &own_nfo_only(&request.preview.profile);
         // A data source can lie in a folder of another one; no item takes a root away.
         let roots = self.source_roots()?;
         let mut reports = Vec::new();
@@ -831,7 +831,7 @@ impl OrganizeService {
             folder: &movie.folder,
             files: &movie.files,
         };
-        let Ok(plan) = MovieRenamer::new(profile.movie.clone()).plan(&input) else {
+        let Ok(plan) = MovieRenamer::new(own_nfo_only(profile).movie).plan(&input) else {
             return Ok(None);
         };
         let current_base = std::path::Path::new(&main_video_name(&movie.files))
@@ -847,7 +847,7 @@ impl OrganizeService {
     }
 
     fn plan(&self, request: &PreviewRequest) -> Result<Planned, OrganizeError> {
-        let profile = &request.profile;
+        let profile = &own_nfo_only(&request.profile);
         let ids = scope_ids(&self.db, &request.scope)?;
         let loaded = load(&self.db, &ids)?;
         let has_movies = loaded.iter().any(|l| matches!(l, Loaded::Movie(_)));
@@ -1806,4 +1806,14 @@ fn describe(planned: Planned, title: TitleLookup<'_>) -> Preview {
         examples: planned.examples,
         problems: Vec::new(),
     }
+}
+
+/// The profile a rename plans with: an NFO CineVault did not write (a downloaded info file, another
+/// program's NFO) goes to the trash folder, so after a rename the title's folder holds only
+/// CineVault's NFO. It is set aside like every leftover, never erased.
+fn own_nfo_only(profile: &cv_rename::RenameProfile) -> cv_rename::RenameProfile {
+    let mut profile = profile.clone();
+    profile.movie.nfo_cleanup = true;
+    profile.tv.nfo_cleanup = true;
+    profile
 }
