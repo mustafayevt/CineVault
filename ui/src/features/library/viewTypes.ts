@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import type { ListSelection } from "../../components/useListSelection";
 import type { TitleType } from "./libraryStore";
 import type { Listing } from "./useLibraryListing";
+import type { PaneFit } from "./usePaneFit";
 
 /** What the grid and the table of the Library share. */
 export interface ListViewProps {
@@ -17,4 +18,6 @@ export interface ListViewProps {
   empty: ReactNode;
   /** F2 and Delete; true when the key did something. */
   onKey: (event: ReactKeyboardEvent | KeyboardEvent) => boolean;
+  /** How much room the pane has (`usePaneFit`); wide when left out. */
+  fit?: PaneFit;
 }

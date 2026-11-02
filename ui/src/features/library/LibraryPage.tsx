@@ -1,17 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import { t } from "../../i18n/catalog";
 import { runRescan, useScanUiStore } from "../scan/scanActions";
 import { CollectionsView } from "./CollectionsView";
 import { currentLibraryBackend } from "./libraryBackend";
 import { LibraryToolbar } from "./LibraryToolbar";
-import { COLUMN_LABEL, SWITCHABLE_COLUMNS } from "./libraryColumns";
+import { COLUMN_LABEL, columnFits, SWITCHABLE_COLUMNS } from "./libraryColumns";
 import { useLibraryStore } from "./libraryStore";
 import type { LibraryType } from "./libraryStore";
 import { LIBRARY_COUNTS_KEY } from "./useLibraryCounts";
 import { TitlesView } from "./TitlesView";
+import { usePaneFit } from "./usePaneFit";
 
 const TYPES: readonly LibraryType[] = ["movies", "tv", "collections"];
 
@@ -39,6 +40,8 @@ export function LibraryPage() {
   const state = useLibraryStore((all) => (type === "collections" ? all.movies : all[type]));
   const posterSize = useLibraryStore((all) => all.posterSize);
   const scanning = useScanUiStore((scan) => scan.starting);
+  const sectionRef = useRef<HTMLElement>(null);
+  const fit = usePaneFit(sectionRef);
 
   const counts = useQuery({
     queryKey: LIBRARY_COUNTS_KEY,
@@ -65,7 +68,11 @@ export function LibraryPage() {
 
   const titles = type !== "collections";
   return (
-    <section aria-label={t("shell.page.library")} className="relative flex h-full min-h-0 flex-col">
+    <section
+      ref={sectionRef}
+      aria-label={t("shell.page.library")}
+      className="relative flex h-full min-h-0 flex-col"
+    >
       <LibraryToolbar
         type={type}
         counts={{
@@ -78,13 +85,14 @@ export function LibraryPage() {
               }),
         }}
         onType={goTo}
+        fit={fit}
         view={state.view}
         onView={(view) => titles && store.setView(type, view)}
         posterSize={posterSize}
         onPosterSize={store.setPosterSize}
         sort={state.sort}
         onSort={(sort) => titles && store.setSort(type, sort)}
-        columns={SWITCHABLE_COLUMNS.map((id) => ({
+        columns={SWITCHABLE_COLUMNS.filter((id) => columnFits(id, fit)).map((id) => ({
           id,
           label: t(COLUMN_LABEL[id]),
           shown: !state.hiddenColumns.includes(id),
@@ -94,7 +102,7 @@ export function LibraryPage() {
         onScan={() => void runRescan()}
       />
       {titles ? (
-        <TitlesView key={type} type={type} text={q} onClearText={clearText} />
+        <TitlesView key={type} type={type} text={q} onClearText={clearText} fit={fit} />
       ) : (
         <CollectionsView />
       )}

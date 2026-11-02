@@ -1,10 +1,11 @@
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Ellipsis, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 
 import { t } from "../i18n/catalog";
 import { cx } from "../lib/cx";
 import { Button } from "./Button";
+import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { Menu } from "./Menu";
 import { MenuItem } from "./MenuItem";
@@ -39,6 +40,10 @@ interface SelectionBarProps {
   onClear: () => void;
   className?: string;
 }
+
+/** On a phone an action with an icon is the icon alone, in a square as tall as the button. */
+const PHONE_ICON_ONLY =
+  "@max-[640px]/pane:w-(--h-btn) @max-[640px]/pane:gap-0 @max-[640px]/pane:px-0";
 
 function Divider({ className }: { className?: string }) {
   return <span aria-hidden="true" className={cx("h-[18px] w-px bg-line-section", className)} />;
@@ -77,41 +82,67 @@ export function SelectionBar({
             role="toolbar"
             aria-label={t("selection.bar")}
             className={cx(
-              "cv-slide-up pointer-events-auto flex items-center gap-1 rounded-(--r-14) border border-solid",
+              "cv-slide-up pointer-events-auto flex max-w-full min-w-0 items-center gap-1 rounded-(--r-14) border border-solid",
               "border-line-edge bg-surface-floating py-1.5 pr-1.5 pl-3.5 text-(length:--fs-13)",
               "whitespace-nowrap text-text shadow-floating",
             )}
           >
-            <span aria-live="polite" className="font-(weight:--fw-600)">
+            <span aria-live="polite" className="shrink-0 font-(weight:--fw-600)">
               {t("selection.count", { count: shown.count })}
             </span>
             {shown.size !== undefined && (
-              <span className="mr-2.5 ml-1 text-text-muted tabular-nums">{shown.size}</span>
+              <span className="mr-2.5 ml-1 text-text-muted tabular-nums @max-[640px]/pane:hidden">
+                {shown.size}
+              </span>
             )}
-            <Divider className="mr-1" />
-            {actions.map((action) => (
-              <Button
-                key={action.id}
-                variant="ghost"
-                icon={action.icon}
-                disabled={action.disabled}
-                disabledReason={action.disabledReason}
-                enabledBy={action.enabledBy}
-                onClick={action.onSelect}
-                className={action.danger ? "text-danger enabled:hover:text-danger" : "text-text"}
-              >
-                {action.label}
-              </Button>
-            ))}
+            <Divider className="mr-1 shrink-0" />
+            {/* On a phone the actions are icons (named for screen readers) and scroll sideways if
+                they still do not fit; the count, More and the clear button stay put. */}
+            <div
+              className={cx(
+                "flex min-w-0 items-center gap-1",
+                "@max-[640px]/pane:-my-1 @max-[640px]/pane:overflow-x-auto @max-[640px]/pane:py-1",
+                "@max-[640px]/pane:[scrollbar-width:none] @max-[640px]/pane:[&::-webkit-scrollbar]:hidden",
+              )}
+            >
+              {actions.map((action) => (
+                <Button
+                  key={action.id}
+                  variant="ghost"
+                  icon={action.icon}
+                  disabled={action.disabled}
+                  disabledReason={action.disabledReason}
+                  enabledBy={action.enabledBy}
+                  onClick={action.onSelect}
+                  className={cx(
+                    action.danger ? "text-danger enabled:hover:text-danger" : "text-text",
+                    action.icon !== undefined && PHONE_ICON_ONLY,
+                  )}
+                >
+                  {action.icon === undefined ? (
+                    action.label
+                  ) : (
+                    <span className="@max-[640px]/pane:sr-only">{action.label}</span>
+                  )}
+                </Button>
+              ))}
+            </div>
             {more.length > 0 && (
               <>
-                <Divider className="mx-1" />
+                <Divider className="mx-1 shrink-0 @max-[640px]/pane:mx-0" />
                 <Menu
                   side="top"
                   align="end"
                   trigger={
-                    <Button variant="ghost" trailingIcon={ChevronDown} className="text-text">
-                      {t("selection.action.more")}
+                    <Button
+                      variant="ghost"
+                      trailingIcon={ChevronDown}
+                      className={cx("text-text @max-[640px]/pane:[&>svg]:hidden", PHONE_ICON_ONLY)}
+                    >
+                      <Icon icon={Ellipsis} className="hidden @max-[640px]/pane:block" />
+                      <span className="@max-[640px]/pane:sr-only">
+                        {t("selection.action.more")}
+                      </span>
                     </Button>
                   }
                 >

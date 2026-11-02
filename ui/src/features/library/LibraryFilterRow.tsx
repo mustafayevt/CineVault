@@ -5,6 +5,7 @@ import { Chip } from "../../components/Chip";
 import { Menu, MenuRadioGroup, MenuRadioItem } from "../../components/Menu";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { cx } from "../../lib/cx";
 import { useLifecycleCounts } from "../lifecycle/useLifecycleCounts";
 import { currentLibraryBackend } from "./libraryBackend";
 import type { LibraryKind } from "./libraryBackend";
@@ -56,7 +57,8 @@ interface LibraryFilterRowProps {
  * The filter row: the stage chips All, New, Scraped and Renamed with
  * their counts, then the Drive, Quality and Problems dropdown chips, the typed search as a chip,
  * and at the right the count and size of what is listed. 42px high on the 24px content inset, chips
- * 24px.
+ * 24px. On a tablet or a phone the chips scroll sideways inside their own row, out to the pane's
+ * edges, and on a phone the count and size go under them.
  */
 export function LibraryFilterRow({
   kind,
@@ -92,117 +94,134 @@ export function LibraryFilterRow({
     <div
       role="group"
       aria-label={t("library.filters.label")}
-      className="flex h-[42px] shrink-0 items-center gap-1.5 px-6"
+      className={cx(
+        "flex h-[42px] shrink-0 items-center gap-1.5 px-6",
+        "@max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:gap-y-0",
+      )}
     >
-      {STAGES.map((stage) => {
-        const count = countOf(stage);
-        return (
-          <Chip
-            key={stage}
-            active={filters.stage === stage}
-            count={count === undefined ? undefined : format.number(count)}
-            onClick={() => onChange({ stage })}
+      <div
+        className={cx(
+          "flex min-w-0 flex-1 items-center gap-1.5 self-stretch",
+          // Sideways scrolling without a scrollbar: the chip cut at the edge says there is more.
+          "@max-[860px]/pane:-ml-6 @max-[860px]/pane:overflow-x-auto @max-[860px]/pane:pr-2 @max-[860px]/pane:pl-6",
+          "@max-[860px]/pane:[scrollbar-width:none] @max-[860px]/pane:[&::-webkit-scrollbar]:hidden",
+          "@max-[640px]/pane:-mr-6 @max-[640px]/pane:h-[42px] @max-[640px]/pane:basis-full @max-[640px]/pane:pr-6",
+        )}
+      >
+        {STAGES.map((stage) => {
+          const count = countOf(stage);
+          return (
+            <Chip
+              key={stage}
+              active={filters.stage === stage}
+              count={count === undefined ? undefined : format.number(count)}
+              onClick={() => onChange({ stage })}
+            >
+              {t(STAGE_LABEL[stage])}
+            </Chip>
+          );
+        })}
+        <span aria-hidden="true" className="mx-1.5 h-[18px] w-px bg-line-section" />
+
+        <Menu
+          aria-label={t("library.drive.label")}
+          trigger={
+            <Chip active={filters.drive !== null} trailingIcon={ChevronDown}>
+              {t("library.drive.chip", { value: filters.drive ?? t("library.drive.all") })}
+            </Chip>
+          }
+        >
+          <MenuRadioGroup
+            value={filters.drive ?? ""}
+            onValueChange={(value) => onChange({ drive: value === "" ? null : value })}
           >
-            {t(STAGE_LABEL[stage])}
-          </Chip>
-        );
-      })}
-      <span aria-hidden="true" className="mx-1.5 h-[18px] w-px bg-line-section" />
+            <MenuRadioItem value="">{t("library.drive.all")}</MenuRadioItem>
+            {folderList.map((group) => (
+              <MenuRadioItem key={group.label} value={group.label}>
+                {t("library.group.header", { label: group.label, count: group.count })}
+              </MenuRadioItem>
+            ))}
+          </MenuRadioGroup>
+        </Menu>
 
-      <Menu
-        aria-label={t("library.drive.label")}
-        trigger={
-          <Chip active={filters.drive !== null} trailingIcon={ChevronDown}>
-            {t("library.drive.chip", { value: filters.drive ?? t("library.drive.all") })}
-          </Chip>
-        }
-      >
-        <MenuRadioGroup
-          value={filters.drive ?? ""}
-          onValueChange={(value) => onChange({ drive: value === "" ? null : value })}
+        <Menu
+          aria-label={t("library.quality.label")}
+          trigger={
+            <Chip active={filters.quality !== "any"} trailingIcon={ChevronDown}>
+              {t("library.quality.chip", { value: t(QUALITY_LABEL[filters.quality]) })}
+            </Chip>
+          }
         >
-          <MenuRadioItem value="">{t("library.drive.all")}</MenuRadioItem>
-          {folderList.map((group) => (
-            <MenuRadioItem key={group.label} value={group.label}>
-              {t("library.group.header", { label: group.label, count: group.count })}
-            </MenuRadioItem>
-          ))}
-        </MenuRadioGroup>
-      </Menu>
-
-      <Menu
-        aria-label={t("library.quality.label")}
-        trigger={
-          <Chip active={filters.quality !== "any"} trailingIcon={ChevronDown}>
-            {t("library.quality.chip", { value: t(QUALITY_LABEL[filters.quality]) })}
-          </Chip>
-        }
-      >
-        <MenuRadioGroup
-          value={filters.quality}
-          onValueChange={(value) => onChange({ quality: value as QualityChoice })}
-        >
-          {QUALITIES.map((quality) => (
-            <MenuRadioItem key={quality} value={quality}>
-              {t(QUALITY_LABEL[quality])}
-            </MenuRadioItem>
-          ))}
-        </MenuRadioGroup>
-      </Menu>
-
-      <Menu
-        aria-label={t("library.problems.label")}
-        trigger={
-          <Chip
-            tone="warn"
-            active={filters.problems !== "any"}
-            icon={TriangleAlert}
-            trailingIcon={ChevronDown}
-            data-testid="problems-chip"
+          <MenuRadioGroup
+            value={filters.quality}
+            onValueChange={(value) => onChange({ quality: value as QualityChoice })}
           >
-            {t("library.problems.chip", { count: problemCount ?? 0 })}
+            {QUALITIES.map((quality) => (
+              <MenuRadioItem key={quality} value={quality}>
+                {t(QUALITY_LABEL[quality])}
+              </MenuRadioItem>
+            ))}
+          </MenuRadioGroup>
+        </Menu>
+
+        <Menu
+          aria-label={t("library.problems.label")}
+          trigger={
+            <Chip
+              tone="warn"
+              active={filters.problems !== "any"}
+              icon={TriangleAlert}
+              trailingIcon={ChevronDown}
+              data-testid="problems-chip"
+            >
+              {t("library.problems.chip", { count: problemCount ?? 0 })}
+            </Chip>
+          }
+        >
+          <MenuRadioGroup
+            value={filters.problems}
+            onValueChange={(value) => onChange({ problems: value as ProblemChoice })}
+          >
+            <MenuRadioItem value="any">{t("library.problems.any")}</MenuRadioItem>
+            {PROBLEMS.map((problem) => (
+              <MenuRadioItem key={problem} value={problem}>
+                {t(PROBLEM_LABEL[problem])}
+              </MenuRadioItem>
+            ))}
+          </MenuRadioGroup>
+        </Menu>
+
+        {kind === "movies" && (filters.copies || (data?.copies ?? 0) > 0) && (
+          <Chip
+            active={filters.copies}
+            icon={Copy}
+            count={format.number(data?.copies ?? 0)}
+            onClick={() => onChange({ copies: !filters.copies })}
+            data-testid="copies-chip"
+          >
+            {t("copies.chip")}
           </Chip>
-        }
+        )}
+
+        {text !== "" && (
+          <Chip
+            active
+            trailingIcon={X}
+            onClick={onClearText}
+            aria-label={t("library.search.clear", { text })}
+            className="max-w-[240px]"
+          >
+            <span className="truncate">{t("library.search.chip", { text })}</span>
+          </Chip>
+        )}
+      </div>
+      <span
+        className={cx(
+          "shrink-0 text-(length:--fs-12) text-text-muted tabular-nums",
+          "@max-[640px]/pane:-mt-0.5 @max-[640px]/pane:pb-2",
+        )}
+        aria-live="polite"
       >
-        <MenuRadioGroup
-          value={filters.problems}
-          onValueChange={(value) => onChange({ problems: value as ProblemChoice })}
-        >
-          <MenuRadioItem value="any">{t("library.problems.any")}</MenuRadioItem>
-          {PROBLEMS.map((problem) => (
-            <MenuRadioItem key={problem} value={problem}>
-              {t(PROBLEM_LABEL[problem])}
-            </MenuRadioItem>
-          ))}
-        </MenuRadioGroup>
-      </Menu>
-
-      {kind === "movies" && (filters.copies || (data?.copies ?? 0) > 0) && (
-        <Chip
-          active={filters.copies}
-          icon={Copy}
-          count={format.number(data?.copies ?? 0)}
-          onClick={() => onChange({ copies: !filters.copies })}
-          data-testid="copies-chip"
-        >
-          {t("copies.chip")}
-        </Chip>
-      )}
-
-      {text !== "" && (
-        <Chip
-          active
-          trailingIcon={X}
-          onClick={onClearText}
-          aria-label={t("library.search.clear", { text })}
-          className="max-w-[240px]"
-        >
-          <span className="truncate">{t("library.search.chip", { text })}</span>
-        </Chip>
-      )}
-
-      <span className="grow" />
-      <span className="text-(length:--fs-12) text-text-muted tabular-nums" aria-live="polite">
         {footer}
       </span>
     </div>

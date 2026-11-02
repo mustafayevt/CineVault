@@ -7,7 +7,7 @@
 
 ## 2. Library
 
-- [ ] 2.1 Library toolbar, filter chips, poster grid, table view, collections and the selection bar fit 390 and 820 widths. Verify: `bun run shots:compact` passes for the Library routes; Library tests pass.
+- [x] 2.1 Library toolbar, filter chips, poster grid, table view, collections and the selection bar fit 390 and 820 widths. Verify: `bun run shots:compact` passes for the Library routes; Library tests pass.
 
 ## 3. Title pages
 
