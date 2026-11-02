@@ -1,11 +1,18 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { ChevronLeft, Menu } from "lucide-react";
 import { useState } from "react";
 
+import { IconButton } from "../../components/IconButton";
+import { t } from "../../i18n/catalog";
+import { useShellStore } from "../../stores/shell";
 import { SpotlightSearch } from "../search/Spotlight";
 import { isServer } from "../../lib/transport";
+import { useBackForwardInput } from "./backForward";
 import { CaptionButtons } from "./CaptionButtons";
 import { LIBRARY_SEARCH_ATTRIBUTE } from "./desktopGuards";
+import { NAV_MENU_ATTRIBUTE } from "./NavDrawer";
 import type { Platform } from "./platform";
+import { useNavigationHistory } from "./useNavigationHistory";
 import { useWindowMaximized } from "./windowApi";
 import type { WindowApi } from "./windowApi";
 
@@ -13,6 +20,8 @@ interface TitleBarProps {
   platform: Platform;
   /** The window to control; `null` in a plain browser. */
   windowApi: WindowApi | null;
+  /** The compact layout: the menu button and Back at the left, the search filling the rest. */
+  compact?: boolean;
 }
 
 /** The `q` of the current address, when the page is the Library. */
@@ -31,9 +40,17 @@ function libraryQuery(pathname: string, search: unknown): string {
  * top right, 46 by 32. On macOS the traffic lights are in the sidebar panel's top row, so the bar
  * holds only the search. The search suggests titles as you type (see `SpotlightSearch`); Enter
  * with no suggestion highlighted opens the Library with `?q=`.
+ *
+ * In the compact layout of a phone or tablet (spec `app-shell` "Phone and tablet layout") the bar
+ * is 52px: the menu button that opens the navigation drawer and Back sit at the left, and the
+ * search fills the rest without its shortcut hint.
  */
-export function TitleBar({ platform, windowApi }: TitleBarProps) {
+export function TitleBar({ platform, windowApi, compact = false }: TitleBarProps) {
   const maximized = useWindowMaximized(windowApi);
+  const nav = useNavigationHistory();
+  useBackForwardInput(compact);
+  const drawerOpen = useShellStore((state) => state.navSheetOpen);
+  const openDrawer = useShellStore((state) => state.setNavSheetOpen);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const urlQuery = useRouterState({
@@ -59,6 +76,45 @@ export function TitleBar({ platform, windowApi }: TitleBarProps) {
       })) as never,
     });
   };
+
+  if (compact) {
+    return (
+      <header
+        data-testid="title-row"
+        data-compact="true"
+        className="flex h-[52px] shrink-0 items-center gap-1 pr-(--gutter) pl-1 select-none"
+      >
+        <IconButton
+          icon={Menu}
+          size="lg"
+          aria-label={t("shell.menu")}
+          aria-expanded={drawerOpen}
+          aria-haspopup="dialog"
+          {...{ [NAV_MENU_ATTRIBUTE]: "" }}
+          onClick={() => openDrawer(true)}
+        />
+        <IconButton
+          icon={ChevronLeft}
+          size="lg"
+          aria-label={t("chrome.back")}
+          onClick={nav.back}
+          disabled={!nav.canGoBack}
+        />
+        <SpotlightSearch
+          compact
+          text={text}
+          setText={setText}
+          shortcut=""
+          fieldAttributes={{ [LIBRARY_SEARCH_ATTRIBUTE]: "" }}
+          openLibrary={open}
+          onClear={() => {
+            setText("");
+            if (urlQuery !== "") open("");
+          }}
+        />
+      </header>
+    );
+  }
 
   return (
     <header

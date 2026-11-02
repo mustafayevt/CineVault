@@ -80,6 +80,7 @@ openspec/            specs and change proposals
 - `bun install`, `bun run dev`, `bun run build`
 - `bun run lint`, `bun run typecheck`, `bun run test`, `bun run format` / `bun run format:check` (Prettier)
 - `bun run shots -- --routes /,/movies,/gallery`: screenshots of each route in dark and light at 1440×900 and 1366×768 in headless Chrome with a throwaway profile, against the synthetic backend; writes PNGs to the git-ignored `ui/.shots/` and fails on console errors or horizontal overflow. Options: `--all` (every route), `--themes`, `--sizes`, `--url`, `--out`, `--full`, `--scroll <selector>`, `--steps '<selector>|<selector>'` (with `focus:`, `key:` and `eval:` steps), `--reduced`, `--scale <ratio>`, `--visible '<selector>,…'`.
+- `bun run shots:compact`: every route at 390×844 (phone) and 820×1180 (tablet) in both themes, the compact layout of the browser version; fails on horizontal overflow like `shots`. Run it after changing a page layout.
 - `bun run check:facts`: the Movie page's first screen at 1366×768 and 1440×900 in both themes must show the plot, the director and release facts and the Technical summary rows without scrolling. Run it after changing the Movie page header, facts or Technical card.
 - `bun run perf:grid`: poster-grid scrolling trace in headless Chrome (writes to `target/perf/`).
 

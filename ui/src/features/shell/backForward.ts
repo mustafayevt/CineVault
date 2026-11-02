@@ -18,11 +18,13 @@ function inTextField(target: EventTarget | null): boolean {
  * CineVault's own back and forward (spec `app-shell` "Back and forward"): Alt+Left and Alt+Right,
  * and the mouse's side buttons, move through the visited pages. The webview's own handling of
  * those keys and buttons is stopped, so a press never moves twice. In a text field Alt with an
- * arrow stays with the field. Mount once, in the shell.
+ * arrow stays with the field. Mount once, in the shell: `enabled` lets the part of the shell that
+ * holds back and forward in the current layout own it.
  */
-export function useBackForwardInput(): void {
+export function useBackForwardInput(enabled = true): void {
   const router = useRouter();
   useEffect(() => {
+    if (!enabled) return;
     const history = router.history;
     const onKey = (event: KeyboardEvent) => {
       if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -51,5 +53,5 @@ export function useBackForwardInput(): void {
       window.removeEventListener("auxclick", swallow);
       window.removeEventListener("mouseup", onMouseUp);
     };
-  }, [router]);
+  }, [router, enabled]);
 }

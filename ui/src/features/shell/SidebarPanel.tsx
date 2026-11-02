@@ -82,6 +82,12 @@ function RowLink({ to, label, icon, active, side }: RowLinkProps) {
 
 interface SidebarPanelProps {
   platform: Platform;
+  /**
+   * `panel` (default) floats at the left of the window; `drawer` is the same panel inside the
+   * compact layout's drawer: always full, wider, without back and forward (they are in the title
+   * bar there) and without the collapse toggle.
+   */
+  variant?: "panel" | "drawer";
 }
 
 /**
@@ -92,18 +98,22 @@ interface SidebarPanelProps {
  * History · Theme · Settings · Collapse. Collapsed, it is a column of icons with tooltips, small
  * drive meters and a progress ring; the choice is remembered.
  */
-export function SidebarPanel({ platform }: SidebarPanelProps) {
-  useBackForwardInput();
+export function SidebarPanel({ platform, variant = "panel" }: SidebarPanelProps) {
+  // In the compact layout the title bar holds back and forward.
+  useBackForwardInput(variant === "panel");
   const nav = useNavigationHistory();
   const counts = useNavCounts();
   const drives = useSidebarDrives();
-  const collapsed = useShellStore(selectSidebarCollapsed);
+  const drawer = variant === "drawer";
+  const railChoice = useShellStore(selectSidebarCollapsed);
+  const collapsed = !drawer && railChoice;
   const toggleSidebar = useShellStore((state) => state.toggleSidebar);
   const theme = useShellStore((state) => state.theme);
   const toggleTheme = useShellStore((state) => state.toggleTheme);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const active = destinationOf(pathname);
-  const mac = platform === "macos";
+  // The traffic lights sit in the panel's top row only in the desktop window.
+  const mac = platform === "macos" && !drawer;
   const lowDrives = drives.filter((drive) => drive.online && drive.low).length;
   const tipSide = collapsed ? "right" : "top";
 
@@ -121,10 +131,11 @@ export function SidebarPanel({ platform }: SidebarPanelProps) {
       aria-label={t("shell.sidebar")}
       data-testid="sidebar-panel"
       data-collapsed={collapsed ? "true" : "false"}
+      data-variant={variant}
       className={cx(
         "flex h-full flex-col overflow-x-hidden overflow-y-auto px-2 pb-2 select-none",
         "rounded-(--r-14) border border-solid border-line-edge bg-surface-floating shadow-floating",
-        collapsed ? (mac ? "w-[76px]" : "w-[50px]") : "w-[200px]",
+        drawer ? "w-[272px] max-w-full" : collapsed ? (mac ? "w-[76px]" : "w-[50px]") : "w-[200px]",
       )}
     >
       <div
@@ -148,20 +159,24 @@ export function SidebarPanel({ platform }: SidebarPanelProps) {
               CineVault
             </span>
             {mac ? <span data-tauri-drag-region className="grow" /> : null}
-            <IconButton
-              icon={ChevronLeft}
-              aria-label={t("chrome.back")}
-              title={t("shell.backHint")}
-              onClick={nav.back}
-              disabled={!nav.canGoBack}
-            />
-            <IconButton
-              icon={ChevronRight}
-              aria-label={t("chrome.forward")}
-              title={t("shell.forwardHint")}
-              onClick={nav.forward}
-              disabled={!nav.canGoForward}
-            />
+            {drawer ? null : (
+              <>
+                <IconButton
+                  icon={ChevronLeft}
+                  aria-label={t("chrome.back")}
+                  title={t("shell.backHint")}
+                  onClick={nav.back}
+                  disabled={!nav.canGoBack}
+                />
+                <IconButton
+                  icon={ChevronRight}
+                  aria-label={t("chrome.forward")}
+                  title={t("shell.forwardHint")}
+                  onClick={nav.forward}
+                  disabled={!nav.canGoForward}
+                />
+              </>
+            )}
           </>
         )}
       </div>
@@ -225,17 +240,19 @@ export function SidebarPanel({ platform }: SidebarPanelProps) {
             active={active === "settings"}
             side={tipSide}
           />
-          <Tooltip content={collapsed ? t("shell.expand") : t("shell.collapse")} side={tipSide}>
-            <button
-              type="button"
-              aria-label={collapsed ? t("shell.expand") : t("shell.collapse")}
-              aria-expanded={!collapsed}
-              className={rowIcon}
-              onClick={toggleSidebar}
-            >
-              <Icon icon={collapsed ? PanelLeftOpen : PanelLeftClose} size={18} />
-            </button>
-          </Tooltip>
+          {drawer ? null : (
+            <Tooltip content={collapsed ? t("shell.expand") : t("shell.collapse")} side={tipSide}>
+              <button
+                type="button"
+                aria-label={collapsed ? t("shell.expand") : t("shell.collapse")}
+                aria-expanded={!collapsed}
+                className={rowIcon}
+                onClick={toggleSidebar}
+              >
+                <Icon icon={collapsed ? PanelLeftOpen : PanelLeftClose} size={18} />
+              </button>
+            </Tooltip>
+          )}
         </div>
       </div>
     </nav>
