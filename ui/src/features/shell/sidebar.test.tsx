@@ -16,6 +16,7 @@ import { useJobProgressStore } from "../jobs/jobProgressStore";
 import { setLifecycleBackend } from "../lifecycle/lifecycleBackend";
 import type { PipelineKind } from "../lifecycle/lifecycleBackend";
 import { SIDEBAR_SETTING_KEY, useSettingsStore } from "../settings/settingsStore";
+import { validateDrivesSearch } from "../drives/drivesSearch";
 import { DriveMeters } from "./DriveMeters";
 import { destinationOf } from "./destinations";
 import { setJobControls } from "./jobControls";
@@ -313,18 +314,24 @@ describe("the drives section", () => {
     { id: "z", name: "Z: NAS", totalBytes: 16e12, freeBytes: 0, online: false, low: false },
   ];
 
-  function renderDrives(list: readonly SidebarDrive[], collapsed = false) {
+  function renderDrives(list: readonly SidebarDrive[], collapsed = false, at = "/") {
     const rootRoute = createRootRoute({
       component: () => <DriveMeters drives={list} collapsed={collapsed} />,
     });
     const router = createRouter({
       routeTree: rootRoute.addChildren([
         createRoute({ getParentRoute: () => rootRoute, path: "/", component: () => null }),
-        createRoute({ getParentRoute: () => rootRoute, path: "/drives", component: () => null }),
+        createRoute({
+          getParentRoute: () => rootRoute,
+          path: "/drives",
+          validateSearch: validateDrivesSearch,
+          component: () => null,
+        }),
       ]),
-      history: createMemoryHistory({ initialEntries: ["/"] }),
+      history: createMemoryHistory({ initialEntries: [at] }),
     });
     render(<RouterProvider router={router} />);
+    return router;
   }
 
   it("shows nothing without drives (the stub until the drives service lands)", async () => {
@@ -341,7 +348,28 @@ describe("the drives section", () => {
     expect(meters[0]).toHaveAttribute("data-state", "low");
     expect(meters[1]).toHaveAttribute("data-state", "offline");
     expect(meters[0]).toHaveAccessibleName(/^C: System · 41\sGB free of 931\sGB$/);
-    expect(screen.getAllByRole("link")[0]).toHaveAttribute("href", "/drives");
+    expect(screen.getAllByRole("link")[0]).toHaveAttribute("href", "/drives?drive=c");
+  });
+
+  it("opens the Drives page with the drive that was clicked", async () => {
+    const user = userEvent.setup();
+    const router = renderDrives(drives);
+    const nas = await screen.findByText("Z: NAS");
+    // No drive is marked away from the Drives page.
+    expect(screen.queryByRole("link", { current: "page" })).toBeNull();
+    await user.click(nas);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/drives"));
+    expect(router.state.location.search).toEqual({ drive: "z" });
+    expect(await screen.findByRole("link", { current: "page" })).toHaveTextContent("Z: NAS");
+    // On the Drives page another drive is chosen from the sidebar too.
+    await user.click(screen.getByText("C: System"));
+    await waitFor(() => expect(router.state.location.search).toEqual({ drive: "c" }));
+    expect(screen.getByRole("link", { current: "page" })).toHaveTextContent("C: System");
+  });
+
+  it("marks the first drive on the Drives page while none is chosen or the chosen one is gone", async () => {
+    renderDrives(drives, false, "/drives?drive=gone");
+    expect(await screen.findByRole("link", { current: "page" })).toHaveTextContent("C: System");
   });
 
   it("shrinks to small meters named by their tooltip when collapsed", async () => {

@@ -9,6 +9,7 @@ import {
 import { ArtworkPage } from "./features/artwork/ArtworkPage";
 import { validateArtworkSearch } from "./features/artwork/artworkSearch";
 import { DrivesPage } from "./features/drives/DrivesPage";
+import { validateDrivesSearch } from "./features/drives/drivesSearch";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { ReleaseNotesPage } from "./features/changelog/ReleaseNotesPage";
 import { LibraryPage } from "./features/library/LibraryPage";
@@ -136,6 +137,8 @@ const renameRoute = createRoute({
 const drivesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/drives",
+  // `?drive=<id>` the drive that is chosen (the first one without it).
+  validateSearch: validateDrivesSearch,
   component: DrivesPage,
 });
 

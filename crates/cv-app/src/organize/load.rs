@@ -1,6 +1,7 @@
 //! Loading the items in scope, with their files shaped for the planner.
 
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use cv_db::repo::{ItemQuery, children_of, get_availability, get_item, get_summary, list_items};
 use cv_db::{Database, DbError};
@@ -336,7 +337,25 @@ fn plan_file(root: &str, file: &MediaFile, video_stem: &str) -> Option<PlanFile>
     if file.kind == MediaFileType::Subtitle {
         plan = plan.subtitle(subtitle_tag(file, video_stem));
     }
+    if file.kind == MediaFileType::Nfo && !nfo_may_be_carried(file) {
+        plan = plan.invalid_nfo();
+    }
     Some(plan)
+}
+
+/// Whether an NFO file may be renamed to the item's NFO name: the same test the NFO writer uses
+/// before it overwrites a file. A downloaded info file (plain text about the video, named like
+/// it) is foreign, so it keeps its name instead of taking the place CineVault's NFO is written
+/// to. A file that cannot be read now is carried as before.
+fn nfo_may_be_carried(file: &MediaFile) -> bool {
+    let path = Path::new(&file.directory).join(&file.filename);
+    match cv_nfo::classify_nfo_file(&path) {
+        Ok(ownership) => ownership.may_overwrite(),
+        Err(e) => {
+            tracing::warn!(path = %path.display(), error = %e, "could not read an NFO to plan its rename");
+            true
+        }
+    }
 }
 
 /// The root without a trailing separator.

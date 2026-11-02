@@ -9,6 +9,12 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Browser mode: CineVault can be added to a phone's home screen (Safari › Share › Add to Home Screen on iPhone, Install app in Chrome on Android) and opens full screen with its own icon. You sign in once more inside the home-screen app.
 - Browser mode on phones and tablets: below 1024px wide the sidebar opens as a drawer from the menu button at the top left, next to Back and the search, every page fits the width without scrolling sideways, buttons and menu items are bigger on touch screens, and a long press opens the menu that a right-click opens on a computer.
 - Browser mode over HTTPS: CineVault starts faster from what it already downloaded, and says "Can't reach CineVault" with Try again when the server doesn't answer, instead of the browser's error page.
+- Drives: a Refresh button next to "Updated …" reads every drive again at once, for example after copying files outside CineVault or plugging a drive in.
+
+### Fixed
+
+- Drives: clicking a drive in the sidebar now opens the Drives page on that drive, also when the page is already open, and the sidebar shows which drive is chosen.
+- Rename no longer gives a downloaded info file (a plain-text `.nfo` about the video, named like it) the movie's NFO name. Before, CineVault could then never write its own NFO for that movie, and when the movie already had one, the info file could push it into the trash. Now a rename sets the info file aside with the other leftovers (Undo brings it back), so only CineVault's NFO stays with the title.
 
 ## [1.4.0] - 2026-11-02
 
