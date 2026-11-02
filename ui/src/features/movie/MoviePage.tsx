@@ -132,26 +132,21 @@ function MovieView({ detail }: { detail: MovieDetail }) {
         actions={<TitleActionBar actions={actions} label={t("movie.actions.label")} />}
       />
 
-      {/* Narrow panes (phones and tablets): one column, with the Technical card right under the
-          plot and facts and the copies, tags and cast after it. */}
-      <div className="relative flex gap-7 px-(--inset) pt-1.5 @max-[860px]/pane:flex-col @max-[860px]/pane:gap-6">
-        <div className="flex min-w-0 flex-[1.25] flex-col gap-6 @max-[860px]/pane:contents">
-          <div className="flex min-w-0 flex-col gap-6">
-            {filesState === null ? null : <FilesNotice state={filesState} folder={detail.folder} />}
-            {detail.plot === "" ? (
-              <p className="cv-plot text-text-muted">{t("movie.plot.none")}</p>
-            ) : (
-              <p className="cv-plot">{detail.plot}</p>
-            )}
-            <MovieFacts detail={detail} format={format} />
-          </div>
-          <div className="flex min-w-0 flex-col gap-6 empty:hidden @max-[860px]/pane:order-2">
-            <CopiesLine movieId={detail.id} />
-            <MovieTags tags={detail.tags} />
-            <CastSection credits={detail.credits} />
-          </div>
+      {/* The source order is the reading order of a narrow pane: plot and facts, the Technical
+          card, then copies, tags and cast. A wide pane places them in two columns (1.25 : 1, 28px
+          apart) with the Technical card at the right spanning both rows; the second row takes the
+          card's extra height, so the cast follows the facts directly. */}
+      <div className="relative grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] grid-rows-[auto_1fr] gap-x-7 px-(--inset) pt-1.5 @max-[860px]/pane:flex @max-[860px]/pane:flex-col @max-[860px]/pane:gap-6">
+        <div className="col-start-1 row-start-1 flex min-w-0 flex-col gap-6">
+          {filesState === null ? null : <FilesNotice state={filesState} folder={detail.folder} />}
+          {detail.plot === "" ? (
+            <p className="cv-plot text-text-muted">{t("movie.plot.none")}</p>
+          ) : (
+            <p className="cv-plot">{detail.plot}</p>
+          )}
+          <MovieFacts detail={detail} format={format} />
         </div>
-        <div className="min-w-0 flex-1 @max-[860px]/pane:order-1 @max-[860px]/pane:flex-none">
+        <div className="col-start-2 row-span-2 row-start-1 min-w-0">
           <TechnicalCard
             detail={detail}
             nfo={nfo.data}
@@ -171,6 +166,11 @@ function MovieView({ detail }: { detail: MovieDetail }) {
             onHide={() => setNfoOpen(false)}
             onRewrite={() => void runNfoAction("rewrite", selectionScope([detail.id]))}
           />
+        </div>
+        <div className="col-start-1 row-start-2 mt-6 flex min-w-0 flex-col gap-6 self-start empty:hidden @max-[860px]/pane:mt-0 @max-[860px]/pane:self-stretch">
+          <CopiesLine movieId={detail.id} />
+          <MovieTags tags={detail.tags} />
+          <CastSection credits={detail.credits} />
         </div>
       </div>
 
