@@ -57,7 +57,7 @@ export function ArtworkFooter({ onChoice }: ArtworkFooterProps) {
   };
 
   return (
-    <div className="flex h-12 shrink-0 items-center gap-2 border-t border-solid border-line-section px-6">
+    <div className="flex h-12 shrink-0 items-center gap-2 border-t border-solid border-line-section px-6 @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:px-4 @max-[640px]/pane:py-2">
       <Button icon={Upload} title={t("artworkPicker.file.tip")} onClick={chooseFile}>
         {t("artworkPicker.file")}
       </Button>
@@ -83,7 +83,7 @@ export function ArtworkFooter({ onChoice }: ArtworkFooterProps) {
         </Button>
       ) : (
         <form
-          className="flex min-w-0 flex-1 items-center gap-2"
+          className="flex min-w-0 flex-1 items-center gap-2 @max-[640px]/pane:basis-full"
           onSubmit={(event) => {
             event.preventDefault();
             submitLink();

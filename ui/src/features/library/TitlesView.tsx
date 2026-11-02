@@ -22,6 +22,7 @@ import { PosterGrid } from "./PosterGrid";
 import { TitleContextMenu } from "./TitleContextMenu";
 import { useLibraryActions } from "./useLibraryActions";
 import type { TitleTarget } from "./useLibraryActions";
+import type { PaneFit } from "./usePaneFit";
 import { useLibraryListing } from "./useLibraryListing";
 
 interface TitlesViewProps {
@@ -29,6 +30,8 @@ interface TitlesViewProps {
   /** The typed search of the title bar (`?q=`). */
   text: string;
   onClearText: () => void;
+  /** How much room the pane has: the table shows fewer columns on a tablet or a phone. */
+  fit?: PaneFit;
 }
 
 /**
@@ -36,7 +39,7 @@ interface TitlesViewProps {
  * the floating selection bar and the right-click menu, all on one selection. Filters, sort and
  * selection are kept when the view switches (spec library-browsing "Grid and table views").
  */
-export function TitlesView({ type, text, onClearText }: TitlesViewProps) {
+export function TitlesView({ type, text, onClearText, fit = "wide" }: TitlesViewProps) {
   const navigate = useNavigate();
   const format = useFormat();
   const kind = type === "movies" ? "movies" : "shows";
@@ -206,6 +209,7 @@ export function TitlesView({ type, text, onClearText }: TitlesViewProps) {
           empty={empty}
           onKey={onKey}
           onColumns={setGridColumns}
+          fit={fit}
         />
       ) : (
         <LibraryTable
@@ -220,6 +224,7 @@ export function TitlesView({ type, text, onClearText }: TitlesViewProps) {
           hiddenColumns={state.hiddenColumns}
           onColumn={(column, shown) => setColumnHidden(type, column, !shown)}
           onKey={onKey}
+          fit={fit}
         />
       )}
       <LibrarySelectionBar

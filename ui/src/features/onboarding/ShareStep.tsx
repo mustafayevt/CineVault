@@ -28,7 +28,7 @@ export function ShareStep({ headingRef, onDone, onCancel, onAddFolder }: ShareSt
       <StepHeading title={t("networkShare.title")} headingRef={headingRef}>
         {t("networkShare.sub.any")}
       </StepHeading>
-      <div className="px-6 pb-6">
+      <div className="px-6 pb-6 @max-[640px]/pane:px-3">
         {support.data === undefined ? (
           <div aria-busy="true">
             <Skeleton shape="tile" aspect="4 / 1" />

@@ -248,6 +248,11 @@ function Section({
   );
 }
 
+/** A block of labelled facts: four to a row, two on a phone-wide pane. */
+const FACT_GRID = "m-0 grid grid-cols-4 @max-[640px]/pane:grid-cols-2";
+const FACT_CELL =
+  "border-r border-b border-solid border-line-row px-4 py-2.5 [&:nth-child(4n)]:border-r-0 @max-[640px]/pane:[&:nth-child(2n)]:border-r-0";
+
 function Grid({ table, mono = [] }: { table: TextTable; mono?: number[] }) {
   return (
     <div className="overflow-x-auto">
@@ -324,8 +329,8 @@ export function TechnicalDetails({
             embedded ? "flex flex-col gap-4 pt-4" : "flex flex-col gap-4 px-(--inset) pt-7"
           }
         >
-          <div className="flex items-center gap-2.5">
-            <h2 className="m-0 flex-1 text-(length:--fs-16) font-(weight:--fw-700)">
+          <div className="flex items-center gap-2.5 @max-[640px]/pane:flex-wrap">
+            <h2 className="m-0 flex-1 text-(length:--fs-16) font-(weight:--fw-700) @max-[640px]/pane:basis-full">
               {t("movie.tech.details")}
             </h2>
             <Button
@@ -354,12 +359,9 @@ export function TechnicalDetails({
           {detail.videos.map((video) => (
             <Section key={video.name} title={t("movie.tech.container")} note={video.name}>
               {video.analysed ? (
-                <dl className="m-0 grid grid-cols-4">
+                <dl className={FACT_GRID}>
                   {containerFacts(video, detail, format).map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="border-r border-b border-solid border-line-row px-4 py-2.5 [&:nth-child(4n)]:border-r-0"
-                    >
+                    <div key={label} className={FACT_CELL}>
                       <dt className="mb-0.5 text-(length:--fs-12) text-text-muted">{label}</dt>
                       <dd className="cv-selectable m-0">{value}</dd>
                     </div>
@@ -379,12 +381,9 @@ export function TechnicalDetails({
           </Section>
           {hdrSections.map(({ key, label, facts }) => (
             <Section key={key} title={t("movie.tech.hdr.title")} note={label}>
-              <dl className="m-0 grid grid-cols-4" data-testid="hdr-details">
+              <dl className={FACT_GRID} data-testid="hdr-details">
                 {facts.map((fact) => (
-                  <div
-                    key={fact.label}
-                    className="border-r border-b border-solid border-line-row px-4 py-2.5 [&:nth-child(4n)]:border-r-0"
-                  >
+                  <div key={fact.label} className={FACT_CELL}>
                     <dt className="mb-0.5 text-(length:--fs-12) text-text-muted">{fact.label}</dt>
                     <dd className="cv-selectable m-0">{fact.value}</dd>
                   </div>

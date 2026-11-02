@@ -1,5 +1,5 @@
 import { FileImage, Maximize2 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { Icon } from "../../components/Icon";
 import { IconButton } from "../../components/IconButton";
@@ -48,6 +48,8 @@ function Picture({
   const frame = cx(
     "group/picture relative overflow-hidden rounded-(--r-10) bg-surface-well shadow-floating",
     tall ? "h-[clamp(220px,calc(100vh-430px),480px)] self-center" : "w-full",
+    // Narrow panes size the picture by the width it has.
+    "@max-[860px]/pane:h-auto @max-[860px]/pane:w-full @max-[640px]/pane:self-start",
   );
   const style = { aspectRatio: slotAspect(slot) };
   // Shown while the pointer is over the picture or the button has the keyboard focus.
@@ -61,6 +63,8 @@ function Picture({
         className={cx(
           "absolute top-2 right-2 z-10 bg-surface-floating opacity-0 transition-opacity duration-(--dur-hover)",
           "group-hover/picture:opacity-100 focus-visible:opacity-100",
+          // No hover on a touch screen: narrow panes always show it.
+          "@max-[860px]/pane:opacity-100",
         )}
       />
     );
@@ -137,12 +141,19 @@ export function ArtworkPreview({
   return (
     <aside
       aria-label={t("artworkPicker.preview")}
-      style={{ width }}
-      className="flex shrink-0 flex-col gap-3.5 overflow-y-auto border-l border-solid border-line-section bg-surface-card px-6 py-[18px]"
+      style={{ "--preview-w": typeof width === "number" ? `${width}px` : width } as CSSProperties}
+      className={cx(
+        "flex w-(--preview-w) shrink-0 flex-col gap-3.5 overflow-y-auto border-l border-solid border-line-section bg-surface-card px-6 py-[18px]",
+        "@max-[860px]/pane:w-full",
+        // A phone shows it under the images: the picture small beside its facts, then the buttons.
+        "@max-[640px]/pane:grid @max-[640px]/pane:grid-cols-[88px_minmax(0,1fr)] @max-[640px]/pane:content-start @max-[640px]/pane:gap-x-3.5 @max-[640px]/pane:gap-y-3 @max-[640px]/pane:overflow-visible @max-[640px]/pane:border-t @max-[640px]/pane:border-l-0 @max-[640px]/pane:px-4 @max-[640px]/pane:py-3",
+      )}
     >
-      <SectionLabel className="mb-0">{heading ?? t("artworkPicker.preview")}</SectionLabel>
+      <SectionLabel className="mb-0 @max-[640px]/pane:hidden">
+        {heading ?? t("artworkPicker.preview")}
+      </SectionLabel>
       <Picture slot={slot} chosen={chosen} fallback={current} onExpand={onExpand} />
-      <dl className="m-0 grid grid-cols-[96px_minmax(0,1fr)] gap-y-[5px]">
+      <dl className="m-0 grid grid-cols-[96px_minmax(0,1fr)] gap-y-[5px] @max-[640px]/pane:grid-cols-[72px_minmax(0,1fr)] @max-[640px]/pane:self-start @max-[640px]/pane:text-(length:--fs-12)">
         {shown === null && chosen === null ? (
           <p className="col-span-2 m-0 text-text-muted">{t("artworkPicker.preview.none")}</p>
         ) : null}
@@ -179,8 +190,8 @@ export function ArtworkPreview({
           </Fact>
         ) : null}
       </dl>
-      <div className="grow" />
-      <div className="flex items-center gap-2.5 text-(length:--fs-12) text-text-muted">
+      <div className="grow @max-[640px]/pane:hidden" />
+      <div className="flex items-center gap-2.5 text-(length:--fs-12) text-text-muted @max-[640px]/pane:hidden">
         <span className="relative h-[33px] w-[22px] shrink-0 overflow-hidden rounded-(--r-4) border border-dashed border-line-edge">
           {current === null ? null : (
             <DetailImage image={current.image} size="list" className="object-cover" />
@@ -190,7 +201,9 @@ export function ArtworkPreview({
           ? t("artworkPicker.current.none", { type })
           : t("artworkPicker.current.of", { type: typeName(slot).toLowerCase() })}
       </div>
-      <div className="flex gap-2">{actions}</div>
+      <div className="flex gap-2 @max-[860px]/pane:flex-wrap @max-[640px]/pane:col-span-2">
+        {actions}
+      </div>
     </aside>
   );
 }

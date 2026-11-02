@@ -82,7 +82,7 @@ export function ShareSections() {
     >
       {SPECIMENS.map(({ label, mode = CONNECT, support = WINDOWS, start }) => (
         <Row key={label} label={label} className="block">
-          <Stage tone="window" className="p-4">
+          <Stage tone="window" className="p-4 @max-[640px]/pane:p-2">
             <NetworkShareForm
               mode={mode}
               support={support}

@@ -24,10 +24,13 @@ function EvidenceLine({ entry }: { entry: QueueEntry }) {
     entry.quality,
   ].filter((part): part is string => part !== null && part !== "");
   return (
-    <div className="flex items-baseline gap-2.5" aria-label={t("scrapePage.evidence.label")}>
+    <div
+      className="flex items-baseline gap-2.5 @max-[640px]/pane:flex-wrap @max-[640px]/pane:gap-y-0.5"
+      aria-label={t("scrapePage.evidence.label")}
+    >
       <PathText
         path={entry.path}
-        className="cv-selectable min-w-0 font-mono text-(length:--fs-13) text-text"
+        className="cv-selectable min-w-0 font-mono text-(length:--fs-13) text-text @max-[640px]/pane:basis-full"
       />
       {facts.length > 0 ? (
         <span className="shrink-0 text-(length:--fs-12) text-text-muted">{facts.join(" · ")}</span>
@@ -66,18 +69,19 @@ export function CandidatePane({ entry, hits, onScrape, onSkip }: CandidatePanePr
   const local = { year: entry.year, runtimeMinutes: minutesOf(entry.runtimeSeconds) };
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-col gap-2.5 border-b border-solid border-line-section px-6 pt-3.5 pb-3">
+      <div className="flex shrink-0 flex-col gap-2.5 border-b border-solid border-line-section px-6 pt-3.5 pb-3 @max-[640px]/pane:px-4">
         <EvidenceLine entry={entry} />
         <CandidateSearchBar search={search} onEnter={apply} />
       </div>
-      <div className="flex min-h-0 flex-1">
+      {/* Below the desktop widths the candidates sit above the chosen one's details, in one scroll. */}
+      <div className="flex min-h-0 flex-1 @max-[860px]/pane:flex-col @max-[860px]/pane:overflow-y-auto">
         <CandidateList
           search={search}
           local={local}
           onApply={apply}
-          className="w-[400px] shrink-0 border-r border-solid border-line-section"
+          className="w-[400px] shrink-0 border-r border-solid border-line-section @max-[860px]/pane:w-full @max-[860px]/pane:overflow-visible @max-[860px]/pane:border-r-0 @max-[860px]/pane:border-b @max-[640px]/pane:px-4"
         />
-        <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto px-6 py-[18px]">
+        <div className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto px-6 py-[18px] @max-[860px]/pane:flex-none @max-[860px]/pane:overflow-visible @max-[640px]/pane:px-4">
           {chosen === null ? null : (
             <>
               <CandidateDetails hit={chosen} kind={search.kind} itemId={entry.itemId} />

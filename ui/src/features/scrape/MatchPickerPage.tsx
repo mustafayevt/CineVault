@@ -130,7 +130,7 @@ function MatchPicker({ subject }: MatchPickerProps) {
       aria-label={t("matchPicker.title", { name })}
       className="relative flex h-full min-h-0 flex-col"
     >
-      <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6">
+      <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6 @max-[640px]/pane:px-4">
         <span
           aria-hidden="true"
           className="absolute right-6 bottom-0 left-6 h-px bg-line-section"
@@ -159,21 +159,22 @@ function MatchPicker({ subject }: MatchPickerProps) {
         search={search}
         focusOnOpen
         onEnter={apply}
-        className="flex shrink-0 items-center gap-2 border-b border-solid border-line-section px-6 py-3.5"
+        className="flex shrink-0 items-center gap-2 border-b border-solid border-line-section px-6 py-3.5 @max-[640px]/pane:px-4"
       />
-      <div className="flex min-h-0 flex-1">
+      {/* Below the desktop widths the candidates sit above the chosen one's details, in one scroll. */}
+      <div className="flex min-h-0 flex-1 @max-[860px]/pane:flex-col @max-[860px]/pane:overflow-y-auto">
         <CandidateList
           search={search}
           local={{ year: subject.year > 0 ? subject.year : null, runtimeMinutes: fileMinutes }}
           onApply={apply}
           {...(scoreless ? { currentNote: t("matchPicker.currentUnknown") } : {})}
-          className="w-[470px] shrink-0 border-r border-solid border-line-section"
+          className="w-[470px] shrink-0 border-r border-solid border-line-section @max-[860px]/pane:w-full @max-[860px]/pane:overflow-visible @max-[860px]/pane:border-r-0 @max-[860px]/pane:border-b @max-[640px]/pane:px-4"
         />
-        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto @max-[860px]/pane:flex-none @max-[860px]/pane:overflow-visible">
           {chosen === null ? null : (
             <>
               <Backdrop hit={chosen} />
-              <div className="relative -mt-24 flex min-h-0 flex-1 flex-col gap-3.5 px-6 pb-5">
+              <div className="relative -mt-24 flex min-h-0 flex-1 flex-col gap-3.5 px-6 pb-5 @max-[640px]/pane:px-4">
                 <CandidateDetails hit={chosen} kind={search.kind} itemId={subject.id} />
                 <CandidateExtras rows={preview} />
                 <NowAfterCard subject={subject} hit={chosen} sameMatch={sameMatch} />
