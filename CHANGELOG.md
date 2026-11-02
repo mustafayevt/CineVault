@@ -2,6 +2,16 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.0] - unreleased
+
+### Added
+
+- Drives: a Refresh button next to "Updated …" reads every drive again at once, for example after copying files outside CineVault or plugging a drive in.
+
+### Fixed
+
+- Drives: clicking a drive in the sidebar now opens the Drives page on that drive, also when the page is already open, and the sidebar shows which drive is chosen.
+
 ## [1.4.0] - 2026-11-02
 
 ### Added

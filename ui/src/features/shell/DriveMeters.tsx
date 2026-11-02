@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 
 import { SectionLabel } from "../../components/SectionLabel";
 import { SpaceBar } from "../../components/SpaceBar";
@@ -6,6 +6,7 @@ import { Tooltip } from "../../components/Tooltip";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
+import { chosenDrive, validateDrivesSearch } from "../drives/drivesSearch";
 import type { SidebarDrive } from "./useSidebarDrives";
 
 interface DriveMetersProps {
@@ -17,10 +18,18 @@ interface DriveMetersProps {
  * The Drives section of the sidebar (spec `drives` "Drives in the sidebar"):
  * each drive's name, its free space and a thin used-space bar, warning-coloured when the drive is
  * low and greyed with "Offline" when it is gone. Hovering shows "<name> · <free> free of <total>";
- * choosing a drive opens the Drives page. Collapsed, each drive is a small meter.
+ * choosing a drive opens it on the Drives page, and while that page is open the chosen drive is
+ * marked as the page being shown. Collapsed, each drive is a small meter.
  */
 export function DriveMeters({ drives, collapsed }: DriveMetersProps) {
   const format = useFormat();
+  // The drive the Drives page shows, by the same rule as the page; none on other pages.
+  const shown = useRouterState({
+    select: (state) =>
+      state.location.pathname === "/drives"
+        ? (chosenDrive(drives, validateDrivesSearch(state.location.search).drive)?.id ?? null)
+        : null,
+  });
   if (drives.length === 0) return null;
   return (
     <section aria-labelledby="sidebar-drives" className="flex flex-col">
@@ -46,17 +55,22 @@ export function DriveMeters({ drives, collapsed }: DriveMetersProps) {
           const note = drive.online ? t("shell.drives.free", { free }) : t("shell.drives.offline");
           const used = drive.totalBytes > 0 ? 1 - drive.freeBytes / drive.totalBytes : 0;
           const state = !drive.online ? "offline" : drive.low ? "low" : "normal";
+          const selected = drive.id === shown;
           return (
             <li key={drive.id}>
               <Tooltip content={tip} side={collapsed ? "right" : "top"}>
                 <Link
                   to="/drives"
+                  search={{ drive: drive.id }}
                   aria-label={collapsed ? tip : undefined}
+                  aria-current={selected ? "page" : undefined}
                   data-drive={drive.id}
                   data-state={state}
                   className={cx(
                     "cv-hoverable flex flex-col gap-1.5 rounded-(--r-6) py-[7px] no-underline",
-                    "hover:bg-surface-floating-hover active:bg-surface-pressed",
+                    selected
+                      ? "bg-surface-active"
+                      : "hover:bg-surface-floating-hover active:bg-surface-pressed",
                     collapsed ? "items-center px-1.5" : "px-2.5",
                     drive.online ? "text-text" : "text-text-disabled",
                   )}

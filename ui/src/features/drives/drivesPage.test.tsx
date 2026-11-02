@@ -17,13 +17,20 @@ import { setDrivesBackend } from "./drivesBackend";
 import type { DrivesBackend } from "./drivesBackend";
 import { agoText, qualityShares, usedShare } from "./drivesModel";
 import type { DrivesOverview } from "./drivesModel";
+import { validateDrivesSearch } from "./drivesSearch";
 import { syntheticDrives } from "./syntheticDrives";
+import { useToastStore } from "../toasts/toastStore";
 
-function renderDrives() {
+function renderDrives(at = "/drives") {
   const root = createRootRoute();
   const router = createRouter({
     routeTree: root.addChildren([
-      createRoute({ getParentRoute: () => root, path: "/drives", component: DrivesPage }),
+      createRoute({
+        getParentRoute: () => root,
+        path: "/drives",
+        validateSearch: validateDrivesSearch,
+        component: DrivesPage,
+      }),
       createRoute({
         getParentRoute: () => root,
         path: "/settings",
@@ -33,7 +40,7 @@ function renderDrives() {
         component: () => <p>Settings page</p>,
       }),
     ]),
-    history: createMemoryHistory({ initialEntries: ["/drives"] }),
+    history: createMemoryHistory({ initialEntries: [at] }),
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -123,6 +130,74 @@ describe("the Drives page", () => {
     system.focus();
     await user.keyboard("{Enter}");
     expect(system).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps the chosen drive in the address, so Back returns to the one before", async () => {
+    const user = userEvent.setup();
+    setDrivesBackend(backendOf(() => syntheticDrives()));
+    const { router } = renderDrives();
+    const archive = await screen.findByRole("button", { name: "Show the titles on E: Archive" });
+    await user.click(archive);
+    await waitFor(() => expect(router.state.location.search).toEqual({ drive: "E:" }));
+    router.history.back();
+    const media = screen.getByRole("button", { name: "Show the titles on D: Media" });
+    await waitFor(() => expect(media).toHaveAttribute("aria-pressed", "true"));
+  });
+
+  it("opens on the drive the address names", async () => {
+    setDrivesBackend(backendOf(() => syntheticDrives()));
+    renderDrives("/drives?drive=E%3A");
+    const archive = await screen.findByRole("button", { name: "Show the titles on E: Archive" });
+    expect(archive).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("57 titles in 2 folders")).toBeVisible();
+  });
+
+  it("falls back to the first drive for an unknown drive in the address", async () => {
+    setDrivesBackend(backendOf(() => syntheticDrives()));
+    renderDrives("/drives?drive=Q%3A");
+    const media = await screen.findByRole("button", { name: "Show the titles on D: Media" });
+    expect(media).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("reads every drive again on Refresh and keeps the numbers when that fails", async () => {
+    const user = userEvent.setup();
+    useToastStore.setState({ toasts: [], history: [] });
+    let reads = 0;
+    let fail = false;
+    let release: () => void = () => undefined;
+    const backend = backendOf(() => syntheticDrives());
+    setDrivesBackend({
+      ...backend,
+      overview: () => {
+        reads += 1;
+        if (fail) return Promise.reject(new Error("the disk did not answer"));
+        if (reads === 1) return backend.overview();
+        return new Promise((resolve) => {
+          release = () => resolve(syntheticDrives());
+        });
+      },
+    });
+    renderDrives();
+    const refresh = await screen.findByRole("button", { name: "Refresh" });
+    expect(reads).toBe(1);
+    await user.click(refresh);
+    // While it reads it says so and does not start a second read.
+    const busy = await screen.findByRole("button", { name: "Refreshing…" });
+    expect(busy).toHaveAttribute("aria-busy", "true");
+    await user.click(busy);
+    expect(reads).toBe(2);
+    act(() => release());
+    expect(await screen.findByRole("button", { name: "Refresh" })).toBeEnabled();
+    expect(screen.getByText("Updated just now")).toBeVisible();
+
+    fail = true;
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain(
+        "Couldn’t read the drives. Showing the last numbers.",
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Show the titles on D: Media" })).toBeVisible();
   });
 
   it("reads the numbers again when the service says they changed", async () => {
