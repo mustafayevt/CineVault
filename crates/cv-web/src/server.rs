@@ -1520,9 +1520,11 @@ async fn read_ui_file(ui: &UiAssets, requested: &str) -> Option<(Vec<u8>, String
                         file.mime
                     };
                     // The app's resolver answers an unknown path (a deep link such as
-                    // `/library`) with `index.html` itself. The build has no other HTML file,
-                    // so an HTML answer is the page that needs the transport marker.
-                    let is_index = wanted == "index.html" || mime.starts_with("text/html");
+                    // `/library`) with `index.html` itself. The only other HTML file of the
+                    // build is the offline page, so any other HTML answer is the page that needs
+                    // the transport marker.
+                    let is_index = wanted == "index.html"
+                        || (mime.starts_with("text/html") && wanted != OFFLINE_PAGE);
                     return Some((file.bytes, mime, is_index));
                 }
                 let index = resolve("index.html")?;
@@ -1536,17 +1538,25 @@ async fn read_ui_file(ui: &UiAssets, requested: &str) -> Option<(Vec<u8>, String
 }
 
 /// The interface files with fixed names that a browser fetches without the session cookie: the
-/// icons, the manifest an installed app starts from (browsers fetch it without cookies), and
-/// `robots.txt`.
-const PUBLIC_FILES: [&str; 7] = [
+/// icons, the manifest an installed app starts from (browsers fetch it without cookies), the
+/// service worker with its "Can't reach CineVault" page, and `robots.txt`.
+const PUBLIC_FILES: [&str; 9] = [
     "favicon.ico",
     "favicon.svg",
     "apple-touch-icon.png",
     "icon-192.png",
     "icon-512.png",
     "manifest.webmanifest",
+    SERVICE_WORKER,
+    OFFLINE_PAGE,
     "robots.txt",
 ];
+
+/// The service worker script. The browser checks it for a new version on every start.
+const SERVICE_WORKER: &str = "sw.js";
+
+/// The page the service worker shows when the server does not answer.
+const OFFLINE_PAGE: &str = "offline.html";
 
 async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap) -> Response {
     let requested = uri.path().trim_start_matches('/');
@@ -1602,6 +1612,9 @@ async fn static_file(State(state): State<WebState>, uri: Uri, headers: HeaderMap
     }
     let cache = if is_index {
         "no-store"
+    } else if requested == SERVICE_WORKER {
+        // Never from the HTTP cache, so an updated worker reaches an installed app on its next start.
+        "no-cache"
     } else if is_hashed {
         "public, max-age=31536000, immutable"
     } else if is_asset {

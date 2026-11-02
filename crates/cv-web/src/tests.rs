@@ -680,6 +680,14 @@ async fn the_app_can_be_installed_from_a_browser() {
             bytes: br#"{"name":"CineVault","display":"standalone"}"#.to_vec(),
             mime: String::new(),
         }),
+        "sw.js" => Some(UiFile {
+            bytes: b"self.addEventListener('fetch', () => {});".to_vec(),
+            mime: "text/javascript".to_owned(),
+        }),
+        "offline.html" => Some(UiFile {
+            bytes: b"<html><head></head><body>Can't reach CineVault</body></html>".to_vec(),
+            mime: "text/html".to_owned(),
+        }),
         "apple-touch-icon.png" | "icon-192.png" | "icon-512.png" => Some(UiFile {
             bytes: b"png".to_vec(),
             mime: "image/png".to_owned(),
@@ -725,6 +733,15 @@ async fn the_app_can_be_installed_from_a_browser() {
         script.headers[header::CACHE_CONTROL],
         "public, max-age=31536000, immutable"
     );
+    // The service worker is checked for a new version on every start.
+    let worker = call(&state, "GET", "/sw.js", "192.168.1.30", &[], None).await;
+    assert_eq!(worker.status, StatusCode::OK);
+    assert_eq!(worker.headers[header::CACHE_CONTROL], "no-cache");
+    // The offline page is public and is not the app page: no transport marker, no session token.
+    let offline = call(&state, "GET", "/offline.html", "192.168.1.30", &[], None).await;
+    assert_eq!(offline.status, StatusCode::OK);
+    assert!(offline.body.contains("Can't reach CineVault"));
+    assert!(!offline.body.contains("__CINEVAULT_TRANSPORT__"));
     // Any other file still needs a session.
     let other = call(&state, "GET", "/icon-1024.png", "192.168.1.30", &[], None).await;
     assert_eq!(other.status, StatusCode::SEE_OTHER);
