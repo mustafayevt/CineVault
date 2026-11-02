@@ -10,6 +10,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Browser mode on phones and tablets: below 1024px wide the sidebar opens as a drawer from the menu button at the top left, next to Back and the search, every page fits the width without scrolling sideways, buttons and menu items are bigger on touch screens, and a long press opens the menu that a right-click opens on a computer.
 - Browser mode over HTTPS: CineVault starts faster from what it already downloaded, and says "Can't reach CineVault" with Try again when the server doesn't answer, instead of the browser's error page.
 - Drives: a Refresh button next to "Updated …" reads every drive again at once, for example after copying files outside CineVault or plugging a drive in.
+- Copies: the Movie page of a movie you have more than once shows a tab for each copy at the top of its Technical card ("2160p DV", "1080p"), the best one marked. A tab switches the page to that copy: its file, NFO, Rename history, Play and Move. The Copies row at the end of the card offers Keep only this one, Delete this copy and Compare. It replaces the "You have 2 copies · Compare" line.
 
 ### Fixed
 

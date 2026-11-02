@@ -5,7 +5,8 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Skeleton } from "../../components/Skeleton";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
-import { CopiesLine } from "../copies/CopiesLine";
+import { CopyActions, CopyTabs } from "../copies/CopyTabs";
+import { useCopyGroup } from "../copies/copyGroup";
 import { useRememberOpened } from "../search/recents";
 import { useClearNewOnOpen } from "../curation/newFlagActions";
 import { displayTitle, usePreferOriginalTitle } from "../library/displayTitle";
@@ -68,6 +69,7 @@ function MovieView({ detail }: { detail: MovieDetail }) {
   });
   const read = useMediaInfoRead([["movie-detail", detail.id]]);
   const renamed = useRenamedFrom(detail.id);
+  const copyGroup = useCopyGroup(detail.id);
   const filesState = filesStateOf(detail.availability);
 
   const showNfo = useCallback(() => setNfoOpen(true), []);
@@ -133,7 +135,7 @@ function MovieView({ detail }: { detail: MovieDetail }) {
       />
 
       {/* The source order is the reading order of a narrow pane: plot and facts, the Technical
-          card, then copies, tags and cast. A wide pane places them in two columns (1.25 : 1, 28px
+          card, then tags and cast. A wide pane places them in two columns (1.25 : 1, 28px
           apart) with the Technical card at the right spanning both rows; the second row takes the
           card's extra height, so the cast follows the facts directly. */}
       <div className="relative grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] grid-rows-[auto_1fr] gap-x-7 px-(--inset) pt-1.5 @max-[860px]/pane:flex @max-[860px]/pane:flex-col @max-[860px]/pane:gap-6">
@@ -157,6 +159,14 @@ function MovieView({ detail }: { detail: MovieDetail }) {
             read={read}
             renamed={renamed.data ?? null}
             onUndoRename={undoRename}
+            copies={
+              copyGroup === null
+                ? null
+                : {
+                    tabs: <CopyTabs group={copyGroup} movieId={detail.id} />,
+                    actions: <CopyActions group={copyGroup} movieId={detail.id} />,
+                  }
+            }
           />
           <NfoPanel
             id={nfoId}
@@ -168,7 +178,6 @@ function MovieView({ detail }: { detail: MovieDetail }) {
           />
         </div>
         <div className="col-start-1 row-start-2 mt-6 flex min-w-0 flex-col gap-6 self-start empty:hidden @max-[860px]/pane:mt-0 @max-[860px]/pane:self-stretch">
-          <CopiesLine movieId={detail.id} />
           <MovieTags tags={detail.tags} />
           <CastSection credits={detail.credits} />
         </div>
