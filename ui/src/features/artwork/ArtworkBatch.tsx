@@ -117,15 +117,18 @@ export function ArtworkBatch({ ids, type }: ArtworkBatchProps) {
   const shown = ids.slice(windowStart, windowStart + STRIP_WINDOW);
 
   const header = (
-    <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6">
-      <span aria-hidden="true" className="absolute right-6 bottom-0 left-6 h-px bg-line-section" />
+    <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6 @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:gap-y-1.5 @max-[640px]/pane:px-4 @max-[640px]/pane:py-2">
+      <span
+        aria-hidden="true"
+        className="absolute right-6 bottom-0 left-6 h-px bg-line-section @max-[640px]/pane:right-4 @max-[640px]/pane:left-4"
+      />
       <IconButton
         aria-label={t("artworkPicker.batch.previous")}
         icon={ChevronLeft}
         disabled={index === 0}
         onClick={() => go(index - 1)}
       />
-      <div className="min-w-0">
+      <div className="min-w-0 @max-[640px]/pane:flex-1">
         <div className="text-(length:--fs-12) text-text-muted">
           {t("artworkPicker.batch.step", { at: index + 1, count: ids.length })}
         </div>
@@ -142,7 +145,7 @@ export function ArtworkBatch({ ids, type }: ArtworkBatchProps) {
       <div
         role="group"
         aria-label={t("artworkPicker.batch.titles")}
-        className="flex flex-1 items-center justify-center gap-[5px]"
+        className="flex flex-1 items-center justify-center gap-[5px] @max-[640px]/pane:order-last @max-[640px]/pane:basis-full @max-[640px]/pane:justify-start"
       >
         {shown.map((entry, position) => (
           <TitleTile
@@ -159,7 +162,10 @@ export function ArtworkBatch({ ids, type }: ArtworkBatchProps) {
           </span>
         ) : null}
       </div>
-      <span className="text-(length:--fs-12) text-text-muted" aria-live="polite">
+      <span
+        className="text-(length:--fs-12) text-text-muted @max-[640px]/pane:order-last"
+        aria-live="polite"
+      >
         {t("artworkPicker.batch.counts", {
           changed: format.number(changed.size),
           skipped: format.number(skipped.size),
