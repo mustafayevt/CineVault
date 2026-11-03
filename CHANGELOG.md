@@ -7,6 +7,8 @@ What changed in each version of CineVault, newest first, in plain words. The app
 ### Fixed
 
 - Settings: clicking a section in the index, especially the last one, no longer scrolls the whole window and pushes the index off screen or leaves empty space below the last card. Only the settings scroll, and only as far as they go.
+- Moves to another drive: resuming a move that stopped in the middle of a large file (CineVault was closed, or the drive filled up) now carries on from where the file stopped instead of copying it again from the start. What was already copied is checked against the original first, and the whole file is still checked once it is done.
+- Move to: a title waiting on a move that did not finish now shows its size instead of "0 B".
 
 ## [1.5.0] - 2026-11-03
 

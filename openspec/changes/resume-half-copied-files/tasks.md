@@ -8,4 +8,4 @@
 
 ## 3. Docs and checks
 
-- [ ] 3.1 `CHANGELOG.md` under 1.6.0 and `bun run site:changelog`; `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test -p cv-app`, `openspec validate resume-half-copied-files --strict`.
+- [x] 3.1 `CHANGELOG.md` under 1.6.0 and `bun run site:changelog`; `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test -p cv-app`, `openspec validate resume-half-copied-files --strict`.
