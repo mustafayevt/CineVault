@@ -4,7 +4,7 @@
 
 ## 2. Move dialog size
 
-- [ ] 2.1 `plan_row` lists the folder and fills in the size before it refuses a title an unfinished move blocks. Verified by a `cv-app` test of the move plan for a blocked title.
+- [x] 2.1 `plan_row` lists the folder and fills in the size before it refuses a title an unfinished move blocks. Verified by a `cv-app` test of the move plan for a blocked title.
 
 ## 3. Docs and checks
 
