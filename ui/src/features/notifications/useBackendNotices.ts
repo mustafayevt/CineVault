@@ -2,6 +2,11 @@ import { Channel } from "@tauri-apps/api/core";
 import { useEffect } from "react";
 
 import { commands } from "../../bindings";
+import { t } from "../../i18n/catalog";
+import { queryClient } from "../../queryClient";
+import { openActivityAction } from "../activity/openActivity";
+import { UNFINISHED_KEY } from "../activity/recoveryBackend";
+import { showToast } from "../toasts/toastStore";
 import type { NoticeDto } from "../../bindings";
 import { notify, useNotificationStore } from "./notificationStore";
 
@@ -28,6 +33,15 @@ export function openNoticeStream(): void {
         // Not a message: what the notices of this topic said no longer holds.
         if (notice.topic !== null) useNotificationStore.getState().resolveTopic(notice.topic);
         return;
+      }
+      if (notice.action === "resolve_unfinished") {
+        // A move or rename that did not finish: the first sign of it leads to its fix.
+        void queryClient.invalidateQueries({ queryKey: UNFINISHED_KEY });
+        showToast({
+          message: t("activity.toast.unfinished", { title: notice.title }),
+          action: openActivityAction(notice.batch_id),
+          duration: null,
+        });
       }
       notify({
         severity: notice.severity,

@@ -172,7 +172,7 @@ describe("the History page", () => {
     expect(within(today).getAllByText(/^(Renamed|Changed|Deleted)/)).toHaveLength(4);
     expect(screen.getByRole("region", { name: "Yesterday" })).toBeInTheDocument();
     expect(await screen.findByTestId("bin-total")).toHaveTextContent("21.5 GB in Recycle Bin");
-    expect(screen.getByRole("heading", { name: "History", level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Activity", level: 1 })).toBeInTheDocument();
   });
 
   it("names the bin the Trash on Linux, in the header total and its tip", async () => {

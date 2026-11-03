@@ -1,4 +1,5 @@
 import { activeLocale, numberFormat } from "./locale";
+import { activity } from "./messages/en/activity";
 import { artwork } from "./messages/en/artwork";
 import { common } from "./messages/en/common";
 import { copies } from "./messages/en/copies";
@@ -38,6 +39,7 @@ export const EN_AREAS = {
   drives,
   torrents,
   history,
+  activity,
   settings,
   onboarding,
   delete: deleteMessages,
@@ -56,6 +58,7 @@ const en = {
   ...drives,
   ...torrents,
   ...history,
+  ...activity,
   ...settings,
   ...onboarding,
   ...deleteMessages,

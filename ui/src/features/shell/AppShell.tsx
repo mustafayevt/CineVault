@@ -10,6 +10,7 @@ import { PermanentDeleteDialog } from "../delete/PermanentDeleteDialog";
 import { JobAnnouncer } from "../jobs/JobAnnouncer";
 import { useJobProgressStream } from "../jobs/useJobProgressStream";
 import { useItemsChangedSync } from "../live/useItemsChanged";
+import { useAutoResume } from "../activity/useAutoResume";
 import { useBackendNotices } from "../notifications/useBackendNotices";
 import { useRefreshQueueAfterMatch } from "../scrape/useRefreshQueue";
 import {
@@ -69,6 +70,8 @@ interface AppShellProps {
 export function AppShell({ platform = defaultPlatform, windowApi }: AppShellProps) {
   useJobProgressStream();
   useBackendNotices();
+  // A move the close cut short carries on by itself; others wait in Activity.
+  useAutoResume();
   useSettingsLoader();
   useAppearance();
   useLocaleSettings();

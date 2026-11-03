@@ -45,10 +45,15 @@ describe("the routes of the new design", () => {
     }
   });
 
-  it("shows the History page at /history", async () => {
-    open("/history");
-    expect(await screen.findByRole("heading", { name: "History", level: 1 })).toBeInTheDocument();
+  it("shows the Activity page at /activity, with History on it", async () => {
+    open("/activity");
+    expect(await screen.findByRole("heading", { name: "Activity", level: 1 })).toBeInTheDocument();
     expect(await screen.findByRole("group", { name: "Show" })).toBeInTheDocument();
+  });
+
+  it("leads the old /history address to Activity", async () => {
+    open("/history");
+    expect(await screen.findByRole("heading", { name: "Activity", level: 1 })).toBeInTheDocument();
   });
 
   it("shows the first-run setup on its own at /welcome, without the shell", async () => {

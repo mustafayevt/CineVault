@@ -34,10 +34,11 @@ import { DriveMeters } from "./DriveMeters";
 import { useNavCounts } from "./navCounts";
 import { SidebarProgress } from "./SidebarProgress";
 import { useNavigationHistory } from "./useNavigationHistory";
+import { useNeedsAttention } from "../activity/attentionModel";
 import { useSidebarDrives } from "./useSidebarDrives";
 
 interface NavTarget {
-  id: Exclude<Destination, "history" | "settings">;
+  id: Exclude<Destination, "activity" | "settings">;
   to: "/library" | "/scrape" | "/rename" | "/drives" | "/torrents";
   label: MessageKey;
   icon: LucideIcon;
@@ -58,23 +59,34 @@ const rowIcon = cx(rowIconBase, buttonLooks.ghost);
 const rowIconActive = cx(rowIconBase, "bg-surface-active text-gold hover:text-gold");
 
 interface RowLinkProps {
-  to: "/history" | "/settings";
+  to: "/activity" | "/settings";
   label: string;
   icon: LucideIcon;
   active: boolean;
   side: "top" | "right";
+  /** The accessible name when it says more than the tooltip ("Activity, 2 things need attention"). */
+  name?: string;
+  /** A warning dot on the icon: something waits for the user there. */
+  warn?: boolean;
 }
 
-function RowLink({ to, label, icon, active, side }: RowLinkProps) {
+function RowLink({ to, label, icon, active, side, name, warn = false }: RowLinkProps) {
   return (
-    <Tooltip content={label} side={side}>
+    <Tooltip content={name ?? label} side={side}>
       <Link
         to={to}
-        aria-label={label}
+        aria-label={name ?? label}
         aria-current={active ? "page" : undefined}
-        className={active ? rowIconActive : rowIcon}
+        data-warn={warn ? "true" : undefined}
+        className={cx(active ? rowIconActive : rowIcon, "relative")}
       >
         <Icon icon={icon} size={18} />
+        {warn ? (
+          <span
+            aria-hidden="true"
+            className="absolute top-1 right-1 size-2 rounded-full bg-warn-bar ring-2 ring-surface-floating"
+          />
+        ) : null}
       </Link>
     </Tooltip>
   );
@@ -95,7 +107,7 @@ interface SidebarPanelProps {
  * floating-surface recipe. From the top: the logo row with back and forward (lined up with the nav
  * icons; on macOS the traffic lights sit in it too), the five labelled destinations with their
  * waiting counts, the Drives section, and at the foot the progress card above the icon row
- * History · Theme · Settings · Collapse. Collapsed, it is a column of icons with tooltips, small
+ * Activity (with a warning dot while something needs attention) · Theme · Settings · Collapse. Collapsed, it is a column of icons with tooltips, small
  * drive meters and a progress ring; the choice is remembered.
  */
 export function SidebarPanel({ platform, variant = "panel" }: SidebarPanelProps) {
@@ -115,6 +127,7 @@ export function SidebarPanel({ platform, variant = "panel" }: SidebarPanelProps)
   // The traffic lights sit in the panel's top row only in the desktop window.
   const mac = platform === "macos" && !drawer;
   const lowDrives = drives.filter((drive) => drive.online && drive.low).length;
+  const attention = useNeedsAttention().length;
   const tipSide = collapsed ? "right" : "top";
 
   const countOf = (id: NavTarget["id"]): { count?: number | string; tone?: "warn" } => {
@@ -215,11 +228,13 @@ export function SidebarPanel({ platform, variant = "panel" }: SidebarPanelProps)
           )}
         >
           <RowLink
-            to="/history"
-            label={t("shell.page.history")}
+            to="/activity"
+            label={t("activity.nav")}
             icon={History}
-            active={active === "history"}
+            active={active === "activity"}
             side={tipSide}
+            warn={attention > 0}
+            {...(attention > 0 ? { name: t("activity.nav.attention", { count: attention }) } : {})}
           />
           <Tooltip
             content={theme === "dark" ? t("shell.theme.toLight") : t("shell.theme.toDark")}
