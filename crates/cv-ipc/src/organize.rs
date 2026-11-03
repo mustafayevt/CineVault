@@ -170,7 +170,7 @@ impl From<PatternsDto> for PatternSet {
 /// A naming profile: a preset or a custom one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct OrganizeProfileDto {
-    /// `clean`, `detailed`, `media-server-safe` or `custom-...`.
+    /// `clean`, `detailed`, `media-server-safe`, `release-info` or `custom-...`.
     pub id: String,
     pub name: String,
     /// A preset, which cannot be changed or deleted.

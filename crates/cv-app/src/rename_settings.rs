@@ -9,7 +9,7 @@
 //! | `naming.colon` | `remove`, `dash` or `lookalike` (unset follows the profile, which writes `dash` unless a custom profile says otherwise) | how a colon in a title is written in names (Settings, Naming): dropped, ` - `, or the look-alike character U+A789 |
 //! | `renamer.keep-subfolders` | bool (default on) | "Keep sub-folders": a folder pattern of one segment renders inside the folder that holds the title now (`Movies/Amadeus` stays in `Movies`); a pattern with `/` still renders under the library folder |
 //!
-//! The three presets (`clean`, `detailed`, `media-server-safe`) are built into `cv-rename` and never
+//! The four presets (`clean`, `detailed`, `media-server-safe`, `release-info`) are built into `cv-rename` and never
 //! stored. A custom profile is stored as an object with camelCase keys; a missing key takes the value
 //! of the Clean preset, an unknown choice name is ignored, so a hand-edited or newer file can never
 //! stop renaming.
