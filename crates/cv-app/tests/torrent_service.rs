@@ -1046,6 +1046,93 @@ mod wishlist {
         assert!(lab.service.wishlist().unwrap()[0].done_ms.is_none());
     }
 
+    fn any_1080() -> WishCriteria {
+        WishCriteria {
+            min_resolution: Some(MinResolution::R1080),
+            ..WishCriteria::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn a_title_already_held_stays_active_until_another_copy_arrives() {
+        let (lab, searches) = shelf_lab(false).await;
+        lab.library_movie("949", "Heat", 1995, 1920, 1080);
+        assert_eq!(
+            lab.service
+                .wishlist_held(MediaKind::Movie, 949, WishScope::Movie)
+                .unwrap()
+                .map(|copy| copy.resolution),
+            Some(Resolution::R1080)
+        );
+        let id = lab
+            .service
+            .wishlist_add(WishRequest {
+                criteria: any_1080(),
+                ..heat()
+            })
+            .await
+            .unwrap();
+
+        let list = lab.service.wishlist().unwrap();
+        assert!(list[0].done_ms.is_none(), "the copy was already there");
+        assert_eq!(list[0].held_copies, 1);
+        assert_eq!(
+            list[0].held.as_ref().map(|copy| copy.resolution),
+            Some(Resolution::R1080)
+        );
+        let report = lab.service.wishlist_check_at(false, 1_000).await.unwrap();
+        assert_eq!(report.checked, 1);
+        assert_eq!(searches.load(Ordering::SeqCst), 1);
+
+        // A second copy that meets the criteria arrives: that is what was wished for.
+        lab.library_movie("949", "Heat", 1995, 3840, 2160);
+        let list = lab.service.wishlist().unwrap();
+        assert!(list[0].done_ms.is_some());
+        assert_eq!(list[0].held, None, "a done entry says so instead");
+
+        // Keep looking counts both copies from now on.
+        lab.service.wishlist_keep_looking(id).unwrap();
+        let list = lab.service.wishlist().unwrap();
+        assert!(list[0].done_ms.is_none());
+        assert_eq!(list[0].held_copies, 2);
+        assert!(list[0].checked_ms.is_none(), "checked at once");
+        assert!(matches!(
+            lab.service.wishlist_keep_looking(999),
+            Err(TorrentServiceError::NotFound)
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_copy_that_leaves_lowers_the_count_so_a_later_one_counts() {
+        let (lab, _) = shelf_lab(false).await;
+        lab.library_movie("949", "Heat", 1995, 1920, 1080);
+        lab.service
+            .wishlist_add(WishRequest {
+                criteria: any_1080(),
+                ..heat()
+            })
+            .await
+            .unwrap();
+        assert_eq!(lab.service.wishlist().unwrap()[0].held_copies, 1);
+
+        let movies: Vec<_> = lab
+            .db
+            .read(|c| cv_db::repo::items_by_provider_id(c, "tmdb", "949"))
+            .unwrap();
+        for id in movies {
+            lab.db
+                .write(move |c| cv_db::repo::delete_item(c, id))
+                .unwrap();
+        }
+        let list = lab.service.wishlist().unwrap();
+        assert!(list[0].done_ms.is_none());
+        assert_eq!(list[0].held_copies, 0);
+        assert_eq!(list[0].held, None);
+
+        lab.library_movie("949", "Heat", 1995, 1920, 1080);
+        assert!(lab.service.wishlist().unwrap()[0].done_ms.is_some());
+    }
+
     #[tokio::test]
     async fn no_source_answering_is_noted_and_scopes_must_fit_the_title() {
         let (lab, _) = shelf_lab(true).await;

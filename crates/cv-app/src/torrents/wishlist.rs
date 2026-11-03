@@ -2,9 +2,9 @@
 //! and the checks that look for one.
 //!
 //! A check is the release search without the page: TMDB details, the scope, the library (an
-//! entry whose criteria the library already meets is done and never checked again), the query,
-//! every source that applies, and the matching releases that carry no warning and meet the
-//! criteria. What it keeps is stored per entry; a dismissed release never comes back. Nothing is
+//! entry is done, and never checked again, once more library copies meet its criteria than did
+//! when it was saved), the query, every source that applies, and the matching releases that
+//! carry no warning and meet the criteria. What it keeps is stored per entry; a dismissed release never comes back. Nothing is
 //! ever handed to the torrent app here: the user chooses every release.
 
 use std::collections::HashMap;
@@ -136,6 +136,8 @@ pub struct WishCriteria {
     pub sources: Vec<WishSource>,
     /// Only releases with HDR (any format).
     pub hdr: bool,
+    /// The smallest size in bytes.
+    pub min_size: Option<u64>,
     /// The largest size in bytes.
     pub max_size: Option<u64>,
     /// The fewest seeders.
@@ -176,6 +178,9 @@ impl WishCriteria {
         self.resolution_ok(parsed.resolution)
             && self.source_ok(WishSource::of_release(&parsed.source, parsed.remux))
             && (!self.hdr || parsed.hdr != Hdr::None)
+            && self
+                .min_size
+                .is_none_or(|min| row.release.size.is_some_and(|size| size >= min))
             && self
                 .max_size
                 .is_none_or(|max| row.release.size.is_some_and(|size| size <= max))
@@ -324,8 +329,13 @@ pub struct WishEntry {
     pub added_ms: i64,
     pub checked_ms: Option<i64>,
     pub note: Option<CheckNote>,
-    /// When the library was found to hold a copy that meets the criteria.
+    /// When the library was found to have gained a copy that meets the criteria.
     pub done_ms: Option<i64>,
+    /// How many library copies met the criteria when the entry was added, last edited or told to
+    /// keep looking.
+    pub held_copies: u32,
+    /// The copy the library holds of the title and scope, for an entry that is not done.
+    pub held: Option<LibraryCopy>,
     /// The episode a "next" entry looked for at its last check.
     pub target: Option<(u16, u16)>,
     /// The library title, when the library has one with this TMDB ID.
@@ -341,6 +351,24 @@ pub struct WishRequest {
     pub tmdb_id: u64,
     pub scope: WishScope,
     pub criteria: WishCriteria,
+}
+
+/// What the library holds of a title and scope.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct Holding {
+    /// The best movie copy, the quality most episodes of a season share when every aired one is
+    /// held, or the episode's copy. Its parts are unknown when the media info was not read.
+    copy: Option<LibraryCopy>,
+    /// How many copies meet the criteria: each movie copy, or one for the season or episode.
+    meeting: u32,
+}
+
+fn unknown_copy() -> LibraryCopy {
+    LibraryCopy {
+        resolution: Resolution::Unknown,
+        source: MediaSource::Unknown,
+        hdr: Hdr::None,
+    }
 }
 
 /// What a check did.
@@ -478,6 +506,8 @@ fn entry_of(row: WishRow, matches: Vec<WishMatch>, library: Option<LibraryLink>)
         checked_ms: row.checked_ms,
         note: row.check_error.as_deref().map(CheckNote::parse),
         done_ms: row.done_ms,
+        held_copies: u32::try_from(row.held_copies).unwrap_or_default(),
+        held: None,
         target: row.target.as_deref().and_then(parse_code),
         library,
         matches,
@@ -518,8 +548,9 @@ impl Drop for Running<'_> {
 
 impl TorrentService {
     /// Every entry of the Wishlist, the newest first, with its matches. Entries that are not done
-    /// are judged against the library first: one whose criteria the library now meets is marked
-    /// done. Only the library is read.
+    /// are judged against the library first: one that more copies meet than when it was saved is
+    /// marked done, and when fewer meet it the lower number counts from then on. Only the library
+    /// is read.
     ///
     /// # Errors
     /// [`TorrentServiceError::Library`] when the library cannot be read or written.
@@ -542,45 +573,84 @@ impl TorrentService {
             let mut entry = entry_of(row, matches, None);
             entry.library =
                 linked_title(&self.db, entry.kind, entry.tmdb_id).map_err(|e| library_error(&e))?;
-            if entry.done_ms.is_none() && self.library_meets(&entry)? {
-                let id = entry.id;
-                self.db
-                    .write(move |tx| rows::mark_done(tx, id, now))
-                    .map_err(|e| library_error(&e))?;
-                entry.done_ms = Some(now);
+            if entry.done_ms.is_none() {
+                let holding = self.holding(
+                    entry.kind,
+                    entry.tmdb_id,
+                    entry.library.as_ref(),
+                    entry.scope,
+                    &entry.criteria,
+                )?;
+                self.judge(&mut entry, holding.meeting, now)?;
+                if entry.done_ms.is_none() {
+                    entry.held = holding.copy;
+                }
             }
             out.push(entry);
         }
         Ok(out)
     }
 
-    /// Whether the library holds a copy that meets the entry's criteria: for a movie any copy
-    /// with its TMDB ID, for a season every aired episode with the quality most of them share,
-    /// for an episode that episode. A "next" entry is never met.
-    fn library_meets(&self, entry: &WishEntry) -> Result<bool, TorrentServiceError> {
-        let Some(link) = entry.library.as_ref() else {
-            return Ok(false);
+    /// Marks the entry done when more copies meet its criteria than when it was saved, or lowers
+    /// the number saved when fewer do.
+    fn judge(
+        &self,
+        entry: &mut WishEntry,
+        meeting: u32,
+        now: i64,
+    ) -> Result<(), TorrentServiceError> {
+        let id = entry.id;
+        if meeting > entry.held_copies {
+            self.db
+                .write(move |tx| rows::mark_done(tx, id, now))
+                .map_err(|e| library_error(&e))?;
+            entry.done_ms = Some(now);
+        } else if meeting < entry.held_copies {
+            self.db
+                .write(move |tx| rows::lower_held(tx, id, i64::from(meeting)))
+                .map_err(|e| library_error(&e))?;
+            entry.held_copies = meeting;
+        }
+        Ok(())
+    }
+
+    /// What the library holds of a title and scope, and how many of those copies meet the
+    /// criteria: for a movie each copy with its TMDB ID, for a season every aired episode with the
+    /// quality most of them share, for an episode that episode. A "next" entry holds nothing.
+    fn holding(
+        &self,
+        kind: MediaKind,
+        tmdb_id: u64,
+        link: Option<&LibraryLink>,
+        scope: WishScope,
+        criteria: &WishCriteria,
+    ) -> Result<Holding, TorrentServiceError> {
+        let Some(link) = link else {
+            return Ok(Holding::default());
         };
-        let criteria = &entry.criteria;
-        let scope = match entry.scope {
-            WishScope::Movie => {
-                let copies =
-                    movie_copies(&self.db, entry.tmdb_id).map_err(|e| library_error(&e))?;
-                return Ok(copies
+        let scope = match scope {
+            WishScope::Movie if kind == MediaKind::Movie => {
+                let copies = movie_copies(&self.db, tmdb_id).map_err(|e| library_error(&e))?;
+                let meeting = copies
                     .iter()
-                    .any(|copy| criteria.met_by_copy(Some(&copy.compared()))));
+                    .filter(|copy| criteria.met_by_copy(Some(&copy.compared())))
+                    .count();
+                return Ok(Holding {
+                    copy: copies.first().map(super::library::MovieCopy::compared),
+                    meeting: u32::try_from(meeting).unwrap_or(u32::MAX),
+                });
             }
-            WishScope::Next => return Ok(false),
+            WishScope::Movie | WishScope::Next => return Ok(Holding::default()),
             WishScope::Season(season) => {
                 let Some(LibraryHolding::Show(show)) =
-                    holding_of(&self.db, link, entry.tmdb_id).map_err(|e| library_error(&e))?
+                    holding_of(&self.db, link, tmdb_id).map_err(|e| library_error(&e))?
                 else {
-                    return Ok(false);
+                    return Ok(Holding::default());
                 };
                 let held = show.held.iter().any(|(s, _)| *s == season);
                 let missing = show.missing.iter().any(|(s, _)| *s == season);
                 if !held || missing {
-                    return Ok(false);
+                    return Ok(Holding::default());
                 }
                 Scope::Season(season)
             }
@@ -590,18 +660,63 @@ impl TorrentService {
                     .iter()
                     .any(|(s, e, _)| (*s, *e) == (season, episode));
                 if !held {
-                    return Ok(false);
+                    return Ok(Holding::default());
                 }
                 Scope::Episode(season, episode)
             }
         };
-        let copy = library_copy(&self.db, Some(link), Some(entry.tmdb_id), scope)
+        let copy = library_copy(&self.db, Some(link), Some(tmdb_id), scope)
             .map_err(|e| library_error(&e))?;
-        Ok(criteria.met_by_copy(copy.as_ref()))
+        Ok(Holding {
+            meeting: u32::from(criteria.met_by_copy(copy.as_ref())),
+            copy: Some(copy.unwrap_or_else(unknown_copy)),
+        })
+    }
+
+    /// How many library copies of the title and scope meet the criteria now.
+    fn meeting_now(
+        &self,
+        kind: MediaKind,
+        tmdb_id: u64,
+        scope: WishScope,
+        criteria: &WishCriteria,
+    ) -> Result<u32, TorrentServiceError> {
+        let link = linked_title(&self.db, kind, tmdb_id).map_err(|e| library_error(&e))?;
+        Ok(self
+            .holding(kind, tmdb_id, link.as_ref(), scope, criteria)?
+            .meeting)
+    }
+
+    /// The copy the library holds of a title and scope, for the editor's "You already have
+    /// this". Only the library is read.
+    ///
+    /// # Errors
+    /// A library that cannot be read.
+    pub fn wishlist_held(
+        &self,
+        kind: MediaKind,
+        tmdb_id: u64,
+        scope: WishScope,
+    ) -> Result<Option<LibraryCopy>, TorrentServiceError> {
+        if !scope.fits(kind) {
+            return Ok(None);
+        }
+        let link = linked_title(&self.db, kind, tmdb_id).map_err(|e| library_error(&e))?;
+        Ok(self
+            .holding(
+                kind,
+                tmdb_id,
+                link.as_ref(),
+                scope,
+                &WishCriteria::default(),
+            )?
+            .copy)
     }
 
     /// Adds a title to the Wishlist, or replaces the criteria of the entry that has this title
-    /// and scope. The title's name, year and poster come from TMDB. Returns the entry's id.
+    /// and scope. The title's name, year and poster come from TMDB. The copies the library holds
+    /// that already meet the criteria are counted, so only a copy that arrives later makes the
+    /// entry done. Returns the entry's id.
     ///
     /// # Errors
     /// `NoticeNotAccepted` before the notice is accepted, TMDB's error, `Invalid` for a scope that
@@ -616,6 +731,15 @@ impl TorrentService {
             ));
         }
         let details = self.title_details(request.kind, request.tmdb_id).await?;
+        let held = self
+            .holding(
+                request.kind,
+                request.tmdb_id,
+                details.library_item.as_ref(),
+                request.scope,
+                &request.criteria,
+            )?
+            .meeting;
         let wish = NewWish {
             kind: kind_text(request.kind).to_owned(),
             tmdb_id: i64::try_from(request.tmdb_id).unwrap_or(i64::MAX),
@@ -625,13 +749,15 @@ impl TorrentService {
             scope: request.scope.as_text(),
             criteria_json: request.criteria.to_json(),
             added_ms: now_ms(),
+            held_copies: i64::from(held),
         };
         self.db
             .write(move |tx| rows::add(tx, &wish))
             .map_err(|e| library_error(&e))
     }
 
-    /// Changes an entry's scope and criteria; the entry is judged and checked again.
+    /// Changes an entry's scope and criteria; the entry is judged and checked again, counting the
+    /// copies that meet the new criteria from now.
     ///
     /// # Errors
     /// `NotFound` for an unknown entry, `Invalid` when the scope does not belong to the title or
@@ -658,16 +784,47 @@ impl TorrentService {
         if !scope.fits(kind) {
             return Err(invalid("That scope does not belong to this kind of title."));
         }
+        let held = i64::from(self.meeting_now(
+            kind,
+            u64::try_from(entry.tmdb_id).unwrap_or_default(),
+            scope,
+            criteria,
+        )?);
         let scope_text = scope.as_text();
         let json = criteria.to_json();
         match self
             .db
-            .write(move |tx| rows::update(tx, id, &scope_text, &json))
+            .write(move |tx| rows::update(tx, id, &scope_text, &json, held))
             .map_err(|e| library_error(&e))?
         {
             UpdateOutcome::Updated => Ok(()),
             UpdateOutcome::Missing => Err(TorrentServiceError::NotFound),
             UpdateOutcome::Duplicate => Err(invalid("That is already on your Wishlist.")),
+        }
+    }
+
+    /// Makes a done entry active again: it is checked at once, and only a copy that arrives from
+    /// now on makes it done.
+    ///
+    /// # Errors
+    /// `NotFound` for an unknown entry, or a library that cannot be written.
+    pub fn wishlist_keep_looking(&self, id: i64) -> Result<(), TorrentServiceError> {
+        let entry = self
+            .db
+            .read(|c| rows::get(c, id))
+            .map_err(|e| library_error(&e))?
+            .ok_or(TorrentServiceError::NotFound)?;
+        let entry = entry_of(entry, Vec::new(), None);
+        let held =
+            i64::from(self.meeting_now(entry.kind, entry.tmdb_id, entry.scope, &entry.criteria)?);
+        let found = self
+            .db
+            .write(move |tx| rows::keep_looking(tx, id, held))
+            .map_err(|e| library_error(&e))?;
+        if found {
+            Ok(())
+        } else {
+            Err(TorrentServiceError::NotFound)
         }
     }
 
@@ -822,11 +979,17 @@ impl TorrentService {
             }
         };
         let mut judged = entry.clone();
-        judged.library.clone_from(&details.library_item);
-        if self.library_meets(&judged)? {
-            self.db
-                .write(move |tx| rows::mark_done(tx, id, now))
-                .map_err(|e| library_error(&e))?;
+        let meeting = self
+            .holding(
+                entry.kind,
+                entry.tmdb_id,
+                details.library_item.as_ref(),
+                entry.scope,
+                &entry.criteria,
+            )?
+            .meeting;
+        self.judge(&mut judged, meeting, now)?;
+        if judged.done_ms.is_some() {
             record(None, target)?;
             return Ok(0);
         }
