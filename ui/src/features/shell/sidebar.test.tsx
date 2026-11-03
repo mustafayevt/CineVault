@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JobProgress, LifecycleCountsDto } from "../../bindings";
 import { useShellStore } from "../../stores/shell";
 import { useJobProgressStore } from "../jobs/jobProgressStore";
+import { useNotificationStore } from "../notifications/notificationStore";
 import { setLifecycleBackend } from "../lifecycle/lifecycleBackend";
 import type { PipelineKind } from "../lifecycle/lifecycleBackend";
 import { SIDEBAR_SETTING_KEY, useSettingsStore } from "../settings/settingsStore";
@@ -65,7 +66,7 @@ function job(overrides: Partial<JobProgress> & Pick<JobProgress, "id" | "name">)
   };
 }
 
-const PAGES = ["/library", "/scrape", "/rename", "/drives", "/torrents", "/history", "/settings"];
+const PAGES = ["/library", "/scrape", "/rename", "/drives", "/torrents", "/activity", "/settings"];
 
 function renderSidebar(path = "/library", platform: "windows" | "macos" = "windows") {
   const rootRoute = createRootRoute({ component: () => <SidebarPanel platform={platform} /> });
@@ -113,6 +114,17 @@ describe("the sidebar destinations", () => {
     expect(names.slice(0, 5)).toEqual(["Library", "Scrape", "Rename", "Drives", "Torrents"]);
   });
 
+  it("leaves Rename out while Metadata only is on", async () => {
+    useSettingsStore.setState({ values: { "renamer.metadata-only": true }, status: "ready" });
+    renderSidebar();
+    const panel = await screen.findByRole("navigation", { name: "Main" });
+    const names = within(panel)
+      .getAllByRole("link")
+      .map((link) => link.textContent?.replace(/\d+( low)?$/, ""));
+    expect(names.slice(0, 4)).toEqual(["Library", "Scrape", "Drives", "Torrents"]);
+    useSettingsStore.setState({ values: {}, status: "ready" });
+  });
+
   it("shows the waiting counts of movies and shows together as soft pills", async () => {
     renderSidebar();
     // Scrape = not scraped + uncertain + not matched (7 + 2 + 1, and 2 shows).
@@ -138,9 +150,9 @@ describe("the sidebar destinations", () => {
     expect(destinationOf("/welcome")).toBeNull();
   });
 
-  it("keeps History and Settings in the icon row, active on their pages", async () => {
-    renderSidebar("/history");
-    const history = await screen.findByRole("link", { name: "History" });
+  it("keeps Activity and Settings in the icon row, active on their pages", async () => {
+    renderSidebar("/activity");
+    const history = await screen.findByRole("link", { name: "Activity" });
     expect(history).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Settings" })).not.toHaveAttribute("aria-current");
     // The active icon is gold on the active fill; the ghost grey must not fight it.
@@ -148,6 +160,22 @@ describe("the sidebar destinations", () => {
     expect(history.className).toContain("bg-surface-active");
     expect(history.className).not.toContain("text-text-2");
     expect(screen.getByRole("link", { name: "Settings" }).className).toContain("text-text-2");
+  });
+
+  it("marks Activity with a warning dot while something needs attention", async () => {
+    useNotificationStore.getState().clear();
+    renderSidebar();
+    const link = await screen.findByRole("link", { name: "Activity" });
+    expect(link).not.toHaveAttribute("data-warn");
+    act(() => {
+      useNotificationStore
+        .getState()
+        .add({ severity: "warning", title: "Artwork could not be saved" });
+    });
+    const marked = await screen.findByRole("link", { name: "Activity, 1 thing needs attention" });
+    expect(marked).toHaveAttribute("data-warn", "true");
+    act(() => useNotificationStore.getState().clear());
+    expect(await screen.findByRole("link", { name: "Activity" })).not.toHaveAttribute("data-warn");
   });
 
   it("switches the theme from the icon row", async () => {
@@ -235,7 +263,7 @@ describe("the progress card", () => {
     renderSidebar();
     await screen.findByRole("navigation", { name: "Main" });
     expect(screen.queryByTestId("sidebar-progress")).toBeNull();
-    expect(screen.getByRole("link", { name: "History" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Activity" })).toBeInTheDocument();
   });
 
   it("names the job started first with its count, percentage and +1 more", async () => {

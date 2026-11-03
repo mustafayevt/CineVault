@@ -33,6 +33,9 @@ pub struct WishRow {
     pub done_ms: Option<i64>,
     /// What a `next` entry looked for at its last check (`S03E06`).
     pub target: Option<String>,
+    /// How many library copies met the criteria when the entry was added, last edited or told to
+    /// keep looking; the entry is done once more copies meet them.
+    pub held_copies: i64,
 }
 
 /// What a new entry holds.
@@ -46,6 +49,8 @@ pub struct NewWish {
     pub scope: String,
     pub criteria_json: String,
     pub added_ms: i64,
+    /// How many library copies meet the criteria now.
+    pub held_copies: i64,
 }
 
 /// Where a match stands.
@@ -111,7 +116,7 @@ pub enum UpdateOutcome {
 }
 
 const WISH_COLUMNS: &str = "id, kind, tmdb_id, title, year, poster_url, scope, criteria_json, \
-     added_ms, checked_ms, check_error, done_ms, target";
+     added_ms, checked_ms, check_error, done_ms, target, held_copies";
 
 fn wish_of(row: &Row<'_>) -> rusqlite::Result<WishRow> {
     Ok(WishRow {
@@ -128,21 +133,23 @@ fn wish_of(row: &Row<'_>) -> rusqlite::Result<WishRow> {
         check_error: row.get(10)?,
         done_ms: row.get(11)?,
         target: row.get(12)?,
+        held_copies: row.get(13)?,
     })
 }
 
 /// Adds an entry, or, when the title and scope are already on the Wishlist, replaces that entry's
-/// title, poster and criteria and judges it again (done and the last check are cleared). Returns
-/// the entry's id.
+/// title, poster, criteria and held copies and judges it again (done and the last check are
+/// cleared). Returns the entry's id.
 pub fn add(conn: &Connection, wish: &NewWish) -> DbResult<i64> {
     let id = conn.query_row(
         "INSERT INTO torrent_wishlist \
-             (kind, tmdb_id, title, year, poster_url, scope, criteria_json, added_ms) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
+             (kind, tmdb_id, title, year, poster_url, scope, criteria_json, added_ms, \
+             held_copies) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
          ON CONFLICT (kind, tmdb_id, scope) DO UPDATE SET title = excluded.title, \
              year = excluded.year, poster_url = excluded.poster_url, \
              criteria_json = excluded.criteria_json, checked_ms = NULL, check_error = NULL, \
-             done_ms = NULL \
+             done_ms = NULL, held_copies = excluded.held_copies \
          RETURNING id",
         params![
             wish.kind,
@@ -153,6 +160,7 @@ pub fn add(conn: &Connection, wish: &NewWish) -> DbResult<i64> {
             wish.scope,
             wish.criteria_json,
             wish.added_ms,
+            wish.held_copies,
         ],
         |row| row.get(0),
     )?;
@@ -192,13 +200,15 @@ fn forget_unsent(conn: &Connection, id: i64) -> DbResult<()> {
     Ok(())
 }
 
-/// Changes an entry's scope and criteria. The entry is judged again: done and the last check are
-/// cleared, and the matches kept for the old criteria go (dismissed and sent ones stay).
+/// Changes an entry's scope, criteria and held copies. The entry is judged again: done and the
+/// last check are cleared, and the matches kept for the old criteria go (dismissed and sent ones
+/// stay).
 pub fn update(
     conn: &Connection,
     id: i64,
     scope: &str,
     criteria_json: &str,
+    held_copies: i64,
 ) -> DbResult<UpdateOutcome> {
     let Some(entry) = get(conn, id)? else {
         return Ok(UpdateOutcome::Missing);
@@ -216,13 +226,39 @@ pub fn update(
     }
     conn.execute(
         "UPDATE torrent_wishlist SET scope = ?2, criteria_json = ?3, checked_ms = NULL, \
-             check_error = NULL, done_ms = NULL, \
+             check_error = NULL, done_ms = NULL, held_copies = ?4, \
              target = CASE WHEN scope = ?2 THEN target ELSE NULL END \
          WHERE id = ?1",
-        params![id, scope, criteria_json],
+        params![id, scope, criteria_json, held_copies],
     )?;
     forget_unsent(conn, id)?;
     Ok(UpdateOutcome::Updated)
+}
+
+/// Makes a done entry active again, counting from now: done and the last check are cleared, the
+/// held copies are set, and the matches that are new or seen go (dismissed and sent ones stay).
+/// Returns whether there was such an entry.
+pub fn keep_looking(conn: &Connection, id: i64, held_copies: i64) -> DbResult<bool> {
+    let changed = conn.execute(
+        "UPDATE torrent_wishlist SET done_ms = NULL, checked_ms = NULL, check_error = NULL, \
+             held_copies = ?2 \
+         WHERE id = ?1",
+        params![id, held_copies],
+    )?;
+    if changed > 0 {
+        forget_unsent(conn, id)?;
+    }
+    Ok(changed > 0)
+}
+
+/// Lowers an entry's held copies to `count` when fewer copies meet its criteria now (some left the
+/// library), so a later arrival still counts. A higher count changes nothing.
+pub fn lower_held(conn: &Connection, id: i64, count: i64) -> DbResult<()> {
+    conn.execute(
+        "UPDATE torrent_wishlist SET held_copies = ?2 WHERE id = ?1 AND held_copies > ?2",
+        params![id, count],
+    )?;
+    Ok(())
 }
 
 /// Removes an entry and its matches.
@@ -269,7 +305,7 @@ pub fn record_check(
     Ok(())
 }
 
-/// Marks an entry done: the library holds a copy that meets its criteria.
+/// Marks an entry done: the library gained a copy that meets its criteria.
 pub fn mark_done(conn: &Connection, id: i64, done_ms: i64) -> DbResult<()> {
     conn.execute(
         "UPDATE torrent_wishlist SET done_ms = ?2 WHERE id = ?1 AND done_ms IS NULL",
@@ -413,6 +449,7 @@ mod tests {
             scope: scope.to_owned(),
             criteria_json: criteria.to_owned(),
             added_ms: 1_000,
+            held_copies: 0,
         }
     }
 
@@ -458,6 +495,42 @@ mod tests {
             "a dismissed release is never stored again"
         );
         assert!(matches(&conn).expect("matches").is_empty());
+    }
+
+    #[test]
+    fn adding_again_and_keep_looking_set_the_held_copies_and_lower_held_only_lowers() {
+        let conn = database();
+        let mut held = wish("movie", "{}");
+        held.held_copies = 2;
+        let id = add(&conn, &held).expect("add");
+        assert_eq!(get(&conn, id).expect("get").expect("entry").held_copies, 2);
+        held.held_copies = 1;
+        add(&conn, &held).expect("add again");
+        assert_eq!(get(&conn, id).expect("get").expect("entry").held_copies, 1);
+
+        lower_held(&conn, id, 3).expect("higher");
+        assert_eq!(get(&conn, id).expect("get").expect("entry").held_copies, 1);
+        lower_held(&conn, id, 0).expect("lower");
+        assert_eq!(get(&conn, id).expect("get").expect("entry").held_copies, 0);
+
+        record_check(&conn, id, 5_000, Some("no-source"), None).expect("check");
+        store_matches(&conn, &[found(id, "aa", 5), found(id, "bb", 9)]).expect("matches");
+        set_match_state(&conn, id, "bb", MatchState::Sent).expect("sent");
+        mark_done(&conn, id, 6_000).expect("done");
+
+        assert!(keep_looking(&conn, id, 1).expect("keep looking"));
+        let entry = get(&conn, id).expect("get").expect("entry");
+        assert_eq!(entry.done_ms, None);
+        assert_eq!(entry.checked_ms, None, "due at once");
+        assert_eq!(entry.check_error, None);
+        assert_eq!(entry.held_copies, 1);
+        let kept = matches(&conn).expect("matches");
+        assert_eq!(
+            kept.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(),
+            ["bb"],
+            "the sent one stays as a record"
+        );
+        assert!(!keep_looking(&conn, 999, 0).expect("unknown"));
     }
 
     #[test]
@@ -519,21 +592,22 @@ mod tests {
         let two = add(&conn, &wish("season:2", "{}")).expect("two");
         let three = add(&conn, &wish("season:3", "{}")).expect("three");
         assert_eq!(
-            update(&conn, three, "season:2", "{}").expect("update"),
+            update(&conn, three, "season:2", "{}", 0).expect("update"),
             UpdateOutcome::Duplicate
         );
         assert_eq!(
-            update(&conn, 999, "season:4", "{}").expect("update"),
+            update(&conn, 999, "season:4", "{}", 0).expect("update"),
             UpdateOutcome::Missing
         );
         record_check(&conn, three, 1, None, Some("x")).expect("check");
         assert_eq!(
-            update(&conn, three, "season:4", "{\"b\":1}").expect("update"),
+            update(&conn, three, "season:4", "{\"b\":1}", 1).expect("update"),
             UpdateOutcome::Updated
         );
         let entry = get(&conn, three).expect("get").expect("entry");
         assert_eq!(entry.scope, "season:4");
         assert_eq!(entry.target, None, "a new scope looks afresh");
+        assert_eq!(entry.held_copies, 1);
 
         store_matches(&conn, &[found(two, "aa", 5)]).expect("store");
         assert!(remove(&conn, two).expect("remove"));

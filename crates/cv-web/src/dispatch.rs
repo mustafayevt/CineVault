@@ -1417,6 +1417,7 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             cv_ipc::library_ops::apply_change_source(
                 library,
                 &commands.library_ops,
+                &commands.settings,
                 ids,
                 target,
                 sink,
@@ -1904,6 +1905,33 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
                     criteria,
                 )
                 .map_err(command_error)
+            })
+            .await?
+            .and_then(to_value)
+        }
+        "torrent_wishlist_held" => {
+            let kind: String = arg(args, "kind")?;
+            let tmdb_id: u32 = arg(args, "tmdbId")?;
+            let scope: cv_ipc::torrent_wishlist::WishScopeDto = arg(args, "scope")?;
+            let commands = Arc::clone(&state.commands);
+            on_blocking(move || {
+                cv_ipc::torrent_wishlist::torrent_wishlist_held(
+                    &commands.torrent,
+                    kind,
+                    tmdb_id,
+                    scope,
+                )
+                .map_err(command_error)
+            })
+            .await?
+            .and_then(to_value)
+        }
+        "torrent_wishlist_keep_looking" => {
+            let id: u32 = arg(args, "id")?;
+            let commands = Arc::clone(&state.commands);
+            on_blocking(move || {
+                cv_ipc::torrent_wishlist::torrent_wishlist_keep_looking(&commands.torrent, id)
+                    .map_err(command_error)
             })
             .await?
             .and_then(to_value)

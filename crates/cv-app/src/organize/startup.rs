@@ -102,7 +102,7 @@ fn volume_root(path: &Path) -> PathBuf {
 }
 
 /// Whether the drive of `path` is there. A relative path counts as reachable.
-fn volume_reachable(path: &Path) -> bool {
+pub(crate) fn volume_reachable(path: &Path) -> bool {
     let root = volume_root(path);
     root.as_os_str().is_empty() || reachable_root(&root)
 }

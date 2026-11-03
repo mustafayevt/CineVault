@@ -1,5 +1,7 @@
 import { t } from "../../i18n/catalog";
 import { queryClient } from "../../queryClient";
+import { openActivityAction } from "../activity/openActivity";
+import { UNFINISHED_KEY } from "../activity/recoveryBackend";
 import { DRIVES_KEY } from "../drives/drivesBackend";
 import { undoBatchInHistory } from "../history/historyUndo";
 import { currentLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
@@ -12,16 +14,17 @@ import { showToast } from "../toasts/toastStore";
 import type { MoveOption } from "./moveOptions";
 import { useMoveToStore } from "./moveToStore";
 
-/** The library and the drives read again after a move or its Undo. */
-async function refreshAfterMove(): Promise<void> {
+/** The library, the drives and the unfinished moves read again after a move or its Undo. */
+export async function refreshAfterMove(): Promise<void> {
   await Promise.all([
     refreshLibrary(queryClient),
     queryClient.invalidateQueries({ queryKey: DRIVES_KEY }),
+    queryClient.invalidateQueries({ queryKey: UNFINISHED_KEY }),
   ]);
 }
 
 /** Takes a finished move back from its Undo toast and says how it went. */
-async function undoMove(batch: string, what: string, target: string): Promise<void> {
+export async function undoMove(batch: string, what: string, target: string): Promise<void> {
   const backend = currentLibraryOpsBackend();
   try {
     // The move's History entry is the record: undoing here or from History is the same Undo.
@@ -81,6 +84,12 @@ function report(applied: MoveApplied, how: { label: string; target: string; many
       title: t("move.toast.stopped", { label: how.label }),
       detail: stopped.map((item) => `${item.title}: ${item.reason}`).join("\n"),
       ...(batch === null ? {} : { batchId: batch, action: "resolve_unfinished" }),
+    });
+    // The first sign of the stop leads to its fix: Resume or Roll back in Activity.
+    showToast({
+      message: t("move.toast.stopped", { label: how.label }),
+      tone: "error",
+      action: openActivityAction(batch),
     });
   }
   if (failed.length > 0) {

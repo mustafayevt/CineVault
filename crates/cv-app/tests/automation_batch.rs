@@ -255,6 +255,44 @@ async fn the_nightly_script_finds_scrapes_and_renames_new_movies() {
     assert_eq!(rig.titles(), ["Alien", "Heat"]);
 }
 
+/// "Metadata only": the rename step renames nothing and says why; turned off, it renames again.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_rename_step_renames_nothing_while_metadata_only_is_on() {
+    let rig = Rig::new();
+    rig.add_source("movies");
+    rig.movie("movies", "heat.1995.720p");
+    let scraped = rig
+        .run(request(|s| {
+            s.update = true;
+            s.scrape = Some(Scope::New);
+        }))
+        .await;
+    assert_ok(&scraped);
+    let before = rig.folders("movies");
+
+    rig.services
+        .settings()
+        .set("renamer.metadata-only", serde_json::json!(true))
+        .unwrap();
+    let report = rig.run(request(|s| s.rename = Some(Scope::All))).await;
+    let step_report = step(&report, Step::Rename);
+    assert_eq!(step_report.status, StepStatus::Failed, "{step_report:?}");
+    assert_eq!(
+        step_report.message,
+        cv_app::rename_settings::METADATA_ONLY_MESSAGE,
+        "{step_report:?}"
+    );
+    assert_eq!(rig.folders("movies"), before, "nothing moved");
+
+    rig.services
+        .settings()
+        .set("renamer.metadata-only", serde_json::json!(false))
+        .unwrap();
+    let report = rig.run(request(|s| s.rename = Some(Scope::All))).await;
+    assert_ok(&report);
+    assert_eq!(step(&report, Step::Rename).counts["renamed"], 1);
+}
+
 /// Review 14.1: a rename step never moves a folder while a scrape's NFO or artwork is still being
 /// written into it. After its bounded wait it renames nothing and says why; once the writes are
 /// over, the same step renames.

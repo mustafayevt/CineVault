@@ -30,12 +30,12 @@
 - **HDR details.** The Technical card shows the exact HDR format (Dolby Vision profile, HDR10+, HDR10, HLG), audio and file details read from the file.
 - **Drives with safe moves.** Free space per drive and Move to another drive: copy, verify, and only then do the originals go to the Recycle Bin (the Trash on Linux).
 - **Deleted files handled your way.** Delete sends a title to the Recycle Bin or Trash, a trash folder on each drive or a trash folder you choose, and old trash can be emptied automatically. Choosing "Delete permanently" there makes Delete erase a title, after a Yes or No that lists what goes.
-- **History and Undo.** Renames, moves, deletes, artwork and match changes are listed in History, each with Undo.
+- **Activity, History and Undo.** Renames, moves, deletes, artwork and match changes are listed in History on the Activity page, each with Undo. Anything that needs you, such as a move that did not finish or a rejected API key, waits above it under Needs attention with its fix.
 - **Collections.** A collection appears on its own once you own two or more films of the same set.
 - **Torrent search hand-off.** Pick a title from the suggestions, search its releases from inside the app and compare each with what you have, side by side; for a show, see which releases fill your missing episodes. CineVault hands the one you pick to your own torrent app. You are responsible for what you download and share.
-- **Wishlist.** Add a movie, a season or the next new episode of a show with the release you want (resolution, source, HDR, size, seeders). CineVault checks for it when it opens, shows new matches on Torrents with a count, and marks the title done once your library has it. It never sends anything by itself.
+- **Wishlist.** Add a movie, a season or the next new episode of a show with the release you want (resolution, source, HDR, a size range, seeders). CineVault checks for it when it opens, shows new matches on Torrents with a count, and marks the title done once a copy that meets what you asked for arrives. A title you already have keeps being checked, with what you have shown on its entry. It never sends anything by itself.
 - **Desktop feel.** Light and dark themes that follow the system, zoom from 80% to 150%, keyboard chords for everyday actions, and a `cinevault` command line.
-- **Naming styles.** One Style control in Settings › Naming (Clean, Detailed, Media-server safe) fills the movie folder, movie file and TV episode templates; edit any of them to make your own.
+- **Naming styles.** One Style control in Settings › Naming (Clean, Detailed, Media-server safe, Release info) fills the movie folder, movie file and TV episode templates; edit any of them to make your own. Release tokens keep the release group, tags and quality from the download's name. A Metadata only switch leaves every file and folder name alone and only writes NFOs and artwork.
 - **Private by design.** You bring your own provider keys, kept in the OS credential store (the system keyring on Linux). No account, no telemetry.
 
 ## Getting started
@@ -48,7 +48,7 @@
 
 ## Backups
 
-Your library, its History and everything Undo needs live in `library.db` in CineVault's data folder (`%APPDATA%\CineVault` on Windows, `~/.local/share/CineVault` on Linux, the `data` folder beside a portable copy, or the folder you chose in Settings). While CineVault runs it keeps a checked copy of it every day in the `backups` folder there, as `library-YYYY-MM-DD.db`, and keeps the last seven. If backups keep failing for three days, the notification centre says so.
+Your library, its History and everything Undo needs live in `library.db` in CineVault's data folder (`%APPDATA%\CineVault` on Windows, `~/.local/share/CineVault` on Linux, the `data` folder beside a portable copy, or the folder you chose in Settings). While CineVault runs it keeps a checked copy of it every day in the `backups` folder there, as `library-YYYY-MM-DD.db`, and keeps the last seven. If backups keep failing for three days, Activity says so.
 
 To bring one back:
 

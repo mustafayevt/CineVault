@@ -136,8 +136,8 @@ pub fn storage(message: &str) -> LibraryOpsCommandError {
 /// Why a command did not run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct LibraryOpsCommandError {
-    /// `storage`, `bad_id`, `unknown_source`, `disk`, or the code of the refused rule: `title`,
-    /// `year`, `data_source`, `unavailable`, `exists`.
+    /// `storage`, `bad_id`, `unknown_source`, `disk`, `metadata_only`, or the code of the refused
+    /// rule: `title`, `year`, `data_source`, `unavailable`, `exists`.
     pub code: String,
     /// Plain sentence for the user.
     pub message: String,
@@ -462,13 +462,21 @@ impl From<&MoveProgress> for MoveProgressDto {
 }
 
 /// Moves the titles to the data source as one undoable batch. Progress goes to `on_progress`.
+/// Refused with `metadata_only` while Settings › Naming › "Metadata only" is on.
 pub async fn apply_change_source(
     library: &LibraryState,
     ops: &LibraryOpsState,
+    settings: &crate::settings::SettingsState,
     ids: Vec<String>,
     target: u32,
     on_progress: crate::sink::Sink<MoveProgressDto>,
 ) -> Result<MoveAppliedDto, LibraryOpsCommandError> {
+    if cv_app::rename_settings::metadata_only(&settings.service().snapshot().values) {
+        return Err(LibraryOpsCommandError {
+            code: "metadata_only".to_owned(),
+            message: cv_app::rename_settings::METADATA_ONLY_MESSAGE.to_owned(),
+        });
+    }
     let service = ops.change(library)?;
     let ids = ids_of(&ids)?;
     let control = MoveControl::new();
@@ -569,6 +577,17 @@ pub struct UnfinishedBatchDto {
     pub files_total: u32,
     /// A plain sentence: why it stopped.
     pub reason: String,
+    /// The library ids of the titles that still have work.
+    pub item_ids: Vec<String>,
+    /// The folder the titles go to (a move), else `null`.
+    pub destination: Option<String>,
+    /// Bytes of the originals copied and verified, and of all of them (a move); the total is
+    /// `null` when an original cannot be read, and for a rename.
+    pub bytes_done: f64,
+    pub bytes_total: Option<f64>,
+    /// A move the app's close or a crash cut short, with its drives and folders all there: the
+    /// window resumes it by itself at start-up. Every other batch waits for Resume or Roll back.
+    pub auto_resume: bool,
 }
 
 impl From<UnfinishedBatch> for UnfinishedBatchDto {
@@ -587,6 +606,11 @@ impl From<UnfinishedBatch> for UnfinishedBatchDto {
             files_done: small(batch.files_done),
             files_total: small(batch.files_total),
             reason: batch.reason,
+            item_ids: batch.item_ids,
+            destination: batch.destination,
+            bytes_done: bytes_of(batch.bytes_done),
+            bytes_total: batch.bytes_total.map(bytes_of),
+            auto_resume: batch.auto_resume,
         }
     }
 }
@@ -1110,6 +1134,55 @@ pub async fn relocate_review_row(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Services over a throwaway library with "Metadata only" on.
+    fn metadata_only_services(root: &std::path::Path) -> Arc<cv_app::services::AppServices> {
+        use cv_app::data_location::{DataLocation, LocationInputs};
+        use cv_app::secrets::SecretStore;
+        use cv_app::services::{AppServices, BootOptions};
+        let inputs = LocationInputs {
+            exe_dir: root.join("app"),
+            user_data_base: root.join("userdata"),
+            user_config_base: root.join("userconfig"),
+        };
+        std::fs::create_dir_all(&inputs.exe_dir).unwrap();
+        let options = BootOptions::new(
+            DataLocation::resolve(&inputs),
+            Arc::new(SecretStore::in_memory()),
+        )
+        .without_providers();
+        let services = AppServices::boot(options).expect("boot");
+        services
+            .settings()
+            .set(
+                cv_app::rename_settings::METADATA_ONLY_KEY,
+                serde_json::json!(true),
+            )
+            .unwrap();
+        services
+    }
+
+    /// Metadata only: a move is refused before anything is copied.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_move_is_refused_while_metadata_only_is_on() {
+        let root = tempfile::tempdir().unwrap();
+        let services = metadata_only_services(root.path());
+        let settings = crate::settings::SettingsState::from_services(Some(&services));
+        let library = LibraryState::from_services(&services);
+        let ops = LibraryOpsState::new(Arc::new(LibrarySources::new()));
+        let refused = apply_change_source(
+            &library,
+            &ops,
+            &settings,
+            vec!["1".to_owned()],
+            1,
+            Arc::new(|_| {}),
+        )
+        .await
+        .expect_err("refused");
+        assert_eq!(refused.code, "metadata_only");
+        assert!(ops.control.lock().unwrap().is_none(), "no move began");
+    }
 
     #[test]
     fn a_shared_move_slot_refuses_a_second_move_from_the_other_surface() {

@@ -13,6 +13,7 @@ import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { openMoveTo } from "../move-to/moveToStore";
 import { playTitle } from "../playback/usePlay";
+import { useMetadataOnly } from "../settings/metadataOnly";
 import { removeTitlesFromLibrary } from "./removeTitles";
 
 /** The header buttons, in order: Play · Scrape · Rename · Move · Open folder · Change artwork. */
@@ -68,6 +69,7 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
   const { id, kind, title, folder, availability, playId, onShowNfo, tmdbId = null } = input;
   const navigate = useNavigate();
   const openFolder = useOpenFolder(title);
+  const metadataOnly = useMetadataOnly();
 
   return useMemo<TitleActions>(() => {
     const blocked = playBlockedFor(filesStateOf(availability), kind);
@@ -79,49 +81,54 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
       });
     };
     return {
-      header: [
-        {
-          id: "play",
-          label: shortLabel("play"),
-          icon: TITLE_ACTIONS["play"].icon,
-          onSelect: () => {
-            if (playId !== null) void playTitle(playId, title);
+      header: (
+        [
+          {
+            id: "play",
+            label: shortLabel("play"),
+            icon: TITLE_ACTIONS["play"].icon,
+            onSelect: () => {
+              if (playId !== null) void playTitle(playId, title);
+            },
+            disabledReason: blocked ?? (playId === null ? t("title.play.nothing") : undefined),
           },
-          disabledReason: blocked ?? (playId === null ? t("title.play.nothing") : undefined),
-        },
-        {
-          id: "scrape",
-          label: shortLabel("scrape"),
-          icon: TITLE_ACTIONS["scrape"].icon,
-          onSelect: () => void navigate({ to: "/scrape/match/$itemId", params: { itemId: id } }),
-        },
-        {
-          id: "rename",
-          label: shortLabel("rename"),
-          icon: TITLE_ACTIONS["rename"].icon,
-          onSelect: () => void navigate({ to: "/rename", search: { ids: id } as never }),
-        },
-        {
-          id: "move",
-          label: shortLabel("move"),
-          icon: TITLE_ACTIONS["move"].icon,
-          // Opens the shared Move to menu under the button.
-          onSelect: () => openMoveTo([id], kind, title),
-        },
-        {
-          id: "open-folder",
-          label: shortLabel("open-folder"),
-          icon: TITLE_ACTIONS["open-folder"].icon,
-          onSelect: () => openFolder(folder),
-          disabledReason: folder === "" ? t("title.openFolder.none") : undefined,
-        },
-        {
-          id: "artwork",
-          label: t("title.action.changeArtwork"),
-          icon: TITLE_ACTIONS["artwork"].icon,
-          onSelect: () => void navigate({ to: "/artwork", search: { ids: id } as never }),
-        },
-      ],
+          {
+            id: "scrape",
+            label: shortLabel("scrape"),
+            icon: TITLE_ACTIONS["scrape"].icon,
+            onSelect: () => void navigate({ to: "/scrape/match/$itemId", params: { itemId: id } }),
+          },
+          {
+            id: "rename",
+            label: shortLabel("rename"),
+            icon: TITLE_ACTIONS["rename"].icon,
+            onSelect: () => void navigate({ to: "/rename", search: { ids: id } as never }),
+          },
+          {
+            id: "move",
+            label: shortLabel("move"),
+            icon: TITLE_ACTIONS["move"].icon,
+            // Opens the shared Move to menu under the button.
+            onSelect: () => openMoveTo([id], kind, title),
+          },
+          {
+            id: "open-folder",
+            label: shortLabel("open-folder"),
+            icon: TITLE_ACTIONS["open-folder"].icon,
+            onSelect: () => openFolder(folder),
+            disabledReason: folder === "" ? t("title.openFolder.none") : undefined,
+          },
+          {
+            id: "artwork",
+            label: t("title.action.changeArtwork"),
+            icon: TITLE_ACTIONS["artwork"].icon,
+            onSelect: () => void navigate({ to: "/artwork", search: { ids: id } as never }),
+          },
+        ] satisfies TitleAction<HeaderActionId>[]
+      ).filter(
+        // "Metadata only" never renames or moves files, so neither is offered.
+        (action) => !metadataOnly || (action.id !== "rename" && action.id !== "move"),
+      ),
       menu: [
         {
           id: "edit",
@@ -194,5 +201,17 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
         },
       ],
     };
-  }, [id, kind, title, folder, availability, playId, onShowNfo, tmdbId, navigate, openFolder]);
+  }, [
+    id,
+    kind,
+    title,
+    folder,
+    availability,
+    playId,
+    onShowNfo,
+    tmdbId,
+    navigate,
+    openFolder,
+    metadataOnly,
+  ]);
 }

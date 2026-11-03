@@ -42,6 +42,8 @@ export interface RunningMove {
   /** "142 MB/s · 4 min left" while files are copied; absent until it is known. */
   speed?: string;
   paused: boolean;
+  /** The unfinished batch this carries on, when it is a Resume. */
+  batchId?: string;
 }
 
 interface MoveToState {

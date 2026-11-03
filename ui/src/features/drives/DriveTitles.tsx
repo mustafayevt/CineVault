@@ -239,15 +239,19 @@ export function DriveTitles({ drive }: { drive: Drive }) {
   }, [allColumns, pane]);
 
   const bar: SelectionBarAction[] = [
-    {
-      id: "move",
-      label: t("drivesPage.bar.move"),
-      icon: actions.move.def.icon,
-      onSelect: actions.move.onSelect,
-      ...(actions.move.disabledReason === undefined
-        ? {}
-        : { disabledReason: actions.move.disabledReason }),
-    },
+    ...(actions.move.hidden === true
+      ? []
+      : [
+          {
+            id: "move",
+            label: t("drivesPage.bar.move"),
+            icon: actions.move.def.icon,
+            onSelect: actions.move.onSelect,
+            ...(actions.move.disabledReason === undefined
+              ? {}
+              : { disabledReason: actions.move.disabledReason }),
+          },
+        ]),
     {
       id: "delete",
       label: actions.delete.short,

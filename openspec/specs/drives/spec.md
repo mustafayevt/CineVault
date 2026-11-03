@@ -210,11 +210,35 @@ A full disk, access denied, a file in use or a missing original SHALL stop the b
 - **THEN** the move stops with "Destination is full" and the originals are untouched
 
 ### Requirement: Unfinished moves are recovered
-A move left unfinished by a stop, a quit or a crash SHALL be found in the journal at the next start, before any new file work, and reported with a warning naming its titles and reason. It SHALL be resumable (copied files checked again by size and hash, the rest copied) or able to be rolled back (removing only the `.cvpart` files, copies and staging folder the batch made). A new move of such a title SHALL be refused until then.
+A move left unfinished by a stop, a quit or a crash SHALL be found in the journal at the next start, before any new file work. It SHALL be resumable (copied files checked again by size and hash, the rest copied) or able to be rolled back (removing only the `.cvpart` files, copies and staging folder the batch made). A resume SHALL continue a half-written `.cvpart` from where it ended when its bytes match the same bytes of the original, and copy the file from the start otherwise; the finished file SHALL be read back and checked whole. A new move of such a title SHALL be refused until then.
+
+A move that the app's close or a crash cut short, with no error recorded, whose destination drive is reachable and whose original folder is there, SHALL resume by itself once the window is up, one batch after the other, with a toast that leads to Activity; its progress, Pause and Cancel SHALL show in the sidebar's progress card and in Activity. Every other unfinished move or rename SHALL be reported with a warning naming its titles and reason, with a toast that opens Activity at it, and SHALL wait in Activity's Needs attention with Resume and Roll back.
+
+The Move to menu of a title held by an unfinished move SHALL say where that move was going and how far it got, and offer "Resume that move", "Roll it back" and "Open in Activity". After Roll back the menu SHALL stay open and read its destinations again.
 
 #### Scenario: App closed mid-copy
-- **WHEN** the app is closed after copying 3 of 9 files across volumes
-- **THEN** all 9 originals are intact, and at the next start a warning says the move did not finish and the originals are untouched
+- **WHEN** the app is closed after copying 3 of 9 files across volumes, and started again with both drives connected
+- **THEN** all 9 originals are intact, a toast says "Resuming the move of <title>", the move carries on from the fourth file, and when it finishes the toast offers Undo
+
+#### Scenario: Move stopped on an error
+- **WHEN** a move stopped because the destination was full
+- **THEN** it is not resumed by itself; a toast says the move stopped with "Open Activity", and Needs attention lists "Move to <folder> did not finish" with its titles, "3 of 9 files copied", the reason and Resume and Roll back
+
+#### Scenario: Drive not connected at start-up
+- **WHEN** the app is started after a move was cut short and the destination drive is not connected
+- **THEN** nothing is resumed or written, and the move waits in Needs attention
+
+#### Scenario: Fix from the Move to menu
+- **WHEN** the user opens Move to for a title an unfinished move holds and chooses "Roll it back"
+- **THEN** only what that move made is removed, the menu stays open, and the destinations can be chosen again
+
+#### Scenario: Resume continues a half-copied file
+- **WHEN** the app was closed with 15 GB of an 85 GB file written to its `.cvpart`, and the move is resumed
+- **THEN** the 15 GB are checked against the original, only the remaining 70 GB are copied, and the whole file is read back and matched before it takes its name
+
+#### Scenario: Half-copied file no longer matches
+- **WHEN** the original changed after the app was closed mid-copy, and the move is resumed
+- **THEN** the part is removed and the file is copied from the start
 
 ### Requirement: Moves are undoable
 Every finished move SHALL be one History entry. Its Undo (from the toast or History) SHALL check every file first and bring the titles back the same safe way: the originals return from the bin or trash folder when they are all there and the copies go to the deleted-files destination; otherwise the titles are copied back with verification. A title that cannot be restored whole SHALL stay where it is and be reported.
@@ -240,3 +264,10 @@ A drive card with trash SHALL offer "Empty…", and the Drives page menu "Empty 
 #### Scenario: Cancelled
 - **WHEN** the user chooses Empty… on D: and then Cancel or Esc
 - **THEN** nothing is erased
+
+### Requirement: Moves are off in metadata-only mode
+While Settings › Naming › "Metadata only" is on, "Move to…" SHALL be hidden from the Library selection bar, the right-click menu, the title page and the Drives selection bar, and a move asked for anyway SHALL be refused with "Metadata only is on in Settings › Naming, so files and folders are not renamed or moved." before anything touches the disk. Resuming or rolling back a move that did not finish, and the Undo of a finished move, SHALL keep working.
+
+#### Scenario: Move refused
+- **WHEN** Metadata only is on and a move of a title to another library folder is sent from a browser
+- **THEN** the move is refused with the reason and no file is copied

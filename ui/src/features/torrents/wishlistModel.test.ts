@@ -10,8 +10,10 @@ import {
   draftOf,
   draftProblem,
   draftValue,
+  heldLine,
   orderEntries,
   scopeText,
+  sizeText,
   sizeUnitBytes,
 } from "./wishlistModel";
 
@@ -37,6 +39,7 @@ const ANY: WishCriteria = {
   minResolution: null,
   sources: [],
   hdr: false,
+  minSize: null,
   maxSize: null,
   minSeeders: null,
 };
@@ -73,12 +76,56 @@ describe("the Wishlist model", () => {
           minResolution: "2160p",
           sources: ["Remux", "BluRay"],
           hdr: true,
+          minSize: null,
           maxSize: 80 * GB,
           minSeeders: 10,
         },
         format,
       ),
     ).toMatch(/^2160p or better · Remux, Blu-ray · HDR · up to 80\sGB · 10\+ seeders$/);
+    expect(
+      criteriaText(
+        {
+          ...ANY,
+          minResolution: "2160p",
+          sources: ["Remux"],
+          minSize: 20 * GB,
+          maxSize: 60 * GB,
+          minSeeders: 10,
+        },
+        format,
+      ),
+    ).toMatch(/^2160p or better · Remux · 20–60\sGB · 10\+ seeders$/);
+  });
+
+  it("says the size limits as a range", () => {
+    expect(sizeText(ANY, format)).toBeNull();
+    expect(sizeText({ ...ANY, minSize: 20 * GB }, format)).toMatch(/^from 20\sGB$/);
+    expect(sizeText({ ...ANY, maxSize: 60 * GB }, format)).toMatch(/^up to 60\sGB$/);
+    expect(sizeText({ ...ANY, minSize: 500 * 1_000_000, maxSize: 4 * GB }, format)).toMatch(
+      /^500\sMB–4\sGB$/,
+    );
+    // Criteria saved before the smallest size have none.
+    const older: WishCriteria = {
+      minResolution: null,
+      sources: [],
+      hdr: false,
+      maxSize: 60 * GB,
+      minSeeders: null,
+    };
+    expect(sizeText(older, format)).toMatch(/^up to 60\sGB$/);
+  });
+
+  it("names the copy held", () => {
+    expect(heldLine({ resolution: "1080p", source: "WEB-DL", hdr: null })).toBe(
+      "You already have this: 1080p · WEB-DL",
+    );
+    expect(heldLine({ resolution: "2160p", source: "BluRay", hdr: "DV" })).toBe(
+      "You already have this: 2160p · Blu-ray · DV",
+    );
+    expect(heldLine({ resolution: "unknown", source: null, hdr: null })).toBe(
+      "You already have this",
+    );
   });
 
   it("reads the editor's fields back and refuses bad numbers", () => {
@@ -93,6 +140,21 @@ describe("the Wishlist model", () => {
     expect(draftProblem({ ...draft, minSeeders: "2.5" })).not.toBeNull();
     expect(draftProblem({ ...draft, maxSizeGb: "12,5", minSeeders: "" })).toBeNull();
     expect(draftValue({ ...draft, maxSizeGb: "12,5" }, GB).criteria.maxSize).toBe(12.5 * GB);
+  });
+
+  it("takes a smallest size that is not above the largest", () => {
+    const criteria: WishCriteria = { ...ANY, minSize: 20 * GB, maxSize: 60 * GB };
+    const draft = draftOf({ kind: "movie", season: null, episode: null }, criteria, GB);
+    expect(draft.minSizeGb).toBe("20");
+    expect(draftValue(draft, GB).criteria).toEqual(criteria);
+    expect(draftProblem(draft)).toBeNull();
+    expect(draftProblem({ ...draft, minSizeGb: "60", maxSizeGb: "20" })).toBe(
+      "The smallest size must not be above the largest size.",
+    );
+    expect(draftProblem({ ...draft, minSizeGb: "-1" })).toBe(
+      "The smallest size must be a number of GB above 0.",
+    );
+    expect(draftProblem({ ...draft, maxSizeGb: "" })).toBeNull();
   });
 
   it("names the scope and lists the newest entries first, done ones last", () => {
@@ -110,6 +172,7 @@ describe("the Wishlist model", () => {
       note: null,
       noteDetail: null,
       done,
+      held: null,
       target: { season: 3, episode: 6 },
       inLibrary: null,
       matches: [],

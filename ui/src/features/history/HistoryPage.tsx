@@ -23,6 +23,7 @@ import { cx } from "../../lib/cx";
 import { t } from "../../i18n/catalog";
 import type { MessageKey } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
+import { NeedsAttention } from "../activity/NeedsAttention";
 import { notify } from "../notifications/notificationStore";
 import { binName } from "../shell/binName";
 import { detectPlatform } from "../shell/platform";
@@ -289,14 +290,21 @@ function DaySection({ day }: { day: Day }) {
   );
 }
 
+interface HistoryPageProps {
+  /** The unfinished batch "Open in Activity" asked for: Needs attention shows it focused. */
+  focusBatch?: string | null;
+}
+
 /**
- * The History page (`/history`): every rename, move, delete, artwork change and
+ * The Activity page (`/activity`; `/history` leads there): Needs attention at the top while
+ * something needs the user (see [`NeedsAttention`]), then History: every rename, move, delete,
+ * artwork change and
  * change of match, newest first and grouped by day, with the tabs All · Renames · Moves · Deletes
  * · Artwork and matches and how much is still in the bin. Each entry offers one action:
  * Undo, Undo all, Restore, Undone or No undo. An entry of several titles expands to their old and
  * new names. The page follows `history-changed`, so a change made anywhere shows at once.
  */
-export function HistoryPage() {
+export function HistoryPage({ focusBatch = null }: HistoryPageProps) {
   const format = useFormat();
   const binLabel = binName(detectPlatform());
   const client = useQueryClient();
@@ -336,8 +344,10 @@ export function HistoryPage() {
   );
 
   return (
-    <section aria-label={t("history.region")} className="flex h-full min-h-0 flex-col">
-      <h1 className="sr-only">{t("history.region")}</h1>
+    <section aria-label={t("activity.region")} className="flex h-full min-h-0 flex-col">
+      <h1 className="sr-only">{t("activity.region")}</h1>
+      <NeedsAttention focusBatch={focusBatch} />
+      <h2 className="sr-only">{t("activity.history")}</h2>
       <div className="px-6 @max-[640px]/pane:px-4">
         <div className="flex h-12 items-center gap-2.5 border-b border-solid border-line-section @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:py-2">
           {/* The tabs scroll sideways where they do not fit. */}

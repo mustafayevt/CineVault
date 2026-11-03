@@ -962,6 +962,12 @@ fn judge(loaded: &Loaded, target: &DataSource, target_available: bool, probes: &
         return row;
     }
     if loaded.unfinished_move {
+        // The dialog still says how big the title is.
+        if let Ok(entries) = enumerate(Path::new(&core.path)) {
+            row.files =
+                u32::try_from(entries.iter().filter(|e| e.is_file()).count()).unwrap_or(u32::MAX);
+            row.bytes = entries.iter().map(|e| e.size).sum();
+        }
         row.status = MoveStatus::NotMovable(
             "A move of this title did not finish. Resume it or roll it back in Activity first."
                 .to_owned(),

@@ -239,6 +239,7 @@ describe("the area files of the catalogue", () => {
   it("has one file per page area", () => {
     expect(Object.keys(EN_AREAS).sort()).toEqual(
       [
+        "activity",
         "artwork",
         "common",
         "copies",

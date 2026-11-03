@@ -61,6 +61,14 @@ async function startRatingSweep(
 }
 
 /**
+ * Fetches the ratings that are missing, the IMDb ratings dataset with them (the retry Activity
+ * offers when its download failed).
+ */
+export function fetchMissingRatings(queryClient: QueryClient): Promise<number | null> {
+  return startRatingSweep(queryClient, "missing");
+}
+
+/**
  * After a new OMDb or MDBList key is saved: when scraped titles lack that source's ratings,
  * offers to fetch them ("Fetch the new OMDb ratings for 24 titles?") with an action that starts
  * the sweep for them. Says nothing when there is nothing to fetch or the count fails.

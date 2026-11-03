@@ -34,8 +34,10 @@ export function LibrarySelectionBar({ actions, count, size, onClear }: LibrarySe
     <SelectionBar
       count={count}
       {...(size === undefined ? {} : { size })}
-      actions={BAR_ORDER.map((id) => toBar(id, "short"))}
-      more={MORE_ORDER.map((id) => toBar(id, "label"))}
+      actions={BAR_ORDER.filter((id) => actions[id].hidden !== true).map((id) =>
+        toBar(id, "short"),
+      )}
+      more={MORE_ORDER.filter((id) => actions[id].hidden !== true).map((id) => toBar(id, "label"))}
       onClear={onClear}
     />
   );

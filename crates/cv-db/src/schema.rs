@@ -67,6 +67,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "torrent_wishlist",
         sql: include_str!("migrations/107_torrent_wishlist.sql"),
     },
+    Migration {
+        version: 108,
+        name: "torrent_wishlist_held",
+        sql: include_str!("migrations/108_torrent_wishlist_held.sql"),
+    },
 ];
 
 /// The schema version of this build: the last migration, or [`BASE_VERSION`] when there is none.

@@ -14,6 +14,7 @@ import { restoreLayout, stubLayout } from "../../test/layout";
 import { setOpenFolderBackend } from "../detail/openFolderBackend";
 import { useNotificationStore } from "../notifications/notificationStore";
 import { setScanBackend, unavailableScanBackend } from "../scan/scanBackend";
+import { useSettingsStore } from "../settings/settingsStore";
 import { useToastStore } from "../toasts/toastStore";
 import { RenamePage } from "./RenamePage";
 import { validateRenameSearch } from "./renameSearch";
@@ -248,6 +249,19 @@ describe("the Rename page", () => {
     expect(
       await screen.findByText("The selected titles are already named as your templates say."),
     ).toBeInTheDocument();
+  });
+});
+
+describe("the Rename page in metadata-only mode", () => {
+  it("says Metadata only is on with Open Settings instead of the plan", async () => {
+    const user = userEvent.setup();
+    useSettingsStore.setState({ values: { "renamer.metadata-only": true }, status: "ready" });
+    const router = renderRename();
+    expect(await screen.findByText("Metadata only is on")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    await user.click(screen.getByRole("link", { name: "Open Settings" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
+    useSettingsStore.setState({ values: {}, status: "ready" });
   });
 });
 

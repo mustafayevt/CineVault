@@ -5,6 +5,7 @@
 use tauri::State;
 use tauri::ipc::Channel;
 
+use crate::settings_ipc::SettingsState;
 use crate::sources_ipc::LibraryState;
 
 pub use cv_ipc::library_ops::*;
@@ -41,6 +42,7 @@ pub async fn preview_change_source_title(
 pub async fn apply_change_source(
     library: State<'_, LibraryState>,
     ops: State<'_, LibraryOpsState>,
+    settings: State<'_, SettingsState>,
     ids: Vec<String>,
     target: u32,
     on_progress: Channel<MoveProgressDto>,
@@ -48,6 +50,7 @@ pub async fn apply_change_source(
     cv_ipc::library_ops::apply_change_source(
         &library,
         &ops,
+        &settings,
         ids,
         target,
         crate::ipc_sink::sink(on_progress),
@@ -301,10 +304,19 @@ mod tests {
             files_total: 9,
             reason: "Destination is full.".into(),
             in_new_place: false,
+            item_ids: vec!["7".into()],
+            destination: Some(r"F:\Movie".into()),
+            bytes_done: 1_500,
+            bytes_total: Some(8_600),
+            auto_resume: false,
         });
         assert_eq!(dto.kind, "move");
         assert_eq!((dto.files_done, dto.files_total, dto.items), (3, 9, 1));
         assert_eq!(dto.reason, "Destination is full.");
+        assert_eq!(dto.item_ids, ["7"]);
+        assert_eq!(dto.destination.as_deref(), Some(r"F:\Movie"));
+        assert_eq!((dto.bytes_done, dto.bytes_total), (1_500.0, Some(8_600.0)));
+        assert!(!dto.auto_resume);
         let stopped = MoveResult::Stopped("Destination is full".into());
         let applied = MoveApplied {
             batch_id: Some("move-1".into()),

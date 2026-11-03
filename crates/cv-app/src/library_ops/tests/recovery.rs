@@ -150,6 +150,19 @@ fn a_move_stopped_after_three_of_nine_files_is_found_and_resumed_to_completion()
     assert_eq!((batch.files_done, batch.files_total), (3, 9));
     assert_eq!(batch.titles, ["Heat"]);
     assert!(batch.reason.contains("closed"), "{}", batch.reason);
+    assert_eq!(batch.item_ids, [heat.0.to_string()]);
+    assert_eq!(
+        batch.destination.as_deref().map(PathBuf::from),
+        Some(PathBuf::from(&lab.archive.path))
+    );
+    let total: u64 = before.iter().map(|(_, bytes)| bytes.len() as u64).sum();
+    assert_eq!(batch.bytes_total, Some(total));
+    assert!(
+        batch.bytes_done > 0 && batch.bytes_done < total,
+        "{batch:?}"
+    );
+    // Cut short by the close, with both folders there: the window resumes it by itself.
+    assert!(batch.auto_resume);
     let notice = batch.notice();
     assert_eq!(notice.batch_id.as_deref(), Some(batch.batch_id.as_str()));
     assert_eq!(
@@ -314,6 +327,8 @@ fn a_full_destination_is_resumed_once_there_is_room() {
     let found = service.find().unwrap();
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].reason, "Destination is full.");
+    // A move that stopped on an error waits for the user.
+    assert!(!found[0].auto_resume);
 
     // Still full: the resume stops again with the same plain reason and removes nothing.
     let again = service
@@ -334,6 +349,132 @@ fn a_full_destination_is_resumed_once_there_is_room() {
         before
     );
     assert!(service.find().unwrap().is_empty());
+}
+
+/// Fills the destination halfway through the 2 MiB video of Heat (1995), so its `.cvpart` is
+/// left half-written. Returns the disk (healed), the batch and the part.
+fn stopped_mid_video(lab: &Lab) -> (Arc<FaultFs>, String, PathBuf) {
+    let heat = lab.nine_file_movie(&lab.movies, "Heat (1995)");
+    let disk = FaultFs::new(Faults {
+        disk_full_after: Some(1024 * 1024 + 64),
+        chunk: Some(256 * 1024),
+        ..Faults::default()
+    });
+    let applied = lab
+        .cross_with(&disk)
+        .apply(&[heat], lab.archive.id, &mut no_progress())
+        .unwrap();
+    assert_eq!(
+        applied.items[0].result,
+        MoveResult::Stopped("Destination is full".to_owned())
+    );
+    let archive = Path::new(&lab.archive.path);
+    let part = files_below(archive)
+        .into_iter()
+        .find(|f| f.ends_with("Heat (1995).mkv.cvpart"))
+        .map(|f| archive.join(f))
+        .expect("the half-written video");
+    disk.heal();
+    disk.faults.lock().unwrap().chunk = Some(256 * 1024);
+    let batch = lab.recovery(&disk).find().unwrap().remove(0).batch_id;
+    (disk, batch, part)
+}
+
+fn record_video_writes(disk: &FaultFs) -> super::moves::WriteLog {
+    let log = super::moves::WriteLog::default();
+    disk.faults.lock().unwrap().record_writes =
+        Some(("Heat (1995).mkv".to_owned(), Arc::clone(&log)));
+    log
+}
+
+fn written(log: &super::moves::WriteLog) -> u64 {
+    log.lock().unwrap().iter().map(|w| w.len() as u64).sum()
+}
+
+#[test]
+fn a_resume_carries_on_a_half_written_file_from_where_it_stopped() {
+    let lab = Lab::new();
+    let old_folder = Path::new(&lab.movies.path).join("Heat (1995)");
+    let (disk, batch, part) = stopped_mid_video(&lab);
+    // The stop left the originals untouched.
+    let before = bytes_below(&old_folder);
+    let kept = fs::metadata(&part).unwrap().len();
+    assert!(kept > 0 && kept < 2 * 1024 * 1024, "{kept}");
+    let log = record_video_writes(&disk);
+
+    let mut seen = Vec::new();
+    let done = lab
+        .recovery(&disk)
+        .resume(&batch, None, &mut |p| seen.push(p.clone()))
+        .unwrap();
+
+    assert_eq!(done.completed, 1, "{done:?}");
+    assert_eq!(
+        written(&log),
+        2 * 1024 * 1024 - kept,
+        "only the rest of the video was written"
+    );
+    assert_eq!(
+        bytes_below(&Path::new(&lab.archive.path).join("Heat (1995)")),
+        before
+    );
+    let last = seen.last().expect("progress");
+    assert_eq!(last.bytes_done, last.bytes_total, "{last:?}");
+}
+
+#[test]
+fn a_half_written_file_that_no_longer_matches_is_copied_again() {
+    // The disk kept something else than what was written, or the part grew past the original.
+    let damage: [fn(&Path); 2] = [
+        |part| {
+            let mut bytes = fs::read(part).unwrap();
+            bytes[10] ^= 0xFF;
+            fs::write(part, bytes).unwrap();
+        },
+        |part| {
+            let mut bytes = fs::read(part).unwrap();
+            bytes.resize(3 * 1024 * 1024, 7);
+            fs::write(part, bytes).unwrap();
+        },
+    ];
+    for damage in damage {
+        let lab = Lab::new();
+        let old_folder = Path::new(&lab.movies.path).join("Heat (1995)");
+        let (disk, batch, part) = stopped_mid_video(&lab);
+        let before = bytes_below(&old_folder);
+        damage(&part);
+        let log = record_video_writes(&disk);
+
+        let done = lab
+            .recovery(&disk)
+            .resume(&batch, None, &mut no_progress())
+            .unwrap();
+
+        assert_eq!(done.completed, 1, "{done:?}");
+        assert_eq!(written(&log), 2 * 1024 * 1024, "the whole video again");
+        assert_eq!(
+            bytes_below(&Path::new(&lab.archive.path).join("Heat (1995)")),
+            before
+        );
+    }
+}
+
+#[test]
+fn a_move_cut_short_whose_original_folder_is_gone_waits_for_the_user() {
+    let lab = Lab::new();
+    let heat = lab.nine_file_movie(&lab.movies, "Heat (1995)");
+    let old_folder = Path::new(&lab.movies.path).join("Heat (1995)");
+    let disk = lab.killed_move(heat);
+    let service = lab.recovery(&disk);
+    assert!(service.find().unwrap()[0].auto_resume);
+
+    // The originals went somewhere else (a drive letter changed, or somebody moved the folder).
+    let elsewhere = Path::new(&lab.movies.path).join("Heat (moved)");
+    fs::rename(&old_folder, &elsewhere).unwrap();
+    let batch = service.find().unwrap().remove(0);
+    assert!(!batch.auto_resume, "{batch:?}");
+    assert_eq!(batch.bytes_total, None, "the originals cannot be read");
+    fs::rename(&elsewhere, &old_folder).unwrap();
 }
 
 #[test]

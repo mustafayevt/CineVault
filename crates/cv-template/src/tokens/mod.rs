@@ -46,6 +46,7 @@ mod labels;
 mod media;
 mod morph;
 mod movie;
+mod release;
 mod tv;
 mod validation;
 
@@ -59,6 +60,7 @@ pub use labels::{
     genre_label, media_source_label, sortable_title, status_label,
 };
 pub use movie::{MovieSetContext, movie_model};
+pub use release::{ReleaseInfo, release_info};
 pub use tv::tv_model;
 pub use validation::{movie_roots, movie_validator, tv_roots, tv_validator};
 

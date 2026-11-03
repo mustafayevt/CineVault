@@ -56,6 +56,8 @@ interface NotificationState {
   dismiss: (id: string) => void;
   /** Drops the messages of a topic that no longer holds (a folder that reads again). */
   resolveTopic: (topic: string) => void;
+  /** Drops the messages about an unfinished move or rename once it is resumed or rolled back. */
+  resolveBatch: (batchId: string) => void;
   clear: () => void;
 }
 
@@ -97,6 +99,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   dismiss: (id) => set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
   resolveTopic: (topic) =>
     set((state) => ({ items: state.items.filter((item) => item.topic !== topic) })),
+  resolveBatch: (batchId) =>
+    set((state) => ({ items: state.items.filter((item) => item.batchId !== batchId) })),
   clear: () => set({ items: [] }),
 }));
 

@@ -5,7 +5,7 @@ use tauri::State;
 
 use cv_ipc::torrent_stream::{CommandResult, TorrentState};
 use cv_ipc::torrent_wishlist::{
-    WishAddDto, WishCheckDto, WishCriteriaDto, WishEntryDto, WishScopeDto,
+    WishAddDto, WishCheckDto, WishCriteriaDto, WishEntryDto, WishHeldDto, WishScopeDto,
 };
 
 /// Every entry of the Wishlist, the newest first, with its matches and poster. Entries whose
@@ -37,6 +37,26 @@ pub fn torrent_wishlist_update(
     criteria: WishCriteriaDto,
 ) -> CommandResult<()> {
     cv_ipc::torrent_wishlist::torrent_wishlist_update(&state, id, scope, criteria)
+}
+
+/// The copy the library holds of a title and scope, for the editor's "You already have this".
+/// Only the library is read.
+#[tauri::command]
+#[specta::specta]
+pub fn torrent_wishlist_held(
+    state: State<'_, TorrentState>,
+    kind: String,
+    tmdb_id: u32,
+    scope: WishScopeDto,
+) -> CommandResult<Option<WishHeldDto>> {
+    cv_ipc::torrent_wishlist::torrent_wishlist_held(&state, kind, tmdb_id, scope)
+}
+
+/// Makes a done entry active again; only a copy that arrives from now on makes it done.
+#[tauri::command]
+#[specta::specta]
+pub fn torrent_wishlist_keep_looking(state: State<'_, TorrentState>, id: u32) -> CommandResult<()> {
+    cv_ipc::torrent_wishlist::torrent_wishlist_keep_looking(&state, id)
 }
 
 /// Removes an entry and its matches.

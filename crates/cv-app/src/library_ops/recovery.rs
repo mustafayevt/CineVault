@@ -77,6 +77,18 @@ pub struct UnfinishedBatch {
     /// A title of the batch is in its new place already and only the originals are left to
     /// tidy (moves only).
     pub in_new_place: bool,
+    /// The library ids of the titles that still have work, as the journal keeps them.
+    pub item_ids: Vec<String>,
+    /// The folder the titles go to (a move): the parent of the first title's new folder.
+    pub destination: Option<String>,
+    /// Bytes of the originals copied and verified, and of all the originals to copy (a move;
+    /// zero and `None` for a rename). The total is `None` when an original cannot be read.
+    pub bytes_done: u64,
+    pub bytes_total: Option<u64>,
+    /// The batch can carry on by itself at start-up: a move that the app's close or a crash
+    /// cut short (no row says why it stopped) whose drives and folders are all there. Every
+    /// other unfinished batch waits for Resume or Roll back.
+    pub auto_resume: bool,
 }
 
 impl UnfinishedBatch {
@@ -355,6 +367,17 @@ impl RecoveryService {
                     .filter_map(|id| self.title_of(id))
                     .take(3)
                     .collect();
+                let disk = self.disk.as_ref();
+                let (bytes_done, bytes_total) = open.iter().map(|i| i.bytes(disk)).fold(
+                    (0, Some(0)),
+                    |(done, total), (d, t): (u64, Option<u64>)| {
+                        (done + d, total.zip(t).map(|(a, b)| a + b))
+                    },
+                );
+                let destination = open.iter().find_map(|i| {
+                    let parent = std::path::Path::new(i.new_folder()?).parent()?;
+                    Some(parent.to_string_lossy().into_owned())
+                });
                 out.push(UnfinishedBatch {
                     batch_id: summary.batch_id,
                     kind: BatchKind::Move,
@@ -365,6 +388,11 @@ impl RecoveryService {
                     files_total: total,
                     reason,
                     in_new_place: open.iter().any(|i| i.committed()),
+                    item_ids: open.iter().filter_map(|i| i.item.clone()).collect(),
+                    destination,
+                    bytes_done,
+                    bytes_total,
+                    auto_resume: open.iter().all(|i| i.resumable_unattended(disk)),
                 });
             } else {
                 let rows = journal.batch(&summary.batch_id)?;
@@ -400,6 +428,11 @@ impl RecoveryService {
                     },
                     reason: "CineVault closed before the rename finished.".to_owned(),
                     in_new_place: false,
+                    item_ids: ids,
+                    destination: None,
+                    bytes_done: 0,
+                    bytes_total: None,
+                    auto_resume: false,
                 });
             }
         }

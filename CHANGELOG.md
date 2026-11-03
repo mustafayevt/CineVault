@@ -2,6 +2,29 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.0] - 2026-11-03
+
+### Added
+
+- Torrents: the Wishlist's limits take a smallest size as well as a largest, so the size works as a range (for example 20–60 GB) and a check skips small re-encodes that pass the resolution.
+- Activity: History is now called Activity. While something needs you, its top shows Needs attention: a move or rename that did not finish, with where it was going, how far it got ("8 of 10 files copied, 15 GB of 86 GB"), why it stopped and Resume and Roll back, and the warnings and errors from background work (a rejected API key, artwork that could not be saved…), each with its fix and Dismiss. History stays below it. The Activity icon in the sidebar shows a dot while something is there.
+- Moves: a move cut short because CineVault was closed carries on by itself the next time CineVault opens, from where it stopped, when both drives are there. A toast says so, and the progress with Pause and Cancel shows in the sidebar and in Activity. A move that stopped on an error, such as a full or unplugged drive, waits in Activity for you.
+- Move to: for a title held by a move that did not finish, the menu says how far that move got and offers Resume that move, Roll it back and Open in Activity.
+- Naming: three new tokens keep what the name of a download said about the release, even after earlier renames: {Quality} (such as Bluray-1080p or WEBDL-2160p), {ReleaseTags} (the release part of the name as it was, such as 1080p.BluRay.x264) and {ReleaseGroup} (the group after the last dash). They are read from the name the file had when CineVault first found it, and stay empty when that name doesn't say it; CineVault never guesses a group.
+- Naming: a Release info style, in Settings › Naming and in the first-run setup, names files like `Example Movie (2020) [1080p.WEB-DL.x264]-GROUP`, so a download manager that reads the same folders still recognises the release. A file without release information gets the Clean name.
+- Settings › Naming: a Metadata only switch. While it is on, CineVault never renames or moves your files and folders, from the app, a browser, the command line or an automation: Rename and Move to… are hidden. Scan, Scrape, NFO and artwork files, Delete and Undo keep working.
+
+### Changed
+
+- Torrents: a title you already have no longer goes straight to Done on the Wishlist. Its entry says what you have ("You already have this: 1080p · WEB-DL", linking to the title) and keeps being checked; it's done only when a copy that meets what you asked for arrives after you added or edited it. A done entry offers Keep looking.
+
+### Fixed
+
+- Moves: "Resume it or roll it back in Activity first" pointed to a page that did not exist, so a stopped move could not be resolved and its title could not be moved again. A stopped move now also shows a toast with Open Activity.
+- Settings: clicking a section in the index, especially the last one, no longer scrolls the whole window and pushes the index off screen or leaves empty space below the last card. Only the settings scroll, and only as far as they go.
+- Moves to another drive: resuming a move that stopped in the middle of a large file (CineVault was closed, or the drive filled up) now carries on from where the file stopped instead of copying it again from the start. What was already copied is checked against the original first, and the whole file is still checked once it is done.
+- Move to: a title waiting on a move that did not finish now shows its size instead of "0 B".
+
 ## [1.5.0] - 2026-11-03
 
 ### Added

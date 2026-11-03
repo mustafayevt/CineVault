@@ -71,6 +71,8 @@ export const onboarding = {
   "setup.naming.style.clean": "Title and year, short names every media centre reads.",
   "setup.naming.style.detailed": "Adds the resolution, source, HDR and audio tags.",
   "setup.naming.style.media-server-safe": "Adds the TMDB id so media servers match the title.",
+  "setup.naming.style.release-info":
+    "Keeps the release tags and group of the download name, for download managers.",
   "setup.naming.style.custom": "Your own templates.",
   "setup.naming.example": "Example",
   "setup.naming.sample": "Built-in sample",
