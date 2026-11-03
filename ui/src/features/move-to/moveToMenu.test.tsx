@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { restoreLayout, stubLayout } from "../../test/layout";
 import { DrivesPage } from "../drives/DrivesPage";
@@ -20,6 +20,9 @@ import { createSyntheticBackend } from "../library/syntheticLibrary";
 import { setLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import type { LibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import { createSyntheticLibraryOpsBackend } from "../library-ops/syntheticLibraryOps";
+import { setRecoveryBackend } from "../activity/recoveryBackend";
+import type { RecoveryBackend, UnfinishedBatch } from "../activity/recoveryBackend";
+import { useRecoveryStore } from "../activity/resolveUnfinished";
 import { useToastStore } from "../toasts/toastStore";
 import { MoveToHost } from "./MoveToMenu";
 import { useMoveToStore } from "./moveToStore";
@@ -92,6 +95,7 @@ afterEach(() => {
   setDrivesBackend(null);
   setLibraryBackend(null);
   setLibraryOpsBackend(null);
+  setRecoveryBackend(null);
 });
 
 describe("opening and closing the Move to menu", () => {
@@ -283,5 +287,75 @@ describe("what the menu shows", () => {
     const archive = within(menu).getByRole("menuitem", { name: /E: Archive/ });
     expect(archive).toHaveAttribute("aria-disabled", "true");
     expect(archive).toHaveAccessibleDescription("Another move is running. Wait for it to finish.");
+  });
+});
+
+describe("a title held by a move that did not finish", () => {
+  const held: UnfinishedBatch = {
+    batch_id: "move-9",
+    kind: "move",
+    created_ms: Date.now(),
+    titles: ["Title 1"],
+    items: 1,
+    files_done: 8,
+    files_total: 10,
+    reason: "CineVault closed before the move finished.",
+    // Every sample title, so whichever are selected one of them is held.
+    item_ids: Array.from({ length: 30 }, (_, n) => String(n + 1)),
+    destination: String.raw`F:\Movie`,
+    bytes_done: 15e9,
+    bytes_total: 86e9,
+    auto_resume: false,
+  };
+
+  function recovery(): RecoveryBackend & { batches: UnfinishedBatch[] } {
+    const backend = {
+      batches: [held],
+      list: vi.fn(() => Promise.resolve(backend.batches)),
+      resume: vi.fn(() =>
+        Promise.resolve({ batch_id: "move-9", completed: 1, stopped: null, notes: [] }),
+      ),
+      rollBack: vi.fn(() => {
+        backend.batches = [];
+        return Promise.resolve({ batch_id: "move-9", restored: 1, removed: 9, problems: [] });
+      }),
+    };
+    return backend;
+  }
+
+  beforeEach(() => useRecoveryStore.setState({ active: null, working: {} }));
+
+  it("says how far it got and rolls it back from the menu, which stays open", async () => {
+    const backend = recovery();
+    setRecoveryBackend(backend);
+    renderDrives();
+    const { user, button } = await selectTitles();
+    await user.click(button);
+    const menu = await loadedMenu();
+    expect(
+      await within(menu).findByText(
+        String.raw`A move of Title 1 to F:\Movie did not finish (8 of 10 files copied, 15 GB of 86 GB).`,
+      ),
+    ).toBeVisible();
+    expect(within(menu).getByRole("menuitem", { name: "Resume that move" })).toBeVisible();
+    expect(within(menu).getByRole("menuitem", { name: "Open in Activity" })).toBeVisible();
+
+    await user.click(within(menu).getByRole("menuitem", { name: "Roll it back" }));
+    expect(backend.rollBack).toHaveBeenCalledWith("move-9");
+    await waitFor(() =>
+      expect(within(menu).queryByRole("menuitem", { name: "Roll it back" })).toBeNull(),
+    );
+    expect(screen.getByRole("menu", { name: "Move to" })).toBeVisible();
+  });
+
+  it("resumes it from the menu", async () => {
+    const backend = recovery();
+    setRecoveryBackend(backend);
+    renderDrives();
+    const { user, button } = await selectTitles();
+    await user.click(button);
+    const menu = await loadedMenu();
+    await user.click(await within(menu).findByRole("menuitem", { name: "Resume that move" }));
+    expect(backend.resume).toHaveBeenCalledWith("move-9", expect.any(Function));
   });
 });
