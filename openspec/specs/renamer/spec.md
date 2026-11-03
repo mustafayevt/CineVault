@@ -144,7 +144,7 @@ The Rename page SHALL show the active folder and file templates in its header wi
 - **THEN** Settings opens at Naming
 
 ### Requirement: Companion files move together
-Applying a rename SHALL move or rename every file of the title together and the library paths SHALL follow without a rescan. Videos SHALL keep their stacking markers; NFOs and artwork SHALL take every name of the profile; subtitles, trailers, samples and sidecars SHALL be named after the new base name; every other file and sub-folder SHALL move with the folder.
+Applying a rename SHALL move or rename every file of the title together and the library paths SHALL follow without a rescan. Videos SHALL keep their stacking markers; readable NFOs and artwork SHALL take every name of the profile, and an `.nfo` CineVault cannot read as an NFO SHALL be set aside like other leftovers; subtitles, trailers, samples and sidecars SHALL be named after the new base name; every other file and sub-folder SHALL move with the folder.
 
 #### Scenario: Subtitle suffix kept
 - **WHEN** `old.eng.forced.srt` belongs to a movie renamed to `Example Movie (2020)`
