@@ -2,6 +2,12 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.0] - unreleased
+
+### Fixed
+
+- Settings: clicking a section in the index, especially the last one, no longer scrolls the whole window and pushes the index off screen or leaves empty space below the last card. Only the settings scroll, and only as far as they go.
+
 ## [1.5.0] - 2026-11-03
 
 ### Added
