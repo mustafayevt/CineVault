@@ -88,12 +88,31 @@ describe("the Settings page frame", () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
     await renderSettings();
+    const region = screen.getByRole("region", { name: "Settings" });
+    const scroller = region.querySelector<HTMLElement>(".overflow-y-auto");
+    if (scroller === null) throw new Error("no scroller");
+    const scrollTo = vi.fn();
+    scroller.scrollTo = scrollTo as typeof scroller.scrollTo;
+    // A 600 px pane over 2,000 px of content: it can scroll 1,400 px at most.
+    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 600 });
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 2000 });
+    const sections = [...region.querySelectorAll<HTMLElement>("[data-settings-section]")];
+    sections.forEach((node, n) => {
+      node.getBoundingClientRect = () => ({ top: n * 300 }) as DOMRect;
+    });
     const index = screen.getByRole("navigation", { name: "Settings sections" });
     const entries = within(index).getAllByRole("button");
+    const second = entries[1];
     const last = entries[entries.length - 1];
-    if (last === undefined) throw new Error("no index entries");
+    if (second === undefined || last === undefined) throw new Error("no index entries");
+
+    await user.click(second);
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 300 }));
+    // The last section cannot reach the top: the pane stops at the end of its content, and
+    // nothing outside the pane scrolls.
     await user.click(last);
-    expect(scrollIntoView).toHaveBeenCalled();
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ top: 1400 }));
+    expect(scrollIntoView).not.toHaveBeenCalled();
     expect(last).toHaveAttribute("aria-current", "true");
     Element.prototype.scrollIntoView = () => {};
   });

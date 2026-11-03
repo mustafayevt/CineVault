@@ -85,14 +85,20 @@ export function SettingsPage() {
   const pinnedUntil = useRef(0);
 
   const scrollTo = useCallback((id: string, instant: boolean) => {
-    const target = scroller.current?.querySelector<HTMLElement>(`[data-settings-section="${id}"]`);
-    if (target === null || target === undefined) return;
+    const el = scroller.current;
+    const target = el?.querySelector<HTMLElement>(`[data-settings-section="${id}"]`);
+    if (el === null || el === undefined || target === null || target === undefined) return;
     pinnedUntil.current = Date.now() + PIN_MS;
     setActive(id);
     const reduced =
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    target.scrollIntoView?.({ block: "start", behavior: instant || reduced ? "auto" : "smooth" });
+    // Only the content pane scrolls, and no further than its content goes: `scrollIntoView` would
+    // also scroll the app's outer containers when the last sections cannot reach the top, moving
+    // the index off screen and leaving blank space below the last card.
+    const offset = target.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    const top = Math.min(el.scrollTop + offset, el.scrollHeight - el.clientHeight);
+    el.scrollTo?.({ top: Math.max(0, top), behavior: instant || reduced ? "auto" : "smooth" });
   }, []);
 
   useEffect(() => {
