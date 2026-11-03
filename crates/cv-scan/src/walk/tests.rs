@@ -184,6 +184,29 @@ fn files_record_size_and_modification_time() {
 }
 
 #[test]
+fn a_disc_folder_carries_the_size_of_everything_in_it() {
+    let dir = source(&[]);
+    let bluray = dir.path().join("Heat (1995)/BDMV");
+    fs::create_dir_all(bluray.join("STREAM")).unwrap();
+    fs::create_dir_all(bluray.join("PLAYLIST")).unwrap();
+    fs::write(bluray.join("index.bdmv"), vec![0_u8; 10]).unwrap();
+    fs::write(bluray.join("STREAM/00800.m2ts"), vec![0_u8; 1000]).unwrap();
+    fs::write(bluray.join("STREAM/00801.m2ts"), vec![0_u8; 200]).unwrap();
+    fs::write(bluray.join("PLAYLIST/00800.mpls"), vec![0_u8; 5]).unwrap();
+    let dvd = dir.path().join("Zulu (1964)/VIDEO_TS");
+    fs::create_dir_all(&dvd).unwrap();
+    fs::write(dvd.join("VIDEO_TS.IFO"), vec![0_u8; 20]).unwrap();
+    fs::write(dvd.join("VTS_01_1.VOB"), vec![0_u8; 700]).unwrap();
+    let report = scan_movie_source(dir.path(), None, &WalkOptions::default());
+    let size_of = |title: &str| {
+        let movie = report.movies.iter().find(|m| m.title == title).unwrap();
+        movie.files.iter().find(|f| f.is_dir).unwrap().size_bytes
+    };
+    assert_eq!(size_of("Heat"), 1215);
+    assert_eq!(size_of("Zulu"), 720);
+}
+
+#[test]
 fn walking_changes_nothing_on_disk() {
     let files = [
         "Heat (1995)/Heat (1995).mkv",
