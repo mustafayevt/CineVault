@@ -2,7 +2,7 @@
 
 Every movie and episode keeps the name of its main video as it was first scanned (`original_filename`, also written to the NFO as `<original_filename>`). Renames never change it, so it still holds the download name after any number of renames. The template engine builds a model per title (`cv-template` `tokens::movie_model` / `tv_model`) and short aliases point into it. Presets live in `cv-rename::preset`; the profile book lists them for Settings and the first run.
 
-Renames go through `OrganizeService::apply` (Rename page, title and copies actions) and the automation engine's rename step (command line and automations). Drive moves go through `ChangeSourceService::apply_with`. Both are reached through `cv-ipc`, which the desktop app, the browser server and the command line share.
+Renames go through `OrganizeService::apply`, reached from the `organize_apply` command (Rename page, title and copies actions) and from the automation engine's rename step (command line and automations). Drive moves go through `ChangeSourceService::apply_with`, reached from the `apply_change_source` command. The commands live in `cv-ipc`, which the desktop app and the browser server share.
 
 ## Goals / Non-Goals
 
@@ -33,7 +33,8 @@ A title without release information gets the Clean name (the empty `[]` is remov
 
 The setting `renamer.metadata-only` (bool, default off) is read on every request, so turning it on takes effect at once.
 
-- `cv-app`: `OrganizeService::apply`, `ChangeSourceService::apply_with` and the automation rename step check it through a small `metadata_only(values)` helper and stop before anything is planned for the disk, with the error code `metadata_only` and the message "Metadata only is on in Settings › Naming, so files and folders are not renamed or moved." The automation step reports it as not run with that reason. The services get the flag from their callers (`cv-ipc` reads the settings it already holds), so no service reads the settings file itself.
+- `cv-app` holds the setting (`rename_settings::metadata_only`, `METADATA_ONLY_KEY`) and the message "Metadata only is on in Settings › Naming, so files and folders are not renamed or moved." The automation rename step (command line and automations) checks it and reports the step as failed with that message.
+- `cv-ipc` checks it in `organize_apply` and `apply_change_source` before any service is asked to plan, answering the error code `metadata_only`. These two commands are the only way the desktop app and the browser server rename or move; the services themselves stay unaware of settings, as they are today.
 - Previews (Rename page plan, the Move menu plan) still work, so nothing breaks when the page is open as the switch changes; applying is what is refused.
 - Undo of a rename or move batch stays allowed.
 - UI: the sidebar hides Rename; the library, title and copies menus hide Rename and "Move to…"; the Rename page, reached by its address, shows a notice with "Open Settings" instead of the plan. Each place reads the same store value.
