@@ -1417,6 +1417,7 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             cv_ipc::library_ops::apply_change_source(
                 library,
                 &commands.library_ops,
+                &commands.settings,
                 ids,
                 target,
                 sink,

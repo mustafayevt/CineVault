@@ -2439,8 +2439,8 @@ export type LibraryKindDto = "movies" | "shows" | "collections";
 /**  Why a command did not run. */
 export type LibraryOpsCommandError = {
 	/**
-	 *  `storage`, `bad_id`, `unknown_source`, `disk`, or the code of the refused rule: `title`,
-	 *  `year`, `data_source`, `unavailable`, `exists`.
+	 *  `storage`, `bad_id`, `unknown_source`, `disk`, `metadata_only`, or the code of the refused
+	 *  rule: `title`, `year`, `data_source`, `unavailable`, `exists`.
 	 */
 	code: string,
 	/**  Plain sentence for the user. */
@@ -3158,8 +3158,8 @@ export type OrderingReportDto = {
 /**  Why a command did not run. */
 export type OrganizeCommandError = {
 	/**
-	 *  `storage`, `settings`, `profile`, `invalid_id`, `unknown_batch`, `template`, `unsettled`, `move` or
-	 *  `journal`.
+	 *  `storage`, `settings`, `profile`, `invalid_id`, `unknown_batch`, `template`, `unsettled`, `move`,
+	 *  `journal` or `metadata_only`.
 	 */
 	code: string,
 	/**  Plain sentence for the user. */
@@ -3178,7 +3178,7 @@ export type OrganizePreviewDto = {
 
 /**  A naming profile: a preset or a custom one. */
 export type OrganizeProfileDto = {
-	/**  `clean`, `detailed`, `media-server-safe` or `custom-...`. */
+	/**  `clean`, `detailed`, `media-server-safe`, `release-info` or `custom-...`. */
 	id: string,
 	name: string,
 	/**  A preset, which cannot be changed or deleted. */
