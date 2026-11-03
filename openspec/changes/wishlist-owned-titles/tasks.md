@@ -11,4 +11,4 @@
 
 ## 3. Integration
 
-- [ ] 3.1 Rust checks; `bun run lint`, `typecheck`, `test`, `format:check` in `ui/`; `openspec validate wishlist-owned-titles --strict`; `bun run shots` for `/torrents/wishlist`; the changelog lines and `bun run site:changelog`.
+- [x] 3.1 Rust checks; `bun run lint`, `typecheck`, `test`, `format:check` in `ui/`; `openspec validate wishlist-owned-titles --strict`; `bun run shots` for `/torrents/wishlist`; the changelog lines and `bun run site:changelog`.

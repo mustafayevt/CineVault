@@ -4,6 +4,14 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ## [1.6.0] - unreleased
 
+### Added
+
+- Torrents: the Wishlist's limits take a smallest size as well as a largest, so the size works as a range (for example 20–60 GB) and a check skips small re-encodes that pass the resolution.
+
+### Changed
+
+- Torrents: a title you already have no longer goes straight to Done on the Wishlist. Its entry says what you have ("You already have this: 1080p · WEB-DL", linking to the title) and keeps being checked; it's done only when a copy that meets what you asked for arrives after you added or edited it. A done entry offers Keep looking.
+
 ### Fixed
 
 - Settings: clicking a section in the index, especially the last one, no longer scrolls the whole window and pushes the index off screen or leaves empty space below the last card. Only the settings scroll, and only as far as they go.

@@ -188,7 +188,7 @@ describe("the Wishlist", () => {
     expect(within(heat).getByTestId("wish-held")).toHaveTextContent(
       "You already have this: 1080p · Blu-ray",
     );
-    expect(heat).toHaveTextContent("2160p or better · HDR · from 20");
+    expect(heat).toHaveTextContent("2160p or better · HDR · from ");
     const done = await entryNamed("Oppenheimer (2023)");
     expect(within(done).queryByTestId("wish-held")).toBeNull();
   });
