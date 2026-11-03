@@ -1195,7 +1195,7 @@ mod tests {
         let clean = dto.profiles.iter().find(|p| p.id == "clean").unwrap();
         assert!(clean.builtin);
         assert_eq!(clean.patterns.movie_folder, "${title} (${year})");
-        assert_eq!(dto.profiles.len(), 3);
+        assert_eq!(dto.profiles.len(), 4);
     }
 
     #[test]
