@@ -2,7 +2,7 @@ import { t } from "../../i18n/catalog";
 import type { Formatters } from "../../i18n/format";
 import type { SizeBase } from "../../i18n/locale";
 import type { LibraryCopy } from "./ownedCopy";
-import type { WishCriteria, WishEntry, WishMatch, WishScope } from "./torrentBackend";
+import type { WishCriteria, WishEntry, WishHeld, WishMatch, WishScope } from "./torrentBackend";
 import type { TitleKind } from "./torrentsSearch";
 
 /** The lowest resolutions the editor offers; `any` takes every one. */
@@ -30,6 +30,8 @@ export interface WishDraft {
   sources: readonly SourceChoice[];
   hdr: boolean;
   /** In the size unit (`sizeUnitBytes`), as typed; empty is no limit. */
+  minSizeGb: string;
+  /** In the size unit (`sizeUnitBytes`), as typed; empty is no limit. */
   maxSizeGb: string;
   /** As typed; empty is no limit. */
   minSeeders: string;
@@ -50,6 +52,7 @@ export function defaultCriteria(best: LibraryCopy | null): WishCriteria {
     minResolution: "1080p",
     sources: [],
     hdr: false,
+    minSize: null,
     maxSize: null,
     minSeeders: null,
   };
@@ -101,6 +104,7 @@ export function draftOf(scope: WishScope, criteria: WishCriteria, unit: number):
     resolution,
     sources: SOURCES.filter((source) => criteria.sources.includes(source)),
     hdr: criteria.hdr,
+    minSizeGb: wholeText(criteria.minSize ?? null, unit),
     maxSizeGb: wholeText(criteria.maxSize, unit),
     minSeeders: wholeText(criteria.minSeeders, 1),
   };
@@ -116,7 +120,13 @@ function positive(text: string): number | null {
 
 /** Why the editor cannot save, or `null` when it can. */
 export function draftProblem(draft: WishDraft): string | null {
-  if (Number.isNaN(positive(draft.maxSizeGb))) return t("wishlist.edit.badSize");
+  const smallest = positive(draft.minSizeGb);
+  const largest = positive(draft.maxSizeGb);
+  if (Number.isNaN(smallest)) return t("wishlist.edit.badMinSize");
+  if (Number.isNaN(largest)) return t("wishlist.edit.badSize");
+  if (smallest !== null && largest !== null && smallest > largest) {
+    return t("wishlist.edit.badRange");
+  }
   const seeders = positive(draft.minSeeders);
   if (Number.isNaN(seeders) || (seeders !== null && !Number.isInteger(seeders))) {
     return t("wishlist.edit.badSeeders");
@@ -129,6 +139,7 @@ export function draftValue(
   draft: WishDraft,
   unit: number,
 ): { scope: WishScope; criteria: WishCriteria } {
+  const smallest = positive(draft.minSizeGb);
   const size = positive(draft.maxSizeGb);
   const seeders = positive(draft.minSeeders);
   const scope: WishScope =
@@ -143,6 +154,7 @@ export function draftValue(
       minResolution: draft.resolution === "any" ? null : draft.resolution,
       sources: [...draft.sources],
       hdr: draft.hdr,
+      minSize: smallest === null || Number.isNaN(smallest) ? null : Math.round(smallest * unit),
       maxSize: size === null || Number.isNaN(size) ? null : Math.round(size * unit),
       minSeeders: seeders === null || Number.isNaN(seeders) ? null : seeders,
     },
@@ -170,7 +182,27 @@ export function scopeText(entry: Pick<WishEntry, "scope" | "target">): string {
   }
 }
 
-/** The criteria in one line: "2160p or better · Remux · HDR · up to 80 GB · 10+ seeders". */
+/**
+ * The size limits in words: "20–60 GB", "from 20 GB", "up to 60 GB", or `null` without a limit.
+ * Both ends in one unit share it.
+ */
+export function sizeText(criteria: WishCriteria, format: Formatters): string | null {
+  const min = criteria.minSize ?? null;
+  const max = criteria.maxSize;
+  if (min === null && max === null) return null;
+  if (min === null) return t("wishlist.criteria.maxSize", { size: format.size(max ?? 0) });
+  if (max === null) return t("wishlist.criteria.minSize", { size: format.size(min) });
+  const from = format.size(min);
+  const to = format.size(max);
+  const unit = to.slice(to.search(/\s\S+$/));
+  const shared = unit !== to && from.endsWith(unit);
+  return t("wishlist.criteria.sizeRange", {
+    from: shared ? from.slice(0, from.length - unit.length) : from,
+    to,
+  });
+}
+
+/** The criteria in one line: "2160p or better · Remux · HDR · 20–60 GB · 10+ seeders". */
 export function criteriaText(criteria: WishCriteria, format: Formatters): string {
   const parts: string[] = [
     criteria.minResolution === null
@@ -179,13 +211,29 @@ export function criteriaText(criteria: WishCriteria, format: Formatters): string
   ];
   if (criteria.sources.length > 0) parts.push(criteria.sources.map(sourceLabel).join(", "));
   if (criteria.hdr) parts.push(t("wishlist.criteria.hdr"));
-  if (criteria.maxSize !== null) {
-    parts.push(t("wishlist.criteria.maxSize", { size: format.size(criteria.maxSize) }));
-  }
+  const size = sizeText(criteria, format);
+  if (size !== null) parts.push(size);
   if (criteria.minSeeders !== null) {
     parts.push(t("wishlist.criteria.minSeeders", { count: criteria.minSeeders }));
   }
   return parts.join(" · ");
+}
+
+/** The copy held in words: "1080p · WEB-DL · HDR10"; the parts not known are left out. */
+export function heldText(held: WishHeld): string {
+  return [
+    held.resolution === "unknown" ? "" : held.resolution,
+    held.source === null ? "" : sourceLabel(held.source),
+    held.hdr ?? "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** "You already have this: 1080p · WEB-DL", or without the quality when nothing is known. */
+export function heldLine(held: WishHeld): string {
+  const quality = heldText(held);
+  return quality === "" ? t("wishlist.held.plain") : t("wishlist.held.line", { quality });
 }
 
 /** The status line of an entry that has no match to list. */

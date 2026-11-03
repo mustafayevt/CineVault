@@ -1,9 +1,11 @@
 import { catalogTitle } from "./syntheticCatalog";
+import type { CopyFacts } from "./syntheticCatalog";
 import type {
   WishAdd,
   WishCheck,
   WishCriteria,
   WishEntry,
+  WishHeld,
   WishMatch,
   WishMatchState,
   WishScope,
@@ -14,6 +16,7 @@ import { TorrentRequestError } from "./torrentBackend";
  * The synthetic Wishlist (`bun run dev`, `bun run shots` and the tests): an in-memory list that
  * starts with a few entries (`demo`) or none (`empty`). "Check now" finds one new release for
  * Heat the first time; a due-only check finds nothing, as every demo entry was checked lately.
+ * What the library holds comes from the synthetic catalog.
  */
 
 const MINUTE_MS = 60_000;
@@ -22,7 +25,7 @@ const GB = 1_000_000_000;
 export type SyntheticWishlistStart = "demo" | "empty";
 
 export interface SyntheticWishlistCalls {
-  /** `check:<dueOnly>`, `add:<kind>:<tmdbId>`, `update:<id>`, `remove:<id>`, `match:<id>:<key>:<state>`, `seen`. */
+  /** `check:<dueOnly>`, `add:<kind>:<tmdbId>`, `update:<id>`, `remove:<id>`, `keep:<id>`, `match:<id>:<key>:<state>`, `seen`. */
   wishlist: string[];
 }
 
@@ -53,9 +56,46 @@ const ANY: WishCriteria = {
   minResolution: null,
   sources: [],
   hdr: false,
+  minSize: null,
   maxSize: null,
   minSeeders: null,
 };
+
+const RESOLUTION_RANK: Record<string, number> = { "2160p": 4, "1080p": 3, "720p": 2, "480p": 1 };
+
+function heldOf(copy: CopyFacts): WishHeld {
+  return { resolution: copy.resolution, source: copy.source, hdr: copy.hdr };
+}
+
+/** What the synthetic library holds of a title and scope, as the backend would say it. */
+export function syntheticHeld(kind: string, tmdbId: number, scope: WishScope): WishHeld | null {
+  const title = catalogTitle(kind === "show" ? "show" : "movie", tmdbId);
+  if (title === undefined || title.inLibrary === null) return null;
+  if (kind === "movie") {
+    const copies = [title.copy, ...(title.moreCopies ?? [])].filter(
+      (copy): copy is CopyFacts => copy !== undefined,
+    );
+    copies.sort(
+      (a, b) => (RESOLUTION_RANK[b.resolution] ?? 0) - (RESOLUTION_RANK[a.resolution] ?? 0),
+    );
+    const best = copies[0];
+    return best === undefined ? null : heldOf(best);
+  }
+  const held = title.held ?? [];
+  const missing = title.missing ?? [];
+  const unknown: WishHeld = { resolution: "unknown", source: null, hdr: null };
+  if (scope.kind === "season") {
+    const some = held.some((episode) => episode.season === scope.season);
+    const gap = missing.some((episode) => episode.season === scope.season);
+    return some && !gap ? unknown : null;
+  }
+  if (scope.kind === "episode") {
+    return held.some((e) => e.season === scope.season && e.episode === scope.episode)
+      ? unknown
+      : null;
+  }
+  return null;
+}
 
 function demoEntries(now: number): WishEntry[] {
   const base = {
@@ -63,6 +103,7 @@ function demoEntries(now: number): WishEntry[] {
     note: null,
     noteDetail: null,
     done: null,
+    held: null,
     target: null,
     inLibrary: null,
     matches: [],
@@ -145,9 +186,10 @@ function demoEntries(now: number): WishEntry[] {
       title: "Heat",
       year: 1995,
       scope: { kind: "movie", season: null, episode: null },
-      criteria: { ...ANY, minResolution: "2160p", hdr: true, minSeeders: 10 },
+      criteria: { ...ANY, minResolution: "2160p", hdr: true, minSize: 20 * GB, minSeeders: 10 },
       added: now - 2 * 24 * 60 * MINUTE_MS,
       checked: now - 25 * MINUTE_MS,
+      held: syntheticHeld("movie", 3, { kind: "movie", season: null, episode: null }),
       inLibrary: { itemId: "3", name: "Heat (1995)" },
     },
     {
@@ -235,6 +277,7 @@ export function createSyntheticWishlist(start: SyntheticWishlistStart = "demo") 
         replace(existing.id, (row) => ({
           ...row,
           criteria: request.criteria,
+          held: syntheticHeld(row.kind, row.tmdbId, row.scope),
           done: null,
           checked: null,
           matches: row.matches.filter((found) => found.state === "sent"),
@@ -257,6 +300,7 @@ export function createSyntheticWishlist(start: SyntheticWishlistStart = "demo") 
           note: null,
           noteDetail: null,
           done: null,
+          held: syntheticHeld(request.kind, request.tmdbId, request.scope),
           target: null,
           inLibrary:
             title === undefined || title.inLibrary === null
@@ -287,6 +331,21 @@ export function createSyntheticWishlist(start: SyntheticWishlistStart = "demo") 
         ...row,
         scope,
         criteria,
+        held: syntheticHeld(row.kind, row.tmdbId, scope),
+        done: null,
+        checked: null,
+        matches: row.matches.filter((found) => found.state === "sent"),
+      }));
+      return Promise.resolve();
+    },
+    wishlistHeld: (kind: string, tmdbId: number, scope: WishScope): Promise<WishHeld | null> =>
+      Promise.resolve(syntheticHeld(kind, tmdbId, scope)),
+    wishlistKeepLooking: (id: number): Promise<void> => {
+      calls.wishlist.push(`keep:${id}`);
+      find(id);
+      replace(id, (row) => ({
+        ...row,
+        held: syntheticHeld(row.kind, row.tmdbId, row.scope),
         done: null,
         checked: null,
         matches: row.matches.filter((found) => found.state === "sent"),

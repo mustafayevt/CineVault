@@ -6,7 +6,7 @@
 
 ## 2. UI
 
-- [ ] 2.1 Wishlist model: the smallest size in the draft, its checks and the criteria text ("20–60 GB", "from 20 GB"), the held copy's words; the backend calls (desktop, browser and the synthetic backend). Verify: unit tests.
+- [x] 2.1 Wishlist model: the smallest size in the draft, its checks and the criteria text ("20–60 GB", "from 20 GB"), the held copy's words; the backend calls (desktop, browser and the synthetic backend). Verify: unit tests.
 - [ ] 2.2 The editor's smallest size and "You already have this" line, the card's held line and Keep looking on a done entry. Verify: page tests.
 
 ## 3. Integration
