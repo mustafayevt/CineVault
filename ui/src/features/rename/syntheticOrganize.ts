@@ -259,6 +259,19 @@ const PRESETS: readonly OrganizeProfileDto[] = [
       episode_file: "${showTitle} - S${seasonNr2}E${episodeNr2}",
     },
   },
+  {
+    id: "release-info",
+    name: "Release info",
+    builtin: true,
+    patterns: {
+      movie_folder: "${title} (${year})",
+      movie_file: "${title}${ - ,edition,} (${year}) [${releaseTags}]${-,releaseGroup,}",
+      show_folder: "${showTitle} (${showYear})",
+      season_folder: "Season ${seasonNr2}",
+      episode_file:
+        "${showTitle} - S${seasonNr2}E${episodeNr2} - ${title} [${releaseTags}]${-,releaseGroup,}",
+    },
+  },
 ];
 
 const MOVIE_TOKENS = [
@@ -276,6 +289,9 @@ const MOVIE_TOKENS = [
   "imdb",
   "certification",
   "originalFilename",
+  "releaseQuality",
+  "releaseTags",
+  "releaseGroup",
 ];
 const TV_TOKENS = [
   "showTitle",
@@ -291,6 +307,9 @@ const TV_TOKENS = [
   "hdrformat",
   "audioCodec",
   "audioChannelsDot",
+  "releaseQuality",
+  "releaseTags",
+  "releaseGroup",
 ];
 
 function valueOf(movieRow: SampleMovie, name: string): string {

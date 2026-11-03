@@ -26,6 +26,9 @@ export const rename = {
   "organize.token.episodeNr2": "Episode 00",
   "organize.token.certification": "Certification",
   "organize.token.originalFilename": "Original file name",
+  "organize.token.releaseQuality": "Quality",
+  "organize.token.releaseTags": "Release tags",
+  "organize.token.releaseGroup": "Release group",
   "organize.token.aspectRatio": "Aspect ratio",
   "organize.token.framerate": "Frame rate",
   "organize.token.language": "Language",
@@ -155,6 +158,10 @@ export const rename = {
   "renamePage.empty.body": "Titles whose folder or main file would change are listed here.",
   "renamePage.empty.selection": "The selected titles are already named as your templates say.",
   "renamePage.empty.edit": "Edit the templates in Settings",
+  "renamePage.metadataOnly.title": "Metadata only is on",
+  "renamePage.metadataOnly.body":
+    "CineVault does not rename or move your files and folders. Scan, Scrape, NFO and artwork files keep working.",
+  "renamePage.metadataOnly.open": "Open Settings",
   "renamePage.toast.done": "Renamed {count, plural, one {# title} other {# titles}}",
   "renamePage.toast.partly":
     "{done}; {count, plural, one {# title} other {# titles}} could not be renamed",

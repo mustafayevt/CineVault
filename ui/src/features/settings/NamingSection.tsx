@@ -4,6 +4,7 @@ import { Button } from "../../components/Button";
 import { Field } from "../../components/Field";
 import { Popover } from "../../components/Popover";
 import { SegmentedControl } from "../../components/SegmentedControl";
+import { Switch } from "../../components/Switch";
 import { t } from "../../i18n/catalog";
 import { FormRow, SettingsSection } from "./FormParts";
 import {
@@ -14,6 +15,7 @@ import {
   tokensOf,
 } from "./namingModel";
 import type { ColonStyle, NamingField } from "./namingModel";
+import { METADATA_ONLY_KEY, useMetadataOnly } from "./metadataOnly";
 import { useNamingTemplates } from "./useNamingTemplates";
 import type { NamingTemplates } from "./useNamingTemplates";
 import { useSettingsStore } from "./settingsStore";
@@ -60,6 +62,7 @@ function Example({ text }: { text: string | null }) {
 export function NamingSection() {
   const naming = useNamingTemplates();
   const colon = colonStyleOf(useSettingsStore((state) => state.values[COLON_SETTING_KEY]));
+  const metadataOnly = useMetadataOnly();
   // The preset waiting for the answer to "Replace your custom templates?".
   const [asking, setAsking] = useState<string | null>(null);
   const [styleProblem, setStyleProblem] = useState<string | null>(null);
@@ -151,6 +154,19 @@ export function NamingSection() {
 
   return (
     <SettingsSection id="naming" title={t("settingsPage.naming.title")}>
+      <FormRow
+        label={t("settings.renamer.metadata-only.title")}
+        hint={t("settings.renamer.metadata-only.description")}
+        labelId="naming-metadata-only"
+      >
+        <Switch
+          checked={metadataOnly}
+          aria-labelledby="naming-metadata-only"
+          onCheckedChange={(on) => {
+            useSettingsStore.getState().set(METADATA_ONLY_KEY, on);
+          }}
+        />
+      </FormRow>
       <FormRow
         label={t("settingsPage.naming.style")}
         hint={t("settingsPage.naming.style.hint")}

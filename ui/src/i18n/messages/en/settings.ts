@@ -94,6 +94,11 @@ export const settings = {
     "A renamed title stays in its sub-folder: Movies/Amadeus becomes Movies/Amadeus (1984). Styles with folders of their own, such as letter folders, start at the library folder.",
   "settings.renamer.keep-subfolders.keywords":
     "sub-folders, subfolders, category, keep, flatten, folder, structure, rename",
+  "settings.renamer.metadata-only.title": "Metadata only",
+  "settings.renamer.metadata-only.description":
+    "Never rename or move your media files and folders. Scan, Scrape, NFO and artwork files keep working.",
+  "settings.renamer.metadata-only.keywords":
+    "metadata only, no rename, never rename, read only, download manager, keep names, move, scrape only",
   "settings.files.deleted-mode.title": "Deleted and replaced files",
   "settings.files.deleted-mode.description":
     "Where Delete, a move's originals, rename leftovers and replaced artwork or NFO files go.",
