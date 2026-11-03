@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import type { ReactNode } from "react";
 
+import type { ScrapeLinkDto } from "../../bindings";
 import { Button } from "../../components/Button";
 import { Checkbox } from "../../components/Checkbox";
 import { Chip } from "../../components/Chip";
@@ -14,6 +15,8 @@ import { useEscapeLayer } from "../shell/escStack";
 import { currentTorrentBackend } from "./torrentBackend";
 import type { WishCriteria, WishScope } from "./torrentBackend";
 import type { TitleKind } from "./torrentsSearch";
+import { WishHeldLine } from "./WishHeldLine";
+import { WISHLIST_KEY } from "./wishlistQueries";
 import {
   RESOLUTIONS,
   SOURCES,
@@ -30,6 +33,8 @@ interface WishEditorProps {
   tmdbId: number;
   scope: WishScope;
   criteria: WishCriteria;
+  /** The library title, when the library has one: the held copy links to it. */
+  library: ScrapeLinkDto | null;
   /** `add` shows "Add to Wishlist", `edit` shows "Save". */
   mode: "add" | "edit";
   saving: boolean;
@@ -71,17 +76,30 @@ function useSeasonOptions(kind: TitleKind, tmdbId: number, season: number, wante
   return { seasons: seasons.data ?? [], episodes: episodes.data ?? [] };
 }
 
+/** The copy the library holds of the scope being edited; `null` while unknown or not held. */
+function useHeld(kind: TitleKind, tmdbId: number, scope: WishScope, wanted: boolean) {
+  const held = useQuery({
+    enabled: wanted,
+    queryKey: [...WISHLIST_KEY, "held", kind, tmdbId, scope.kind, scope.season, scope.episode],
+    queryFn: () => currentTorrentBackend().wishlistHeld(kind, tmdbId, scope),
+    retry: false,
+  });
+  return held.data ?? null;
+}
+
 /**
  * The Wishlist editor (spec `torrent-wishlist` "Wishlist entries and criteria"), part of the page
- * rather than a dialog: for a show what to look for (the next new episode, a season or an
- * episode), then the lowest resolution, the sources, HDR only, the largest size and the fewest
- * seeders, with "Add to Wishlist" or "Save" and "Cancel".
+ * rather than a dialog: "You already have this" when the library holds the title and scope, for
+ * a show what to look for (the next new episode, a season or an episode), then the lowest
+ * resolution, the sources, HDR only, the size range and the fewest seeders, with "Add to
+ * Wishlist" or "Save" and "Cancel".
  */
 export function WishEditor({
   kind,
   tmdbId,
   scope,
   criteria,
+  library,
   mode,
   saving,
   onSave,
@@ -102,6 +120,7 @@ export function WishEditor({
   // Esc cancels, like it closes a picker page.
   useEscapeLayer("picker", true, onCancel);
   const problem = draftProblem(draft);
+  const held = useHeld(kind, tmdbId, draftValue(draft, unit).scope, library !== null);
   const seasonOptions =
     options.seasons.length === 0
       ? [
@@ -150,6 +169,7 @@ export function WishEditor({
         save();
       }}
     >
+      {held === null ? null : <WishHeldLine held={held} kind={kind} library={library} />}
       {kind === "show" ? (
         <Row label={t("wishlist.edit.lookFor")} id={`${ids}-scope`}>
           <SegmentedControl<ScopeChoice>
@@ -236,7 +256,21 @@ export function WishEditor({
         </Checkbox>
       </Row>
       <Row label={t("wishlist.edit.limits")} id={`${ids}-limits`}>
-        <span className="text-(length:--fs-12) text-text-2">{t("wishlist.edit.upTo")}</span>
+        <span className="text-(length:--fs-12) text-text-2">{t("wishlist.edit.from")}</span>
+        <Field
+          aria-label={t("wishlist.edit.minSize")}
+          inputMode="decimal"
+          placeholder={t("wishlist.edit.noLimit")}
+          value={draft.minSizeGb}
+          onChange={(event) => change({ minSizeGb: event.target.value })}
+          boxClassName="w-[120px]"
+          trailing={
+            <span className="text-(length:--fs-12) text-text-muted">
+              {format.sizeBase === "base2" ? "GiB" : "GB"}
+            </span>
+          }
+        />
+        <span className="text-(length:--fs-12) text-text-2">{t("wishlist.edit.to")}</span>
         <Field
           aria-label={t("wishlist.edit.maxSize")}
           inputMode="decimal"

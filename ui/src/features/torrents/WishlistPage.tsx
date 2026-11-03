@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { Check, Pencil, Plus, RefreshCw, Search, Send, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, RefreshCw, RotateCcw, Search, Send, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "../../components/Button";
@@ -30,6 +30,7 @@ import type { TitleRef, WishlistSearch } from "./torrentsSearch";
 import { TorrentsViewSwitch } from "./TorrentsViewSwitch";
 import { useTorrentNotice } from "./useTorrentNotice";
 import { WishEditor } from "./WishEditor";
+import { WishHeldLine } from "./WishHeldLine";
 import { WishTitlePicker } from "./WishTitlePicker";
 import {
   criteriaText,
@@ -216,6 +217,19 @@ function EntryCard({ entry, now, fresh, editing, onEdit, highlight = false }: En
       failed(t("wishlist.error.save"), error);
     }
   };
+  const keepLooking = async () => {
+    try {
+      await backend.wishlistKeepLooking(entry.id);
+      await refreshWishlist(client);
+      showToast({ message: t("wishlist.toast.keepLooking", { title: titleName(entry) }) });
+      // The entry is due at once: look for it now, as the app would on its next check.
+      const report = await backend.wishlistCheck(true);
+      await refreshWishlist(client);
+      announce(report.newMatches, () => void navigate({ to: "/torrents/wishlist" }));
+    } catch (error) {
+      failed(t("wishlist.error.save"), error);
+    }
+  };
   const remove = async () => {
     try {
       await backend.wishlistRemove(entry.id);
@@ -287,6 +301,9 @@ function EntryCard({ entry, now, fresh, editing, onEdit, highlight = false }: En
           <p className="m-0 truncate text-(length:--fs-13) text-text-2 @max-[640px]/pane:whitespace-normal">
             {criteriaText(entry.criteria, format)}
           </p>
+          {done || entry.held === null ? null : (
+            <WishHeldLine held={entry.held} kind={ref.kind} library={entry.inLibrary} />
+          )}
           <p
             data-testid="wish-status"
             className={`m-0 flex items-center gap-1.5 text-(length:--fs-12) ${done ? "text-ok" : "text-text-muted"}`}
@@ -296,7 +313,11 @@ function EntryCard({ entry, now, fresh, editing, onEdit, highlight = false }: En
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {done ? null : (
+          {done ? (
+            <Button size="sm" variant="ghost" icon={RotateCcw} onClick={() => void keepLooking()}>
+              {t("wishlist.keepLooking")}
+            </Button>
+          ) : (
             <IconButton
               aria-label={t("wishlist.searchNow")}
               title={t("wishlist.searchNow")}
@@ -328,6 +349,7 @@ function EntryCard({ entry, now, fresh, editing, onEdit, highlight = false }: En
             tmdbId={entry.tmdbId}
             scope={entry.scope}
             criteria={entry.criteria}
+            library={entry.inLibrary}
             mode="edit"
             saving={saving}
             onSave={(scope, criteria) => void save(scope, criteria)}
@@ -443,6 +465,7 @@ function AddPanel({ add, search, onAdded }: AddPanelProps) {
             tmdbId={add.tmdbId}
             scope={defaultScope(add.kind, search.season, search.episode)}
             criteria={defaultCriteria(known.libraryCopies[0] ?? null)}
+            library={known.inLibrary}
             mode="add"
             saving={saving}
             onSave={(scope, criteria) => void save(scope, criteria)}
