@@ -2,7 +2,7 @@
 
 - [x] 1.1 `cv-db`: migration 108 adds `held_copies` to `torrent_wishlist`; `add` and `update` take it, `keep_looking` clears done and the last check, drops new and seen matches and sets it, `lower_held` lowers it. Verify: repository unit tests, the migration tests.
 - [x] 1.2 `cv-app` `torrents::wishlist`: `min_size` in the criteria; the held copy and the count of copies meeting the criteria per scope; the done rule against the count saved; `held_copies` written on add and update; `wishlist_keep_looking` and `wishlist_held`. Verify: unit tests for the size range; service tests for a title already held staying active, a second copy closing it, a copy leaving lowering the count, and Keep looking.
-- [ ] 1.3 `cv-ipc`, `src-tauri`, `cv-web`: `minSize` (refused when negative or above `maxSize`) and `held` in the DTOs; the `torrent_wishlist_held` and `torrent_wishlist_keep_looking` commands; regenerate `ui/src/bindings.ts`. Verify: `cargo test -p cv-ipc -p cv-web -p cinevault-app`, clippy, fmt.
+- [x] 1.3 `cv-ipc`, `src-tauri`, `cv-web`: `minSize` (refused when negative or above `maxSize`) and `held` in the DTOs; the `torrent_wishlist_held` and `torrent_wishlist_keep_looking` commands; regenerate `ui/src/bindings.ts`. Verify: `cargo test -p cv-ipc -p cv-web -p cinevault-app`, clippy, fmt.
 
 ## 2. UI
 

@@ -859,6 +859,16 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["dueOnly"],
     },
     CommandInfo {
+        name: "torrent_wishlist_held",
+        module: "torrent_wishlist",
+        args: &["kind", "tmdbId", "scope"],
+    },
+    CommandInfo {
+        name: "torrent_wishlist_keep_looking",
+        module: "torrent_wishlist",
+        args: &["id"],
+    },
+    CommandInfo {
         name: "torrent_wishlist_match_state",
         module: "torrent_wishlist",
         args: &["id", "key", "matchState"],

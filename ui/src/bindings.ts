@@ -622,6 +622,20 @@ export const commands = {
 	torrentWishlistAdd: (request: WishAddDto) => typedError<number, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_add", { request })),
 	/**  Changes an entry's scope and criteria; the entry is judged and checked again. */
 	torrentWishlistUpdate: (id: number, scope: WishScopeDto, criteria: WishCriteriaDto) => typedError<null, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_update", { id, scope, criteria })),
+	/**
+	 *  The copy the library holds of a title and scope, for the editor's "You already have this".
+	 *  Only the library is read.
+	 */
+	torrentWishlistHeld: (kind: string, tmdbId: number, scope: WishScopeDto) => typedError<{
+	/**  `2160p`, `1080p`, `720p`, `480p` or `unknown` (media info not read yet). */
+	resolution: string,
+	/**  `BluRay`, `WEB-DL`, ... or none. */
+	source: string | null,
+	/**  `DV`, `HDR10+`, `HDR10` or `HLG`. */
+	hdr: string | null,
+} | null, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_held", { kind, tmdbId, scope })),
+	/**  Makes a done entry active again; only a copy that arrives from now on makes it done. */
+	torrentWishlistKeepLooking: (id: number) => typedError<null, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_keep_looking", { id })),
 	/**  Removes an entry and its matches. */
 	torrentWishlistRemove: (id: number) => typedError<null, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_remove", { id })),
 	/**
@@ -4789,6 +4803,8 @@ export type WishCriteriaDto = {
 	sources: string[],
 	/**  Only releases with HDR. */
 	hdr: boolean,
+	/**  The smallest size in bytes. */
+	minSize?: number | null,
 	/**  The largest size in bytes. */
 	maxSize: number | null,
 	/**  The fewest seeders. */
@@ -4813,13 +4829,25 @@ export type WishEntryDto = {
 	note: string | null,
 	/**  The day an awaited episode airs (`airs`), or the failure's words (`failed`). */
 	noteDetail: string | null,
-	/**  When the library was found to hold a copy that meets the criteria. */
+	/**  When the library was found to have gained a copy that meets the criteria. */
 	done: number | null,
+	/**  The copy the library holds of the title and scope, for an entry that is not done. */
+	held: WishHeldDto | null,
 	/**  The episode a "next new episode" entry looked for at its last check. */
 	target: TorrentEpisodeRefDto | null,
 	inLibrary: ScrapeLinkDto | null,
 	/**  The matches that are not dismissed, most seeders first. */
 	matches: WishMatchDto[],
+};
+
+/**  The copy the library holds of an entry's title and scope: "1080p · WEB-DL". */
+export type WishHeldDto = {
+	/**  `2160p`, `1080p`, `720p`, `480p` or `unknown` (media info not read yet). */
+	resolution: string,
+	/**  `BluRay`, `WEB-DL`, ... or none. */
+	source: string | null,
+	/**  `DV`, `HDR10+`, `HDR10` or `HLG`. */
+	hdr: string | null,
 };
 
 /**  A release a check kept for an entry. */
