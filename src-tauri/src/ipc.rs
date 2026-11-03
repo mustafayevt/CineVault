@@ -285,6 +285,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             crate::torrent_wishlist_ipc::torrent_wishlist,
             crate::torrent_wishlist_ipc::torrent_wishlist_add,
             crate::torrent_wishlist_ipc::torrent_wishlist_update,
+            crate::torrent_wishlist_ipc::torrent_wishlist_held,
+            crate::torrent_wishlist_ipc::torrent_wishlist_keep_looking,
             crate::torrent_wishlist_ipc::torrent_wishlist_remove,
             crate::torrent_wishlist_ipc::torrent_wishlist_check,
             crate::torrent_wishlist_ipc::torrent_wishlist_match_state,

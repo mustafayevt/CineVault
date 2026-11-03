@@ -51,6 +51,7 @@ fn criteria(min: Option<MinResolution>, sources: &[WishSource], hdr: bool) -> Wi
         min_resolution: min,
         sources: sources.to_vec(),
         hdr,
+        min_size: None,
         max_size: None,
         min_seeders: None,
     }
@@ -90,6 +91,21 @@ fn size_and_seeders_limits_fail_unknown_values() {
     assert!(
         !wants.met_by_release(&unknown),
         "an unknown size fails a set limit"
+    );
+
+    let mut range = criteria(None, &[], false);
+    range.min_size = Some(20_000_000_000);
+    range.max_size = Some(60_000_000_000);
+    assert!(range.met_by_release(&row(REMUX_DV, 58, Some(50))));
+    assert!(
+        !range.met_by_release(&row(WEB_1080, 12, Some(50))),
+        "12 GB < 20 GB"
+    );
+    let mut unknown = row(REMUX_DV, 58, Some(50));
+    unknown.release.size = None;
+    assert!(
+        !range.met_by_release(&unknown),
+        "an unknown size fails a smallest size too"
     );
 
     let mut seeded = criteria(None, &[], false);
@@ -143,6 +159,7 @@ fn criteria_round_trip_and_damaged_text_gives_the_defaults() {
         min_resolution: Some(MinResolution::R2160),
         sources: vec![WishSource::Remux, WishSource::WebDl],
         hdr: true,
+        min_size: Some(20_000_000_000),
         max_size: Some(80_000_000_000),
         min_seeders: Some(5),
     };
@@ -151,6 +168,11 @@ fn criteria_round_trip_and_damaged_text_gives_the_defaults() {
     assert!(json.contains("\"WEB-DL\""), "{json}");
     assert_eq!(WishCriteria::from_json(&json), wants);
     assert!(WishCriteria::from_json("{\"hdr\":true}").hdr);
+    assert_eq!(
+        WishCriteria::from_json("{\"maxSize\":5}").min_size,
+        None,
+        "criteria saved before the smallest size have none"
+    );
     assert_eq!(WishCriteria::from_json("not json"), WishCriteria::default());
 }
 

@@ -176,6 +176,59 @@ describe("the Wishlist", () => {
       "true",
     );
   });
+
+  it("says what the library holds in the editor and on the entry, linking to the title", async () => {
+    await renderTorrents("/torrents/wishlist?add=movie:8");
+    const editor = await screen.findByTestId("wish-editor");
+    const line = await within(editor).findByTestId("wish-held");
+    expect(line).toHaveTextContent("You already have this: 720p · Blu-ray");
+    expect(within(line).getByRole("link")).toHaveAttribute("href", "/movies/8");
+
+    const heat = await entryNamed("Heat (1995)");
+    expect(within(heat).getByTestId("wish-held")).toHaveTextContent(
+      "You already have this: 1080p · Blu-ray",
+    );
+    expect(heat).toHaveTextContent("2160p or better · HDR · from ");
+    const done = await entryNamed("Oppenheimer (2023)");
+    expect(within(done).queryByTestId("wish-held")).toBeNull();
+  });
+
+  it("keeps looking for a done entry and checks it at once", async () => {
+    const user = userEvent.setup();
+    const backend = spiedBackend();
+    await renderTorrents("/torrents/wishlist", backend);
+    const done = await entryNamed("Oppenheimer (2023)");
+    await user.click(within(done).getByRole("button", { name: "Keep looking" }));
+    await waitFor(() =>
+      expect(screen.getByRole("article", { name: "Oppenheimer (2023)" })).toHaveAttribute(
+        "data-done",
+        "false",
+      ),
+    );
+    expect(screen.queryByRole("heading", { name: "Done" })).toBeNull();
+    expect(backend.wishlistCalls.wishlist).toContain("keep:5");
+    await waitFor(() => expect(backend.wishlistCalls.wishlist).toContain("check:true"));
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain(
+      "Looking for Oppenheimer (2023) again",
+    );
+  });
+
+  it("takes a size range and refuses a smallest size above the largest", async () => {
+    const user = userEvent.setup();
+    await renderTorrents("/torrents/wishlist?add=movie:4");
+    const editor = await screen.findByTestId("wish-editor");
+    expect(within(editor).queryByTestId("wish-held")).toBeNull();
+    await user.type(within(editor).getByRole("textbox", { name: "Smallest size" }), "60");
+    await user.type(within(editor).getByRole("textbox", { name: "Largest size" }), "20");
+    await user.click(within(editor).getByRole("button", { name: "Add to Wishlist" }));
+    expect(await within(editor).findByRole("alert")).toHaveTextContent(
+      "The smallest size must not be above the largest size.",
+    );
+    await user.clear(within(editor).getByRole("textbox", { name: "Smallest size" }));
+    await user.type(within(editor).getByRole("textbox", { name: "Smallest size" }), "5");
+    await user.click(within(editor).getByRole("button", { name: "Add to Wishlist" }));
+    expect(await entryNamed("Blade Runner (1982)")).toHaveTextContent(/5–20\sGB/);
+  });
 });
 
 describe("Add to Wishlist on the search page", () => {

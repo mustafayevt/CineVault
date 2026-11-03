@@ -10,6 +10,7 @@ use cv_app::torrents::wishlist::{
     WishSource,
 };
 use cv_db::repo::torrent_wishlist::MatchState;
+use cv_torrent::model::LibraryCopy;
 use cv_torrent::release::parse_release;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -18,7 +19,7 @@ use crate::matching::ScrapeLinkDto;
 use crate::matching::{POSTER_WAIT, poster_keys_of};
 use crate::torrent_stream::{
     CommandResult, TorrentCommandError, TorrentEpisodeRefDto, TorrentState, audio_text, codec_text,
-    hdr_text, kind_text, link_dto, parse_kind, resolution_text, source_text,
+    hdr_text, kind_text, link_dto, media_source_text, parse_kind, resolution_text, source_text,
 };
 
 /// What kind of release an entry is after.
@@ -31,6 +32,9 @@ pub struct WishCriteriaDto {
     pub sources: Vec<String>,
     /// Only releases with HDR.
     pub hdr: bool,
+    /// The smallest size in bytes.
+    #[serde(default)]
+    pub min_size: Option<f64>,
     /// The largest size in bytes.
     pub max_size: Option<f64>,
     /// The fewest seeders.
@@ -45,6 +49,18 @@ pub struct WishScopeDto {
     pub kind: String,
     pub season: Option<u16>,
     pub episode: Option<u16>,
+}
+
+/// The copy the library holds of an entry's title and scope: "1080p · WEB-DL".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WishHeldDto {
+    /// `2160p`, `1080p`, `720p`, `480p` or `unknown` (media info not read yet).
+    pub resolution: String,
+    /// `BluRay`, `WEB-DL`, ... or none.
+    pub source: Option<String>,
+    /// `DV`, `HDR10+`, `HDR10` or `HLG`.
+    pub hdr: Option<String>,
 }
 
 /// A release a check kept for an entry.
@@ -92,8 +108,10 @@ pub struct WishEntryDto {
     pub note: Option<String>,
     /// The day an awaited episode airs (`airs`), or the failure's words (`failed`).
     pub note_detail: Option<String>,
-    /// When the library was found to hold a copy that meets the criteria.
+    /// When the library was found to have gained a copy that meets the criteria.
     pub done: Option<f64>,
+    /// The copy the library holds of the title and scope, for an entry that is not done.
+    pub held: Option<WishHeldDto>,
     /// The episode a "next new episode" entry looked for at its last check.
     pub target: Option<TorrentEpisodeRefDto>,
     pub in_library: Option<ScrapeLinkDto>,
@@ -143,6 +161,7 @@ pub fn criteria_dto(criteria: &WishCriteria) -> WishCriteriaDto {
             .map(|s| s.as_str().to_owned())
             .collect(),
         hdr: criteria.hdr,
+        min_size: criteria.min_size.map(|size| size as f64),
         max_size: criteria.max_size.map(|size| size as f64),
         min_seeders: criteria.min_seeders,
     }
@@ -151,7 +170,8 @@ pub fn criteria_dto(criteria: &WishCriteria) -> WishCriteriaDto {
 /// The criteria a DTO names; an unknown resolution or source is refused.
 ///
 /// # Errors
-/// `invalid` for an unknown resolution or source, or a negative size.
+/// `invalid` for an unknown resolution or source, a negative size, or a smallest size above the
+/// largest.
 pub fn criteria_of(dto: &WishCriteriaDto) -> CommandResult<WishCriteria> {
     let min_resolution = match dto.min_resolution.as_deref() {
         None | Some("") => None,
@@ -167,19 +187,29 @@ pub fn criteria_of(dto: &WishCriteriaDto) -> CommandResult<WishCriteria> {
             sources.push(source);
         }
     }
-    let max_size = match dto.max_size {
-        None => None,
+    let bytes = |size: Option<f64>| match size {
+        None => Ok(None),
         Some(size) if size.is_finite() && size >= 0.0 => {
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let bytes = size.round() as u64;
-            Some(bytes)
+            Ok(Some(bytes))
         }
-        Some(_) => return Err(invalid("The size limit must be a positive number.")),
+        Some(_) => Err(invalid("The size limit must be a positive number.")),
     };
+    let min_size = bytes(dto.min_size)?;
+    let max_size = bytes(dto.max_size)?;
+    if let (Some(min), Some(max)) = (min_size, max_size)
+        && min > max
+    {
+        return Err(invalid(
+            "The smallest size must not be above the largest size.",
+        ));
+    }
     Ok(WishCriteria {
         min_resolution,
         sources,
         hdr: dto.hdr,
+        min_size,
         max_size,
         min_seeders: dto.min_seeders,
     })
@@ -246,6 +276,14 @@ pub fn match_dto(found: WishMatch) -> WishMatchDto {
     }
 }
 
+pub fn held_dto(copy: &LibraryCopy) -> WishHeldDto {
+    WishHeldDto {
+        resolution: resolution_text(copy.resolution).to_owned(),
+        source: media_source_text(&copy.source, false),
+        hdr: hdr_text(copy.hdr).map(str::to_owned),
+    }
+}
+
 fn note_dto(note: Option<CheckNote>) -> (Option<String>, Option<String>) {
     match note {
         None => (None, None),
@@ -272,6 +310,7 @@ pub fn entry_dto(entry: WishEntry, poster_key: Option<String>) -> WishEntryDto {
         note,
         note_detail,
         done: entry.done_ms.map(millis),
+        held: entry.held.as_ref().map(held_dto),
         target: entry
             .target
             .map(|(season, episode)| TorrentEpisodeRefDto { season, episode }),
@@ -331,6 +370,27 @@ pub fn torrent_wishlist_update(
 ) -> CommandResult<()> {
     let service = state.get()?;
     service.wishlist_update(i64::from(id), scope_of(&scope)?, &criteria_of(&criteria)?)?;
+    Ok(())
+}
+
+/// The copy the library holds of a title and scope, for the editor's "You already have this".
+/// Only the library is read.
+pub fn torrent_wishlist_held(
+    state: &TorrentState,
+    kind: String,
+    tmdb_id: u32,
+    scope: WishScopeDto,
+) -> CommandResult<Option<WishHeldDto>> {
+    let held =
+        state
+            .get()?
+            .wishlist_held(parse_kind(&kind)?, u64::from(tmdb_id), scope_of(&scope)?)?;
+    Ok(held.as_ref().map(held_dto))
+}
+
+/// Makes a done entry active again; only a copy that arrives from now on makes it done.
+pub fn torrent_wishlist_keep_looking(state: &TorrentState, id: u32) -> CommandResult<()> {
+    state.get()?.wishlist_keep_looking(i64::from(id))?;
     Ok(())
 }
 
@@ -394,6 +454,7 @@ mod tests {
             min_resolution: min.map(str::to_owned),
             sources: sources.iter().map(|s| (*s).to_owned()).collect(),
             hdr: true,
+            min_size: None,
             max_size: Some(80_000_000_000.0),
             min_seeders: Some(5),
         }
@@ -415,6 +476,31 @@ mod tests {
         let mut negative = criteria_dto_of(None, &[]);
         negative.max_size = Some(-1.0);
         assert_eq!(criteria_of(&negative).unwrap_err().code, "invalid");
+
+        let mut range = criteria_dto_of(None, &[]);
+        range.min_size = Some(20_000_000_000.0);
+        assert_eq!(criteria_of(&range).unwrap().min_size, Some(20_000_000_000));
+        range.min_size = Some(90_000_000_000.0);
+        assert_eq!(criteria_of(&range).unwrap_err().code, "invalid");
+        range.min_size = Some(-1.0);
+        assert_eq!(criteria_of(&range).unwrap_err().code, "invalid");
+        let without: WishCriteriaDto = serde_json::from_str(
+            r#"{"minResolution":null,"sources":[],"hdr":false,"maxSize":null,"minSeeders":null}"#,
+        )
+        .unwrap();
+        assert_eq!(without.min_size, None, "the smallest size may be left out");
+    }
+
+    #[test]
+    fn the_held_copy_names_its_resolution_source_and_hdr() {
+        let dto = held_dto(&LibraryCopy {
+            resolution: cv_torrent::model::Resolution::R1080,
+            source: cv_domain::MediaSource::WebDl,
+            hdr: cv_torrent::model::Hdr::None,
+        });
+        assert_eq!(dto.resolution, "1080p");
+        assert_eq!(dto.source.as_deref(), Some("WEB-DL"));
+        assert_eq!(dto.hdr, None);
     }
 
     #[test]

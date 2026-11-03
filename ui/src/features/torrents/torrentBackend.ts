@@ -30,6 +30,7 @@ import type {
   WishCheckDto,
   WishCriteriaDto,
   WishEntryDto,
+  WishHeldDto,
   WishMatchDto,
   WishScopeDto,
 } from "../../bindings";
@@ -66,6 +67,8 @@ export type WishEntry = WishEntryDto;
 export type WishMatch = WishMatchDto;
 export type WishCriteria = WishCriteriaDto;
 export type WishScope = WishScopeDto;
+/** The copy the library holds of a title and scope. */
+export type WishHeld = WishHeldDto;
 export type WishAdd = WishAddDto;
 export type WishCheck = WishCheckDto;
 /** What the user can set a match to. */
@@ -175,6 +178,10 @@ export interface TorrentBackend {
   wishlistAdd: (request: WishAdd) => Promise<number>;
   wishlistUpdate: (id: number, scope: WishScope, criteria: WishCriteria) => Promise<void>;
   wishlistRemove: (id: number) => Promise<void>;
+  /** The copy the library holds of a title and scope, or `null`; reads only the library. */
+  wishlistHeld: (kind: TitleKind, tmdbId: number, scope: WishScope) => Promise<WishHeld | null>;
+  /** Makes a done entry active again; only a copy that arrives from now on makes it done. */
+  wishlistKeepLooking: (id: number) => Promise<void>;
   /** Checks the entries that are due, or (`dueOnly` false) every entry that is not done. */
   wishlistCheck: (dueOnly: boolean) => Promise<WishCheck>;
   wishlistMatchState: (id: number, key: string, state: WishMatchState) => Promise<void>;
@@ -274,6 +281,9 @@ const tauriTorrentBackend: TorrentBackend = {
   wishlistUpdate: async (id, scope, criteria) =>
     void unwrap(await commands.torrentWishlistUpdate(id, scope, criteria)),
   wishlistRemove: async (id) => void unwrap(await commands.torrentWishlistRemove(id)),
+  wishlistHeld: async (kind, tmdbId, scope) =>
+    unwrap(await commands.torrentWishlistHeld(kind, tmdbId, scope)),
+  wishlistKeepLooking: async (id) => void unwrap(await commands.torrentWishlistKeepLooking(id)),
   wishlistCheck: async (dueOnly) => unwrap(await commands.torrentWishlistCheck(dueOnly)),
   wishlistMatchState: async (id, key, state) =>
     void unwrap(await commands.torrentWishlistMatchState(id, key, state)),
