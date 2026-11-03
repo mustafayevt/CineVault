@@ -52,6 +52,7 @@ pub use numbered::{numbered_names, numbered_names_on};
 pub use patterns::PatternSet;
 pub(crate) use service::record_rename_from_journal;
 pub use service::{ChangedHook, OrganizeService, PlainNames};
+pub(crate) use startup::volume_reachable;
 pub use startup::{
     DEFERRED_RECOVERY_INTERVAL, recover_interrupted_batches, retry_deferred_recovery,
 };

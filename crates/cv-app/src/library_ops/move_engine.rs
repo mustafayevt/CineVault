@@ -596,6 +596,48 @@ impl ItemRows {
             .last()
     }
 
+    /// Bytes of the originals copied and verified so far, and of all the originals to copy. The
+    /// total is `None` when an original cannot be read.
+    pub(crate) fn bytes(&self, fs: &dyn MoveFs) -> (u64, Option<u64>) {
+        let mut done = 0;
+        let mut total = Some(0_u64);
+        for step in &self.copies {
+            let len = fs
+                .meta(Path::new(&step.entry.from))
+                .ok()
+                .flatten()
+                .map(|m| m.len);
+            if step.done() {
+                done += len.or(step.size).unwrap_or(0);
+            }
+            let known = len.or_else(|| step.size.filter(|_| step.done()));
+            total = total.zip(known).map(|(sum, len)| sum + len);
+        }
+        (done, total)
+    }
+
+    /// The title can carry on without anyone deciding: its move was cut short (no row says why it
+    /// stopped, so the app was closed or crashed), and the drives and folders it reads and writes
+    /// are there. A move that stopped on an error waits for the user.
+    pub(crate) fn resumable_unattended(&self, fs: &dyn MoveFs) -> bool {
+        if self.stop_reason().is_some() {
+            return false;
+        }
+        let (Some(old), Some(new)) = (self.old_folder(), self.new_folder()) else {
+            return false;
+        };
+        let (old, new) = (Path::new(old), Path::new(new));
+        let is_dir = |path: &Path| fs.meta(path).ok().flatten().is_some_and(|m| m.is_dir);
+        if !crate::organize::volume_reachable(new) {
+            return false;
+        }
+        if self.committed() {
+            // Only the originals are left to tidy: the title is whole in its new place.
+            return is_dir(new);
+        }
+        crate::organize::volume_reachable(old) && is_dir(old)
+    }
+
     pub(crate) fn old_folder(&self) -> Option<&str> {
         self.commit.as_ref().map(|s| s.entry.from.as_str())
     }

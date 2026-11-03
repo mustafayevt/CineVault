@@ -4680,6 +4680,21 @@ export type UnfinishedBatchDto = {
 	files_total: number,
 	/**  A plain sentence: why it stopped. */
 	reason: string,
+	/**  The library ids of the titles that still have work. */
+	item_ids: string[],
+	/**  The folder the titles go to (a move), else `null`. */
+	destination: string | null,
+	/**
+	 *  Bytes of the originals copied and verified, and of all of them (a move); the total is
+	 *  `null` when an original cannot be read, and for a rename.
+	 */
+	bytes_done: number | null,
+	bytes_total: number | null,
+	/**
+	 *  A move the app's close or a crash cut short, with its drives and folders all there: the
+	 *  window resumes it by itself at start-up. Every other batch waits for Resume or Roll back.
+	 */
+	auto_resume: boolean,
 };
 
 /**  A Kodi add-on scraper that is listed but cannot run, with the reason. */

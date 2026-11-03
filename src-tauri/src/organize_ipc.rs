@@ -37,7 +37,8 @@ pub fn recover_at_startup(library: &LibraryState, boot: &crate::boot::Boot) {
     }
     // Moves and renames that did not finish are listed before any new file work and offered in
     // Activity's Needs attention: Resume or Roll back. The folders they touched are not scanned
-    // behind the user's back: a half-copied title lives in a hidden staging folder.
+    // behind the user's back: a half-copied title lives in a hidden staging folder. A move that
+    // the close cut short, with its drives there, gets no warning: the window resumes it.
     let recovery = cv_app::library_ops::RecoveryService::new(Arc::clone(&db));
     // A batch that finished but has no History entry (the app stopped in between) gets one, so
     // History can undo it.
@@ -47,7 +48,7 @@ pub fn recover_at_startup(library: &LibraryState, boot: &crate::boot::Boot) {
     if let Some(services) = boot.services() {
         match recovery.find() {
             Ok(found) => {
-                for batch in found {
+                for batch in found.into_iter().filter(|b| !b.auto_resume) {
                     services.notices().publish(batch.notice());
                 }
             }

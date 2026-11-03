@@ -569,6 +569,17 @@ pub struct UnfinishedBatchDto {
     pub files_total: u32,
     /// A plain sentence: why it stopped.
     pub reason: String,
+    /// The library ids of the titles that still have work.
+    pub item_ids: Vec<String>,
+    /// The folder the titles go to (a move), else `null`.
+    pub destination: Option<String>,
+    /// Bytes of the originals copied and verified, and of all of them (a move); the total is
+    /// `null` when an original cannot be read, and for a rename.
+    pub bytes_done: f64,
+    pub bytes_total: Option<f64>,
+    /// A move the app's close or a crash cut short, with its drives and folders all there: the
+    /// window resumes it by itself at start-up. Every other batch waits for Resume or Roll back.
+    pub auto_resume: bool,
 }
 
 impl From<UnfinishedBatch> for UnfinishedBatchDto {
@@ -587,6 +598,11 @@ impl From<UnfinishedBatch> for UnfinishedBatchDto {
             files_done: small(batch.files_done),
             files_total: small(batch.files_total),
             reason: batch.reason,
+            item_ids: batch.item_ids,
+            destination: batch.destination,
+            bytes_done: bytes_of(batch.bytes_done),
+            bytes_total: batch.bytes_total.map(bytes_of),
+            auto_resume: batch.auto_resume,
         }
     }
 }
