@@ -13,6 +13,7 @@ use super::media::media_fields;
 use super::movie::{
     basename, date_value, labeled_list, number_id, parent_folder, rating_value, sortable,
 };
+use super::release::release_info;
 use crate::value::Value;
 
 /// The number of an episode that does not have one in an ordering.
@@ -128,6 +129,10 @@ fn episode_model(
         "originalBasename",
         Value::text(basename(&core.original_filename)),
     );
+    let release = release_info(&core.original_filename);
+    put("releaseGroup", Value::text(&release.group));
+    put("releaseTags", Value::text(&release.tags));
+    put("releaseQuality", Value::text(&release.quality));
     put("folderName", Value::text(folder));
     put("titleSortable", Value::text(sortable(&core.title, options)));
     put("year", Value::Int(year_of(fields.first_aired)));
