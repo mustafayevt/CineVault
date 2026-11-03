@@ -288,7 +288,7 @@ mod tests {
         let active = book.active();
         assert_eq!(active.preset, Some(Preset::Clean));
         assert_eq!(active.movie, Preset::Clean.movie_settings());
-        assert_eq!(book.list().len(), 3);
+        assert_eq!(book.list().len(), 4);
     }
 
     #[test]

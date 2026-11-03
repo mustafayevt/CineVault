@@ -214,7 +214,9 @@ export function syntheticNameExample(profileId: string, fileName: string | null)
       ? `${base}${tags.map((tag) => ` [${tag}]`).join("")}`
       : profileId === "media-server-safe"
         ? `${base}${tmdb === undefined ? "" : ` {tmdb-${tmdb}}`}`
-        : base;
+        : profileId === "release-info"
+          ? releaseName(base, stem, year)
+          : base;
   return {
     current,
     folder: named,
@@ -223,6 +225,15 @@ export function syntheticNameExample(profileId: string, fileName: string | null)
     year: Number(year) || 0,
     sample: !given,
   };
+}
+
+/** The Release info name: the release part of the name after the year, and its group. */
+function releaseName(base: string, stem: string, year: string): string {
+  const after = year === "" ? "" : stem.slice(stem.indexOf(year) + year.length);
+  const release = /^[ ._()-]*(.*?)(?:-([A-Za-z0-9_]{2,20}))?$/.exec(after);
+  const tags = release?.[1]?.replace(/^[ ._()[\]-]+|[ ._()[\]-]+$/g, "") ?? "";
+  const group = release?.[2];
+  return `${base}${tags === "" ? "" : ` [${tags}]`}${group === undefined ? "" : `-${group}`}`;
 }
 
 /** The parent of the single show, a folder of three shows, for trying "Use parent". */

@@ -13,6 +13,7 @@ use super::labels::{
     decade_long, decade_short, edition_label, genre_label, media_source_label, sortable_title,
 };
 use super::media::media_fields;
+use super::release::release_info;
 use crate::datetime::DateTime;
 use crate::value::{Object, Value};
 
@@ -54,6 +55,10 @@ pub fn movie_model(item: &Item, set: Option<&MovieSetContext>, options: &ModelOp
         "originalBasename",
         Value::text(basename(&core.original_filename)),
     );
+    let release = release_info(&core.original_filename);
+    put("releaseGroup", Value::text(&release.group));
+    put("releaseTags", Value::text(&release.tags));
+    put("releaseQuality", Value::text(&release.quality));
     put("sortTitle", Value::text(&fields.sort_title));
     put("titleSortable", Value::text(sortable(&core.title, options)));
     put("year", Value::Int(i64::from(core.year)));

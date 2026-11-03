@@ -21,6 +21,7 @@ import {
   TITLE_ACTIONS,
   fullLabel,
 } from "./titleActions";
+import { useSettingsStore } from "../settings/settingsStore";
 import { useLibraryActions } from "./useLibraryActions";
 import type { TitleTarget } from "./useLibraryActions";
 
@@ -186,6 +187,23 @@ describe("title actions", () => {
     await screen.findAllByRole("menuitem");
     expect(screen.queryByRole("menuitem", { name: /^Compare/ })).toBeNull();
     await user.keyboard("{Escape}");
+  });
+
+  it("leaves Rename and Move out while Metadata only is on", async () => {
+    const user = userEvent.setup();
+    useSettingsStore.setState({ values: { "renamer.metadata-only": true }, status: "ready" });
+    await renderPage(four);
+    const bar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    const buttons = within(bar)
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim());
+    expect(buttons).toEqual(["Scrape", "Artwork", "Delete", "More", ""]);
+    await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
+    await screen.findAllByRole("menuitem");
+    expect(screen.queryByRole("menuitem", { name: /^Rename/ })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: /^Move/ })).toBeNull();
+    await user.keyboard("{Escape}");
+    useSettingsStore.setState({ values: {}, status: "ready" });
   });
 
   it("leaves Compare out for a movie that has no copy", async () => {

@@ -12,6 +12,7 @@ import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { useMediaInfoRead } from "../movie/useMediaInfoRead";
 import { useOpenFolder } from "../detail/useOpenFolder";
+import { useMetadataOnly } from "../settings/metadataOnly";
 import { RenameRow, ROW_COLUMNS } from "./RenameRow";
 import { selectionOf } from "./renameSearch";
 import type { RenameSearch } from "./renameSearch";
@@ -62,14 +63,40 @@ function Empty({ selection }: { selection: boolean }) {
   );
 }
 
+/** What the page says instead of its plan while "Metadata only" is on. */
+function MetadataOnly() {
+  return (
+    <section aria-label={t("renamePage.region")} className="relative flex h-full min-h-0 flex-col">
+      <h1 className="sr-only">{t("renamePage.region")}</h1>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        <h2 className="m-0 text-(length:--fs-16) font-(weight:--fw-700)">
+          {t("renamePage.metadataOnly.title")}
+        </h2>
+        <p className="m-0 max-w-[48ch] text-text-2">{t("renamePage.metadataOnly.body")}</p>
+        <Link to="/settings" search={{ section: "naming" }} className="cv-link">
+          {t("renamePage.metadataOnly.open")}
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 /**
- * The Rename page (`/rename`): every title whose folder or main file would change,
+ * The Rename page (`/rename`), or while "Metadata only" is on (spec `renamer` "Rename hidden in
+ * metadata-only mode") a notice that sends the user to Settings › Naming instead of a plan.
+ */
+export function RenamePage() {
+  return useMetadataOnly() ? <MetadataOnly /> : <RenamePlan />;
+}
+
+/**
+ * The Rename page's plan: every title whose folder or main file would change,
  * with a checkbox per title (all ticked at first), the folder and the main file as now → after
  * with word-level diffs, "Show all N files" in place, held-back titles with Read now, and inline
  * conflicts. The templates are shown in the header and edited only in Settings. Nothing touches the
  * disk until "Rename N titles"; the footer counts what is ticked and what is blocked.
  */
-export function RenamePage() {
+function RenamePlan() {
   const format = useFormat();
   const search = useSearch({ strict: false }) as RenameSearch;
   const scope = useMemo(() => selectionOf(search), [search]);

@@ -80,8 +80,8 @@ impl OrganizeState {
 /// Why a command did not run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct OrganizeCommandError {
-    /// `storage`, `settings`, `profile`, `invalid_id`, `unknown_batch`, `template`, `unsettled`, `move` or
-    /// `journal`.
+    /// `storage`, `settings`, `profile`, `invalid_id`, `unknown_batch`, `template`, `unsettled`, `move`,
+    /// `journal` or `metadata_only`.
     pub code: String,
     /// Plain sentence for the user.
     pub message: String,
@@ -170,7 +170,7 @@ impl From<PatternsDto> for PatternSet {
 /// A naming profile: a preset or a custom one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct OrganizeProfileDto {
-    /// `clean`, `detailed`, `media-server-safe` or `custom-...`.
+    /// `clean`, `detailed`, `media-server-safe`, `release-info` or `custom-...`.
     pub id: String,
     pub name: String,
     /// A preset, which cannot be changed or deleted.
@@ -998,6 +998,12 @@ pub async fn organize_apply(
     request: OrganizeRequestDto,
     include: Vec<String>,
 ) -> Result<AppliedDto, OrganizeCommandError> {
+    if rename_settings::metadata_only(&settings.service().snapshot().values) {
+        return Err(OrganizeCommandError {
+            code: "metadata_only".to_owned(),
+            message: rename_settings::METADATA_ONLY_MESSAGE.to_owned(),
+        });
+    }
     let service = organize.service(library)?;
     let preview = to_request(settings, request)?;
     blocking(move || {
@@ -1127,6 +1133,60 @@ pub async fn organize_undo(
 mod tests {
     use super::*;
 
+    /// Services over a throwaway library with "Metadata only" on.
+    fn metadata_only_services(root: &std::path::Path) -> Arc<cv_app::services::AppServices> {
+        use cv_app::data_location::{DataLocation, LocationInputs};
+        use cv_app::secrets::SecretStore;
+        use cv_app::services::{AppServices, BootOptions};
+        let inputs = LocationInputs {
+            exe_dir: root.join("app"),
+            user_data_base: root.join("userdata"),
+            user_config_base: root.join("userconfig"),
+        };
+        std::fs::create_dir_all(&inputs.exe_dir).unwrap();
+        let options = BootOptions::new(
+            DataLocation::resolve(&inputs),
+            Arc::new(SecretStore::in_memory()),
+        )
+        .without_providers();
+        let services = AppServices::boot(options).expect("boot");
+        services
+            .settings()
+            .set(
+                cv_app::rename_settings::METADATA_ONLY_KEY,
+                serde_json::json!(true),
+            )
+            .unwrap();
+        services
+    }
+
+    /// Metadata only: a rename is refused before anything is planned for the disk.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_rename_is_refused_while_metadata_only_is_on() {
+        let root = tempfile::tempdir().unwrap();
+        let services = metadata_only_services(root.path());
+        let settings = SettingsState::from_services(Some(&services));
+        let library = LibraryState::from_services(&services);
+        let organize = OrganizeState::new(Arc::new(LibrarySources::new()));
+        let request = OrganizeRequestDto {
+            scope: OrganizeScopeDto::Everything,
+            profile_id: "clean".to_owned(),
+            patterns: PatternsDto {
+                movie_folder: "${title} (${year})".to_owned(),
+                movie_file: "${title} (${year})".to_owned(),
+                show_folder: "${showTitle}".to_owned(),
+                season_folder: "Season ${seasonNr2}".to_owned(),
+                episode_file: "${showTitle} - S${seasonNr2}E${episodeNr2}".to_owned(),
+            },
+            choices: Vec::new(),
+        };
+        let refused = organize_apply(&library, &organize, &settings, request, Vec::new())
+            .await
+            .expect_err("refused");
+        assert_eq!(refused.code, "metadata_only");
+        assert_eq!(refused.message, rename_settings::METADATA_ONLY_MESSAGE);
+    }
+
     #[test]
     fn a_profile_dto_carries_the_templates_and_whether_it_is_a_preset() {
         let settings = RenameSettings::default();
@@ -1135,7 +1195,7 @@ mod tests {
         let clean = dto.profiles.iter().find(|p| p.id == "clean").unwrap();
         assert!(clean.builtin);
         assert_eq!(clean.patterns.movie_folder, "${title} (${year})");
-        assert_eq!(dto.profiles.len(), 3);
+        assert_eq!(dto.profiles.len(), 4);
     }
 
     #[test]

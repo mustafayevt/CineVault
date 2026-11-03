@@ -5,6 +5,7 @@
 use tauri::State;
 use tauri::ipc::Channel;
 
+use crate::settings_ipc::SettingsState;
 use crate::sources_ipc::LibraryState;
 
 pub use cv_ipc::library_ops::*;
@@ -41,6 +42,7 @@ pub async fn preview_change_source_title(
 pub async fn apply_change_source(
     library: State<'_, LibraryState>,
     ops: State<'_, LibraryOpsState>,
+    settings: State<'_, SettingsState>,
     ids: Vec<String>,
     target: u32,
     on_progress: Channel<MoveProgressDto>,
@@ -48,6 +50,7 @@ pub async fn apply_change_source(
     cv_ipc::library_ops::apply_change_source(
         &library,
         &ops,
+        &settings,
         ids,
         target,
         crate::ipc_sink::sink(on_progress),

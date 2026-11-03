@@ -1,6 +1,6 @@
 {
  "version": 1,
- "note": "Written by hand: the Clean, Detailed and Media-server safe presets rendered against fixture entities. Not generated; edit by hand. Run: cargo test -p cv-compat --test presets.",
+ "note": "Written by hand: the Clean, Detailed, Media-server safe and Release info presets rendered against fixture entities. Not generated; edit by hand. Run: cargo test -p cv-compat --test presets.",
  "cases": [
   {"id": "preset-movie-01", "preset": "clean", "kind": "movie", "entity": "rn-movie-detailed", "expect": {"folder": "Dune - Part Two (2024)", "file": "Dune - Part Two - Extended Edition (2024)"}},
   {"id": "preset-movie-02", "preset": "detailed", "kind": "movie", "entity": "rn-movie-detailed", "expect": {"folder": "Dune - Part Two (2024) [2160p] [Web-DL] [Dolby Vision, HDR10] [TrueHD Atmos 7.1]", "file": "Dune - Part Two (2024) [2160p] [Web-DL] [Dolby Vision, HDR10] [TrueHD Atmos 7.1]"}},
@@ -31,6 +31,12 @@
   {"id": "preset-tv-06", "preset": "media-server-safe", "kind": "tv", "entity": "rn-show-noyear", "episode": {"season": 1, "episode": 1}, "expect": {"show_folder": "Plain Show {tmdb-1396}", "season_folder": "Season 01", "file": "Plain Show - S01E01"}},
   {"id": "preset-tv-07", "preset": "clean", "kind": "tv", "entity": "preset-show-no-id", "episode": {"season": 1, "episode": 1}, "expect": {"show_folder": "No Id Show (2019)", "season_folder": "Season 01", "file": "No Id Show - S01E01 - Arrival"}},
   {"id": "preset-tv-08", "preset": "detailed", "kind": "tv", "entity": "preset-show-no-id", "episode": {"season": 1, "episode": 1}, "expect": {"show_folder": "No Id Show (2019)", "season_folder": "Season 01", "file": "No Id Show - S01E01 - Arrival [1080p] [Blu-ray] [AC3 5.1]"}},
-  {"id": "preset-tv-09", "preset": "media-server-safe", "kind": "tv", "entity": "preset-show-no-id", "episode": {"season": 1, "episode": 1}, "expect": {"show_folder": "No Id Show (2019)", "season_folder": "Season 01", "file": "No Id Show - S01E01"}}
+  {"id": "preset-tv-09", "preset": "media-server-safe", "kind": "tv", "entity": "preset-show-no-id", "episode": {"season": 1, "episode": 1}, "expect": {"show_folder": "No Id Show (2019)", "season_folder": "Season 01", "file": "No Id Show - S01E01"}},
+  {"id": "preset-movie-release-01", "preset": "release-info", "kind": "movie", "entity": "rn-movie-detailed", "original_filename": "Dune.Part.Two.2024.Extended.2160p.WEB-DL.DV.HDR10.TrueHD.Atmos.7.1-GRP.mkv", "expect": {"folder": "Dune - Part Two (2024)", "file": "Dune - Part Two - Extended Edition (2024) [2160p.WEB-DL.DV.HDR10.TrueHD.Atmos.7.1]-GRP"}},
+  {"id": "preset-movie-release-02", "preset": "release-info", "kind": "movie", "entity": "rn-movie-sdr", "expect": {"folder": "The Matrix (1999)", "file": "The Matrix (1999)"}},
+  {"id": "preset-movie-release-03", "preset": "release-info", "kind": "movie", "entity": "rn-movie-sdr", "original_filename": "The.Matrix.1999.PROPER.1080p.BluRay.x264-GRP[site].mkv", "expect": {"folder": "The Matrix (1999)", "file": "The Matrix (1999) [PROPER.1080p.BluRay.x264]-GRP"}},
+  {"id": "preset-movie-release-04", "preset": "release-info", "kind": "movie", "entity": "rn-movie-sdr", "original_filename": "The Matrix (1999) [1080p.BluRay.x264]-GRP.mkv", "expect": {"folder": "The Matrix (1999)", "file": "The Matrix (1999) [1080p.BluRay.x264]-GRP"}},
+  {"id": "preset-tv-release-01", "preset": "release-info", "kind": "tv", "entity": "rn-show", "episode": {"season": 1, "episode": 1}, "original_filename": "Lighthouse.Keepers.The.Series.2015.S01E01.Arrival.1080p.BluRay.German.DL.x265-GRP.mkv", "expect": {"show_folder": "Lighthouse Keepers - The Series (2015)", "season_folder": "Season 01", "file": "Lighthouse Keepers - The Series - S01E01 - Arrival [1080p.BluRay.German.DL.x265]-GRP"}},
+  {"id": "preset-tv-release-02", "preset": "release-info", "kind": "tv", "entity": "rn-show", "episode": {"season": 1, "episode": 1}, "original_filename": "Lighthouse Keepers - S01E01.mkv", "expect": {"show_folder": "Lighthouse Keepers - The Series (2015)", "season_folder": "Season 01", "file": "Lighthouse Keepers - The Series - S01E01 - Arrival"}}
  ]
 }

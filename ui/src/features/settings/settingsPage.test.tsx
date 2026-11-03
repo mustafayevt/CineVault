@@ -388,6 +388,40 @@ describe("Settings, Naming", () => {
     );
   });
 
+  it("offers the release tokens and fills the templates from the Release info style", async () => {
+    const user = userEvent.setup();
+    setOrganizeBackend(createSyntheticOrganizeBackend());
+    setProvidersBackend(recordingBackend());
+    await renderSettings();
+    await templateField("Movie file");
+    for (const name of ["Movie file", "TV episode"]) {
+      const tokens = screen.getByRole("group", { name: `Tokens for ${name}` });
+      for (const token of ["Quality", "ReleaseTags", "ReleaseGroup"]) {
+        expect(within(tokens).getByRole("button", { name: `{${token}}` })).toBeVisible();
+      }
+    }
+    const styles = await screen.findByRole("group", { name: "Style" });
+    await user.click(within(styles).getByRole("button", { name: "Release info" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Movie file template")).toHaveValue(
+        "{Title}{ - Edition?} ({Year}) [{ReleaseTags}]{-ReleaseGroup?}",
+      );
+    });
+    expect(screen.getByLabelText("Movie folder template")).toHaveValue("{Title} ({Year})");
+  });
+
+  it("stores Metadata only at once from its switch in Naming", async () => {
+    const user = userEvent.setup();
+    setProvidersBackend(recordingBackend());
+    await renderSettings();
+    await act(() => useSettingsStore.getState().load());
+    const toggle = screen.getByRole("switch", { name: "Metadata only" });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    await settleSettingSaves();
+    expect(useSettingsStore.getState().values["renamer.metadata-only"]).toBe(true);
+  });
+
   it("stores the colon style and shows it in the example", async () => {
     const user = userEvent.setup();
     setProvidersBackend(recordingBackend());

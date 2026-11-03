@@ -904,6 +904,13 @@ impl Run<'_> {
             return StepReport::new(step, StepStatus::Failed, FOLLOW_UPS_BUSY.to_owned());
         }
         let values = self.services().settings().snapshot().values;
+        if crate::rename_settings::metadata_only(&values) {
+            return StepReport::new(
+                step,
+                StepStatus::Failed,
+                crate::rename_settings::METADATA_ONLY_MESSAGE.to_owned(),
+            );
+        }
         let book = RenameSettings::from_values(&values);
         let nfo_settings = NfoSettings::from_values(&values);
         let mut profile = match planned.options.arg("profile") {

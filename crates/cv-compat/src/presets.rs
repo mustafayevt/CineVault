@@ -1,7 +1,7 @@
 //! The naming-preset fixtures.
 //!
-//! `tests/compat/rename/presets.json` is written by hand for the three presets (Clean, Detailed,
-//! Media-server safe). Each case renders one preset against a fixture entity (`rename/entities` next to the case
+//! `tests/compat/rename/presets.json` is written by hand for the four presets (Clean, Detailed,
+//! Media-server safe, Release info). Each case renders one preset against a fixture entity (`rename/entities` next to the case
 //! file, else the shared `fixtures/rename/entities`) and
 //! lists the names it must produce, character for character. The token values underneath
 //! (`Web-DL`, `Blu-ray`, `DTS-HD MA`, `7.1`) are the ones the destination golden files pin, so a
@@ -9,7 +9,8 @@
 //!
 //! A case is `{id, preset, kind: "movie", entity, expect: {folder, file}}` or
 //! `{id, preset, kind: "tv", entity, episode: {season, episode}, expect: {show_folder,
-//! season_folder, file}}`.
+//! season_folder, file}}`, with an optional `original_filename`: the name the video was
+//! downloaded under, which the release tokens read.
 
 use std::fs;
 use std::path::Path;
@@ -60,8 +61,9 @@ fn movie_case(case: &Json, preset: Preset, root: &Path) -> Result<Vec<String>, S
         text(&entity, "folder"),
         &entity::entity_videos(&entity),
     );
-    // The fixture movies are built without an import, so they have no original file name.
-    item.core.original_filename.clear();
+    // The fixture movies are built without an import, so they have no original file name unless
+    // the case gives the name the video was downloaded under.
+    item.core.original_filename = text(case, "original_filename").to_owned();
     let renamer = MovieRenamer::new(preset.movie_settings());
     let expect = case.get("expect").cloned().unwrap_or(Json::Null);
     let mut out = Vec::new();
@@ -94,7 +96,10 @@ fn tv_case(case: &Json, preset: Preset, root: &Path) -> Result<Vec<String>, Stri
     let (season, episode_nr) = (number("season")?, number("episode")?);
     let json = find_episode(&entity, season, episode_nr)
         .ok_or_else(|| format!("no episode S{season}E{episode_nr}"))?;
-    let episode = build_episode(&show, json);
+    let mut episode = build_episode(&show, json);
+    if let Some(name) = case.get("original_filename").and_then(Json::as_str) {
+        name.clone_into(&mut episode.core.original_filename);
+    }
     let renamer = TvRenamer::new(preset.tv_settings());
     let expect = case.get("expect").cloned().unwrap_or(Json::Null);
     let mut out = Vec::new();

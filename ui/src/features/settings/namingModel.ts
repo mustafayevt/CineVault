@@ -21,6 +21,9 @@ export const MOVIE_TOKENS: readonly NamingToken[] = [
   { label: "Channels", engine: "audioChannelsDot" },
   { label: "Edition", engine: "edition" },
   { label: "Source", engine: "mediaSource" },
+  { label: "Quality", engine: "releaseQuality" },
+  { label: "ReleaseTags", engine: "releaseTags" },
+  { label: "ReleaseGroup", engine: "releaseGroup" },
   { label: "IMDb", engine: "imdb" },
   { label: "TMDB", engine: "tmdb" },
 ];
@@ -40,6 +43,9 @@ export const EPISODE_TOKENS: readonly NamingToken[] = [
   { label: "AudioCodec", engine: "audioCodec" },
   { label: "Channels", engine: "audioChannelsDot" },
   { label: "Source", engine: "mediaSource" },
+  { label: "Quality", engine: "releaseQuality" },
+  { label: "ReleaseTags", engine: "releaseTags" },
+  { label: "ReleaseGroup", engine: "releaseGroup" },
 ];
 
 export function tokensOf(field: NamingField): readonly NamingToken[] {

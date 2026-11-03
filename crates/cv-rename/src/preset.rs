@@ -1,4 +1,4 @@
-//! The naming presets: Clean, Detailed and Media-server safe, for movies and TV shows.
+//! The naming presets: Clean, Detailed, Media-server safe and Release info, for movies and TV shows.
 //!
 //! A preset is a set of patterns with the option values that go with them. It builds the
 //! [`MovieSettings`] and [`TvSettings`] a planner reads (`Preset::movie_settings`,
@@ -9,6 +9,7 @@
 //! | Clean (default) | `Title (Year)` | `Title - Edition (Year)` |
 //! | Detailed | `Title (Year) [Resolution] [Source] [HDR] [Audio Channels]` | the same tags |
 //! | Media-server safe | `Title (Year) {tmdb-ID}` | `Title (Year) {edition-Edition}` |
+//! | Release info | `Title (Year)` | `Title - Edition (Year) [Release tags]-Group` |
 //!
 //! The TV presets are the equivalents for the show folder, the season folder and the episode
 //! file. A tag that has no value (no HDR, no edition, no TMDB id) leaves nothing behind: empty
@@ -29,6 +30,9 @@ pub enum Preset {
     Detailed,
     /// An id tag in the folder and an edition tag in the file, for servers that match by id.
     MediaServerSafe,
+    /// Clean folders, and file names that keep the release tags and group of the download name,
+    /// for libraries a download manager also reads.
+    ReleaseInfo,
 }
 
 /// The movie folder of [`Preset::Clean`].
@@ -44,7 +48,12 @@ pub const SAFE_MOVIE_FOLDER: &str = "${title} (${year})${if tmdb > 0} {tmdb-${tm
 /// The movie file of [`Preset::MediaServerSafe`]; the edition tag is left out without an edition.
 pub const SAFE_MOVIE_FILE: &str = "${title} (${year})${if edition} {edition-${edition}}${end}";
 
-/// The show folder of [`Preset::Clean`] and [`Preset::Detailed`].
+/// The movie file of [`Preset::ReleaseInfo`]: the Clean name with the release tags and group of
+/// the original file name; a name without them gets the Clean name.
+pub const RELEASE_MOVIE_FILE: &str =
+    "${title}${ - ,edition,} (${year}) [${releaseTags}]${-,releaseGroup,}";
+
+/// The show folder of [`Preset::Clean`], [`Preset::Detailed`] and [`Preset::ReleaseInfo`].
 pub const CLEAN_SHOW_FOLDER: &str = "${showTitle} (${showYear})";
 /// The season folder of every preset.
 pub const SEASON_FOLDER: &str = "Season ${seasonNr2}";
@@ -57,10 +66,18 @@ pub const SAFE_SHOW_FOLDER: &str =
     "${showTitle} (${showYear})${if showTmdb > 0} {tmdb-${showTmdb}}${end}";
 /// The episode file of [`Preset::MediaServerSafe`]: no title, so a retitled episode keeps its name.
 pub const SAFE_EPISODE_FILE: &str = "${showTitle} - S${seasonNr2}E${episodeNr2}";
+/// The episode file of [`Preset::ReleaseInfo`].
+pub const RELEASE_EPISODE_FILE: &str =
+    "${showTitle} - S${seasonNr2}E${episodeNr2} - ${title} [${releaseTags}]${-,releaseGroup,}";
 
 impl Preset {
     /// The presets in the order the app lists them.
-    pub const ALL: [Preset; 3] = [Preset::Clean, Preset::Detailed, Preset::MediaServerSafe];
+    pub const ALL: [Preset; 4] = [
+        Preset::Clean,
+        Preset::Detailed,
+        Preset::MediaServerSafe,
+        Preset::ReleaseInfo,
+    ];
 
     /// The stable id stored in the settings.
     pub fn id(self) -> &'static str {
@@ -68,6 +85,7 @@ impl Preset {
             Preset::Clean => "clean",
             Preset::Detailed => "detailed",
             Preset::MediaServerSafe => "media-server-safe",
+            Preset::ReleaseInfo => "release-info",
         }
     }
 
@@ -77,6 +95,7 @@ impl Preset {
             Preset::Clean => "Clean",
             Preset::Detailed => "Detailed",
             Preset::MediaServerSafe => "Media-server safe",
+            Preset::ReleaseInfo => "Release info",
         }
     }
 
@@ -94,6 +113,7 @@ impl Preset {
             Preset::Clean => (CLEAN_MOVIE_FOLDER, CLEAN_MOVIE_FILE),
             Preset::Detailed => (DETAILED_MOVIE_FOLDER, DETAILED_MOVIE_FILE),
             Preset::MediaServerSafe => (SAFE_MOVIE_FOLDER, SAFE_MOVIE_FILE),
+            Preset::ReleaseInfo => (CLEAN_MOVIE_FOLDER, RELEASE_MOVIE_FILE),
         }
     }
 
@@ -103,6 +123,7 @@ impl Preset {
             Preset::Clean => (CLEAN_SHOW_FOLDER, SEASON_FOLDER, CLEAN_EPISODE_FILE),
             Preset::Detailed => (CLEAN_SHOW_FOLDER, SEASON_FOLDER, DETAILED_EPISODE_FILE),
             Preset::MediaServerSafe => (SAFE_SHOW_FOLDER, SEASON_FOLDER, SAFE_EPISODE_FILE),
+            Preset::ReleaseInfo => (CLEAN_SHOW_FOLDER, SEASON_FOLDER, RELEASE_EPISODE_FILE),
         }
     }
 
@@ -189,5 +210,47 @@ mod tests {
         assert_eq!(tv.file_pattern, DETAILED_EPISODE_FILE);
         assert_eq!(tv.season_pattern, SEASON_FOLDER);
         assert!(tv.rename_show_folder && tv.rename_season_folder && tv.rename_files);
+    }
+
+    #[test]
+    fn release_info_keeps_the_release_of_the_original_file_name() {
+        use cv_domain::{EpisodeNumber, Item, ItemDetail, ItemId};
+
+        use crate::{MovieRenamer, TvRenamer};
+
+        let movies = MovieRenamer::new(Preset::ReleaseInfo.movie_settings());
+        let mut movie = Item::movie("Example Movie");
+        movie.core.year = 2020;
+        movie.core.original_filename = "Example.Movie.2020.1080p.WEB-DL.x264-GRP.mkv".into();
+        assert_eq!(
+            movies.folder_name(&movie, None).unwrap(),
+            "Example Movie (2020)"
+        );
+        assert_eq!(
+            movies.file_name(&movie, None).unwrap(),
+            "Example Movie (2020) [1080p.WEB-DL.x264]-GRP"
+        );
+        movie.core.original_filename = "Example Movie (2020).mkv".into();
+        assert_eq!(
+            movies.file_name(&movie, None).unwrap(),
+            "Example Movie (2020)"
+        );
+
+        let mut show = Item::show("Example Show");
+        show.id = Some(ItemId(1));
+        show.core.year = 2017;
+        let mut episode = Item::episode(ItemId(1), "Pilot");
+        episode.core.original_filename =
+            "Example.Show.2017.S01E01.Episode.1.Bluray-1080p.German.DL.x265-GRP.mkv".into();
+        if let ItemDetail::Episode(fields) = &mut episode.detail {
+            fields.numbers.set(EpisodeNumber::aired(1, 1));
+        }
+        let name = TvRenamer::new(Preset::ReleaseInfo.tv_settings())
+            .episode_file_name(&show, &[&episode])
+            .unwrap();
+        assert_eq!(
+            name,
+            "Example Show - S01E01 - Pilot [Bluray-1080p.German.DL.x265]-GRP"
+        );
     }
 }
