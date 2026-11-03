@@ -7,6 +7,9 @@ What changed in each version of CineVault, newest first, in plain words. The app
 ### Added
 
 - Torrents: the Wishlist's limits take a smallest size as well as a largest, so the size works as a range (for example 20–60 GB) and a check skips small re-encodes that pass the resolution.
+- Activity: History is now called Activity. While something needs you, its top shows Needs attention: a move or rename that did not finish, with where it was going, how far it got ("8 of 10 files copied, 15 GB of 86 GB"), why it stopped and Resume and Roll back, and the warnings and errors from background work (a rejected API key, artwork that could not be saved…), each with its fix and Dismiss. History stays below it. The Activity icon in the sidebar shows a dot while something is there.
+- Moves: a move cut short because CineVault was closed carries on by itself the next time CineVault opens, from where it stopped, when both drives are there. A toast says so, and the progress with Pause and Cancel shows in the sidebar and in Activity. A move that stopped on an error, such as a full or unplugged drive, waits in Activity for you.
+- Move to: for a title held by a move that did not finish, the menu says how far that move got and offers Resume that move, Roll it back and Open in Activity.
 
 ### Changed
 
@@ -14,6 +17,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 ### Fixed
 
+- Moves: "Resume it or roll it back in Activity first" pointed to a page that did not exist, so a stopped move could not be resolved and its title could not be moved again. A stopped move now also shows a toast with Open Activity.
 - Settings: clicking a section in the index, especially the last one, no longer scrolls the whole window and pushes the index off screen or leaves empty space below the last card. Only the settings scroll, and only as far as they go.
 - Moves to another drive: resuming a move that stopped in the middle of a large file (CineVault was closed, or the drive filled up) now carries on from where the file stopped instead of copying it again from the start. What was already copied is checked against the original first, and the whole file is still checked once it is done.
 - Move to: a title waiting on a move that did not finish now shows its size instead of "0 B".
