@@ -43,11 +43,15 @@ The Providers section SHALL hold the TMDB key ("Needed for Scrape."), the OMDb k
 - **THEN** the key is checked against TMDB and its state reads "Works" or "Rejected" with the reason
 
 ### Requirement: Naming section
-The Naming section SHALL hold the Movie folder, Movie file and TV episode templates as mono text fields, each with its tokens and a live example of the result, and the "Colon in titles" choice (Remove, Use " - ", or a look-alike colon). These templates are the ones Rename uses, as defined by the `renamer` capability; changing them SHALL rename nothing by itself.
+The Naming section SHALL start with the "Metadata only" switch, then hold the Movie folder, Movie file and TV episode templates as mono text fields, each with its tokens and a live example of the result, and the "Colon in titles" choice (Remove, Use " - ", or a look-alike colon). These templates are the ones Rename uses, as defined by the `renamer` capability; changing them SHALL rename nothing by itself. While Metadata only is on, the templates SHALL stay editable.
 
 #### Scenario: Live example
 - **WHEN** the user edits the Movie folder template
 - **THEN** the example under the field shows the new folder name, and no folder on disk changes
+
+#### Scenario: Metadata only switch
+- **WHEN** the user turns on "Metadata only"
+- **THEN** the setting is saved at once and Rename and "Move to…" disappear from the app
 
 ### Requirement: Library folders section
 The Library folders section SHALL list every library folder with its full path, how many titles or shows it holds and whether it is watched for changes or offline, a Movies | TV shows switch and Remove, and SHALL offer "Add folder…" and "Network share…" and accept folders dropped on the window. Removing a folder SHALL keep its titles in the library as offline and confirm with an Undo toast. Scanning these folders is defined by `library-scanning`; connecting shares is defined by `network-shares`.
