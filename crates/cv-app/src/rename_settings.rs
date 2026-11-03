@@ -7,6 +7,7 @@
 //! | `renamer.cleanup-unwanted` | bool (default off) | move unwanted files to the trash folder after a rename, and allow the clean-up action |
 //! | `renamer.unwanted-patterns` | text (default `.txt, .url, .html, .sfv`) | the unwanted files: extensions or regular expressions on the file name, separated by commas |
 //! | `naming.colon` | `remove`, `dash` or `lookalike` (unset follows the profile, which writes `dash` unless a custom profile says otherwise) | how a colon in a title is written in names (Settings, Naming): dropped, ` - `, or the look-alike character U+A789 |
+//! | `renamer.metadata-only` | bool (default off) | "Metadata only" (Settings, Naming): nothing renames or moves a title's files or folders; [`metadata_only`] is checked by every rename and move before it plans anything for the disk |
 //! | `renamer.keep-subfolders` | bool (default on) | "Keep sub-folders": a folder pattern of one segment renders inside the folder that holds the title now (`Movies/Amadeus` stays in `Movies`); a pattern with `/` still renders under the library folder |
 //!
 //! The four presets (`clean`, `detailed`, `media-server-safe`, `release-info`) are built into `cv-rename` and never
@@ -61,6 +62,11 @@ pub const UNWANTED_KEY: &str = "renamer.unwanted-patterns";
 pub const DEFAULT_UNWANTED_TEXT: &str = ".txt, .url, .html, .sfv";
 /// The key of how a colon in a title is written in names.
 pub const COLON_KEY: &str = "naming.colon";
+/// The key of the "Metadata only" switch.
+pub const METADATA_ONLY_KEY: &str = "renamer.metadata-only";
+/// Why a rename or a move is refused while "Metadata only" is on.
+pub const METADATA_ONLY_MESSAGE: &str =
+    "Metadata only is on in Settings › Naming, so files and folders are not renamed or moved.";
 /// The key of the library-wide "Keep sub-folders" switch.
 pub const KEEP_SUBFOLDERS_KEY: &str = "renamer.keep-subfolders";
 /// The key of how the language is written in subtitle file names (`ISO2`, `ISO3T`, `ISO3B`,
@@ -221,6 +227,16 @@ pub fn keep_subfolders(values: &Values) -> bool {
         .get(KEEP_SUBFOLDERS_KEY)
         .and_then(Value::as_bool)
         .unwrap_or(true)
+}
+
+/// Whether "Metadata only" is on: no rename or move may change a title's files or folders. Off
+/// unless the switch is turned on.
+#[must_use]
+pub fn metadata_only(values: &Values) -> bool {
+    values
+        .get(METADATA_ONLY_KEY)
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
 }
 
 /// What the colon is written as for the `naming.colon` choice: nothing (`remove`), `-` (`dash`,
