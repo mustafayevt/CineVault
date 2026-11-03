@@ -119,6 +119,11 @@ export const torrents = {
   "torrentsPage.count.sources": "{count, plural, one {# source} other {# sources}}",
   "torrentsPage.noReleases": "No releases found for {title}.",
   "torrentsPage.noTier": "No {tier} releases.",
+  "torrentsPage.filter": "Filter results",
+  "torrentsPage.filter.tip":
+    "Words in the release name, in any order. Start a word with - to leave it out.",
+  "torrentsPage.filter.clear": "Clear filter",
+  "torrentsPage.noText": "No releases contain “{text}”.",
   "torrentsPage.match.for": "Releases for",
   "torrentsPage.match.change": "Change title",
   "torrentsPage.suggest.label": "Title suggestions",

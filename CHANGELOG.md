@@ -2,6 +2,12 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.1] - unreleased
+
+### Added
+
+- Torrents: a Filter results field at the right of the chips narrows a title's releases by words in their names, in any order (`remux atmos`); start a word with - to leave it out (`-x265`). The chip counts follow it, and Esc clears it.
+
 ## [1.6.0] - 2026-11-03
 
 ### Added
