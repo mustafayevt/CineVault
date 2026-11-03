@@ -27,6 +27,7 @@ import type { MessageKey } from "../../i18n/catalog";
 import { cx } from "../../lib/cx";
 import { selectSidebarCollapsed, useShellStore } from "../../stores/shell";
 import type { Platform } from "./platform";
+import { useMetadataOnly } from "../settings/metadataOnly";
 import { useBackForwardInput } from "./backForward";
 import { destinationOf } from "./destinations";
 import type { Destination } from "./destinations";
@@ -128,6 +129,9 @@ export function SidebarPanel({ platform, variant = "panel" }: SidebarPanelProps)
   const mac = platform === "macos" && !drawer;
   const lowDrives = drives.filter((drive) => drive.online && drive.low).length;
   const attention = useNeedsAttention().length;
+  // "Metadata only" renames nothing, so Rename has no page to offer.
+  const metadataOnly = useMetadataOnly();
+  const targets = metadataOnly ? NAV.filter((target) => target.id !== "rename") : NAV;
   const tipSide = collapsed ? "right" : "top";
 
   const countOf = (id: NavTarget["id"]): { count?: number | string; tone?: "warn" } => {
@@ -196,7 +200,7 @@ export function SidebarPanel({ platform, variant = "panel" }: SidebarPanelProps)
       </div>
 
       <ul className={cx("m-0 flex list-none flex-col gap-0.5 p-0", collapsed && "items-center")}>
-        {NAV.map((target) => {
+        {targets.map((target) => {
           const { count, tone } = countOf(target.id);
           return (
             <li key={target.id} className={collapsed ? undefined : "w-full"}>

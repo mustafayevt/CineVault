@@ -5,6 +5,7 @@ import { queryClient } from "../../queryClient";
 import { requestDelete } from "../delete/deleteActions";
 import type { DeleteTarget } from "../delete/deleteActions";
 import { notify } from "../notifications/notificationStore";
+import { isMetadataOnly } from "../settings/metadataOnly";
 import { showToast } from "../toasts/toastStore";
 import { currentCopiesBackend } from "./copiesBackend";
 import type { Comparison, CopyRow } from "./copiesBackend";
@@ -57,7 +58,8 @@ export async function keepThisOne(
     .map((copy) => ({ id: copy.id, title: copyName(copy) }));
   // Asked before anything moves: the label is a property of the kept copy's names, not of the
   // delete. A failed read just leaves the offer out.
-  const label = await backend.labelToDrop(keepId).catch(() => null);
+  // "Metadata only" renames nothing, so dropping the label is not offered.
+  const label = isMetadataOnly() ? null : await backend.labelToDrop(keepId).catch(() => null);
   requestDelete(targets, {
     onDone: outcome.done,
     ...(label === null || label === ""

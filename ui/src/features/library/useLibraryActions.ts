@@ -9,6 +9,7 @@ import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { playTitle } from "../playback/usePlay";
 import { requestDelete } from "../delete/deleteActions";
+import { useMetadataOnly } from "../settings/metadataOnly";
 import { removeTitlesFromLibrary } from "../title/removeTitles";
 import { fullLabel, shortLabel, TITLE_ACTIONS } from "./titleActions";
 import type { TitleActionDef, TitleActionId } from "./titleActions";
@@ -67,6 +68,7 @@ export function useLibraryActions(targets: readonly TitleTarget[]): TitleActionS
   const navigate = useNavigate();
   const [first] = targets;
   const openFolder = useOpenFolder(first?.title ?? "");
+  const metadataOnly = useMetadataOnly();
 
   return useMemo<TitleActionSet>(() => {
     const ids = targets.map((target) => target.id);
@@ -181,10 +183,14 @@ export function useLibraryActions(targets: readonly TitleTarget[]): TitleActionS
           short: compare ? t("copies.act.compare", { count: copies }) : shortLabel(id),
           label: compare ? t("copies.act.compare", { count: copies }) : fullLabel(id, count),
           ...run[id],
-          ...(compare && copies === 0 ? { hidden: true } : {}),
+          ...((compare && copies === 0) ||
+          // "Metadata only" never renames or moves files, so neither is offered.
+          (metadataOnly && (id === "rename" || id === "move"))
+            ? { hidden: true }
+            : {}),
         },
       ];
     });
     return Object.fromEntries(entries) as TitleActionSet;
-  }, [targets, first, navigate, openFolder]);
+  }, [targets, first, navigate, openFolder, metadataOnly]);
 }

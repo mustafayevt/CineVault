@@ -114,6 +114,17 @@ describe("the sidebar destinations", () => {
     expect(names.slice(0, 5)).toEqual(["Library", "Scrape", "Rename", "Drives", "Torrents"]);
   });
 
+  it("leaves Rename out while Metadata only is on", async () => {
+    useSettingsStore.setState({ values: { "renamer.metadata-only": true }, status: "ready" });
+    renderSidebar();
+    const panel = await screen.findByRole("navigation", { name: "Main" });
+    const names = within(panel)
+      .getAllByRole("link")
+      .map((link) => link.textContent?.replace(/\d+( low)?$/, ""));
+    expect(names.slice(0, 4)).toEqual(["Library", "Scrape", "Drives", "Torrents"]);
+    useSettingsStore.setState({ values: {}, status: "ready" });
+  });
+
   it("shows the waiting counts of movies and shows together as soft pills", async () => {
     renderSidebar();
     // Scrape = not scraped + uncertain + not matched (7 + 2 + 1, and 2 shows).
