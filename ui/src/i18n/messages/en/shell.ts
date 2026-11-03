@@ -26,7 +26,6 @@ export const shell = {
   "shell.page.rename": "Rename",
   "shell.page.drives": "Drives",
   "shell.page.torrents": "Torrents",
-  "shell.page.history": "History",
   "shell.page.settings": "Settings",
   "shell.sidebar": "Main",
   "shell.menu": "Menu",

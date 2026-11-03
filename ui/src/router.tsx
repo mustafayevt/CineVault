@@ -159,10 +159,25 @@ const wishlistRoute = createRoute({
   component: WishlistPage,
 });
 
+const activityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity",
+  // `?batch=<id>` shows that unfinished move or rename in Needs attention with the focus on it.
+  validateSearch: (search: Record<string, unknown>): { batch?: string } =>
+    typeof search.batch === "string" && search.batch !== "" ? { batch: search.batch } : {},
+  component: function ActivityRoute() {
+    const { batch } = activityRoute.useSearch();
+    return <HistoryPage focusBatch={batch ?? null} />;
+  },
+});
+
+// History became Activity: the old address leads there.
 const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/history",
-  component: HistoryPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/activity", replace: true });
+  },
 });
 
 const settingsRoute = createRoute({
@@ -278,6 +293,7 @@ const routeTree = rootRoute.addChildren([
   drivesRoute,
   torrentsRoute,
   wishlistRoute,
+  activityRoute,
   historyRoute,
   settingsRoute,
   networkShareRoute,

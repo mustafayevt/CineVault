@@ -1,6 +1,6 @@
 /** The sidebar's destinations, in order. */
 export type Destination =
-  "library" | "scrape" | "rename" | "drives" | "torrents" | "history" | "settings";
+  "library" | "scrape" | "rename" | "drives" | "torrents" | "activity" | "settings";
 
 /** Which destination a page belongs to; title and picker pages belong to the Library. */
 export function destinationOf(pathname: string): Destination | null {
@@ -12,7 +12,7 @@ export function destinationOf(pathname: string): Destination | null {
   if (under("/rename")) return "rename";
   if (under("/drives")) return "drives";
   if (under("/torrents")) return "torrents";
-  if (under("/history")) return "history";
+  if (under("/activity") || under("/history")) return "activity";
   if (under("/settings") || under("/release-notes") || under("/network-share")) return "settings";
   return null;
 }

@@ -1,7 +1,6 @@
 /** English strings of the history area. Merged with the other areas in `../../catalog.ts`. */
 export const history = {
   // The History page
-  "history.region": "History",
   "history.tabs": "Show",
   "history.tab.all": "All",
   "history.tab.renames": "Renames",

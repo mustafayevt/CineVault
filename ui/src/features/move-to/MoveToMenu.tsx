@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { HardDrive, TriangleAlert } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
@@ -5,7 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
 import { Icon } from "../../components/Icon";
-import { Menu } from "../../components/Menu";
+import { Menu, MenuSeparator } from "../../components/Menu";
 import { PathText } from "../../components/PathText";
 import { Skeleton } from "../../components/Skeleton";
 import { SpaceBar } from "../../components/SpaceBar";
@@ -14,6 +15,16 @@ import { menuItemClass } from "../../components/floating";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
+import { openActivity } from "../activity/openActivity";
+import { UNFINISHED_KEY, useUnfinishedBatches } from "../activity/recoveryBackend";
+import type { UnfinishedBatch } from "../activity/recoveryBackend";
+import {
+  batchLabel,
+  batchProgress,
+  resumeBatch,
+  rollBackBatch,
+  useRecoveryStore,
+} from "../activity/resolveUnfinished";
 import type { MoveOption } from "./moveOptions";
 import { moveToDestination } from "./runMove";
 import { liveRect, trackPointer, useMoveToStore } from "./moveToStore";
@@ -148,6 +159,10 @@ function MoveToItems({ ids, kind, label, keyboard }: MoveToItemsProps) {
   const navigate = useNavigate();
   const running = useMoveToStore((state) => state.running);
   const { loading, failed, retry, options, totalBytes, frees } = useMoveOptions(ids, kind);
+  const unfinished = useUnfinishedBatches().data;
+  const blocking = unfinished?.find(
+    (batch) => batch.kind === "move" && batch.item_ids.some((id) => ids.includes(id)),
+  );
   const list = useRef<HTMLDivElement>(null);
   const busy = running === null ? null : t("moveTo.busy");
 
@@ -167,6 +182,7 @@ function MoveToItems({ ids, kind, label, keyboard }: MoveToItemsProps) {
           ? t("moveTo.label.count", { count: ids.length })
           : t("moveTo.label", { count: ids.length, size: format.size(totalBytes) })}
       </DropdownMenu.Label>
+      {blocking === undefined ? null : <UnfinishedMove batch={blocking} />}
       <div
         ref={list}
         aria-busy={loading || undefined}
@@ -226,6 +242,68 @@ function MoveToItems({ ids, kind, label, keyboard }: MoveToItemsProps) {
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * A title of the request is held by a move that did not finish: what it is, how far it got, and
+ * its fix right here. Resume carries it on (the progress shows in the sidebar and the menu
+ * closes); Roll back takes back what it made and keeps the menu open, so the move can be chosen
+ * again once the destinations are read again; Open in Activity goes to its row.
+ */
+function UnfinishedMove({ batch }: { batch: UnfinishedBatch }) {
+  const format = useFormat();
+  const client = useQueryClient();
+  const work = useRecoveryStore((state) => state.working[batch.batch_id]);
+  const otherMove = useMoveToStore((state) => state.running !== null);
+  const progress = batchProgress(batch, format.size);
+  const label = batchLabel(batch);
+  const text =
+    batch.destination === null
+      ? t("activity.move.blockedNoPlace", { label, progress })
+      : t("activity.move.blocked", { label, destination: batch.destination, progress });
+  const busy = work !== undefined;
+  return (
+    <div data-unfinished={batch.batch_id} className="flex shrink-0 flex-col px-1 pb-1">
+      <p className="m-0 flex items-start gap-1.5 rounded-(--r-6) bg-warn-tint px-2.5 py-2 text-(length:--fs-12) leading-snug text-warn">
+        <Icon icon={TriangleAlert} size={14} className="mt-px shrink-0" />
+        <span className="min-w-0 break-words">{text}</span>
+      </p>
+      <DropdownMenu.Item
+        aria-disabled={busy || otherMove ? true : undefined}
+        onSelect={(event) => {
+          if (busy || otherMove) {
+            event.preventDefault();
+            return;
+          }
+          void resumeBatch(batch);
+        }}
+        className={cx(menuItemClass, "text-gold", (busy || otherMove) && "cursor-not-allowed")}
+      >
+        {t("activity.move.resume")}
+      </DropdownMenu.Item>
+      <DropdownMenu.Item
+        aria-disabled={busy ? true : undefined}
+        onSelect={(event) => {
+          event.preventDefault();
+          if (busy) return;
+          // The menu's own client reads the batches and plans again: the title can be moved now.
+          void rollBackBatch(batch).then(() =>
+            Promise.all([
+              client.invalidateQueries({ queryKey: UNFINISHED_KEY }),
+              client.invalidateQueries({ queryKey: ["move-to"] }),
+            ]),
+          );
+        }}
+        className={cx(menuItemClass, busy && "cursor-not-allowed")}
+      >
+        {t("activity.move.rollBack")}
+      </DropdownMenu.Item>
+      <DropdownMenu.Item onSelect={() => openActivity(batch.batch_id)} className={menuItemClass}>
+        {t("activity.move.open")}
+      </DropdownMenu.Item>
+      <MenuSeparator />
+    </div>
   );
 }
 
