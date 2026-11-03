@@ -12,6 +12,7 @@ import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
 import { CachedImage } from "../images/CachedImage";
+import { wishlistAddLink } from "../torrents/torrentsSearch";
 import { currentCollectionBackend } from "./collectionBackend";
 import type { CollectionPage } from "./collectionBackend";
 import type { LibraryRow } from "./libraryBackend";
@@ -35,6 +36,12 @@ function PosterBox({ poster, title, size, className }: PosterBoxProps) {
       className={className}
     />
   );
+}
+
+/** The Wishlist editor for a film the library lacks, when its TMDB ID is known. */
+function wishLink(tmdbId: string | null): string | null {
+  const id = Number(tmdbId ?? "");
+  return Number.isInteger(id) && id > 0 ? wishlistAddLink({ kind: "movie", tmdbId: id }) : null;
 }
 
 /** "Alien 1979": what the torrent search starts from for a film the library lacks. */
@@ -174,6 +181,18 @@ export function CollectionPane({ row, ref }: CollectionPaneProps) {
                     >
                       {t("library.collections.searchTorrents")}
                     </Link>
+                    {wishLink(film.tmdb_id) === null ? null : (
+                      <a
+                        href={wishLink(film.tmdb_id) ?? undefined}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          void navigate({ href: wishLink(film.tmdb_id) ?? "/torrents/wishlist" });
+                        }}
+                        className="cv-link shrink-0 text-(length:--fs-12)"
+                      >
+                        {t("wishlist.add")}
+                      </a>
+                    )}
                   </li>
                 );
               }

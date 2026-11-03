@@ -1,5 +1,5 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { Check, Search, WifiOff, X } from "lucide-react";
+import { BookmarkCheck, BookmarkPlus, Check, Search, WifiOff, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "../../components/Button";
@@ -34,12 +34,22 @@ import { TorrentNotice } from "./TorrentNotice";
 import { useTitleDetails } from "./titleQueries";
 import type { ReleaseSearchTarget, TitleHit, TorrentRelease } from "./torrentBackend";
 import { noSourceAnswered, titleName } from "./torrentModel";
-import { onlyParam, parseOnly, parseTitleRef, scopeOf, titleParam } from "./torrentsSearch";
+import {
+  onlyParam,
+  parseOnly,
+  parseTitleRef,
+  scopeOf,
+  titleParam,
+  wishlistAddLink,
+} from "./torrentsSearch";
 import type { LibraryFilter, TitleRef, TorrentsSearch } from "./torrentsSearch";
 import { useOnline } from "./useOnline";
 import { useReleaseSearch } from "./useReleaseSearch";
 import { useTitleMatch } from "./useTitleMatch";
 import { useTorrentNotice } from "./useTorrentNotice";
+import { TorrentsViewSwitch } from "./TorrentsViewSwitch";
+import { onWishlist } from "./wishlistModel";
+import { useWishlist } from "./wishlistQueries";
 import { YouHaveThis } from "./YouHaveThis";
 
 type Chosen = "all" | QualityTier;
@@ -100,6 +110,55 @@ function Rows() {
         <Skeleton key={n} shape="row" />
       ))}
     </div>
+  );
+}
+
+/**
+ * "Add to Wishlist" for the picked title, which opens the Wishlist with its editor (a show starts
+ * from the season or episode chosen here), or "On your Wishlist" when it is there already.
+ */
+function WishlistButton({
+  target,
+  search,
+  routed,
+}: {
+  target: TitleRef;
+  search: TorrentsSearch;
+  routed: TitleRef | null;
+}) {
+  const navigate = useNavigate();
+  const list = useWishlist();
+  const listed = list.data === undefined ? null : onWishlist(list.data, target.kind, target.tmdbId);
+  if (listed !== null) {
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={BookmarkCheck}
+        onClick={() => void navigate({ to: "/torrents/wishlist" })}
+      >
+        {t("wishlist.onList")}
+      </Button>
+    );
+  }
+  const scoped = target.kind === "show" && routed?.tmdbId === target.tmdbId;
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      icon={BookmarkPlus}
+      onClick={() =>
+        void navigate({
+          href: wishlistAddLink(
+            target,
+            scoped ? search.season : undefined,
+            scoped ? search.episode : undefined,
+          ),
+        })
+      }
+    >
+      {t("wishlist.add")}
+    </Button>
   );
 }
 
@@ -400,79 +459,82 @@ function TorrentsContent() {
           aria-hidden="true"
           className="absolute right-0 bottom-0 left-0 h-px bg-line-section"
         />
-        <div ref={setAnchor}>
-          <Field
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-            ref={field}
-            height="search"
-            icon={Search}
-            aria-label={t("torrentsPage.field")}
-            placeholder={t("torrentsPage.placeholder")}
-            value={shownText}
-            boxClassName="[&_input]:text-(length:--fs-16)"
-            {...combobox.fieldProps}
-            onChange={(event) => {
-              setText(event.target.value);
-              setTyped(true);
-              // A new text is a new title: the old one and its releases go.
-              setPicked(null);
-              combobox.typed();
-            }}
-            onKeyDown={(event) => {
-              combobox.fieldProps.onKeyDown(event);
-              if (event.defaultPrevented) return;
-              if (event.key === "Enter" && suggesting && suggested[0] !== undefined) {
-                // Enter with nothing highlighted takes the best suggestion.
-                event.preventDefault();
-                combobox.select(suggested[0].id);
-              } else if (event.key === "Escape" && shownText !== "") {
-                event.preventDefault();
-                event.stopPropagation();
-                clear();
-              }
-            }}
-            trailing={
-              <>
-                <span
-                  aria-live="polite"
-                  className="shrink-0 text-(length:--fs-12) whitespace-nowrap text-text-muted"
-                >
-                  {countText}
-                </span>
-                {shownText === "" ? null : (
-                  <IconButton
-                    aria-label={t("torrentsPage.clear")}
-                    icon={X}
-                    size="sm"
-                    onClick={clear}
-                  />
-                )}
-              </>
-            }
-          />
-          <SuggestPanel
-            combobox={combobox}
-            label={t("torrentsPage.suggest.label")}
-            groups={[{ id: "titles", label: "", items: suggestions }]}
-            term={text.trim()}
-            maxWidth={720}
-            {...(match.settled && suggested.length === 0
-              ? {
-                  empty: match.failed ? (
-                    <span className="flex items-center gap-3">
-                      <span className="text-text">{t("torrents.picker.failed")}</span>
-                      <Button size="sm" onClick={match.retry}>
-                        {t("torrents.retryAll")}
-                      </Button>
-                    </span>
-                  ) : (
-                    t("torrents.picker.nothing", { query: text.trim() })
-                  ),
+        <div className="flex min-w-0 items-center gap-3 @max-[640px]/pane:flex-col @max-[640px]/pane:items-stretch">
+          <TorrentsViewSwitch value="search" />
+          <div ref={setAnchor} className="min-w-0 flex-1">
+            <Field
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              ref={field}
+              height="search"
+              icon={Search}
+              aria-label={t("torrentsPage.field")}
+              placeholder={t("torrentsPage.placeholder")}
+              value={shownText}
+              boxClassName="[&_input]:text-(length:--fs-16)"
+              {...combobox.fieldProps}
+              onChange={(event) => {
+                setText(event.target.value);
+                setTyped(true);
+                // A new text is a new title: the old one and its releases go.
+                setPicked(null);
+                combobox.typed();
+              }}
+              onKeyDown={(event) => {
+                combobox.fieldProps.onKeyDown(event);
+                if (event.defaultPrevented) return;
+                if (event.key === "Enter" && suggesting && suggested[0] !== undefined) {
+                  // Enter with nothing highlighted takes the best suggestion.
+                  event.preventDefault();
+                  combobox.select(suggested[0].id);
+                } else if (event.key === "Escape" && shownText !== "") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  clear();
                 }
-              : {})}
-          />
+              }}
+              trailing={
+                <>
+                  <span
+                    aria-live="polite"
+                    className="shrink-0 text-(length:--fs-12) whitespace-nowrap text-text-muted"
+                  >
+                    {countText}
+                  </span>
+                  {shownText === "" ? null : (
+                    <IconButton
+                      aria-label={t("torrentsPage.clear")}
+                      icon={X}
+                      size="sm"
+                      onClick={clear}
+                    />
+                  )}
+                </>
+              }
+            />
+            <SuggestPanel
+              combobox={combobox}
+              label={t("torrentsPage.suggest.label")}
+              groups={[{ id: "titles", label: "", items: suggestions }]}
+              term={text.trim()}
+              maxWidth={720}
+              {...(match.settled && suggested.length === 0
+                ? {
+                    empty: match.failed ? (
+                      <span className="flex items-center gap-3">
+                        <span className="text-text">{t("torrents.picker.failed")}</span>
+                        <Button size="sm" onClick={match.retry}>
+                          {t("torrents.retryAll")}
+                        </Button>
+                      </span>
+                    ) : (
+                      t("torrents.picker.nothing", { query: text.trim() })
+                    ),
+                  }
+                : {})}
+            />
+          </div>
         </div>
         <TitleLine
           name={name}
@@ -481,6 +543,9 @@ function TorrentsContent() {
             clear();
             field.current?.focus();
           }}
+          {...(ref === null
+            ? {}
+            : { extra: <WishlistButton target={ref} search={search} routed={routed} /> })}
         />
         {card}
         <div

@@ -849,3 +849,243 @@ async fn all_of_it_refuses_while_the_feature_is_off() {
     );
     assert_eq!(lab.settings.get("torrents.source.yts"), None);
 }
+
+// ------------------------------------------------------------------ the Wishlist
+
+mod wishlist {
+    use super::*;
+    use async_trait::async_trait;
+    use cv_app::torrent_settings::SOURCE_IDS;
+    use cv_app::torrents::wishlist::{
+        CHECK_EVERY_MS, CheckNote, MinResolution, WishCriteria, WishRequest, WishScope, WishSource,
+    };
+    use cv_db::repo::torrent_wishlist::MatchState;
+    use cv_torrent::model::{RawRelease, SourceError, SourceId, SourceKind, Support, TorrentQuery};
+    use cv_torrent::source::SearchContext;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A source that answers every search with the same releases and counts its searches.
+    struct Shelf {
+        id: SourceId,
+        releases: Vec<(&'static str, &'static str, u64, u32)>,
+        searches: Arc<AtomicUsize>,
+        fail: bool,
+    }
+
+    #[async_trait]
+    impl TorrentSource for Shelf {
+        fn id(&self) -> &SourceId {
+            &self.id
+        }
+        fn name(&self) -> &str {
+            "Shelf"
+        }
+        fn kind(&self) -> SourceKind {
+            SourceKind::Torznab
+        }
+        fn supports(&self, _query: &TorrentQuery) -> Support {
+            Support::Yes
+        }
+        async fn search(
+            &self,
+            _query: &TorrentQuery,
+            _context: &SearchContext,
+        ) -> Result<Vec<RawRelease>, SourceError> {
+            self.searches.fetch_add(1, Ordering::SeqCst);
+            if self.fail {
+                return Err(SourceError::Timeout);
+            }
+            Ok(self
+                .releases
+                .iter()
+                .map(|(hash, name, gb, seeders)| RawRelease {
+                    source: Some(self.id.clone()),
+                    name: (*name).to_owned(),
+                    info_hash: Some((*hash).to_owned()),
+                    magnet: Some(format!("magnet:?xt=urn:btih:{hash}")),
+                    size: Some(gb * 1_000_000_000),
+                    seeders: Some(*seeders),
+                    ..RawRelease::default()
+                })
+                .collect())
+        }
+    }
+
+    const UHD: &str = "Heat.1995.2160p.UHD.BluRay.REMUX.HDR.HEVC.TrueHD.7.1-GRP";
+    const WEB: &str = "Heat.1995.1080p.WEB-DL.DDP5.1.H.264-GRP";
+    const UHD_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const WEB_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /// A lab whose only source is a shelf of two Heat releases.
+    async fn shelf_lab(fail: bool) -> (Lab, Arc<AtomicUsize>) {
+        let lab = Lab::new(true).await;
+        for id in SOURCE_IDS {
+            lab.service.set_source(id, false).unwrap();
+        }
+        let searches = Arc::new(AtomicUsize::new(0));
+        lab.service.set_extra_source(Arc::new(Shelf {
+            id: SourceId("shelf".to_owned()),
+            releases: vec![(UHD_HASH, UHD, 58, 40), (WEB_HASH, WEB, 6, 300)],
+            searches: Arc::clone(&searches),
+            fail,
+        }));
+        (lab, searches)
+    }
+
+    fn uhd_remux() -> WishCriteria {
+        WishCriteria {
+            min_resolution: Some(MinResolution::R2160),
+            sources: vec![WishSource::Remux],
+            ..WishCriteria::default()
+        }
+    }
+
+    fn heat() -> WishRequest {
+        WishRequest {
+            kind: MediaKind::Movie,
+            tmdb_id: 949,
+            scope: WishScope::Movie,
+            criteria: uhd_remux(),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_check_keeps_the_releases_that_meet_the_criteria() {
+        let (lab, searches) = shelf_lab(false).await;
+        let id = lab.service.wishlist_add(heat()).await.unwrap();
+
+        let report = lab.service.wishlist_check_at(false, 1_000).await.unwrap();
+
+        assert_eq!(report.checked, 1);
+        assert_eq!(report.new_matches, 1);
+        assert_eq!(searches.load(Ordering::SeqCst), 1);
+        let list = lab.service.wishlist().unwrap();
+        assert_eq!(list.len(), 1);
+        let entry = &list[0];
+        assert_eq!(entry.id, id);
+        assert_eq!(entry.title, "Heat");
+        assert_eq!(entry.year, Some(1995));
+        assert_eq!(entry.checked_ms, Some(1_000));
+        assert_eq!(entry.note, None);
+        assert_eq!(entry.matches.len(), 1, "the 1080p WEB-DL is left out");
+        assert_eq!(entry.matches[0].name, UHD);
+        assert_eq!(entry.matches[0].state, MatchState::New);
+        assert_eq!(entry.matches[0].sources, ["shelf"]);
+        assert_eq!(lab.service.wishlist_new_count().unwrap(), 1);
+        assert_eq!(lab.service.wishlist_seen().unwrap(), 1);
+        assert_eq!(lab.service.wishlist_new_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_dismissed_release_stays_away_and_the_six_hour_rule_holds() {
+        let (lab, searches) = shelf_lab(false).await;
+        let id = lab.service.wishlist_add(heat()).await.unwrap();
+        lab.service.wishlist_check_at(false, 1_000).await.unwrap();
+        let key = lab.service.wishlist().unwrap()[0].matches[0].key.clone();
+        lab.service
+            .wishlist_set_match(id, &key, MatchState::Dismissed)
+            .unwrap();
+
+        let early = lab
+            .service
+            .wishlist_check_at(true, 1_000 + CHECK_EVERY_MS - 1)
+            .await
+            .unwrap();
+        assert_eq!(early.checked, 0, "not due yet");
+        assert_eq!(searches.load(Ordering::SeqCst), 1);
+
+        let due = lab
+            .service
+            .wishlist_check_at(true, 1_000 + CHECK_EVERY_MS)
+            .await
+            .unwrap();
+        assert_eq!(due.checked, 1);
+        assert_eq!(due.new_matches, 0);
+        assert!(lab.service.wishlist().unwrap()[0].matches.is_empty());
+        assert!(
+            lab.service
+                .wishlist_set_match(id, "nothing", MatchState::Sent)
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn an_entry_the_library_meets_is_done_and_not_checked() {
+        let (lab, searches) = shelf_lab(false).await;
+        lab.service.wishlist_add(heat()).await.unwrap();
+        lab.service
+            .wishlist_add(WishRequest {
+                criteria: WishCriteria {
+                    min_resolution: Some(MinResolution::R1080),
+                    ..WishCriteria::default()
+                },
+                ..heat()
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            lab.service.wishlist().unwrap().len(),
+            1,
+            "one entry per title"
+        );
+
+        // A 1080p WEB-DL copy arrives: it meets "1080p or better".
+        lab.library_movie("949", "Heat", 1995, 1920, 1080);
+        let list = lab.service.wishlist().unwrap();
+        assert!(list[0].done_ms.is_some());
+        assert!(list[0].library.is_some());
+        let report = lab.service.wishlist_check_at(false, 5_000).await.unwrap();
+        assert_eq!(report.checked, 0);
+        assert_eq!(searches.load(Ordering::SeqCst), 0);
+
+        // Asking for more judges it again: the copy no longer meets it.
+        let id = list[0].id;
+        lab.service
+            .wishlist_update(id, WishScope::Movie, &uhd_remux())
+            .unwrap();
+        assert!(lab.service.wishlist().unwrap()[0].done_ms.is_none());
+    }
+
+    #[tokio::test]
+    async fn no_source_answering_is_noted_and_scopes_must_fit_the_title() {
+        let (lab, _) = shelf_lab(true).await;
+        lab.service.wishlist_add(heat()).await.unwrap();
+        let report = lab.service.wishlist_check_at(false, 1_000).await.unwrap();
+        assert_eq!(report.new_matches, 0);
+        assert_eq!(
+            lab.service.wishlist().unwrap()[0].note,
+            Some(CheckNote::NoSource)
+        );
+        assert!(
+            lab.service
+                .wishlist_add(WishRequest {
+                    scope: WishScope::Season(1),
+                    ..heat()
+                })
+                .await
+                .is_err()
+        );
+        let id = lab.service.wishlist().unwrap()[0].id;
+        assert!(
+            lab.service
+                .wishlist_update(id, WishScope::Next, &WishCriteria::default())
+                .is_err()
+        );
+        assert!(lab.service.wishlist_remove(id).unwrap());
+        assert!(lab.service.wishlist().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn nothing_is_checked_before_the_notice_is_accepted() {
+        let lab = Lab::new(false).await;
+        assert!(matches!(
+            lab.service.wishlist_check(true).await,
+            Err(TorrentServiceError::Torrent(
+                TorrentError::NoticeNotAccepted
+            ))
+        ));
+        assert!(lab.service.wishlist_add(heat()).await.is_err());
+        assert!(lab.tmdb.calls().is_empty());
+        assert!(lab.service.wishlist().unwrap().is_empty());
+    }
+}

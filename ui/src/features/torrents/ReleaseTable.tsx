@@ -389,8 +389,10 @@ export function ReleaseTable({
           onSelect={() => {
             if (only === undefined) return;
             // After the menu has closed and given focus back, or the popover would close at once.
+            // The menu gives focus back on a timer of its own, scheduled after this one, so the
+            // popover waits one more turn.
             const id = only.id;
-            window.setTimeout(() => setComparing(id), 0);
+            window.setTimeout(() => window.setTimeout(() => setComparing(id), 0), 0);
           }}
         >
           {t("torrentsPage.cmp.open")}

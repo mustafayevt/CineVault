@@ -90,10 +90,10 @@ pub struct EpisodeInfo {
 /// One row of a show's episode list.
 #[derive(Debug, Clone)]
 pub(super) struct EpisodeRow {
-    season: u16,
-    episode: u16,
-    name: String,
-    air_date: Option<CalendarDate>,
+    pub(super) season: u16,
+    pub(super) episode: u16,
+    pub(super) name: String,
+    pub(super) air_date: Option<CalendarDate>,
 }
 
 pub(super) type EpisodeCache =
@@ -407,7 +407,7 @@ impl TorrentService {
     }
 
     /// A show's episodes in aired order, kept for ten minutes.
-    async fn episode_rows(
+    pub(super) async fn episode_rows(
         &self,
         tmdb_id: u64,
     ) -> Result<Arc<Vec<EpisodeRow>>, TorrentServiceError> {

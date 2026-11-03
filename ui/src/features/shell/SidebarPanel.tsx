@@ -120,6 +120,7 @@ export function SidebarPanel({ platform, variant = "panel" }: SidebarPanelProps)
   const countOf = (id: NavTarget["id"]): { count?: number | string; tone?: "warn" } => {
     if (id === "scrape" && counts.scrape > 0) return { count: counts.scrape };
     if (id === "rename" && counts.rename > 0) return { count: counts.rename };
+    if (id === "torrents" && counts.torrents > 0) return { count: counts.torrents };
     if (id === "drives" && lowDrives > 0) {
       return { count: t("shell.drives.low", { count: lowDrives }), tone: "warn" };
     }

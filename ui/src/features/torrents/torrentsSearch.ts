@@ -114,3 +114,35 @@ export function tmdbIdOf(ids: readonly { provider: string; value: string }[]): n
   const value = ids.find((id) => id.provider === "tmdb")?.value.trim() ?? "";
   return /^[1-9]\d{0,9}$/.test(value) ? Number(value) : null;
 }
+
+/**
+ * The search of `/torrents/wishlist`: `add` opens the editor for a title (`movie:123`), with the
+ * `season` or `episode` of a show to start from.
+ */
+export interface WishlistSearch {
+  add?: string;
+  season?: number;
+  episode?: number;
+}
+
+/** Reads the search of `/torrents/wishlist`; anything damaged is dropped. */
+export function validateWishlistSearch(search: Record<string, unknown>): WishlistSearch {
+  const ref = parseTitleRef(typeof search.add === "string" ? search.add : undefined);
+  const season = ref?.kind === "show" ? wholeNumber(search.season, 0, 999) : undefined;
+  const episode = season === undefined ? undefined : wholeNumber(search.episode, 1, 9999);
+  return {
+    ...(ref === null ? {} : { add: titleParam(ref) }),
+    ...(season === undefined ? {} : { season }),
+    ...(episode === undefined ? {} : { episode }),
+  };
+}
+
+/** The link that opens the Wishlist with the editor for a title (and a show's scope). */
+export function wishlistAddLink(ref: TitleRef, season?: number, episode?: number): string {
+  const clean = validateWishlistSearch({ add: titleParam(ref), season, episode });
+  const params = new URLSearchParams();
+  if (clean.add !== undefined) params.set("add", clean.add);
+  if (clean.season !== undefined) params.set("season", String(clean.season));
+  if (clean.episode !== undefined) params.set("episode", String(clean.episode));
+  return `/torrents/wishlist?${params.toString()}`;
+}

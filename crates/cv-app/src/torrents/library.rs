@@ -229,7 +229,7 @@ fn movies_with(db: &Database, tmdb_id: u64) -> Result<Vec<Item>, cv_db::DbError>
 }
 
 /// The copies of a movie, best first.
-fn movie_copies(db: &Database, tmdb_id: u64) -> Result<Vec<MovieCopy>, cv_db::DbError> {
+pub(super) fn movie_copies(db: &Database, tmdb_id: u64) -> Result<Vec<MovieCopy>, cv_db::DbError> {
     let mut copies: Vec<MovieCopy> = movies_with(db, tmdb_id)?
         .iter()
         .filter_map(movie_copy_of)
@@ -239,7 +239,10 @@ fn movie_copies(db: &Database, tmdb_id: u64) -> Result<Vec<MovieCopy>, cv_db::Db
 }
 
 /// The episode items of a show that have a video, with their aired numbers, in aired order.
-fn held_episodes(db: &Database, show: ItemId) -> Result<Vec<(u16, u16, Item)>, cv_db::DbError> {
+pub(super) fn held_episodes(
+    db: &Database,
+    show: ItemId,
+) -> Result<Vec<(u16, u16, Item)>, cv_db::DbError> {
     let mut held = Vec::new();
     for season_id in db.read(|c| children_of(c, show))? {
         for episode_id in db.read(|c| children_of(c, season_id))? {

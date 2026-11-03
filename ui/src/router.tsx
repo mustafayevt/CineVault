@@ -27,7 +27,8 @@ import { NetworkSharePage } from "./features/shares/NetworkSharePage";
 import { validateNetworkShareSearch } from "./features/shares/shareMode";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { TorrentsPage } from "./features/torrents/TorrentsPage";
-import { validateTorrentsSearch } from "./features/torrents/torrentsSearch";
+import { validateTorrentsSearch, validateWishlistSearch } from "./features/torrents/torrentsSearch";
+import { WishlistPage } from "./features/torrents/WishlistPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
 
 // The first-run setup replaces the window until a library exists; afterwards the app shell.
@@ -150,6 +151,14 @@ const torrentsRoute = createRoute({
   component: TorrentsPage,
 });
 
+const wishlistRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/torrents/wishlist",
+  // `?add=movie:123` opens the editor for that title; `&season=1&episode=2` picks a show's scope.
+  validateSearch: validateWishlistSearch,
+  component: WishlistPage,
+});
+
 const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/history",
@@ -268,6 +277,7 @@ const routeTree = rootRoute.addChildren([
   renameRoute,
   drivesRoute,
   torrentsRoute,
+  wishlistRoute,
   historyRoute,
   settingsRoute,
   networkShareRoute,

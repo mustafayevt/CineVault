@@ -610,6 +610,31 @@ export const commands = {
 	 *  whether it is a weak one.
 	 */
 	torrentFeedLookup: (request: TorrentFeedLookupRequestDto) => typedError<TorrentFeedLookupDto, TorrentCommandError>(__TAURI_INVOKE("torrent_feed_lookup", { request })),
+	/**
+	 *  Every entry of the Wishlist, the newest first, with its matches and poster. Entries whose
+	 *  criteria the library now meets are marked done. Only the library is read.
+	 */
+	torrentWishlist: () => typedError<WishEntryDto[], TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist")),
+	/**
+	 *  Adds a title to the Wishlist, or replaces the criteria of the entry with this title and
+	 *  scope. Returns the entry's id.
+	 */
+	torrentWishlistAdd: (request: WishAddDto) => typedError<number, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_add", { request })),
+	/**  Changes an entry's scope and criteria; the entry is judged and checked again. */
+	torrentWishlistUpdate: (id: number, scope: WishScopeDto, criteria: WishCriteriaDto) => typedError<null, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_update", { id, scope, criteria })),
+	/**  Removes an entry and its matches. */
+	torrentWishlistRemove: (id: number) => typedError<null, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_remove", { id })),
+	/**
+	 *  Checks the entries that are due (`due_only`) or every entry that is not done. One check runs
+	 *  at a time; a second answers at once with `busy`.
+	 */
+	torrentWishlistCheck: (dueOnly: boolean) => typedError<WishCheckDto, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_check", { dueOnly })),
+	/**  Marks a match `sent` or `dismissed` (or `seen` again). */
+	torrentWishlistMatchState: (id: number, key: string, matchState: string) => typedError<null, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_match_state", { id, key, matchState })),
+	/**  Marks every new match seen (the Wishlist was opened). Returns how many there were. */
+	torrentWishlistSeen: () => typedError<number, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_seen")),
+	/**  How many matches have not been looked at yet, for the sidebar. */
+	torrentWishlistNewCount: () => typedError<number, TorrentCommandError>(__TAURI_INVOKE("torrent_wishlist_new_count")),
 	/**  Gives a magnet link to the system's magnet handler (the person's torrent app). */
 	torrentOpenMagnet: (magnet: string) => typedError<null, TorrentCommandError>(__TAURI_INVOKE("torrent_open_magnet", { magnet })),
 	/**  Opens a release's page on its source's site in the browser (`http` and `https` only). */
@@ -4735,6 +4760,97 @@ export type WatchStateDto = {
 	play_count: number,
 	/**  Unix milliseconds of the last time it was watched. */
 	last_watched_ms: number | null,
+};
+
+/**  A title to add to the Wishlist. */
+export type WishAddDto = {
+	/**  `movie` or `show`. */
+	kind: string,
+	tmdbId: number,
+	scope: WishScopeDto,
+	criteria: WishCriteriaDto,
+};
+
+/**  What a check did. */
+export type WishCheckDto = {
+	/**  How many entries were checked. */
+	checked: number,
+	/**  How many releases were found that were not known before. */
+	newMatches: number,
+	/**  Another check was running, so this one did nothing. */
+	busy: boolean,
+};
+
+/**  What kind of release an entry is after. */
+export type WishCriteriaDto = {
+	/**  `720p`, `1080p` or `2160p`; none takes any. */
+	minResolution: string | null,
+	/**  `Remux`, `BluRay`, `WEB-DL` or `WEBRip`; none takes any. */
+	sources: string[],
+	/**  Only releases with HDR. */
+	hdr: boolean,
+	/**  The largest size in bytes. */
+	maxSize: number | null,
+	/**  The fewest seeders. */
+	minSeeders: number | null,
+};
+
+/**  An entry of the Wishlist. */
+export type WishEntryDto = {
+	id: number,
+	/**  `movie` or `show`. */
+	kind: string,
+	tmdbId: number,
+	title: string,
+	year: number | null,
+	posterKey: string | null,
+	scope: WishScopeDto,
+	criteria: WishCriteriaDto,
+	/**  Epoch milliseconds. */
+	added: number | null,
+	checked: number | null,
+	/**  What the last check could not do: `no-source`, `airs`, `no-new-episode` or `failed`. */
+	note: string | null,
+	/**  The day an awaited episode airs (`airs`), or the failure's words (`failed`). */
+	noteDetail: string | null,
+	/**  When the library was found to hold a copy that meets the criteria. */
+	done: number | null,
+	/**  The episode a "next new episode" entry looked for at its last check. */
+	target: TorrentEpisodeRefDto | null,
+	inLibrary: ScrapeLinkDto | null,
+	/**  The matches that are not dismissed, most seeders first. */
+	matches: WishMatchDto[],
+};
+
+/**  A release a check kept for an entry. */
+export type WishMatchDto = {
+	/**  The release's key within its entry. */
+	key: string,
+	name: string,
+	size: number | null,
+	seeders: number | null,
+	magnet: string | null,
+	torrentUrl: string | null,
+	/**  The ids of the sources that returned it. */
+	sources: string[],
+	/**  Epoch milliseconds. */
+	found: number | null,
+	/**  `new`, `seen` or `sent`. */
+	state: string,
+	/**  `2160p`, `1080p`, `720p`, `480p` or `unknown`. */
+	resolution: string,
+	source: string | null,
+	codec: string | null,
+	hdr: string | null,
+	audio: string | null,
+};
+
+/**  What an entry looks for within its title. */
+export type WishScopeDto = {
+	/**  `movie`, `season`, `episode` or `next` (the next new episode). */
+	kind: string,
+	season: number | null,
+	episode: number | null,
 };
 
 /* Tauri Specta runtime */

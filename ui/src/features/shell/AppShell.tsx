@@ -39,6 +39,7 @@ import { usePageScrollReset } from "./usePageScrollReset";
 import { ROUTE_CONTENT_ATTRIBUTE, useRouteFocus } from "./useRouteFocus";
 import { tauriWindowApi } from "./windowApi";
 import type { WindowApi } from "./windowApi";
+import { useWishlistWatch } from "../torrents/wishlistQueries";
 
 const defaultPlatform = detectPlatform();
 
@@ -80,6 +81,8 @@ export function AppShell({ platform = defaultPlatform, windowApi }: AppShellProp
   useUndoShortcut(platform);
   useUpdateChecks();
   useWhatsNew();
+  // Due Wishlist entries are checked when the app opens and every hour while it is open.
+  useWishlistWatch();
   useRouteFocus();
   const history = useNavigationHistory();
   useDesktopGuards({ back: history.back, forward: history.forward });

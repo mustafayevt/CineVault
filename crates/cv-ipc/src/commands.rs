@@ -844,6 +844,46 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &[],
     },
     CommandInfo {
+        name: "torrent_wishlist",
+        module: "torrent_wishlist",
+        args: &[],
+    },
+    CommandInfo {
+        name: "torrent_wishlist_add",
+        module: "torrent_wishlist",
+        args: &["request"],
+    },
+    CommandInfo {
+        name: "torrent_wishlist_check",
+        module: "torrent_wishlist",
+        args: &["dueOnly"],
+    },
+    CommandInfo {
+        name: "torrent_wishlist_match_state",
+        module: "torrent_wishlist",
+        args: &["id", "key", "matchState"],
+    },
+    CommandInfo {
+        name: "torrent_wishlist_new_count",
+        module: "torrent_wishlist",
+        args: &[],
+    },
+    CommandInfo {
+        name: "torrent_wishlist_remove",
+        module: "torrent_wishlist",
+        args: &["id"],
+    },
+    CommandInfo {
+        name: "torrent_wishlist_seen",
+        module: "torrent_wishlist",
+        args: &[],
+    },
+    CommandInfo {
+        name: "torrent_wishlist_update",
+        module: "torrent_wishlist",
+        args: &["id", "scope", "criteria"],
+    },
+    CommandInfo {
         name: "undo_nfo_action",
         module: "nfo",
         args: &["token"],
