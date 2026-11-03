@@ -302,7 +302,9 @@ async fn details_give_ids_titles_year_runtime_and_the_library_link() {
             .is_some_and(|o| o.contains("McCauley"))
     );
     match details.holding.expect("the library copy") {
-        LibraryHolding::Movie(copy) => {
+        LibraryHolding::Movie(copies) => {
+            assert_eq!(copies.len(), 1);
+            let copy = &copies[0];
             assert_eq!(copy.resolution, Resolution::R1080);
             assert_eq!(copy.source, MediaSource::WebDl);
             assert_eq!(copy.size_bytes, 1_000);
@@ -414,6 +416,29 @@ async fn seasons_and_episodes_come_from_one_episode_list() {
 }
 
 // ------------------------------------------------------------------ queries and the library
+
+#[tokio::test]
+async fn two_copies_are_listed_best_first_and_the_best_is_compared() {
+    let lab = Lab::new(true).await;
+    lab.library_movie("949", "Heat", 1995, 1920, 1080);
+    lab.library_movie("949", "Heat", 1995, 3840, 2160);
+    let details = lab
+        .service
+        .title_details(MediaKind::Movie, 949)
+        .await
+        .unwrap();
+    let Some(LibraryHolding::Movie(copies)) = &details.holding else {
+        panic!("a movie holding, not {:?}", details.holding);
+    };
+    let order: Vec<Resolution> = copies.iter().map(|copy| copy.resolution).collect();
+    assert_eq!(order, [Resolution::R2160, Resolution::R1080]);
+    assert_ne!(copies[0].item, copies[1].item);
+    let query = lab.service.build_query(&details, Scope::Movie).unwrap();
+    assert_eq!(
+        query.library_copy.expect("the copy").resolution,
+        Resolution::R2160
+    );
+}
 
 #[tokio::test]
 async fn the_query_carries_the_title_scope_and_the_library_copy() {

@@ -1,5 +1,5 @@
-import { Copy, Info, Send } from "lucide-react";
-import { useCallback, useEffect, useMemo } from "react";
+import { Copy, Info, Scale, Send } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 
 import { Button } from "../../components/Button";
@@ -7,6 +7,7 @@ import { IconButton } from "../../components/IconButton";
 import { FileSize } from "../../components/FileSize";
 import { MenuSeparator } from "../../components/Menu";
 import { MenuItem } from "../../components/MenuItem";
+import { Popover } from "../../components/Popover";
 import { QualityBadge } from "../../components/QualityBadge";
 import { Table } from "../../components/Table";
 import type { TableColumn, TableSort } from "../../components/Table";
@@ -16,6 +17,9 @@ import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
 import { usePaneWidth } from "../../lib/usePaneWidth";
+import { CompareBlock } from "./CompareBlock";
+import { reasonOf, verdictOf } from "./ownedCopy";
+import type { LibraryCopy } from "./ownedCopy";
 import { sourceText, tierOf } from "./releaseSort";
 import { copyMagnet, openRelease } from "./torrentActions";
 import type { SourceInfo, TorrentRelease } from "./torrentBackend";
@@ -23,18 +27,12 @@ import { ageText, seedHealth } from "./torrentModel";
 
 import "./torrentsPage.css";
 
-/** What the library holds of the searched movie, for the hint on each release. */
-export interface OwnedCopy {
-  /** "2160p Dolby Vision". */
-  quality: string;
-  size: number | null;
-}
-
 interface ReleaseTableProps {
   releases: readonly TorrentRelease[];
   /** Every source of the search, to name the sources of a release. */
   sources: readonly Pick<SourceInfo, "id" | "name">[];
-  owned: OwnedCopy | null;
+  /** The library copy the releases are compared with; without one no release has a tag. */
+  owned: LibraryCopy | null;
   sort: TableSort;
   onSort: (sort: TableSort) => void;
   /**
@@ -72,23 +70,54 @@ const PHONE_ACTIONS_WIDTH = 52;
 /** A phone row holds the name over its marks. */
 const PHONE_ROW_HEIGHT = 52;
 
-/** How a release compares with the copy the library holds, or null when there is none. */
-function Compare({ release, owned }: { release: TorrentRelease; owned: OwnedCopy | null }) {
-  const format = useFormat();
-  const verdict = release.upgrade;
-  if (verdict !== "same" && verdict !== "better" && verdict !== "worse") return null;
-  const tip =
-    owned === null
-      ? undefined
-      : t("torrentsPage.cmp.tip", {
-          quality: owned.quality,
-          size: owned.size === null ? "" : format.size(owned.size),
-        });
+interface CompareProps {
+  release: TorrentRelease;
+  owned: LibraryCopy | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+/**
+ * How a release compares with the copy the library holds: a tag whose tooltip says why, and
+ * which opens "Compare with yours". Nothing without a compared copy.
+ */
+function Compare({ release, owned, open, onOpenChange }: CompareProps) {
+  const verdict = verdictOf(release);
+  if (owned === null || verdict === null) return null;
+  const label = t(`torrentsPage.cmp.${verdict}`);
+  const why = reasonOf(verdict, owned, release);
   return (
-    <span className="ml-2 shrink-0" {...(tip === undefined ? {} : { title: tip })}>
-      <Tag variant={verdict === "better" ? "ok" : verdict === "worse" ? "warn" : "neutral"}>
-        {t(`torrentsPage.cmp.${verdict}`)}
-      </Tag>
+    <span className="ml-2 shrink-0">
+      <Popover
+        aria-label={t("torrentsPage.cmp.title")}
+        open={open}
+        onOpenChange={onOpenChange}
+        className="w-[360px] max-w-[calc(100vw-32px)]"
+        trigger={
+          <button
+            type="button"
+            // The row is the focus stop; the right-click menu's "Compare with yours" opens it too.
+            tabIndex={-1}
+            title={why}
+            aria-label={`${label}. ${t("torrentsPage.cmp.open")}`}
+            data-testid="compare-tag"
+            className="flex cursor-pointer rounded-(--r-4) border-0 bg-transparent p-0"
+            onClick={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+          >
+            <Tag variant={verdict === "better" ? "ok" : verdict === "worse" ? "warn" : "neutral"}>
+              {label}
+            </Tag>
+          </button>
+        }
+      >
+        {/* Keys inside the popover stay there (React events cross the portal): Enter never
+            sends the row behind it. The popover's own Esc still closes it. */}
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        <div onKeyDown={(event) => event.stopPropagation()}>
+          <CompareBlock copy={owned} release={release} verdict={verdict} heading />
+        </div>
+      </Popover>
     </span>
   );
 }
@@ -117,6 +146,8 @@ export function ReleaseTable({
   storageKey = "torrent-releases",
 }: ReleaseTableProps) {
   const format = useFormat();
+  // The release whose "Compare with yours" is open.
+  const [comparing, setComparing] = useState<string | null>(null);
   const { ref: frame, width: pane } = usePaneWidth();
   const narrow = pane !== null && pane <= NARROW_PANE;
   const phone = pane !== null && pane < PHONE_PANE;
@@ -185,7 +216,12 @@ export function ReleaseTable({
               <span className="flex min-w-0 items-center overflow-hidden">
                 <QualityBadge quality={tierOf(release)} />
                 {nameExtra?.(release)}
-                <Compare release={release} owned={owned} />
+                <Compare
+                  release={release}
+                  owned={owned}
+                  open={comparing === release.id}
+                  onOpenChange={(open) => setComparing(open ? release.id : null)}
+                />
               </span>
             </span>
           ) : (
@@ -194,7 +230,12 @@ export function ReleaseTable({
                 {release.name}
               </span>
               {nameExtra?.(release)}
-              <Compare release={release} owned={owned} />
+              <Compare
+                release={release}
+                owned={owned}
+                open={comparing === release.id}
+                onOpenChange={(open) => setComparing(open ? release.id : null)}
+              />
             </span>
           ),
       },
@@ -291,7 +332,7 @@ export function ReleaseTable({
         ),
       },
     ],
-    [owned, sources, format, onDetails, qualitySortable, nameExtra, phone],
+    [owned, sources, format, onDetails, qualitySortable, nameExtra, phone, comparing],
   );
   const shownColumns = useMemo(() => {
     const kept = columns.filter(
@@ -337,6 +378,24 @@ export function ReleaseTable({
       >
         {t("torrentsPage.send")}
       </MenuItem>
+      {owned === null ? null : (
+        <MenuItem
+          icon={Scale}
+          {...(only === undefined
+            ? { disabledReason: t("torrentsPage.needOne") }
+            : verdictOf(only) === null
+              ? { disabledReason: t("torrentsPage.cmp.none") }
+              : {})}
+          onSelect={() => {
+            if (only === undefined) return;
+            // After the menu has closed and given focus back, or the popover would close at once.
+            const id = only.id;
+            window.setTimeout(() => setComparing(id), 0);
+          }}
+        >
+          {t("torrentsPage.cmp.open")}
+        </MenuItem>
+      )}
       <MenuSeparator />
       <MenuItem
         icon={Copy}

@@ -281,6 +281,17 @@ fn resolution_rank(resolution: Resolution) -> u8 {
     }
 }
 
+/// How good a library copy is in the order [`upgrade`] weighs a release: resolution, then
+/// source, then HDR. Of several copies, the highest is the one releases are compared with.
+#[must_use]
+pub fn copy_rank(copy: &LibraryCopy) -> (u8, u8, bool) {
+    (
+        resolution_rank(copy.resolution),
+        source_rank(&copy.source, false),
+        copy.hdr != Hdr::None,
+    )
+}
+
 /// A release against the copy in the library. A cam or screener is never an upgrade. When the
 /// resolution of either is unknown it counts as equal, so the source and HDR decide.
 #[must_use]

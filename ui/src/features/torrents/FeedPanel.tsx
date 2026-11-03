@@ -18,7 +18,9 @@ import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
 import { CachedImage } from "../images/CachedImage";
 import { openRatingPage } from "../ratings/ratingPage";
+import { CompareBlock } from "./CompareBlock";
 import { titleLinks } from "./feedView";
+import { verdictOf } from "./ownedCopy";
 import { tierOf } from "./releaseSort";
 import { useTitleDetails } from "./titleQueries";
 import { openRelease } from "./torrentActions";
@@ -165,6 +167,9 @@ export function FeedPanel({
   const overview = known?.overview ?? hit?.overview ?? null;
   const imdbId = known?.imdbId ?? hit?.imdbId ?? row.imdbId;
   const inLibrary = known?.inLibrary ?? hit?.inLibrary ?? row.inLibrary;
+  // A library movie's copy, for "Compare with yours" (the verdict is the row's own).
+  const compared = row.kind === "movie" ? (known?.libraryCopies[0] ?? null) : null;
+  const verdict = verdictOf(row.release);
   const links = hit === null ? [] : titleLinks(kindOf(row), hit.tmdbId, imdbId);
   const others = siblings.filter((other) => other.release.id !== row.release.id);
   const sourceNames = row.release.sources
@@ -298,6 +303,12 @@ export function FeedPanel({
             </Link>
           )}
         </p>
+      )}
+
+      {compared === null || verdict === null ? null : (
+        <div className="mx-5 mt-4">
+          <CompareBlock copy={compared} release={row.release} verdict={verdict} heading />
+        </div>
       )}
 
       {links.length === 0 ? null : (

@@ -1,4 +1,4 @@
-import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Check, Search, WifiOff, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -8,6 +8,7 @@ import { Field } from "../../components/Field";
 import { IconButton } from "../../components/IconButton";
 import { Icon } from "../../components/Icon";
 import { Skeleton } from "../../components/Skeleton";
+import { Tag } from "../../components/Tag";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import type { QualityTier } from "../../components/QualityBadge";
@@ -17,8 +18,9 @@ import { useCombobox } from "../search/useCombobox";
 import { DEFAULT_FEED_VIEW } from "./feedView";
 import type { FeedView } from "./feedView";
 import { LatestFeed } from "./LatestFeed";
+import { holdsTitle, showHoldings, showMarkOf, verdictOf } from "./ownedCopy";
+import type { ShowMark } from "./ownedCopy";
 import { ReleaseTable } from "./ReleaseTable";
-import type { OwnedCopy } from "./ReleaseTable";
 import {
   TIERS,
   sortReleases,
@@ -30,21 +32,25 @@ import {
 import { TitleLine } from "./TitleLine";
 import { TorrentNotice } from "./TorrentNotice";
 import { useTitleDetails } from "./titleQueries";
-import type { ReleaseSearchTarget, TitleHit } from "./torrentBackend";
+import type { ReleaseSearchTarget, TitleHit, TorrentRelease } from "./torrentBackend";
 import { noSourceAnswered, titleName } from "./torrentModel";
-import { parseTitleRef, scopeOf, titleParam } from "./torrentsSearch";
-import type { TitleRef, TorrentsSearch } from "./torrentsSearch";
+import { onlyParam, parseOnly, parseTitleRef, scopeOf, titleParam } from "./torrentsSearch";
+import type { LibraryFilter, TitleRef, TorrentsSearch } from "./torrentsSearch";
 import { useOnline } from "./useOnline";
 import { useReleaseSearch } from "./useReleaseSearch";
 import { useTitleMatch } from "./useTitleMatch";
 import { useTorrentNotice } from "./useTorrentNotice";
+import { YouHaveThis } from "./YouHaveThis";
 
 type Chosen = "all" | QualityTier;
 
-/** "Dolby Vision" for the short HDR word the backend sends. */
-function hdrWord(hdr: string | null): string {
-  return hdr === "DV" ? "Dolby Vision" : (hdr ?? "");
-}
+const NO_FILTERS: ReadonlySet<LibraryFilter> = new Set();
+
+const MARK_VARIANT: Record<ShowMark, "ok" | "neutral"> = {
+  gap: "ok",
+  held: "neutral",
+  better: "ok",
+};
 
 /** The release search a confirmed title and the route's scope ask for. */
 function targetOf(
@@ -183,6 +189,20 @@ function TorrentsContent() {
 
   // The confirmed title goes into the address, so a reload or a copied link opens it again.
   const param = ref === null ? undefined : titleParam(ref);
+  // The library chips belong to one title: another title starts with them off.
+  const [library, setLibrary] = useState<{
+    title: string | undefined;
+    on: ReadonlySet<LibraryFilter>;
+  }>(() => ({ title: search.title, on: parseOnly(search.only) }));
+  const filters = library.title === param ? library.on : NO_FILTERS;
+  const setFilters = (on: ReadonlySet<LibraryFilter>) => setLibrary({ title: param, on });
+  const toggleFilter = (filter: LibraryFilter) => {
+    const next = new Set(filters);
+    if (next.has(filter)) next.delete(filter);
+    else next.add(filter);
+    setFilters(next);
+  };
+  const only = onlyParam(filters);
   useEffect(() => {
     if (param === undefined) {
       // The title was changed by typing: the address stops naming it.
@@ -191,13 +211,20 @@ function TorrentsContent() {
       }
       return;
     }
-    if (param === search.title) return;
+    if (param === search.title && only === search.only) return;
     void navigate({
       to: "/torrents",
-      search: { title: param } as TorrentsSearch,
+      search: {
+        title: param,
+        ...(param === search.title && search.season !== undefined ? { season: search.season } : {}),
+        ...(param === search.title && search.episode !== undefined
+          ? { episode: search.episode }
+          : {}),
+        ...(only === undefined ? {} : { only }),
+      } as TorrentsSearch,
       replace: true,
     });
-  }, [param, search.title, typed, navigate]);
+  }, [param, only, search.title, search.only, search.season, search.episode, typed, navigate]);
 
   const target = ref === null ? null : targetOf(ref, search, routed);
   const releases = useReleaseSearch(target);
@@ -210,19 +237,61 @@ function TorrentsContent() {
   const counts = useMemo(() => tierCounts(matching), [matching]);
   // Before the first release arrives the chips are quiet: no "0" counts, nothing to pick.
   const hasResults = matching.length > 0;
+  // What the library holds: the copy a movie's releases are compared with, a show's episodes.
+  const owned = known?.kind === "movie" ? (known.libraryCopies[0] ?? null) : null;
+  const holdings = useMemo(
+    () =>
+      known?.kind === "show" && known.heldEpisodes.length > 0
+        ? showHoldings(known.heldEpisodes, known.missingEpisodes)
+        : null,
+    [known],
+  );
+  const marks = useMemo(() => {
+    const out = new Map<string, ShowMark>();
+    if (holdings === null) return out;
+    for (const release of matching) {
+      const mark = showMarkOf(release, holdings);
+      if (mark !== null) out.set(release.id, mark);
+    }
+    return out;
+  }, [matching, holdings]);
+  const betterCount = matching.filter((release) => verdictOf(release) === "better").length;
+  const gapCount = [...marks.values()].filter((mark) => mark === "gap").length;
+  const offerBetter =
+    owned !== null || (holdings !== null && matching.some((r) => verdictOf(r) !== null));
+  const offerGaps = holdings !== null;
+  const betterOn = filters.has("better") && offerBetter;
+  const gapsOn = filters.has("gaps") && offerGaps;
   const shown = useMemo(() => {
-    const inTier = chosen === "all" ? matching : matching.filter((r) => tierOf(r) === chosen);
-    return sortReleases(inTier, sort, (release) => sourceText(release, releases.sources));
-  }, [matching, chosen, sort, releases.sources]);
-
-  const owned: OwnedCopy | null = useMemo(() => {
-    const copy = known?.libraryCopy;
-    if (copy === undefined || copy === null) return null;
-    const quality = [copy.resolution === "unknown" ? "" : copy.resolution, hdrWord(copy.hdr)]
-      .filter(Boolean)
-      .join(" ");
-    return { quality, size: copy.size };
-  }, [known]);
+    const kept = matching.filter(
+      (release) =>
+        (chosen === "all" || tierOf(release) === chosen) &&
+        (!betterOn || verdictOf(release) === "better") &&
+        (!gapsOn || marks.get(release.id) === "gap"),
+    );
+    return sortReleases(kept, sort, (release) => sourceText(release, releases.sources));
+  }, [matching, chosen, betterOn, gapsOn, marks, sort, releases.sources]);
+  const nameExtra = useMemo(
+    () =>
+      holdings === null
+        ? undefined
+        : (release: TorrentRelease) => {
+            const mark = marks.get(release.id);
+            if (mark === undefined) return null;
+            return (
+              <span
+                className="ml-2 shrink-0"
+                title={t(`torrentsPage.mark.${mark}.tip`)}
+                data-testid="show-mark"
+              >
+                <Tag variant={MARK_VARIANT[mark]}>{t(`torrentsPage.mark.${mark}`)}</Tag>
+              </span>
+            );
+          },
+    [holdings, marks],
+  );
+  // "Search anyway" folds the card for the title it was pressed on.
+  const [foldedFor, setFoldedFor] = useState<string | null>(null);
 
   const asked = releases.sources.filter((source) => source.skipped === null).length;
   const countText =
@@ -245,25 +314,18 @@ function TorrentsContent() {
   };
 
   const searching = ref === null ? false : releases.searching;
-  const inLibrary = known?.inLibrary ?? null;
-  const copyTitle = known === null ? "" : titleName(known);
-  const ownedLine =
-    owned === null ? null : (
-      <span className="flex min-w-0 items-center gap-2 text-(length:--fs-13) text-text-2">
-        <Icon icon={Check} className="text-ok" />
-        <span className="truncate">
-          {t("torrentsPage.yours.head")}{" "}
-          {inLibrary !== null && known?.kind === "movie" ? (
-            <Link to="/movies/$movieId" params={{ movieId: inLibrary.itemId }} className="cv-link">
-              {copyTitle}
-            </Link>
-          ) : (
-            copyTitle
-          )}{" "}
-          · {owned.quality}
-          {owned.size === null ? "" : ` · ${format.size(owned.size)}`}
-        </span>
-      </span>
+  const card =
+    known === null || !holdsTitle(known) ? null : (
+      <YouHaveThis
+        details={known}
+        folded={foldedFor === param}
+        onFold={(fold) => setFoldedFor(fold ? (param ?? null) : null)}
+        onLook={() => {
+          const next = new Set(filters);
+          next.add(known.kind === "show" ? "gaps" : "better");
+          setFilters(next);
+        }}
+      />
     );
 
   let body: React.ReactNode;
@@ -298,8 +360,19 @@ function TorrentsContent() {
   } else if (shown.length === 0) {
     body = (
       <Message role="status">
-        <p className="m-0">{t("torrentsPage.noTier", { tier: chosen })}</p>
-        <Button onClick={() => setChosen("all")}>{t("torrents.filters.clear")}</Button>
+        <p className="m-0">
+          {betterOn || gapsOn
+            ? t("torrentsPage.noLibraryFilter")
+            : t("torrentsPage.noTier", { tier: chosen })}
+        </p>
+        <Button
+          onClick={() => {
+            setChosen("all");
+            setFilters(NO_FILTERS);
+          }}
+        >
+          {t("torrents.filters.clear")}
+        </Button>
       </Message>
     );
   } else {
@@ -310,6 +383,7 @@ function TorrentsContent() {
         owned={owned}
         sort={sort}
         onSort={setSort}
+        {...(nameExtra === undefined ? {} : { nameExtra })}
       />
     );
   }
@@ -408,6 +482,7 @@ function TorrentsContent() {
             field.current?.focus();
           }}
         />
+        {card}
         <div
           className={
             ref === null
@@ -440,8 +515,34 @@ function TorrentsContent() {
               </Chip>
             ))}
           </div>
-          <span className="grow @max-[640px]/pane:hidden" />
-          {ownedLine}
+          {offerBetter || offerGaps ? (
+            <div
+              role="group"
+              aria-label={t("torrentsPage.chip.library")}
+              className="flex items-center gap-1.5 border-l border-solid border-line-section pl-1.5 @max-[640px]/pane:border-l-0 @max-[640px]/pane:pl-0"
+            >
+              {offerBetter ? (
+                <Chip
+                  active={betterOn}
+                  disabled={!hasResults}
+                  {...(hasResults ? { count: format.number(betterCount) } : {})}
+                  onClick={() => toggleFilter("better")}
+                >
+                  {t("torrentsPage.chip.better")}
+                </Chip>
+              ) : null}
+              {offerGaps ? (
+                <Chip
+                  active={gapsOn}
+                  disabled={!hasResults}
+                  {...(hasResults ? { count: format.number(gapCount) } : {})}
+                  onClick={() => toggleFilter("gaps")}
+                >
+                  {t("torrentsPage.chip.gaps")}
+                </Chip>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
       {online ? null : (

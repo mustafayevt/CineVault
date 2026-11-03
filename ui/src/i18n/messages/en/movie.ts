@@ -229,6 +229,8 @@ export const movie = {
   "title.art.changeBackdrop": "Change backdrop",
   "title.menu.showNfo": "Show NFO",
   "title.menu.rewriteNfo": "Rewrite NFO",
+  "title.menu.findBetter": "Find a better copy",
+  "title.menu.findMissing": "Find missing episodes",
   "title.menu.remove": "Remove from library (keep files)",
   "title.menu.ignore": "Ignore this folder",
   "title.remove.done":

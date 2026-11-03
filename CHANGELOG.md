@@ -11,6 +11,10 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Browser mode over HTTPS: CineVault starts faster from what it already downloaded, and says "Can't reach CineVault" with Try again when the server doesn't answer, instead of the browser's error page.
 - Drives: a Refresh button next to "Updated …" reads every drive again at once, for example after copying files outside CineVault or plugging a drive in.
 - Copies: the Movie page of a movie you have more than once shows a tab for each copy at the top of its Technical card ("2160p DV", "1080p"), the best one marked. A tab switches the page to that copy: its file, NFO, Rename history, Play and Move. The Copies row at the end of the card offers Keep only this one, Delete this copy and Compare. It replaces the "You have 2 copies · Compare" line.
+- Torrents: when you search a title you already have, a "You have this" card shows what you have: each copy of a movie (resolution, HDR, codec, audio, source, edition, size), or the seasons of a show and the episodes you're missing ("You have S01–S02 · missing S02E04–E10"). It replaces the thin "Yours:" line. Search anyway folds it into one line.
+- Torrents: the Better, Same as yours and Worse tag on a release now says why when you point at it ("Better: 2160p Dolby Vision vs your 1080p SDR"), and clicking it opens Compare with yours: your copy and the release side by side, the differences marked, ending in a plain verdict like "Better picture, better audio, 2.5× the size". The Latest releases details panel shows the same comparison for a movie you have.
+- Torrents: an "Only better than mine" chip hides the releases that are no better than your copy. For a show, releases are tagged Fills a gap, In your library or Better, and a "Fills a gap" chip lists only the ones with episodes you're missing.
+- Movie and show pages: the ⋯ menu has Find a better copy (movies) and Find missing episodes (shows), which open Torrents with the title picked and the matching chip on.
 
 ### Fixed
 

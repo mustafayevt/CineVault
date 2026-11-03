@@ -65,6 +65,11 @@ function renderMovie(path = `/movies/${SYNTHETIC_MOVIE_ID}`): Rendered {
     createRoute({ getParentRoute: () => root, path: "/rename", component: stub("Rename page") }),
     createRoute({ getParentRoute: () => root, path: "/artwork", component: stub("Artwork page") }),
     createRoute({ getParentRoute: () => root, path: "/library", component: stub("Library page") }),
+    createRoute({
+      getParentRoute: () => root,
+      path: "/torrents",
+      component: stub("Torrents page"),
+    }),
   ];
   const router = createRouter({
     routeTree: root.addChildren(routes),
@@ -259,6 +264,22 @@ describe("the Movie page artwork buttons", () => {
       "Rewrite NFO",
       "Reload media info",
     ]);
+  });
+
+  it("offers Find a better copy, which opens Torrents with the title and the chip on", async () => {
+    const user = userEvent.setup();
+    const { router } = renderMovie();
+    await user.click(await screen.findByRole("button", { name: /More actions/ }));
+    const names = screen.getAllByRole("menuitem").map((item) => item.textContent);
+    expect(names.indexOf("Find a better copy")).toBe(names.indexOf("Reload media info") + 1);
+    expect(names.indexOf("Remove from library (keep files)")).toBe(
+      names.indexOf("Find a better copy") + 1,
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Find a better copy" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/torrents"));
+    const search = decodeURIComponent(router.state.location.searchStr);
+    expect(search).toContain("title=movie:693134");
+    expect(search).toContain("only=better");
   });
 });
 

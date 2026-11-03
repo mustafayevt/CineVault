@@ -39,7 +39,8 @@ use cv_torrent::{TorrentError, model::TorrentQuery};
 pub use feed::{LibraryIndex, LibraryMatch};
 pub use landing::{Landing, LandingTitle, STRIP_LENGTH, landing_of};
 pub use library::{
-    LibraryHolding, LibraryLink, MovieCopy, copy_of, hdr_of, movie_copy_of, resolution_of,
+    LibraryHolding, LibraryLink, MovieCopy, ShowHolding, copy_of, hdr_of, movie_copy_of,
+    resolution_of,
 };
 pub use title::{EpisodeInfo, SeasonInfo, TitleDetails, TitleHit};
 

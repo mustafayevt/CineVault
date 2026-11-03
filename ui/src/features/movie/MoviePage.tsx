@@ -23,6 +23,7 @@ import { RatingStrip } from "../title/RatingStrip";
 import { TitleActionBar } from "../title/TitleActionBar";
 import { TitleHeader } from "../title/TitleHeader";
 import { useTitleActions } from "../title/titleActions";
+import { tmdbIdOf } from "../torrents/torrentsSearch";
 import { idMap } from "../ratings/ratingLinks";
 import { ArtworkStrip } from "./ArtworkStrip";
 import { CastSection } from "./CastSection";
@@ -81,6 +82,7 @@ function MovieView({ detail }: { detail: MovieDetail }) {
     availability: detail.availability,
     playId: detail.id,
     onShowNfo: showNfo,
+    tmdbId: tmdbIdOf(detail.ids),
   });
 
   const undoRename = useCallback(() => {
