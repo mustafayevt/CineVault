@@ -1880,6 +1880,86 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
                 .map_err(command_error)
                 .and_then(to_value)
         }
+        "torrent_wishlist" => cv_ipc::torrent_wishlist::torrent_wishlist(&commands.torrent)
+            .await
+            .map_err(command_error)
+            .and_then(to_value),
+        "torrent_wishlist_add" => {
+            let request: cv_ipc::torrent_wishlist::WishAddDto = arg(args, "request")?;
+            cv_ipc::torrent_wishlist::torrent_wishlist_add(&commands.torrent, request)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "torrent_wishlist_update" => {
+            let id: u32 = arg(args, "id")?;
+            let scope: cv_ipc::torrent_wishlist::WishScopeDto = arg(args, "scope")?;
+            let criteria: cv_ipc::torrent_wishlist::WishCriteriaDto = arg(args, "criteria")?;
+            let commands = Arc::clone(&state.commands);
+            on_blocking(move || {
+                cv_ipc::torrent_wishlist::torrent_wishlist_update(
+                    &commands.torrent,
+                    id,
+                    scope,
+                    criteria,
+                )
+                .map_err(command_error)
+            })
+            .await?
+            .and_then(to_value)
+        }
+        "torrent_wishlist_remove" => {
+            let id: u32 = arg(args, "id")?;
+            let commands = Arc::clone(&state.commands);
+            on_blocking(move || {
+                cv_ipc::torrent_wishlist::torrent_wishlist_remove(&commands.torrent, id)
+                    .map_err(command_error)
+            })
+            .await?
+            .and_then(to_value)
+        }
+        "torrent_wishlist_check" => {
+            let due_only: bool = arg(args, "dueOnly")?;
+            cv_ipc::torrent_wishlist::torrent_wishlist_check(&commands.torrent, due_only)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "torrent_wishlist_match_state" => {
+            let id: u32 = arg(args, "id")?;
+            let key: String = arg(args, "key")?;
+            let match_state: String = arg(args, "matchState")?;
+            let commands = Arc::clone(&state.commands);
+            on_blocking(move || {
+                cv_ipc::torrent_wishlist::torrent_wishlist_match_state(
+                    &commands.torrent,
+                    id,
+                    key,
+                    match_state,
+                )
+                .map_err(command_error)
+            })
+            .await?
+            .and_then(to_value)
+        }
+        "torrent_wishlist_seen" => {
+            let commands = Arc::clone(&state.commands);
+            on_blocking(move || {
+                cv_ipc::torrent_wishlist::torrent_wishlist_seen(&commands.torrent)
+                    .map_err(command_error)
+            })
+            .await?
+            .and_then(to_value)
+        }
+        "torrent_wishlist_new_count" => {
+            let commands = Arc::clone(&state.commands);
+            on_blocking(move || {
+                cv_ipc::torrent_wishlist::torrent_wishlist_new_count(&commands.torrent)
+                    .map_err(command_error)
+            })
+            .await?
+            .and_then(to_value)
+        }
         "torrent_sources_status" => {
             let commands = Arc::clone(&state.commands);
             on_blocking(move || {

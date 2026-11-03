@@ -104,7 +104,7 @@ pub type CommandResult<T> = Result<T, TorrentCommandError>;
 pub struct TorrentState {
     pub(crate) service: Option<Arc<TorrentService>>,
     pub(crate) indexer: Option<Arc<cv_app::torrents::indexer::IndexerServiceManager>>,
-    artwork: Option<Arc<ArtworkService>>,
+    pub(crate) artwork: Option<Arc<ArtworkService>>,
     data_dir: Option<std::path::PathBuf>,
     /// The "Latest releases" feeds and their title lookups.
     feeds: Arc<crate::torrent_feed::FeedState>,

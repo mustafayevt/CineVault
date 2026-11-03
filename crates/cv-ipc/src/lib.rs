@@ -52,6 +52,7 @@ pub mod torrent;
 pub mod torrent_feed;
 pub mod torrent_indexer;
 pub mod torrent_stream;
+pub mod torrent_wishlist;
 pub mod tv;
 pub mod updates;
 
