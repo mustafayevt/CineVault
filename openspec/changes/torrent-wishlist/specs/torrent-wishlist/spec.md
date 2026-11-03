@@ -1,15 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: Wishlist view
-The Torrents page SHALL have two views, Search and Wishlist, switched by a "Search · Wishlist" control at the top of both that shows the number of new matches. The Wishlist view (`/torrents/wishlist`), behind the responsibility notice like the search, SHALL list every entry with its poster, title, year, what it looks for and its criteria in one line, with Edit and Remove; entries with matches first, done entries last under "Done".
+The Torrents page SHALL have two views, Search (the one the Torrents item opens) and Wishlist, switched by a "Search · Wishlist" control at the top of both that shows the number of new matches. The Wishlist view (`/torrents/wishlist`), behind the responsibility notice like the search, SHALL list every entry with its poster, title, year, what it looks for and its criteria in one line, with Edit and Remove; the newest entries first, done entries last under "Done".
 
 #### Scenario: Open the Wishlist
 - **WHEN** the user chooses Wishlist on the Torrents page
-- **THEN** the address is `/torrents/wishlist` and the entries are listed, those with matches first
+- **THEN** the address is `/torrents/wishlist` and the entries are listed, the newest first
 
 #### Scenario: Empty Wishlist
 - **WHEN** the Wishlist has no entry
-- **THEN** the view says "Your Wishlist is empty. Add a title from a torrent search, a collection or a title page."
+- **THEN** the view says "Your Wishlist is empty. Choose Add, or add a title from a torrent search, a collection or a title page."
 
 #### Scenario: What an entry looks for
 - **WHEN** the Wishlist holds Season 2 of Example Show and the next new episode of Another Show
@@ -37,6 +37,13 @@ An entry SHALL be a movie, or for a show a season, one episode or "Next new epis
 #### Scenario: Added twice
 - **WHEN** the user adds Season 2 of Example Show while it is already on the Wishlist
 - **THEN** the Wishlist still holds one Season 2 entry, with the new criteria
+
+### Requirement: Add on the Wishlist
+The Wishlist view SHALL have an **Add** button that shows a title field with suggestions as the user types (movies and shows, the owned ones marked) and Cancel; picking a title SHALL open the editor for it at the top of the Wishlist.
+
+#### Scenario: From the Wishlist
+- **WHEN** the user chooses Add on the Wishlist, types "example" and picks Example Movie (2020)
+- **THEN** the editor for Example Movie (2020) opens at the top of the Wishlist
 
 ### Requirement: Adding to the Wishlist
 "Add to Wishlist" SHALL be offered on a title picked in the torrent search, on a film of a collection that the library does not hold (beside "Search torrents"), and in the ⋯ menu of the Movie page and the TV show page of a title with a TMDB ID. Each SHALL open the Wishlist with the editor filled in for that title; a show SHALL start from the season or episode chosen on the search page, otherwise from "Next new episode".

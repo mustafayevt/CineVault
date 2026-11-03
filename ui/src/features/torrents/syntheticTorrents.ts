@@ -27,6 +27,8 @@ import {
 import type { CatalogTitle, SyntheticTarget } from "./syntheticCatalog";
 import { createSyntheticFeed } from "./syntheticFeed";
 import type { SyntheticFeed } from "./syntheticFeed";
+import { createSyntheticWishlist } from "./syntheticWishlist";
+import type { SyntheticWishlistCalls, SyntheticWishlistStart } from "./syntheticWishlist";
 import { TorrentRequestError } from "./torrentBackend";
 import type { SearchStart, TorrentBackend } from "./torrentBackend";
 import type { TitleKind } from "./torrentsSearch";
@@ -138,6 +140,8 @@ export interface SyntheticTorrentOptions {
   ownJackett?: boolean;
   /** The feed's title lookup fails as without a TMDB key. Default false. */
   feedNoKey?: boolean;
+  /** The Wishlist starts with demo entries or empty. Default `demo`. */
+  wishlist?: SyntheticWishlistStart;
 }
 
 export interface SyntheticTorrentCalls {
@@ -154,6 +158,7 @@ export interface SyntheticTorrentCalls {
 export interface SyntheticTorrentBackend extends TorrentBackend {
   calls: SyntheticTorrentCalls;
   feedCalls: SyntheticFeed["feedCalls"];
+  wishlistCalls: SyntheticWishlistCalls;
 }
 
 /** How each source answers a release search of a target. */
@@ -221,8 +226,10 @@ export function createSyntheticTorrentBackend(
     indexerState: input.indexerState ?? "running",
     ownJackett: input.ownJackett ?? true,
     feedNoKey: input.feedNoKey ?? false,
+    wishlist: input.wishlist ?? "demo",
   };
   const feed = createSyntheticFeed({ speed: options.speed, noKey: options.feedNoKey });
+  const wishlist = createSyntheticWishlist(options.wishlist);
   const calls: SyntheticTorrentCalls = {
     magnets: [],
     files: [],
@@ -289,6 +296,7 @@ export function createSyntheticTorrentBackend(
     available: true,
     calls,
     ...feed,
+    ...wishlist,
     titleTransport: (onStart) =>
       perSearchTransport<TorrentTitleHitDto>((request) => {
         const text = request.query.trim();

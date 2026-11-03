@@ -15,9 +15,12 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Torrents: the Better, Same as yours and Worse tag on a release now says why when you point at it ("Better: 2160p Dolby Vision vs your 1080p SDR"), and clicking it opens Compare with yours: your copy and the release side by side, the differences marked, ending in a plain verdict like "Better picture, better audio, 2.5× the size". The Latest releases details panel shows the same comparison for a movie you have.
 - Torrents: an "Only better than mine" chip hides the releases that are no better than your copy. For a show, releases are tagged Fills a gap, In your library or Better, and a "Fills a gap" chip lists only the ones with episodes you're missing.
 - Movie and show pages: the ⋯ menu has Find a better copy (movies) and Find missing episodes (shows), which open Torrents with the title picked and the matching chip on.
+- Torrents: a Wishlist, next to Search at the top of the Torrents page. Add a movie, a season, an episode or "the next new episode" of a show with the kind of release you want: the lowest resolution, the sources (Remux, Blu-ray, WEB-DL, WEBRip), HDR only, a largest size and the fewest seeders. Add titles with Add on the Wishlist, from a torrent search, from a film of a collection you don't have, or from the ⋯ menu of a Movie or Show page.
+- Torrents: CineVault checks the Wishlist when it opens and every hour while it stays open, each title at most every 6 hours, or at once with Check now. New releases that match show as a count on Torrents in the sidebar and as a toast, each with Send to torrent app and Dismiss. Nothing is sent without you. A title is marked done once your library has a copy that meets what you asked for.
 
 ### Fixed
 
+- Torrents: Compare with yours from a release's right-click menu sometimes closed again at once.
 - Drives: clicking a drive in the sidebar now opens the Drives page on that drive, also when the page is already open, and the sidebar shows which drive is chosen.
 - Rename no longer gives a downloaded info file (a plain-text `.nfo` about the video, named like it) the movie's NFO name. Before, CineVault could then never write its own NFO for that movie, and when the movie already had one, the info file could push it into the trash. Now a rename sets the info file aside with the other leftovers (Undo brings it back), so only CineVault's NFO stays with the title.
 

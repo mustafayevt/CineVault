@@ -24,7 +24,10 @@ function messageOf(error: unknown): string {
  * release has no magnet. A confirmation toast says it was sent; when no program is set up for
  * magnet links the toast says so and offers to copy the link instead.
  */
-export async function openRelease(release: TorrentRelease): Promise<boolean> {
+/** What handing a release over needs: its magnet link, else its `.torrent` file and name. */
+export type Handoff = Pick<TorrentRelease, "magnet" | "torrentUrl" | "name">;
+
+export async function openRelease(release: Handoff): Promise<boolean> {
   if (release.magnet === null) return downloadTorrent(release);
   const magnet = release.magnet;
   try {
@@ -61,7 +64,7 @@ export async function openRelease(release: TorrentRelease): Promise<boolean> {
 }
 
 /** Downloads the `.torrent` file of a release and opens it in the person's torrent app. */
-async function downloadTorrent(release: TorrentRelease): Promise<boolean> {
+async function downloadTorrent(release: Handoff): Promise<boolean> {
   if (release.torrentUrl === null) return false;
   try {
     await currentTorrentBackend().openTorrentFile(release.torrentUrl, release.name);

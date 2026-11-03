@@ -272,14 +272,24 @@ describe("the Movie page artwork buttons", () => {
     await user.click(await screen.findByRole("button", { name: /More actions/ }));
     const names = screen.getAllByRole("menuitem").map((item) => item.textContent);
     expect(names.indexOf("Find a better copy")).toBe(names.indexOf("Reload media info") + 1);
+    expect(names.indexOf("Add to Wishlist")).toBe(names.indexOf("Find a better copy") + 1);
     expect(names.indexOf("Remove from library (keep files)")).toBe(
-      names.indexOf("Find a better copy") + 1,
+      names.indexOf("Add to Wishlist") + 1,
     );
     await user.click(screen.getByRole("menuitem", { name: "Find a better copy" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/torrents"));
     const search = decodeURIComponent(router.state.location.searchStr);
     expect(search).toContain("title=movie:693134");
     expect(search).toContain("only=better");
+  });
+
+  it("offers Add to Wishlist, which opens the Wishlist with the editor for the movie", async () => {
+    const user = userEvent.setup();
+    const { router } = renderMovie();
+    await user.click(await screen.findByRole("button", { name: /More actions/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Add to Wishlist" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/torrents/wishlist"));
+    expect(decodeURIComponent(router.state.location.searchStr)).toContain("add=movie:693134");
   });
 });
 

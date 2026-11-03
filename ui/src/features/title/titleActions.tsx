@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Download, FileText } from "lucide-react";
+import { BookmarkPlus, Download, FileText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo } from "react";
 
@@ -8,7 +8,7 @@ import { requestDelete } from "../delete/deleteActions";
 import { filesStateOf, playBlockedFor } from "../detail/filesState";
 import { useOpenFolder } from "../detail/useOpenFolder";
 import { shortLabel, TITLE_ACTIONS } from "../library/titleActions";
-import { torrentsLink } from "../torrents/torrentsSearch";
+import { torrentsLink, wishlistAddLink } from "../torrents/torrentsSearch";
 import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { openMoveTo } from "../move-to/moveToStore";
@@ -24,6 +24,7 @@ export type MenuActionId =
   | "rewrite-nfo"
   | "reload-media-info"
   | "find-torrents"
+  | "wishlist"
   | "remove"
   | "ignore"
   | "delete";
@@ -158,6 +159,16 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
                       title: `${kind}:${tmdbId}`,
                       only: kind === "movie" ? "better" : "gaps",
                     }),
+                  }),
+              },
+              {
+                // The Wishlist with the editor filled in for the title.
+                id: "wishlist" as const,
+                label: t("wishlist.add"),
+                icon: BookmarkPlus,
+                onSelect: () =>
+                  void navigate({
+                    href: wishlistAddLink({ kind: kind === "movie" ? "movie" : "show", tmdbId }),
                   }),
               },
             ]),

@@ -26,6 +26,12 @@ import type {
   TorrentTitleHitDto,
   TorrentTitleStartDto,
   TorznabTestDto,
+  WishAddDto,
+  WishCheckDto,
+  WishCriteriaDto,
+  WishEntryDto,
+  WishMatchDto,
+  WishScopeDto,
 } from "../../bindings";
 import { channelTransport } from "../workspaces/channelTransport";
 import type { ProviderSearchTransport } from "../workspaces/providerEvents";
@@ -55,6 +61,15 @@ export type FeedSource = TorrentFeedSourceDto;
 export type FeedStart = TorrentFeedStartDto;
 export type FeedLookup = TorrentFeedLookupDto;
 export type FeedLookupRequest = TorrentFeedLookupRequestDto;
+/** An entry of the Wishlist with its matches. */
+export type WishEntry = WishEntryDto;
+export type WishMatch = WishMatchDto;
+export type WishCriteria = WishCriteriaDto;
+export type WishScope = WishScopeDto;
+export type WishAdd = WishAddDto;
+export type WishCheck = WishCheckDto;
+/** What the user can set a match to. */
+export type WishMatchState = "sent" | "dismissed" | "seen";
 /** Which releases the feed lists. */
 export type FeedKind = "all" | "movies" | "tv";
 
@@ -154,6 +169,19 @@ export interface TorrentBackend {
   indexers: () => Promise<IndexerInfo[]>;
   /** Switches one indexer on or off for good. */
   setIndexer: (id: string, on: boolean) => Promise<IndexerInfo[]>;
+  /** Every entry of the Wishlist, the newest first, with its matches. */
+  wishlist: () => Promise<WishEntry[]>;
+  /** Adds a title, or replaces the criteria of the entry with this title and scope. */
+  wishlistAdd: (request: WishAdd) => Promise<number>;
+  wishlistUpdate: (id: number, scope: WishScope, criteria: WishCriteria) => Promise<void>;
+  wishlistRemove: (id: number) => Promise<void>;
+  /** Checks the entries that are due, or (`dueOnly` false) every entry that is not done. */
+  wishlistCheck: (dueOnly: boolean) => Promise<WishCheck>;
+  wishlistMatchState: (id: number, key: string, state: WishMatchState) => Promise<void>;
+  /** Marks every new match seen. */
+  wishlistSeen: () => Promise<number>;
+  /** How many matches have not been looked at yet. */
+  wishlistNewCount: () => Promise<number>;
 }
 
 type Result<T> = { status: "ok"; data: T } | { status: "error"; error: TorrentCommandError };
@@ -241,6 +269,16 @@ const tauriTorrentBackend: TorrentBackend = {
   openIndexerManager: async () => unwrap(await commands.torrentOpenIndexerManager()),
   indexers: async () => unwrap(await commands.torrentIndexers()),
   setIndexer: async (id, on) => unwrap(await commands.torrentSetIndexer(id, on)),
+  wishlist: async () => unwrap(await commands.torrentWishlist()),
+  wishlistAdd: async (request) => unwrap(await commands.torrentWishlistAdd(request)),
+  wishlistUpdate: async (id, scope, criteria) =>
+    void unwrap(await commands.torrentWishlistUpdate(id, scope, criteria)),
+  wishlistRemove: async (id) => void unwrap(await commands.torrentWishlistRemove(id)),
+  wishlistCheck: async (dueOnly) => unwrap(await commands.torrentWishlistCheck(dueOnly)),
+  wishlistMatchState: async (id, key, state) =>
+    void unwrap(await commands.torrentWishlistMatchState(id, key, state)),
+  wishlistSeen: async () => unwrap(await commands.torrentWishlistSeen()),
+  wishlistNewCount: async () => unwrap(await commands.torrentWishlistNewCount()),
 };
 
 /** The browser server: the client's own browser opens magnets, pages and .torrent files. */

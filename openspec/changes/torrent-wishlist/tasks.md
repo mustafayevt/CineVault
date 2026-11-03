@@ -6,11 +6,11 @@
 
 ## 2. UI
 
-- [ ] 2.1 Wishlist model: criteria text, defaults from the copy held, the editor's state, the backend calls (desktop, browser and the synthetic backend). Verify: unit tests.
-- [ ] 2.2 The Wishlist view at `/torrents/wishlist` with the Search · Wishlist switch, entries, matches (Send, Dismiss, New, Sent), Done, the empty state, Check now and the editor in the page. Verify: page tests.
-- [ ] 2.3 Entry points: "Add to Wishlist" / "On your Wishlist" on the search page, the collection pane, the Movie and TV show ⋯ menus. Verify: tests.
-- [ ] 2.4 The due check when the app opens and every hour, the toast with Show, the Torrents count in the sidebar and on the switch, marking seen. Verify: tests.
+- [x] 2.1 Wishlist model: criteria text, defaults from the copy held, the editor's state, the backend calls (desktop, browser and the synthetic backend). Verify: unit tests.
+- [x] 2.2 The Wishlist view at `/torrents/wishlist` with the Search · Wishlist switch, entries, matches (Send, Dismiss, New, Sent), Done, the empty state, Check now and the editor in the page. Verify: page tests.
+- [x] 2.3 Entry points: "Add to Wishlist" / "On your Wishlist" on the search page, the collection pane, the Movie and TV show ⋯ menus. Verify: tests.
+- [x] 2.4 The due check when the app opens and every hour, the toast with Show, the Torrents count in the sidebar and on the switch, marking seen. Verify: tests.
 
 ## 3. Integration
 
-- [ ] 3.1 Rust checks; `bun run lint`, `typecheck`, `test`, `format:check` in `ui/`; `openspec validate torrent-wishlist --strict`; `bun run shots` for `/torrents/wishlist` in both themes and the compact sizes; changelog lines and `bun run site:changelog`.
+- [x] 3.1 Rust checks; `bun run lint`, `typecheck`, `test`, `format:check` in `ui/`; `openspec validate torrent-wishlist --strict`; `bun run shots` for `/torrents/wishlist` in both themes and the compact sizes; changelog lines and `bun run site:changelog`.
