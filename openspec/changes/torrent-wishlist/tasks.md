@@ -1,7 +1,7 @@
 ## 1. Backend
 
-- [ ] 1.1 `cv-db`: migration 107 (`torrent_wishlist`, `torrent_wishlist_match`) and the `torrent_wishlist` repository (add or replace, list, update criteria, remove, record a check, store matches keeping dismissed ones out, mark seen, sent and dismissed, mark done, count new). Verify: repository unit tests, the migration tests.
-- [ ] 1.2 `cv-app` `torrents::wishlist`: criteria on a release and on a library copy, the done rule (movie, season, episode), the next episode, the check (due only or every entry, one at a time, the collecting sink), the list with done judged. Verify: unit tests for the criteria, defaults, next episode and done rule; a service test with fake sources for a check, dismissed releases and the 6-hour rule.
+- [x] 1.1 `cv-db`: migration 107 (`torrent_wishlist`, `torrent_wishlist_match`) and the `torrent_wishlist` repository (add or replace, list, update criteria, remove, record a check, store matches keeping dismissed ones out, mark seen, sent and dismissed, mark done, count new). Verify: repository unit tests, the migration tests.
+- [x] 1.2 `cv-app` `torrents::wishlist`: criteria on a release and on a library copy, the done rule (movie, season, episode), the next episode, the check (due only or every entry, one at a time, the collecting sink), the list with done judged. Verify: unit tests for the criteria, defaults, next episode and done rule; a service test with fake sources for a check, dismissed releases and the 6-hour rule.
 - [ ] 1.3 `cv-ipc`, `src-tauri`, `cv-web`: the `torrent_wishlist`, `torrent_wishlist_add`, `torrent_wishlist_update`, `torrent_wishlist_remove`, `torrent_wishlist_check`, `torrent_wishlist_match_state` and `torrent_wishlist_seen` commands with their DTOs; regenerate `ui/src/bindings.ts`. Verify: `cargo test -p cv-ipc -p cv-web -p cinevault-app`, clippy, fmt.
 
 ## 2. UI

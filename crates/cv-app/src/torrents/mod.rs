@@ -16,8 +16,10 @@ pub mod indexer_update;
 mod landing;
 mod library;
 mod title;
+pub mod wishlist;
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use cv_db::Database;
@@ -138,6 +140,8 @@ pub struct TorrentService {
     extra: Mutex<HashMap<String, Arc<dyn TorrentSource>>>,
     /// What the last search found out about each source.
     health: Mutex<HashMap<String, SourceHealth>>,
+    /// A Wishlist check is running.
+    wishlist_busy: AtomicBool,
 }
 
 /// How a source is doing, as Settings shows it.
@@ -240,6 +244,7 @@ impl TorrentService {
             episodes: Mutex::default(),
             extra: Mutex::default(),
             health: Mutex::default(),
+            wishlist_busy: AtomicBool::new(false),
         }
     }
 
