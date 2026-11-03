@@ -26,13 +26,14 @@
 - **Ratings side by side.** TMDB and IMDb with no key, plus Rotten Tomatoes, Metacritic, Letterboxd and Trakt with your own free OMDb or MDBList key.
 - **Search as you type.** Type in the search box and matching titles appear at once, grouped, with your recent searches and See all results. Punctuation, spacing, accents and small typos do not matter; messy release names still match, with a confidence score for every candidate.
 - **Library your way.** A poster grid with a size you choose, or a table with a Stage column whose columns you can move and resize.
-- **Copies of a movie.** If the same movie is in the library twice (a 4K and a 1080p download, say), the Copies filter lists them, Compare puts them side by side with the better value of each row marked, and Keep this one deletes the other the way Delete always does. Keep both leaves them alone, and Rename gives each its own name, such as `- 2160p` and `- 1080p`.
+- **Copies of a movie.** If the same movie is in the library twice (a 4K and a 1080p download, say), the Copies filter lists them, the Movie page has a tab for each copy, Compare puts them side by side with the better value of each row marked, and Keep this one deletes the other the way Delete always does. Keep both leaves them alone, and Rename gives each its own name, such as `- 2160p` and `- 1080p`.
 - **HDR details.** The Technical card shows the exact HDR format (Dolby Vision profile, HDR10+, HDR10, HLG), audio and file details read from the file.
 - **Drives with safe moves.** Free space per drive and Move to another drive: copy, verify, and only then do the originals go to the Recycle Bin (the Trash on Linux).
 - **Deleted files handled your way.** Delete sends a title to the Recycle Bin or Trash, a trash folder on each drive or a trash folder you choose, and old trash can be emptied automatically. Choosing "Delete permanently" there makes Delete erase a title, after a Yes or No that lists what goes.
 - **History and Undo.** Renames, moves, deletes, artwork and match changes are listed in History, each with Undo.
 - **Collections.** A collection appears on its own once you own two or more films of the same set.
-- **Torrent search hand-off.** Pick a title from the suggestions, search its releases from inside the app and see whether it is better than your copy; CineVault hands the one you pick to your own torrent app. You are responsible for what you download and share.
+- **Torrent search hand-off.** Pick a title from the suggestions, search its releases from inside the app and compare each with what you have, side by side; for a show, see which releases fill your missing episodes. CineVault hands the one you pick to your own torrent app. You are responsible for what you download and share.
+- **Wishlist.** Add a movie, a season or the next new episode of a show with the release you want (resolution, source, HDR, size, seeders). CineVault checks for it when it opens, shows new matches on Torrents with a count, and marks the title done once your library has it. It never sends anything by itself.
 - **Desktop feel.** Light and dark themes that follow the system, zoom from 80% to 150%, keyboard chords for everyday actions, and a `cinevault` command line.
 - **Naming styles.** One Style control in Settings › Naming (Clean, Detailed, Media-server safe) fills the movie folder, movie file and TV episode templates; edit any of them to make your own.
 - **Private by design.** You bring your own provider keys, kept in the OS credential store (the system keyring on Linux). No account, no telemetry.
@@ -60,7 +61,7 @@ The library, History and Undo go back to that day. Files renamed or moved after 
 
 ## Use it in a browser (beta)
 
-Use your library from any phone, tablet, TV or computer at home.
+Use your library from any phone, tablet, TV or computer at home. On a phone or tablet the layout fits the screen, and you can add CineVault to the home screen to open it like an app.
 
 **Easiest: Browser access in the desktop app** (Windows and Linux). Install CineVault as usual,
 open **Settings › Browser access**, set a password and switch it on. CineVault shows an address
@@ -138,8 +139,12 @@ command line exits with code 2 instead of writing behind the server's back.
     <td width="50%" valign="top"><img src=".github/assets/drives.png" alt="The Drives page with free space per drive and the titles of one drive, biggest first"><br><sub>Drives: free space and safe moves between drives</sub></td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><img src=".github/assets/torrents.png" alt="Torrent search with title suggestions under the search field"><br><sub>Torrents: pick the title from the suggestions</sub></td>
+    <td width="50%" valign="top"><img src=".github/assets/torrents.png" alt="Torrent search for a movie you have: a You have this card with your copy, and releases marked Better, Worse or Same as yours"><br><sub>Torrents: what you have, and whether each release is better</sub></td>
+    <td width="50%" valign="top"><img src=".github/assets/wishlist.png" alt="The Wishlist: titles with the release wanted, their matches with Send to torrent app and Dismiss, and Check now"><br><sub>Wishlist: say what you want, see when it turns up</sub></td>
+  </tr>
+  <tr>
     <td width="50%" valign="top"><img src=".github/assets/first-run.png" alt="The first-run setup asking where the movies and shows are"><br><sub>First run: add your folders, then your own provider keys</sub></td>
+    <td width="50%" valign="top"></td>
   </tr>
 </table>
 
