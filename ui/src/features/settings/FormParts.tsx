@@ -54,6 +54,8 @@ export function FormRow({ label, hint, labelId, align = "center", dim, children 
     <div
       className={cx(
         "grid grid-cols-[200px_minmax(0,1fr)] gap-5 border-t border-solid border-line-row px-4 py-3 first:border-t-0",
+        // A phone puts the control under its label.
+        "@max-[640px]/pane:grid-cols-1 @max-[640px]/pane:gap-2",
         align === "start" ? "items-start" : "items-center",
         dim && "text-text-disabled",
       )}

@@ -90,10 +90,10 @@ pub struct EpisodeInfo {
 /// One row of a show's episode list.
 #[derive(Debug, Clone)]
 pub(super) struct EpisodeRow {
-    season: u16,
-    episode: u16,
-    name: String,
-    air_date: Option<CalendarDate>,
+    pub(super) season: u16,
+    pub(super) episode: u16,
+    pub(super) name: String,
+    pub(super) air_date: Option<CalendarDate>,
 }
 
 pub(super) type EpisodeCache =
@@ -333,7 +333,7 @@ impl TorrentService {
             .map_err(|e| TorrentServiceError::Library(e.to_string()))?;
         // What the library holds is a nicety of the header: a read failure leaves it out.
         let holding = library_item.as_ref().and_then(|link| {
-            holding_of(&self.db, link).unwrap_or_else(|error| {
+            holding_of(&self.db, link, tmdb_id).unwrap_or_else(|error| {
                 tracing::debug!(%error, "library copy not read");
                 None
             })
@@ -385,8 +385,13 @@ impl TorrentService {
                 other => other,
             },
         };
-        let library_copy = library_copy(&self.db, details.library_item.as_ref(), scope)
-            .map_err(|e| TorrentServiceError::Library(e.to_string()))?;
+        let library_copy = library_copy(
+            &self.db,
+            details.library_item.as_ref(),
+            details.ids.tmdb,
+            scope,
+        )
+        .map_err(|e| TorrentServiceError::Library(e.to_string()))?;
         Ok(TorrentQuery {
             kind: details.kind,
             ids: details.ids.clone(),
@@ -402,7 +407,7 @@ impl TorrentService {
     }
 
     /// A show's episodes in aired order, kept for ten minutes.
-    async fn episode_rows(
+    pub(super) async fn episode_rows(
         &self,
         tmdb_id: u64,
     ) -> Result<Arc<Vec<EpisodeRow>>, TorrentServiceError> {

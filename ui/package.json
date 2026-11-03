@@ -2,7 +2,7 @@
   "name": "cinevault-ui",
   "private": true,
   "license": "Apache-2.0",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "perf:grid": "node scripts/perf-grid.mjs",
     "shots": "node scripts/shots.mjs",
+    "shots:compact": "node scripts/shots.mjs --all --sizes 390x844,820x1180",
     "check:facts": "node scripts/shots.mjs --routes /movies/1,/movies/2,/movies/3 --sizes 1366x768,1440x900 --visible .cv-plot,[data-fact=director],[data-spec=video],[data-spec=audio],[data-spec=file] && node scripts/shots.mjs --routes /movies/4 --sizes 1366x768,1440x900 --visible [data-fact=released],[data-spec=video],[data-spec=file]",
     "notices": "license-checker-rseidelsohn --production --json --excludePrivatePackages --out ../target/ui-licenses.json"
   },

@@ -1,5 +1,6 @@
 import { ContextMenu as RadixContextMenu } from "radix-ui";
-import type { KeyboardEvent, MouseEvent, ReactElement, ReactNode } from "react";
+import { useRef } from "react";
+import type { KeyboardEvent, MouseEvent, PointerEvent, ReactElement, ReactNode } from "react";
 
 import { cx } from "../lib/cx";
 import { isContextMenuKey, MenuKindContext, menuSurface, useFloatingContainer } from "./floating";
@@ -30,8 +31,8 @@ interface ContextMenuProps {
 
 /**
  * Our own right-click menu (spec desktop-interaction "Own right-click menus"). It opens at the
- * pointer on right-click, and on Shift+F10 or the menu key under the focused item; `onTarget`
- * runs first so an unselected item can be selected alone. Same floating surface, item sizes and
+ * pointer on right-click, on a touch long-press, and on Shift+F10 or the menu key under the
+ * focused item; `onTarget` runs first so an unselected item can be selected alone. Same floating surface, item sizes and
  * key hints as `Menu`; Esc and an outside click close it.
  */
 export function ContextMenu({
@@ -48,6 +49,18 @@ export function ContextMenu({
   const onContextMenu = (event: MouseEvent) => {
     if (disabled === true) return;
     if (event.target instanceof Element) onTarget?.(event.target);
+  };
+  // A touch long-press opens the menu without a `contextmenu` event on iOS: remember what the
+  // finger went down on, and target it when the menu opens.
+  const touched = useRef<Element | null>(null);
+  const onPointerDown = (event: PointerEvent) => {
+    touched.current =
+      event.pointerType !== "mouse" && event.target instanceof Element ? event.target : null;
+  };
+  const onOpen = (open: boolean) => {
+    if (open && touched.current !== null && disabled !== true) onTarget?.(touched.current);
+    touched.current = null;
+    onOpenChange?.(open);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -73,11 +86,12 @@ export function ContextMenu({
   };
 
   return (
-    <RadixContextMenu.Root onOpenChange={onOpenChange} modal>
+    <RadixContextMenu.Root onOpenChange={onOpen} modal>
       <RadixContextMenu.Trigger
         asChild
         disabled={disabled}
         onContextMenu={onContextMenu}
+        onPointerDown={onPointerDown}
         onKeyDown={onKeyDown}
       >
         {children}

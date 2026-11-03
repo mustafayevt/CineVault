@@ -29,6 +29,7 @@ export const shell = {
   "shell.page.history": "History",
   "shell.page.settings": "Settings",
   "shell.sidebar": "Main",
+  "shell.menu": "Menu",
   "shell.backHint": "Back (Alt+Left)",
   "shell.forwardHint": "Forward (Alt+Right)",
   "shell.collapse": "Collapse sidebar",

@@ -51,11 +51,15 @@ In the desktop app, the main window SHALL draw its own 38px title bar over the c
 - **THEN** the title-bar search and page header are shown without minimize, maximize or close controls
 
 ### Requirement: Sidebar destinations and counts
-The sidebar panel SHALL hold the brand mark with Back and Forward; the destinations Library, Scrape, Rename, Drives and Torrents; the Drives section with each drive's free space; and at its foot the progress card above the icon row History, Theme, Settings and collapse. Scrape and Rename SHALL show waiting counts as pills, Drives SHALL show "N low" in the warning tone, and a zero count SHALL show no pill. The active destination SHALL have a gold icon; title and picker pages count as the Library.
+The sidebar panel SHALL hold the brand mark with Back and Forward; the destinations Library, Scrape, Rename, Drives and Torrents; the Drives section with each drive's free space; and at its foot the progress card above the icon row History, Theme, Settings and collapse. Scrape and Rename SHALL show waiting counts as pills, Drives SHALL show "N low" in the warning tone, Torrents SHALL show the number of new Wishlist matches, and a zero count SHALL show no pill. The active destination SHALL have a gold icon; title and picker pages count as the Library.
 
 #### Scenario: Counts on the nav
 - **WHEN** 12 titles wait to be scraped and 71 renames are pending
 - **THEN** Scrape shows "12" and Rename shows "71" as pills
+
+#### Scenario: New Wishlist matches
+- **WHEN** a Wishlist check found 3 new matches that have not been looked at
+- **THEN** Torrents shows "3" as a pill, and the pill goes once the Wishlist is opened
 
 #### Scenario: Active page
 - **WHEN** the user is on the Rename page
@@ -164,11 +168,15 @@ A failed action SHALL be reported as an error toast that says what failed, on th
 - **THEN** a toast says "3 titles could not be scraped and stay in the list", and the three stay in the Scrape list
 
 ### Requirement: Legible at common screen sizes
-Every page SHALL show its content without clipped labels or horizontal page scrolling at 1366×768, 1440×900, 1920×1080 and 3840×2160, at 100%, 125% and 150% display scaling. Grids and tables SHALL use the full width of the content column, and reading text SHALL stay narrow enough to read.
+Every page SHALL show its content without clipped labels or horizontal page scrolling at 1366×768, 1440×900, 1920×1080 and 3840×2160, at 100%, 125% and 150% display scaling, and in the browser version also at 390×844 (a phone) and 820×1180 (a tablet). Grids and tables SHALL use the full width of the content column, and reading text SHALL stay narrow enough to read.
 
 #### Scenario: Small laptop screen
 - **WHEN** the app runs at 1366×768 with 125% scaling
 - **THEN** the Movie page header actions fit and no page scrolls horizontally
+
+#### Scenario: Phone
+- **WHEN** the browser version shows the Library, a Movie page or the Rename preview at 390×844
+- **THEN** no page scrolls horizontally and every action is reachable
 
 ### Requirement: App zoom
 In the desktop app, the app SHALL have its own zoom, Settings › Appearance › Size, in the steps 80, 90, 100, 110, 125 and 150 percent (100 by default, kept in `appearance.zoom`). Ctrl plus and Ctrl minus (⌘ on macOS) SHALL step it and Ctrl 0 SHALL reset it, applied as the native webview zoom; Ctrl+wheel and pinch SHALL NOT zoom. In a browser the browser's own zoom SHALL be used, the app zoom control SHALL NOT be shown, and Ctrl plus/minus SHALL be left to the browser.
@@ -221,3 +229,14 @@ While "Keep running in the tray when the window is closed" and Browser access ar
 #### Scenario: Turn off
 - **WHEN** the user turns it off
 - **THEN** the registration is removed and the next sign-in does not start CineVault
+
+### Requirement: Phone and tablet layout
+In the browser version, a window narrower than 1024px SHALL use the compact layout: the sidebar panel SHALL be hidden and open as a drawer from a menu button at the left of the title bar, the title bar SHALL hold the menu button, Back and a search field that fills the rest, and the frame SHALL keep clear of the notch and the home indicator. Choosing a page, a tap outside the drawer or Esc SHALL close the drawer. The desktop app SHALL keep its panel at every window size and zoom.
+
+#### Scenario: Open a page from the drawer
+- **WHEN** the browser version is open on a 390px-wide phone and the person taps the menu button, then Rename
+- **THEN** the drawer slides in with the same destinations, counts and drives as the sidebar, and choosing Rename opens the Rename page and closes the drawer
+
+#### Scenario: Wide window
+- **WHEN** the browser version is 1280px wide
+- **THEN** the sidebar panel shows at the left as on the desktop and there is no menu button

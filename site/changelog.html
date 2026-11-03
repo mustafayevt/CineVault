@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CineVault changelog</title>
-<meta name="description" content="What changed in each version of CineVault, from 1.4.0 on, in plain words.">
+<meta name="description" content="What changed in each version of CineVault, from 1.5.0 on, in plain words.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)">
@@ -16,7 +16,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="CineVault">
 <meta property="og:title" content="CineVault changelog">
-<meta property="og:description" content="What changed in each version of CineVault, from 1.4.0 on, in plain words.">
+<meta property="og:description" content="What changed in each version of CineVault, from 1.5.0 on, in plain words.">
 <meta property="og:url" content="https://mustafayevt.github.io/CineVault/changelog.html">
 <meta property="og:image" content="https://mustafayevt.github.io/CineVault/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -52,6 +52,31 @@
       <h1>What's new in CineVault</h1>
       <p class="section-lede">What changed in each version, newest first.</p>
     </header>
+    <article class="log-entry" id="v1.5.0">
+      <div class="log-meta"><h2>1.5.0</h2><time datetime="2026-11-03">3 November 2026</time></div>
+      <div class="log-body">
+<h3>Added</h3>
+<ul>
+<li>Browser mode: CineVault can be added to a phone's home screen (Safari › Share › Add to Home Screen on iPhone, Install app in Chrome on Android) and opens full screen with its own icon. You sign in once more inside the home-screen app.</li>
+<li>Browser mode on phones and tablets: below 1024px wide the sidebar opens as a drawer from the menu button at the top left, next to Back and the search, every page fits the width without scrolling sideways, buttons and menu items are bigger on touch screens, and a long press opens the menu that a right-click opens on a computer.</li>
+<li>Browser mode over HTTPS: CineVault starts faster from what it already downloaded, and says &quot;Can't reach CineVault&quot; with Try again when the server doesn't answer, instead of the browser's error page.</li>
+<li>Drives: a Refresh button next to &quot;Updated …&quot; reads every drive again at once, for example after copying files outside CineVault or plugging a drive in.</li>
+<li>Copies: the Movie page of a movie you have more than once shows a tab for each copy at the top of its Technical card (&quot;2160p DV&quot;, &quot;1080p&quot;), the best one marked. A tab switches the page to that copy: its file, NFO, Rename history, Play and Move. The Copies row at the end of the card offers Keep only this one, Delete this copy and Compare. It replaces the &quot;You have 2 copies · Compare&quot; line.</li>
+<li>Torrents: when you search a title you already have, a &quot;You have this&quot; card shows what you have: each copy of a movie (resolution, HDR, codec, audio, source, edition, size), or the seasons of a show and the episodes you're missing (&quot;You have S01–S02 · missing S02E04–E10&quot;). It replaces the thin &quot;Yours:&quot; line. Search anyway folds it into one line.</li>
+<li>Torrents: the Better, Same as yours and Worse tag on a release now says why when you point at it (&quot;Better: 2160p Dolby Vision vs your 1080p SDR&quot;), and clicking it opens Compare with yours: your copy and the release side by side, the differences marked, ending in a plain verdict like &quot;Better picture, better audio, 2.5× the size&quot;. The Latest releases details panel shows the same comparison for a movie you have.</li>
+<li>Torrents: an &quot;Only better than mine&quot; chip hides the releases that are no better than your copy. For a show, releases are tagged Fills a gap, In your library or Better, and a &quot;Fills a gap&quot; chip lists only the ones with episodes you're missing.</li>
+<li>Movie and show pages: the ⋯ menu has Find a better copy (movies) and Find missing episodes (shows), which open Torrents with the title picked and the matching chip on.</li>
+<li>Torrents: a Wishlist, next to Search at the top of the Torrents page. Add a movie, a season, an episode or &quot;the next new episode&quot; of a show with the kind of release you want: the lowest resolution, the sources (Remux, Blu-ray, WEB-DL, WEBRip), HDR only, a largest size and the fewest seeders. Add titles with Add on the Wishlist, from a torrent search, from a film of a collection you don't have, or from the ⋯ menu of a Movie or Show page.</li>
+<li>Torrents: CineVault checks the Wishlist when it opens and every hour while it stays open, each title at most every 6 hours, or at once with Check now. New releases that match show as a count on Torrents in the sidebar and as a toast, each with Send to torrent app and Dismiss. Nothing is sent without you. A title is marked done once your library has a copy that meets what you asked for.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Torrents: Compare with yours from a release's right-click menu sometimes closed again at once.</li>
+<li>Drives: clicking a drive in the sidebar now opens the Drives page on that drive, also when the page is already open, and the sidebar shows which drive is chosen.</li>
+<li>Rename no longer gives a downloaded info file (a plain-text <code>.nfo</code> about the video, named like it) the movie's NFO name. Before, CineVault could then never write its own NFO for that movie, and when the movie already had one, the info file could push it into the trash. Now a rename sets the info file aside with the other leftovers (Undo brings it back), so only CineVault's NFO stays with the title.</li>
+</ul>
+      </div>
+    </article>
     <article class="log-entry" id="v1.4.0">
       <div class="log-meta"><h2>1.4.0</h2><time datetime="2026-11-02">2 November 2026</time></div>
       <div class="log-body">

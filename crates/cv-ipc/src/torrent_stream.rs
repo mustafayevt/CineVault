@@ -29,7 +29,7 @@ use cv_torrent::model::{
     Hdr, MediaKind, Resolution, Scope, SkipReason, SourceError, SourceId, SourceKind, Support,
 };
 use cv_torrent::rank::{FlagKind, PackKind, Relevance, Upgrade};
-use cv_torrent::release::{Audio, Codec};
+use cv_torrent::release::{Audio, Codec, EpisodeSpan};
 use cv_torrent::search::{ResultRow, SearchSession, Sink, Summary};
 use cv_torrent::source::TorrentSource;
 use serde::{Deserialize, Serialize};
@@ -104,7 +104,7 @@ pub type CommandResult<T> = Result<T, TorrentCommandError>;
 pub struct TorrentState {
     pub(crate) service: Option<Arc<TorrentService>>,
     pub(crate) indexer: Option<Arc<cv_app::torrents::indexer::IndexerServiceManager>>,
-    artwork: Option<Arc<ArtworkService>>,
+    pub(crate) artwork: Option<Arc<ArtworkService>>,
     data_dir: Option<std::path::PathBuf>,
     /// The "Latest releases" feeds and their title lookups.
     feeds: Arc<crate::torrent_feed::FeedState>,
@@ -250,24 +250,73 @@ pub struct TorrentTitleDetailsDto {
     /// The genres as words.
     pub genres: Vec<String>,
     pub overview: Option<String>,
-    /// The copy of a movie the library holds.
-    pub library_copy: Option<TorrentLibraryCopyDto>,
+    /// Every copy of a movie the library holds, best first: releases are compared with the
+    /// first.
+    pub library_copies: Vec<TorrentLibraryCopyDto>,
     /// The episodes of a show the library holds, in aired order.
     pub held_episodes: Vec<TorrentEpisodeRefDto>,
+    /// The aired episodes of a show the library has no video of, in aired order.
+    pub missing_episodes: Vec<TorrentEpisodeRefDto>,
 }
 
-/// A movie's copy in the library: "1080p WEB-DL · 5.6 GB · <file name>".
+/// A movie's copy in the library: "2160p · DV · HEVC · TrueHD Atmos 7.1 · Remux · 58 GB".
 #[derive(Debug, Clone, PartialEq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TorrentLibraryCopyDto {
+    /// The library movie, as text.
+    pub item_id: String,
     /// `2160p`, `1080p`, `720p`, `480p` or `unknown` (media info not read yet).
     pub resolution: String,
     /// `Remux`, `BluRay`, `WEB-DL`, ... or none.
     pub source: Option<String>,
     /// `DV`, `HDR10+`, `HDR10` or `HLG`.
     pub hdr: Option<String>,
+    /// `HEVC`, `AVC`, `AV1` as the media info names it; none when not read.
+    pub codec: Option<String>,
+    /// The lead audio track: `TrueHD Atmos 7.1`; none when not read.
+    pub audio: Option<String>,
+    /// `Extended Edition`; none when the movie has no edition.
+    pub edition: Option<String>,
+    /// The languages of the audio tracks, ISO 639 codes as stored.
+    pub languages: Vec<String>,
     pub size: f64,
     pub file_name: String,
+}
+
+/// What a release's name covers of a show. A season pack has no episodes; the whole show has
+/// neither seasons nor episodes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TorrentEpisodeSpanDto {
+    pub first_season: Option<u16>,
+    pub last_season: Option<u16>,
+    /// The episodes of the one season covered, when the name gives them.
+    pub first_episode: Option<u16>,
+    pub last_episode: Option<u16>,
+}
+
+/// The span of a release name; none when the name gives no season or episode.
+pub fn episode_span_dto(span: EpisodeSpan) -> Option<TorrentEpisodeSpanDto> {
+    let dto = |seasons: Option<(u16, u16)>, episodes: Option<(u16, u16)>| TorrentEpisodeSpanDto {
+        first_season: seasons.map(|s| s.0),
+        last_season: seasons.map(|s| s.1),
+        first_episode: episodes.map(|e| e.0),
+        last_episode: episodes.map(|e| e.1),
+    };
+    match span {
+        EpisodeSpan::None => None,
+        EpisodeSpan::Single { season, episode } => {
+            Some(dto(Some((season, season)), Some((episode, episode))))
+        }
+        EpisodeSpan::Multi {
+            season,
+            first,
+            last,
+        } => Some(dto(Some((season, season)), Some((first, last)))),
+        EpisodeSpan::SeasonPack(season) => Some(dto(Some((season, season)), None)),
+        EpisodeSpan::SeasonRange { first, last } => Some(dto(Some((first, last)), None)),
+        EpisodeSpan::Complete => Some(dto(None, None)),
+    }
 }
 
 /// An episode by its numbers.
@@ -518,15 +567,20 @@ pub async fn torrent_title_details(
         POSTER_WAIT,
     )
     .await;
-    let (library_copy, held_episodes) = match &details.holding {
-        Some(LibraryHolding::Movie(copy)) => (Some(library_copy_dto(copy)), Vec::new()),
-        Some(LibraryHolding::Show(held)) => (
-            None,
-            held.iter()
-                .map(|&(season, episode)| TorrentEpisodeRefDto { season, episode })
-                .collect(),
+    let refs = |episodes: &[(u16, u16)]| -> Vec<TorrentEpisodeRefDto> {
+        episodes
+            .iter()
+            .map(|&(season, episode)| TorrentEpisodeRefDto { season, episode })
+            .collect()
+    };
+    let (library_copies, held_episodes, missing_episodes) = match &details.holding {
+        Some(LibraryHolding::Movie(copies)) => (
+            copies.iter().map(library_copy_dto).collect(),
+            Vec::new(),
+            Vec::new(),
         ),
-        None => (None, Vec::new()),
+        Some(LibraryHolding::Show(show)) => (Vec::new(), refs(&show.held), refs(&show.missing)),
+        None => (Vec::new(), Vec::new(), Vec::new()),
     };
     Ok(TorrentTitleDetailsDto {
         kind: kind_text(details.kind).to_owned(),
@@ -553,8 +607,9 @@ pub async fn torrent_title_details(
             .map(|value| (f64::from(value) * 10.0).round() / 10.0),
         genres: details.genres,
         overview: details.overview,
-        library_copy,
+        library_copies,
         held_episodes,
+        missing_episodes,
     })
 }
 
@@ -566,10 +621,16 @@ pub fn smaller_backdrop(url: &str) -> String {
 pub fn library_copy_dto(copy: &MovieCopy) -> TorrentLibraryCopyDto {
     #[allow(clippy::cast_precision_loss)]
     let size = copy.size_bytes as f64;
+    let text = |value: &str| (!value.is_empty()).then(|| value.to_owned());
     TorrentLibraryCopyDto {
+        item_id: copy.item.0.to_string(),
         resolution: resolution_text(copy.resolution).to_owned(),
         source: media_source_text(&copy.source, false),
         hdr: hdr_text(copy.hdr).map(str::to_owned),
+        codec: text(&copy.codec),
+        audio: text(&copy.audio),
+        edition: text(&copy.edition),
+        languages: copy.languages.clone(),
         size,
         file_name: copy.file_name.clone(),
     }
@@ -753,6 +814,8 @@ pub struct TorrentReleaseDto {
     pub audio: Option<String>,
     /// `episodes`, `season`, `seasons` or `complete` for a pack.
     pub pack: Option<String>,
+    /// What the name covers of a show; none for a movie.
+    pub episodes: Option<TorrentEpisodeSpanDto>,
     pub flags: Vec<FlagDto>,
     /// `better`, `same` or `worse` against the library copy; none when not in the library.
     pub upgrade: Option<String>,
@@ -894,6 +957,7 @@ pub fn release_dto(row: ResultRow) -> TorrentReleaseDto {
         hdr: hdr_text(parsed.hdr).map(str::to_owned),
         audio: audio_text(parsed.audio, parsed.channels.as_deref()),
         pack: assessment.pack.map(|p| pack_text(p).to_owned()),
+        episodes: episode_span_dto(parsed.span),
         flags: assessment
             .flags
             .iter()

@@ -7,6 +7,7 @@ import { FileSize } from "../../components/FileSize";
 import { Icon } from "../../components/Icon";
 import { QualityBadge } from "../../components/QualityBadge";
 import { Skeleton } from "../../components/Skeleton";
+import { StageBadge } from "../../components/StageBadge";
 import { StageTag } from "../../components/StageTag";
 import { Table } from "../../components/Table";
 import type { TableColumn, TableSort } from "../../components/Table";
@@ -20,6 +21,7 @@ import { LibraryColumnItems } from "./LibraryColumnItems";
 import {
   COLUMN_LABEL,
   COLUMN_SORT,
+  columnFits,
   columnOfField,
   DESCENDING_FIRST,
   SWITCHABLE_COLUMNS,
@@ -76,7 +78,9 @@ export function LibraryTable({
   onSort,
   hiddenColumns,
   onColumn,
+  fit = "wide",
 }: LibraryTableProps) {
+  const phone = fit === "phone";
   const preferOriginal = usePreferOriginalTitle();
   const format = useFormat();
   const { keys, version, total } = listing;
@@ -138,8 +142,10 @@ export function LibraryTable({
       {
         id: "stage",
         label: label("stage"),
-        // Wide enough for the tag ("Renamed", "Not matched") beside the label's sort arrow.
-        width: 140,
+        // Wide enough for the tag ("Renamed", "Not matched") beside the label's sort arrow. On a
+        // phone it is the glyph alone, at the end of the row, under a header with no words.
+        width: phone ? 52 : 140,
+        ...(phone ? { header: <span className="sr-only">{label("stage")}</span> } : {}),
         fixed: true,
         resizable: false,
         sortable: true,
@@ -150,6 +156,9 @@ export function LibraryTable({
           const stage = stageBadgeOf(card);
           const note = problemNote(card);
           const reason = problemReason(card);
+          if (phone) {
+            return <StageBadge stage={stage} {...(note === null ? {} : { label: note })} />;
+          }
           return (
             <StageTag
               stage={stage}
@@ -162,8 +171,9 @@ export function LibraryTable({
       {
         id: "title",
         label: label("title"),
-        width: 280,
-        minWidth: 160,
+        // Narrower panes start the title small and let it take whatever the other columns leave.
+        width: fit === "wide" ? 280 : phone ? 120 : 160,
+        minWidth: phone ? 100 : 160,
         grow: true,
         // Title stays first: it never moves and nothing takes its place.
         fixed: true,
@@ -189,6 +199,12 @@ export function LibraryTable({
                 )}
               </span>
               <span className="truncate font-(weight:--fw-500)">{name}</span>
+              {/* A phone has no Year column: the year follows the title. */}
+              {phone && yearText(row.card.year) !== "????" && (
+                <span className="shrink-0 text-text-muted tabular-nums">
+                  {yearText(row.card.year)}
+                </span>
+              )}
               {row.card.copies > 0 && (
                 <span
                   role="img"
@@ -199,7 +215,7 @@ export function LibraryTable({
                   {row.card.copies}
                 </span>
               )}
-              {note !== null && (
+              {note !== null && !phone && (
                 <span className="shrink-0 text-(length:--fs-12) text-warn">{note}</span>
               )}
             </span>
@@ -221,7 +237,9 @@ export function LibraryTable({
       {
         id: "quality",
         label: label("quality"),
-        width: 150,
+        width: phone ? 84 : 150,
+        // On a phone the header is the word alone: there is no room for the label's usual floor.
+        ...(phone ? { header: label("quality") } : {}),
         sortable: true,
         ...first("quality"),
         cell: (slot) => {
@@ -232,7 +250,7 @@ export function LibraryTable({
           return (
             <span className="flex items-center gap-1.5">
               <QualityBadge quality={tier} />
-              {card.hdr !== null && (
+              {card.hdr !== null && !phone && (
                 <span className="text-(length:--fs-12) text-text-muted">{card.hdr}</span>
               )}
             </span>
@@ -307,17 +325,26 @@ export function LibraryTable({
         cell: (slot) => dateCell(slot.row?.file_modified_ms),
       },
     ];
-    return defined.filter((column) => !hiddenColumns.includes(column.id));
-  }, [selection, keys.length, hiddenColumns, preferOriginal, format]);
+    if (phone) {
+      // A phone's list: the checkbox, the title with its year, the quality and the stage glyph.
+      const order = ["select", "title", "quality", "stage"];
+      return order.flatMap((id) => defined.filter((column) => column.id === id));
+    }
+    return defined.filter(
+      (column) =>
+        column.id === "select" ||
+        (columnFits(column.id as LibraryColumnId, fit) && !hiddenColumns.includes(column.id)),
+    );
+  }, [selection, keys.length, hiddenColumns, preferOriginal, format, fit, phone]);
 
   const chooser = useMemo(
     () =>
-      SWITCHABLE_COLUMNS.map((id) => ({
+      SWITCHABLE_COLUMNS.filter((id) => columnFits(id, fit)).map((id) => ({
         id,
         label: t(COLUMN_LABEL[id]),
         shown: !hiddenColumns.includes(id),
       })),
-    [hiddenColumns],
+    [hiddenColumns, fit],
   );
 
   const first = sort[0];
@@ -351,7 +378,8 @@ export function LibraryTable({
         rowKey={(slot) => slot.id}
         columns={columns}
         selection={selection}
-        storageKey={`library-${type}`}
+        // Widths and order dragged on a phone or a tablet are kept apart from the desktop's.
+        storageKey={fit === "wide" ? `library-${type}` : `library-${type}-${fit}`}
         sort={sorted}
         onSortChange={onSortChange}
         bottomRoom={bottomRoom}

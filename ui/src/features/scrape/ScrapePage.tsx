@@ -191,13 +191,13 @@ function ScrapeView({ queue, tab, onTab }: ScrapeViewProps) {
           skip();
         }
       }}
-      className="relative flex h-full min-h-0 flex-col outline-none"
+      className="relative flex h-full min-h-0 flex-col outline-none @max-[640px]/pane:overflow-y-auto"
     >
       <h1 className="sr-only">{t("scrapePage.region")}</h1>
-      <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6">
+      <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6 @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:px-4 @max-[640px]/pane:py-2">
         <span
           aria-hidden="true"
-          className="absolute right-6 bottom-0 left-6 h-px bg-line-section"
+          className="absolute right-6 bottom-0 left-6 h-px bg-line-section @max-[640px]/pane:right-4 @max-[640px]/pane:left-4"
         />
         <SegmentedControl<QueueTab>
           aria-label={t("scrapePage.tabs")}
@@ -232,8 +232,10 @@ function ScrapeView({ queue, tab, onTab }: ScrapeViewProps) {
       {everythingEmpty ? (
         <EmptyScrape />
       ) : (
-        <div className="flex min-h-0 flex-1">
-          <div className="flex w-[330px] shrink-0 flex-col border-r border-solid border-line-section">
+        // Narrow panes give the queue less room; on a phone it sits above the candidates and the
+        // whole page scrolls.
+        <div className="flex min-h-0 flex-1 @max-[640px]/pane:flex-none @max-[640px]/pane:flex-col">
+          <div className="flex w-[330px] shrink-0 flex-col border-r border-solid border-line-section @max-[860px]/pane:w-[260px] @max-[640px]/pane:h-[260px] @max-[640px]/pane:w-full @max-[640px]/pane:border-r-0 @max-[640px]/pane:border-b">
             {queue.error !== null ? (
               <div role="alert" className="flex flex-col items-start gap-2 px-6 py-3">
                 <p className="m-0 text-danger">{t("scrapePage.queue.loadFailed")}</p>
@@ -258,7 +260,7 @@ function ScrapeView({ queue, tab, onTab }: ScrapeViewProps) {
                 onKeyDown={(event) => {
                   if (selection.onKeyDown(event)) event.preventDefault();
                 }}
-                className="min-h-0 flex-1 overflow-auto px-6 py-3 outline-none"
+                className="min-h-0 flex-1 overflow-auto px-6 py-3 outline-none @max-[860px]/pane:px-3"
               >
                 <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
                   {items.map((item) => {

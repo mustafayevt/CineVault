@@ -8,6 +8,8 @@
 //!   naming choices, see [`stale_nfos`]), so another movie's `Other.nfo` in a shared folder or a
 //!   release note is never a candidate.
 //! * Writing refuses a target that exists and is foreign ([`NfoOwnership::may_overwrite`]).
+//! * A rename never carries a foreign file to an NFO name; it sets it aside in the trash folder
+//!   with the other leftovers (journaled, so Undo brings it back).
 //!
 //! Two kinds of existing file are overwritten although they have no title: an empty file (there is
 //! nothing to lose) and a **pointer** file, whose whole content is a URL or an ID such as
@@ -37,7 +39,7 @@ pub enum NfoOwnership {
     Managed,
     /// Only a URL or an ID.
     Pointer,
-    /// Anything else. Never overwritten, never deleted.
+    /// Anything else. Never overwritten; a rename sets it aside, never erases it.
     Foreign,
 }
 

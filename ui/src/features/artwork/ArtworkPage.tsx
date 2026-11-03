@@ -39,8 +39,11 @@ interface HeaderProps {
 /** The header of the artwork picker: the title's poster, what is picked and for whom, and Done. */
 function PickerHeader({ subject, onDone }: HeaderProps) {
   return (
-    <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6">
-      <span aria-hidden="true" className="absolute right-6 bottom-0 left-6 h-px bg-line-section" />
+    <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-6 @max-[640px]/pane:px-4">
+      <span
+        aria-hidden="true"
+        className="absolute right-6 bottom-0 left-6 h-px bg-line-section @max-[640px]/pane:right-4 @max-[640px]/pane:left-4"
+      />
       <HeaderPoster subject={subject} />
       <h1
         title={t("artworkPicker.title.tip")}

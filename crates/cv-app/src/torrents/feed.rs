@@ -2,6 +2,7 @@
 //! releases, and the library matched by title and year (no provider is asked) for the "In your
 //! library" and "Better than your copy" marks.
 
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -10,6 +11,7 @@ use cv_domain::{ItemKind, MediaSource};
 use cv_torrent::latest::{FeedKind, FeedSupport};
 use cv_torrent::model::{LibraryCopy, MediaKind, Resolution};
 use cv_torrent::query::match_key;
+use cv_torrent::rank::copy_rank;
 use cv_torrent::release::ParsedRelease;
 use cv_torrent::source::TorrentSource;
 
@@ -115,9 +117,13 @@ impl LibraryIndex {
                 (MediaKind::Movie, Some(held), Some(year)) => held.abs_diff(year) <= 1,
                 _ => true,
             })
-            .min_by_key(|entry| match (entry.year, parsed.year) {
-                (Some(held), Some(year)) => held.abs_diff(year),
-                _ => u16::MAX,
+            // Of copies that fit as well, the best is the one compared, as in the search.
+            .min_by_key(|entry| {
+                let fit = match (entry.year, parsed.year) {
+                    (Some(held), Some(year)) => held.abs_diff(year),
+                    _ => u16::MAX,
+                };
+                (fit, Reverse(entry.found.copy.as_ref().map(copy_rank)))
             })
             .map(|entry| &entry.found)
     }

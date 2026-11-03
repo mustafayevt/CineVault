@@ -10,8 +10,16 @@ import { cx } from "../../lib/cx";
 import { fullPath, conflictLine, displayPath, leafOf, rootText } from "./renameText";
 import { WordDiffText } from "./WordDiffText";
 
-/** The columns of the Rename list: the checkbox, the title, the names and the files link. */
-export const ROW_COLUMNS = "grid-cols-[34px_200px_minmax(0,1fr)_96px]";
+/**
+ * The columns of the Rename list: the checkbox, the title, the names and the files link. Below the
+ * desktop widths the names go under the title, across the row (`NAMES_NARROW`).
+ */
+export const ROW_COLUMNS =
+  "grid-cols-[34px_200px_minmax(0,1fr)_96px] @max-[860px]/pane:grid-cols-[34px_minmax(0,1fr)_auto]";
+
+/** Where the names sit on a narrow pane: the second line, under the title and the files link. */
+const NAMES_NARROW =
+  "@max-[860px]/pane:col-span-2 @max-[860px]/pane:col-start-2 @max-[860px]/pane:row-start-2";
 
 function Pair({
   icon,
@@ -29,7 +37,7 @@ function Pair({
   label?: string | undefined;
 }) {
   return (
-    <div className="grid grid-cols-[18px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 leading-[22px]">
+    <div className="grid grid-cols-[18px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 leading-[22px] @max-[860px]/pane:grid-cols-[18px_minmax(0,1fr)] @max-[860px]/pane:gap-y-0">
       <Icon icon={icon} size={14} className="text-text-muted" />
       <WordDiffText before={before} after={after} side="before" />
       <Icon
@@ -62,9 +70,9 @@ function FileList({ row }: { row: PreviewRowDto }) {
         return (
           <li
             key={`${file.from}:${index}`}
-            className="grid grid-cols-[minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 text-(length:--fs-12) leading-[21px]"
+            className="grid grid-cols-[minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 text-(length:--fs-12) leading-[21px] @max-[860px]/pane:grid-cols-[18px_minmax(0,1fr)] @max-[860px]/pane:gap-y-0"
           >
-            <span title={from} className="truncate text-text-muted">
+            <span title={from} className="truncate text-text-muted @max-[860px]/pane:col-span-2">
               {from}
             </span>
             <Icon icon={ArrowRight} size={14} className="text-text-muted" />
@@ -158,6 +166,7 @@ export function RenameRow({
       style={{ transform: `translateY(${top}px)` }}
       className={cx(
         "absolute top-0 left-0 grid w-full items-start border-b border-solid border-line-row px-6 py-[9px]",
+        "@max-[860px]/pane:gap-x-2 @max-[640px]/pane:px-4",
         ROW_COLUMNS,
         blocked && "bg-warn-tint",
         open && !blocked && "bg-surface-card",
@@ -186,7 +195,7 @@ export function RenameRow({
           </div>
         )}
       </div>
-      <div className="min-w-0 font-mono text-(length:--fs-12)">
+      <div className={cx("min-w-0 font-mono text-(length:--fs-12)", NAMES_NARROW)}>
         {held ? (
           <div
             title={row.note === "" ? t("renamePage.held") : row.note}
@@ -271,7 +280,7 @@ export function RenameRow({
           <div>{open ? <FileList row={row} /> : null}</div>
         </div>
       </div>
-      <div className="text-right text-(length:--fs-12) leading-[22px]">
+      <div className="text-right text-(length:--fs-12) leading-[22px] @max-[860px]/pane:col-start-3 @max-[860px]/pane:row-start-1">
         {held ? (
           <Button size="sm" disabled={reading} onClick={onReadNow}>
             {reading ? t("renamePage.held.reading") : t("renamePage.held.readNow")}

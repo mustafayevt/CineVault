@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, Image } from "lucide-react";
+import type { Ref } from "react";
 
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
@@ -11,6 +12,7 @@ import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
 import { CachedImage } from "../images/CachedImage";
+import { wishlistAddLink } from "../torrents/torrentsSearch";
 import { currentCollectionBackend } from "./collectionBackend";
 import type { CollectionPage } from "./collectionBackend";
 import type { LibraryRow } from "./libraryBackend";
@@ -36,6 +38,12 @@ function PosterBox({ poster, title, size, className }: PosterBoxProps) {
   );
 }
 
+/** The Wishlist editor for a film the library lacks, when its TMDB ID is known. */
+function wishLink(tmdbId: string | null): string | null {
+  const id = Number(tmdbId ?? "");
+  return Number.isInteger(id) && id > 0 ? wishlistAddLink({ kind: "movie", tmdbId: id }) : null;
+}
+
 /** "Alien 1979": what the torrent search starts from for a film the library lacks. */
 function searchText(title: string, year: number): string {
   return year > 0 ? `${title} ${year}` : title;
@@ -44,6 +52,7 @@ function searchText(title: string, year: number): string {
 interface CollectionPaneProps {
   /** The row of the collection in the list: its name, counts and size. */
   row: LibraryRow;
+  ref?: Ref<HTMLElement>;
 }
 
 /**
@@ -52,7 +61,7 @@ interface CollectionPaneProps {
  * 103.6 GB", its overview, and "Films in this set": owned films open their page, missing ones are
  * muted with Search torrents (spec library-browsing "Collections view").
  */
-export function CollectionPane({ row }: CollectionPaneProps) {
+export function CollectionPane({ row, ref }: CollectionPaneProps) {
   const navigate = useNavigate();
   const format = useFormat();
   const id = row.card.id;
@@ -75,8 +84,13 @@ export function CollectionPane({ row }: CollectionPaneProps) {
 
   return (
     <aside
+      ref={ref}
       aria-label={name}
-      className="flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-solid border-line-section bg-surface-card"
+      className={cx(
+        "flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-solid border-line-section bg-surface-card",
+        // A phone has no room beside the grid: the pane follows it, full width, in one scroll.
+        "@max-[860px]/pane:w-[320px] @max-[640px]/pane:w-full @max-[640px]/pane:overflow-y-visible @max-[640px]/pane:border-t @max-[640px]/pane:border-l-0",
+      )}
     >
       <div className="relative h-[150px] shrink-0 overflow-hidden bg-surface-window">
         {poster !== null && (
@@ -167,6 +181,18 @@ export function CollectionPane({ row }: CollectionPaneProps) {
                     >
                       {t("library.collections.searchTorrents")}
                     </Link>
+                    {wishLink(film.tmdb_id) === null ? null : (
+                      <a
+                        href={wishLink(film.tmdb_id) ?? undefined}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          void navigate({ href: wishLink(film.tmdb_id) ?? "/torrents/wishlist" });
+                        }}
+                        className="cv-link shrink-0 text-(length:--fs-12)"
+                      >
+                        {t("wishlist.add")}
+                      </a>
+                    )}
                   </li>
                 );
               }

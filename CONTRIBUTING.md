@@ -88,7 +88,7 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `build`, `ci`, `perf`
 
 ## Pull requests
 
-- Branch from `main` and keep the pull request focused on one topic.
+- Branch from `main` and keep the pull request focused on one topic. When a `release/<version>` branch is open, the maintainer may ask you to target it instead (see the Release train section in [AGENTS.md](AGENTS.md)).
 - Fill in the template: what and why, how it was checked, the linked issue and OpenSpec change.
 - Follow the conventions in [AGENTS.md](AGENTS.md): design tokens only in the UI, keyboard reachable controls, one verb per job (Scan, Scrape, Rename), data safety first (nothing is deleted without the user's choice, renames are undoable), and compatibility described as the Kodi, Jellyfin, Emby or MediaPortal formats without naming other media-manager apps.
 - Use only code you have the right to contribute. Contributions are licensed under the [Apache License 2.0](LICENSE), like the rest of the project.

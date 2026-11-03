@@ -16,8 +16,10 @@ pub mod indexer_update;
 mod landing;
 mod library;
 mod title;
+pub mod wishlist;
 
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use cv_db::Database;
@@ -39,7 +41,8 @@ use cv_torrent::{TorrentError, model::TorrentQuery};
 pub use feed::{LibraryIndex, LibraryMatch};
 pub use landing::{Landing, LandingTitle, STRIP_LENGTH, landing_of};
 pub use library::{
-    LibraryHolding, LibraryLink, MovieCopy, copy_of, hdr_of, movie_copy_of, resolution_of,
+    LibraryHolding, LibraryLink, MovieCopy, ShowHolding, copy_of, hdr_of, movie_copy_of,
+    resolution_of,
 };
 pub use title::{EpisodeInfo, SeasonInfo, TitleDetails, TitleHit};
 
@@ -137,6 +140,8 @@ pub struct TorrentService {
     extra: Mutex<HashMap<String, Arc<dyn TorrentSource>>>,
     /// What the last search found out about each source.
     health: Mutex<HashMap<String, SourceHealth>>,
+    /// A Wishlist check is running.
+    wishlist_busy: AtomicBool,
 }
 
 /// How a source is doing, as Settings shows it.
@@ -239,6 +244,7 @@ impl TorrentService {
             episodes: Mutex::default(),
             extra: Mutex::default(),
             health: Mutex::default(),
+            wishlist_busy: AtomicBool::new(false),
         }
     }
 

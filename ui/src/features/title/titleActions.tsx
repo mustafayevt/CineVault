@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { FileText } from "lucide-react";
+import { BookmarkPlus, Download, FileText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo } from "react";
 
@@ -8,6 +8,7 @@ import { requestDelete } from "../delete/deleteActions";
 import { filesStateOf, playBlockedFor } from "../detail/filesState";
 import { useOpenFolder } from "../detail/useOpenFolder";
 import { shortLabel, TITLE_ACTIONS } from "../library/titleActions";
+import { torrentsLink, wishlistAddLink } from "../torrents/torrentsSearch";
 import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { openMoveTo } from "../move-to/moveToStore";
@@ -18,7 +19,15 @@ import { removeTitlesFromLibrary } from "./removeTitles";
 export type HeaderActionId = "play" | "scrape" | "rename" | "move" | "open-folder" | "artwork";
 /** What the ⋯ menu holds. */
 export type MenuActionId =
-  "edit" | "show-nfo" | "rewrite-nfo" | "reload-media-info" | "remove" | "ignore" | "delete";
+  | "edit"
+  | "show-nfo"
+  | "rewrite-nfo"
+  | "reload-media-info"
+  | "find-torrents"
+  | "wishlist"
+  | "remove"
+  | "ignore"
+  | "delete";
 
 export interface TitleAction<Id extends string> {
   id: Id;
@@ -45,6 +54,8 @@ export interface TitleActionsInput {
   playId: string | null;
   /** Opens the NFO text in the page. */
   onShowNfo: () => void;
+  /** The title's TMDB ID, for "Find a better copy" or "Find missing episodes"; none leaves it out. */
+  tmdbId?: number | null;
 }
 
 /**
@@ -54,7 +65,7 @@ export interface TitleActionsInput {
  * the one list in `features/library/titleActions.ts`, which the Library's selection bar and
  * right-click menu read too.  */
 export function useTitleActions(input: TitleActionsInput): TitleActions {
-  const { id, kind, title, folder, availability, playId, onShowNfo } = input;
+  const { id, kind, title, folder, availability, playId, onShowNfo, tmdbId = null } = input;
   const navigate = useNavigate();
   const openFolder = useOpenFolder(title);
 
@@ -134,6 +145,33 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
           icon: TITLE_ACTIONS["reload-media-info"].icon,
           onSelect: () => void reloadMediaInfo([id]),
         },
+        ...(tmdbId === null
+          ? []
+          : [
+              {
+                // Torrents with the title picked and the matching library chip on.
+                id: "find-torrents" as const,
+                label: t(kind === "movie" ? "title.menu.findBetter" : "title.menu.findMissing"),
+                icon: Download,
+                onSelect: () =>
+                  void navigate({
+                    href: torrentsLink({
+                      title: `${kind}:${tmdbId}`,
+                      only: kind === "movie" ? "better" : "gaps",
+                    }),
+                  }),
+              },
+              {
+                // The Wishlist with the editor filled in for the title.
+                id: "wishlist" as const,
+                label: t("wishlist.add"),
+                icon: BookmarkPlus,
+                onSelect: () =>
+                  void navigate({
+                    href: wishlistAddLink({ kind: kind === "movie" ? "movie" : "show", tmdbId }),
+                  }),
+              },
+            ]),
         {
           id: "remove",
           label: shortLabel("remove"),
@@ -156,5 +194,5 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
         },
       ],
     };
-  }, [id, kind, title, folder, availability, playId, onShowNfo, navigate, openFolder]);
+  }, [id, kind, title, folder, availability, playId, onShowNfo, tmdbId, navigate, openFolder]);
 }

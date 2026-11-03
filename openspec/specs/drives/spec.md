@@ -6,7 +6,7 @@ Shows where the library lives on disk and moves titles between library folders s
 ## Requirements
 
 ### Requirement: Drives in the sidebar
-The sidebar SHALL list each drive that holds a library folder with its name, a thin used-space bar and "<free> free". A low drive SHALL show its bar and note in the warning colour; an offline drive SHALL be greyed with "Offline". The tooltip SHALL read "<name> · <free> free of <total>". Clicking a drive SHALL open it on the Drives page, and the Drives item SHALL show a warning pill "N low" while any drive is low.
+The sidebar SHALL list each drive that holds a library folder with its name, a thin used-space bar and "<free> free". A low drive SHALL show its bar and note in the warning colour; an offline drive SHALL be greyed with "Offline". The tooltip SHALL read "<name> · <free> free of <total>". Clicking a drive SHALL open the Drives page with that drive chosen, also when the Drives page is already open, and while the Drives page is open the sidebar SHALL show the chosen drive as selected. The Drives item SHALL show a warning pill "N low" while any drive is low.
 
 #### Scenario: Low drive
 - **WHEN** drive C: has 41 GB free of 931 GB
@@ -15,6 +15,14 @@ The sidebar SHALL list each drive that holds a library folder with its name, a t
 #### Scenario: Offline drive
 - **WHEN** the network drive holding `Z:\Shows` does not answer
 - **THEN** the sidebar shows that drive greyed with "Offline"
+
+#### Scenario: Clicking a sidebar drive chooses it
+- **WHEN** the Library is open and the person clicks "D: Media" in the sidebar
+- **THEN** the Drives page opens with the D: card chosen and the titles of D: on the right, and the sidebar shows D: as selected
+
+#### Scenario: Sidebar and cards agree
+- **WHEN** the Drives page shows D: and the person clicks "E: Archive" in the sidebar, then chooses the D: card
+- **THEN** the page first shows E: with E: selected in the sidebar, then D: with D: selected in the sidebar, and Back returns to E:
 
 ### Requirement: Which drive a folder is on
 A library folder SHALL belong to the volume that holds it: a Windows drive letter, a network share, a macOS mount point or a Linux mount point (such as `/media/<user>/<name>`, `/run/media/<user>/<name>`, `/mnt/<name>` or `/`). On Linux the mount point of a folder below `/media`, `/run/media` or `/mnt` SHALL be the deepest folder from `/media/<name>`, `/run/media/<user>` or `/mnt/<name>` down to `/media/<user>/<name>`, `/run/media/<user>/<name>` or `/mnt/<name>` that the system's mount list names, and that usual mount point when the list names none of them. A folder on a share connected by CineVault SHALL belong to that share, named like `\\nas\movies`, wherever the share is mounted. Two folders on one volume SHALL be one drive with two folders. A Linux drive with no volume label SHALL be named after its mount point's last part. A drive SHALL be online when at least one of its library folders answers the health check, and every folder that answers SHALL record when it was last seen. On Linux a library folder SHALL NOT answer while its mount point exists but is not mounted (the drive is unmounted).
@@ -62,14 +70,18 @@ The Drives page SHALL show a card per drive holding a library folder: the drive 
 - **THEN** its card is greyed, reads "Offline · last seen 2 days ago", still lists its folders, and its titles stay in the library
 
 ### Requirement: Drives page header
-The Drives page header SHALL say how many drives there are, how many are offline, and when the numbers were last read. With no library folder the page SHALL say "No drives to show yet" with "Open Settings".
+The Drives page header SHALL say how many drives there are, how many are offline, and when the numbers were last read, with a Refresh button that reads every drive again at once. While it reads, the button SHALL show that it is working and SHALL NOT start a second read. With no library folder the page SHALL say "No drives to show yet" with "Open Settings".
 
 #### Scenario: One drive offline
 - **WHEN** four drives hold library folders and one does not answer
 - **THEN** the header reads "4 drives · 1 offline" with "Updated just now"
 
+#### Scenario: Refresh after copying files
+- **WHEN** the header says "Updated 2 minutes ago", 5 GB were copied onto D: outside CineVault, and the person clicks Refresh
+- **THEN** the free space of D: shows 5 GB less on the card and in the sidebar, and the header says "Updated just now"
+
 ### Requirement: Space numbers stay current
-Space numbers SHALL be read again when the Drives page opens, when the window comes back to the front, after a scan, move or delete changes files (announced at most once in ten seconds), when a drive comes or goes, and every minute while the app is in front. Reading space SHALL NOT wake network drives more often than that.
+Space numbers SHALL be read again when the Drives page opens, when the window comes back to the front, after a scan, move or delete changes files (announced at most once in ten seconds), when a drive comes or goes, every minute while the app is in front, and when the person clicks Refresh. Automatic reads SHALL NOT wake network drives more often than that.
 
 #### Scenario: After a move
 - **WHEN** a move of 198.7 GB from D: to E: finishes

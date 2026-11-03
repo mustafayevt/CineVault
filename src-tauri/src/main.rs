@@ -64,6 +64,7 @@ mod tools_ipc;
 mod torrent_indexer_ipc;
 mod torrent_ipc;
 mod torrent_stream_ipc;
+mod torrent_wishlist_ipc;
 mod tv_detail_ipc;
 mod updates_ipc;
 

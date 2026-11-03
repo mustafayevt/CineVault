@@ -45,6 +45,11 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser, ...globals.vitest } },
   },
   {
+    // The service worker runs in its own scope, not in a window.
+    files: ["public/sw.js"],
+    languageOptions: { globals: { ...globals.serviceworker } },
+  },
+  {
     files: ["*.config.{js,ts}", "scripts/**/*.mjs"],
     languageOptions: { globals: { ...globals.node } },
   },

@@ -511,18 +511,54 @@ fn a_title_hit_becomes_a_dto_with_its_poster_key() {
 #[test]
 fn a_movie_copy_becomes_the_header_words() {
     let copy = MovieCopy {
+        item: cv_domain::ItemId(42),
         resolution: Resolution::R1080,
         source: cv_domain::MediaSource::WebDl,
         hdr: Hdr::None,
+        codec: "HEVC".into(),
+        audio: "E-AC-3 5.1".into(),
+        edition: String::new(),
+        languages: vec!["en".into(), "fr".into()],
         size_bytes: 5_600_000_000,
         file_name: "Blade.Runner.2049.2017.1080p.WEB-DL.mkv".into(),
     };
     let dto = library_copy_dto(&copy);
+    assert_eq!(dto.item_id, "42");
     assert_eq!(dto.resolution, "1080p");
     assert_eq!(dto.source.as_deref(), Some("WEB-DL"));
     assert_eq!(dto.hdr, None);
+    assert_eq!(dto.codec.as_deref(), Some("HEVC"));
+    assert_eq!(dto.audio.as_deref(), Some("E-AC-3 5.1"));
+    assert_eq!(dto.edition, None, "no edition");
+    assert_eq!(dto.languages, ["en", "fr"]);
     assert!((dto.size - 5.6e9).abs() < 1.0);
     assert_eq!(dto.file_name, "Blade.Runner.2049.2017.1080p.WEB-DL.mkv");
+}
+
+#[test]
+fn a_release_name_gives_its_episode_span() {
+    use cv_torrent::release::EpisodeSpan;
+    let span = episode_span_dto;
+    assert_eq!(span(EpisodeSpan::None), None);
+    let single = span(EpisodeSpan::Single {
+        season: 2,
+        episode: 5,
+    })
+    .expect("a span");
+    assert_eq!(
+        (single.first_season, single.last_season),
+        (Some(2), Some(2))
+    );
+    assert_eq!(
+        (single.first_episode, single.last_episode),
+        (Some(5), Some(5))
+    );
+    let pack = span(EpisodeSpan::SeasonPack(4)).expect("a span");
+    assert_eq!((pack.first_season, pack.first_episode), (Some(4), None));
+    let range = span(EpisodeSpan::SeasonRange { first: 1, last: 3 }).expect("a span");
+    assert_eq!((range.first_season, range.last_season), (Some(1), Some(3)));
+    let all = span(EpisodeSpan::Complete).expect("a span");
+    assert_eq!((all.first_season, all.last_episode), (None, None));
 }
 
 #[test]

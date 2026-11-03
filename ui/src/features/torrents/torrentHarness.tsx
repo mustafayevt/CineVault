@@ -17,7 +17,8 @@ import { forgetOwnJackett } from "./useOwnJackett";
 import { TorrentsPage } from "./TorrentsPage";
 import { createSyntheticTorrentBackend } from "./syntheticTorrents";
 import type { SyntheticTorrentBackend, SyntheticTorrentOptions } from "./syntheticTorrents";
-import { validateTorrentsSearch } from "./torrentsSearch";
+import { validateTorrentsSearch, validateWishlistSearch } from "./torrentsSearch";
+import { WishlistPage } from "./WishlistPage";
 
 /** What a spied transport was started with. */
 export interface Started {
@@ -106,8 +107,14 @@ export async function renderTorrents(
     validateSearch: validateTorrentsSearch,
     component: TorrentsPage,
   });
+  const wishlist = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/torrents/wishlist",
+    validateSearch: validateWishlistSearch,
+    component: WishlistPage,
+  });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([route]),
+    routeTree: rootRoute.addChildren([route, wishlist]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   await router.load();
@@ -116,7 +123,9 @@ export async function renderTorrents(
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
-  await screen.findByTestId("torrents-page");
+  await screen.findByTestId(
+    path.startsWith("/torrents/wishlist") ? "wishlist-page" : "torrents-page",
+  );
   return { ...view, router, backend, client };
 }
 
@@ -142,6 +151,7 @@ export function release(overrides: Partial<TorrentRelease> = {}): TorrentRelease
     hdr: "DV",
     audio: "Atmos",
     pack: null,
+    episodes: null,
     flags: [],
     upgrade: null,
     matching: true,

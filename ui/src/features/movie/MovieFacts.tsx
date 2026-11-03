@@ -103,7 +103,8 @@ function movieFacts(detail: MovieDetail, format: ReturnType<typeof useFormat>): 
 
 /**
  * The facts of the Movie page: a four-column list (110px label, value, 110px label, value) with
- * 9px between rows. A title without a value for a fact leaves the fact out.
+ * 9px between rows; one label/value pair per row on a phone-wide pane. A title without a value for
+ * a fact leaves the fact out.
  */
 export function MovieFacts({
   detail,
@@ -115,7 +116,7 @@ export function MovieFacts({
   const facts = movieFacts(detail, format);
   if (facts.length === 0) return null;
   return (
-    <dl className="m-0 grid grid-cols-[110px_minmax(0,1fr)_110px_minmax(0,1fr)] gap-x-3 gap-y-[9px]">
+    <dl className="m-0 grid grid-cols-[110px_minmax(0,1fr)_110px_minmax(0,1fr)] gap-x-3 gap-y-[9px] @max-[640px]/pane:grid-cols-[96px_minmax(0,1fr)]">
       {facts.map((fact) => (
         <div key={fact.id} className="contents">
           <dt className="text-text-muted">{fact.label}</dt>

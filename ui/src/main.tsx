@@ -23,11 +23,15 @@ import { createRoot } from "react-dom/client";
 import { FolderPickerHost } from "./features/pickers/FolderPickerHost";
 import { queryClient } from "./queryClient";
 import { applyBootZoom } from "./features/settings/zoom";
+import { registerServiceWorker } from "./lib/serviceWorker";
 import { router } from "./router";
 import "./styles/index.css";
 
 // The last session's zoom, before the first screen is drawn.
 applyBootZoom();
+
+// The browser version over HTTPS starts from its stored build files and says when it is offline.
+registerServiceWorker();
 
 const container = document.getElementById("root");
 if (!container) {

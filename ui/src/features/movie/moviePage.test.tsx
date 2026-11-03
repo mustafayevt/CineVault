@@ -65,6 +65,11 @@ function renderMovie(path = `/movies/${SYNTHETIC_MOVIE_ID}`): Rendered {
     createRoute({ getParentRoute: () => root, path: "/rename", component: stub("Rename page") }),
     createRoute({ getParentRoute: () => root, path: "/artwork", component: stub("Artwork page") }),
     createRoute({ getParentRoute: () => root, path: "/library", component: stub("Library page") }),
+    createRoute({
+      getParentRoute: () => root,
+      path: "/torrents",
+      component: stub("Torrents page"),
+    }),
   ];
   const router = createRouter({
     routeTree: root.addChildren(routes),
@@ -177,6 +182,36 @@ describe("the Movie page header", () => {
   });
 });
 
+describe("the Movie page on a narrow pane", () => {
+  it("keeps the desktop poster width as a variable the phone layout can override", async () => {
+    renderMovie();
+    const poster = await screen.findByTestId("title-poster");
+    expect(poster.style.getPropertyValue("--poster-w")).toBe("172px");
+    expect(poster.className).toContain("@max-[640px]/pane:w-[132px]");
+  });
+
+  it("puts the Technical card after the facts and before the cast in reading order", async () => {
+    renderMovie();
+    const cast = (await screen.findAllByTestId("cast-person"))[0];
+    const technical = document.querySelector("[data-tech-toggle]");
+    const facts = document.querySelector('[data-fact="director"]');
+    expect(cast).toBeDefined();
+    expect(technical).not.toBeNull();
+    expect(facts).not.toBeNull();
+    const follows = (a: Node, b: Node) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(follows(facts as Node, technical as Node)).toBe(true);
+    expect(follows(technical as Node, cast as Node)).toBe(true);
+  });
+
+  it("lets the header actions wrap so Play stays first on a phone", async () => {
+    renderMovie();
+    const toolbar = await screen.findByRole("toolbar", { name: /actions/i });
+    expect(toolbar.className).toContain("@max-[860px]/pane:flex-wrap");
+    expect(toolbar.querySelector("button")).toHaveAttribute("data-action", "play");
+  });
+});
+
 describe("the Movie page artwork buttons", () => {
   it("opens the picker on the poster from the poster's floating button, reachable by keyboard", async () => {
     const user = userEvent.setup();
@@ -229,6 +264,32 @@ describe("the Movie page artwork buttons", () => {
       "Rewrite NFO",
       "Reload media info",
     ]);
+  });
+
+  it("offers Find a better copy, which opens Torrents with the title and the chip on", async () => {
+    const user = userEvent.setup();
+    const { router } = renderMovie();
+    await user.click(await screen.findByRole("button", { name: /More actions/ }));
+    const names = screen.getAllByRole("menuitem").map((item) => item.textContent);
+    expect(names.indexOf("Find a better copy")).toBe(names.indexOf("Reload media info") + 1);
+    expect(names.indexOf("Add to Wishlist")).toBe(names.indexOf("Find a better copy") + 1);
+    expect(names.indexOf("Remove from library (keep files)")).toBe(
+      names.indexOf("Add to Wishlist") + 1,
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Find a better copy" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/torrents"));
+    const search = decodeURIComponent(router.state.location.searchStr);
+    expect(search).toContain("title=movie:693134");
+    expect(search).toContain("only=better");
+  });
+
+  it("offers Add to Wishlist, which opens the Wishlist with the editor for the movie", async () => {
+    const user = userEvent.setup();
+    const { router } = renderMovie();
+    await user.click(await screen.findByRole("button", { name: /More actions/ }));
+    await user.click(screen.getByRole("menuitem", { name: "Add to Wishlist" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/torrents/wishlist"));
+    expect(decodeURIComponent(router.state.location.searchStr)).toContain("add=movie:693134");
   });
 });
 

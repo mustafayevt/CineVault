@@ -41,6 +41,8 @@ interface SpotlightProps {
   openLibrary: (query: string, type?: "collections") => void;
   /** The clear button: empties the field and, when the address held a search, the address too. */
   onClear: () => void;
+  /** The compact layout: the field fills the bar, with no shortcut hint (phones have no keys). */
+  compact?: boolean;
 }
 
 /** The stage of a title as a tag: "Scraped", or its problem ("Not matched"). */
@@ -62,6 +64,7 @@ export function SpotlightSearch({
   fieldAttributes,
   openLibrary,
   onClear,
+  compact = false,
 }: SpotlightProps) {
   const navigate = useNavigate();
   const preferOriginal = usePreferOriginalTitle();
@@ -273,7 +276,7 @@ export function SpotlightSearch({
     <form
       ref={setAnchor}
       role="search"
-      className="flex h-[38px] items-center"
+      className={compact ? "flex h-full min-w-0 flex-1 items-center" : "flex h-[38px] items-center"}
       onSubmit={(event) => {
         event.preventDefault();
         combobox.setOpen(false);
@@ -285,7 +288,7 @@ export function SpotlightSearch({
         {...fieldProps}
         aria-label={t("shell.search.label")}
         placeholder={t("shell.search.placeholder")}
-        shortcut={shortcut}
+        {...(compact ? {} : { shortcut })}
         value={text}
         onChange={(event) => {
           setText(event.target.value);
@@ -300,8 +303,8 @@ export function SpotlightSearch({
           combobox.setOpen(true);
         }}
         clearLabel={t("shell.search.clear")}
-        className="w-[440px] min-w-[200px] max-w-[40vw]"
-        boxClassName="h-[30px]!"
+        className={compact ? "w-full min-w-0" : "w-[440px] min-w-[200px] max-w-[40vw]"}
+        boxClassName={compact ? "h-(--h-field)!" : "h-[30px]!"}
       />
       <SuggestPanel
         combobox={combobox}

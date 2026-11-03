@@ -54,6 +54,7 @@ export function PosterGrid({
   empty,
   onKey,
   onColumns,
+  fit = "wide",
 }: PosterGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -69,7 +70,9 @@ export function PosterGrid({
     return () => observer.disconnect();
   }, []);
 
-  const posterSize = useLibraryStore((store) => store.posterSize);
+  const chosenSize = useLibraryStore((store) => store.posterSize);
+  // A phone has no poster size control: two posters across, whatever the desktop chose.
+  const posterSize = fit === "phone" ? "m" : chosenSize;
   const { columns, cellWidth, rowHeight } = gridGeometry(width, POSTER_SIZES[posterSize]);
   const total = listing.total;
   const rowCount = Math.ceil(total / columns);

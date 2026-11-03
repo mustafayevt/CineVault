@@ -47,6 +47,8 @@
 //! - [`torrent_indexers`]: the indexers of the managed indexer service and how the last check left them.
 //! - [`torrent_landing`]: the library movies whose copy could be better and the newest additions,
 //!   for the Torrent search landing.
+//! - [`torrent_wishlist`]: the titles on the torrent Wishlist with their criteria, and the releases
+//!   the checks found for them.
 //! - [`watched`]: watched state and play counts of movies and episodes, with show and season expansion.
 //! - [`history`]: the lasting record of renames, moves, deletes, artwork and match changes, with
 //!   their titles, for the History page and its Undo.
@@ -93,6 +95,7 @@ pub mod step_outcome;
 pub mod table_facts;
 pub mod torrent_indexers;
 pub mod torrent_landing;
+pub mod torrent_wishlist;
 pub mod watched;
 
 #[cfg(test)]

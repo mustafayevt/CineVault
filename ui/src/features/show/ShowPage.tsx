@@ -21,6 +21,7 @@ import { RatingStrip } from "../title/RatingStrip";
 import { TitleActionBar } from "../title/TitleActionBar";
 import { TitleHeader } from "../title/TitleHeader";
 import { useTitleActions } from "../title/titleActions";
+import { tmdbIdOf } from "../torrents/torrentsSearch";
 import { currentTvBackend } from "../tv/tvBackend";
 import type { ShowDetail } from "../tv/tvBackend";
 import { showMetaLine } from "../tv/tvFormat";
@@ -128,6 +129,7 @@ function ShowView({ detail }: { detail: ShowDetail }) {
     availability: detail.availability,
     playId: play?.id ?? null,
     onShowNfo: showNfo,
+    tmdbId: tmdbIdOf(detail.ids),
   });
   const filesState = filesStateOf(detail.availability);
   const status =

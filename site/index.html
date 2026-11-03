@@ -55,13 +55,13 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="pill">New</span> Version <span data-version>1.1.0</span> for Windows and Linux</p>
+        <p class="eyebrow"><span class="pill">New</span> Version <span data-version>1.5.0</span> for Windows and Linux</p>
         <h1 id="hero-title">Every title<br>in its place.</h1>
         <p class="lede">A fast desktop library manager for your movies and TV shows. CineVault reads your folders, fills in details, ratings and artwork, writes complete NFO files for Kodi, Jellyfin and Emby, and tidies every name, with Undo for all of it.</p>
         <div class="cta">
           <a class="btn btn-lg" data-dl href="https://github.com/mustafayevt/CineVault/releases/latest/download/CineVault-setup-x64.exe">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75v11.5M7.25 10.5 12 15.25l4.75-4.75M4.75 19.25h14.5"/></svg>
-            <span class="btn-text"><span data-dl-label>Download for Windows</span><small data-dl-note>Version <span data-version>1.1.0</span>, <span data-size>18.5 MB</span></small></span>
+            <span class="btn-text"><span data-dl-label>Download for Windows</span><small data-dl-note>Version <span data-version>1.5.0</span>, <span data-size>18.5 MB</span></small></span>
           </a>
           <a class="btn btn-quiet btn-lg" href="#flow">See how it works</a>
         </div>
@@ -280,9 +280,10 @@
         <div class="feature-copy">
           <p class="kicker">Torrent search</p>
           <h2 id="f-torrents">Find a better copy</h2>
-          <p>Search a movie or a show from inside the app: type a title and pick it from the suggestions, then filter by resolution and see at once whether each release is the Same as, Better or Worse than the copy you own. CineVault only hands the release you pick to your own torrent app.</p>
+          <p>Search a movie or a show from inside the app: type a title and pick it from the suggestions. When you already have it, a card shows your copy, and each release says whether it is Better, Worse or the Same as yours, and why, side by side. CineVault only hands the release you pick to your own torrent app.</p>
           <ul class="facts">
             <li>Results with quality, size, seeders, source and age</li>
+            <li>Only better than mine, or for a show only the releases that fill a gap</li>
             <li>Search a whole show, one season or one episode</li>
           </ul>
           <p class="note">A short notice appears on your first visit: You are responsible for what you download and share.</p>
@@ -290,13 +291,34 @@
         <figure class="window reveal">
           <picture>
             <source srcset="img/torrents-light.webp" media="(prefers-color-scheme: light)">
-            <img src="img/torrents-dark.webp" width="1440" height="900" loading="lazy" alt="Torrent search for Blade Runner 2049: the picked title shown as a chip you can change, your copy at 1080p, and eight releases listed with quality, size, seeders, source and age, each marked Better, Worse or Same as yours, with resolution filters above">
+            <img src="img/torrents-dark.webp" width="1440" height="900" loading="lazy" alt="Torrent search for Blade Runner 2049: a You have this card with your 1080p copy and Look for a better copy, and eight releases listed with quality, size, seeders, source and age, each marked Better, Worse or Same as yours, with resolution filters and Only better than mine above">
           </picture>
         </figure>
       </div>
     </section>
 
-    <section class="feature feature-flip" aria-labelledby="f-history">
+    <section class="feature feature-flip" aria-labelledby="f-wishlist">
+      <div class="wrap feature-in">
+        <div class="feature-copy">
+          <p class="kicker">Wishlist</p>
+          <h2 id="f-wishlist">Wait for the right release</h2>
+          <p>Add a movie, a season or the next new episode of a show, with the release you are after: the resolution, the source, HDR, how big and how well seeded. CineVault looks when it opens and tells you when something matches, with a count on Torrents and a short note.</p>
+          <ul class="facts">
+            <li>Send a match to your torrent app, or dismiss it for good</li>
+            <li>Done by itself once your library has a copy that meets it</li>
+            <li>Nothing is ever sent without you choosing it</li>
+          </ul>
+        </div>
+        <figure class="window reveal">
+          <picture>
+            <source srcset="img/wishlist-light.webp" media="(prefers-color-scheme: light)">
+            <img src="img/wishlist-dark.webp" width="1440" height="900" loading="lazy" alt="The Wishlist: Dune wanted in 2160p Remux with HDR and two matches, the next new episode of Severance with one match, Heat with no match yet, a show waiting for its next episode, and Oppenheimer done, with Check now at the top">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
+    <section class="feature" aria-labelledby="f-history">
       <div class="wrap feature-in">
         <div class="feature-copy">
           <p class="kicker">History</p>
@@ -316,12 +338,12 @@
         </figure>
       </div>
     </section>
-    <section class="feature" aria-labelledby="f-server">
+    <section class="feature feature-flip" aria-labelledby="f-server">
       <div class="wrap feature-in">
         <div class="feature-copy">
           <p class="kicker">Browser mode · beta</p>
           <h2 id="f-server">Run it next to the files</h2>
-          <p>CineVault can run on the computer or NAS that holds the media and be used from any browser at home: phone, tablet or laptop. Install it with one command; run the same command again to update it.</p>
+          <p>CineVault can run on the computer or NAS that holds the media and be used from any browser at home: phone, tablet or laptop, with a layout that fits a phone and an app icon on its home screen. Install it with one command; run the same command again to update it.</p>
           <div class="strip strip-install" role="group" aria-label="Install commands">
             <div class="strip-row"><span class="strip-tag">Linux</span><code>curl -fsSL https://mustafayevt.github.io/CineVault/install.sh | sh</code></div>
             <div class="strip-row"><span class="strip-tag">Windows</span><code>irm https://mustafayevt.github.io/CineVault/install.ps1 | iex</code></div>
@@ -366,7 +388,7 @@
     <div class="wrap">
       <header class="section-head">
         <p class="kicker">Download</p>
-        <h2 id="dl-title">Get CineVault <span data-version>1.1.0</span></h2>
+        <h2 id="dl-title">Get CineVault <span data-version>1.5.0</span></h2>
         <p class="section-lede">Free and open source. Updates arrive inside the app, signed with the project key.</p>
       </header>
       <div class="dl-grid">

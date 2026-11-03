@@ -9,6 +9,7 @@ import {
 import { ArtworkPage } from "./features/artwork/ArtworkPage";
 import { validateArtworkSearch } from "./features/artwork/artworkSearch";
 import { DrivesPage } from "./features/drives/DrivesPage";
+import { validateDrivesSearch } from "./features/drives/drivesSearch";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { ReleaseNotesPage } from "./features/changelog/ReleaseNotesPage";
 import { LibraryPage } from "./features/library/LibraryPage";
@@ -26,7 +27,8 @@ import { NetworkSharePage } from "./features/shares/NetworkSharePage";
 import { validateNetworkShareSearch } from "./features/shares/shareMode";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { TorrentsPage } from "./features/torrents/TorrentsPage";
-import { validateTorrentsSearch } from "./features/torrents/torrentsSearch";
+import { validateTorrentsSearch, validateWishlistSearch } from "./features/torrents/torrentsSearch";
+import { WishlistPage } from "./features/torrents/WishlistPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
 
 // The first-run setup replaces the window until a library exists; afterwards the app shell.
@@ -136,6 +138,8 @@ const renameRoute = createRoute({
 const drivesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/drives",
+  // `?drive=<id>` the drive that is chosen (the first one without it).
+  validateSearch: validateDrivesSearch,
   component: DrivesPage,
 });
 
@@ -145,6 +149,14 @@ const torrentsRoute = createRoute({
   // `?title=movie:123` opens with that title confirmed; `&season=1&episode=2` also picks the scope.
   validateSearch: validateTorrentsSearch,
   component: TorrentsPage,
+});
+
+const wishlistRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/torrents/wishlist",
+  // `?add=movie:123` opens the editor for that title; `&season=1&episode=2` picks a show's scope.
+  validateSearch: validateWishlistSearch,
+  component: WishlistPage,
 });
 
 const historyRoute = createRoute({
@@ -265,6 +277,7 @@ const routeTree = rootRoute.addChildren([
   renameRoute,
   drivesRoute,
   torrentsRoute,
+  wishlistRoute,
   historyRoute,
   settingsRoute,
   networkShareRoute,

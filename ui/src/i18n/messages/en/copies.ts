@@ -7,9 +7,13 @@ export const copies = {
   "copies.table.count": "{count} copies",
   "copies.act.compare": "Compare {count} copies",
 
-  // The Movie page line
-  "copies.movie.line": "You have {count} copies",
-  "copies.movie.compare": "Compare",
+  // The Movie page: the copy tabs and the Copies row of the Technical card
+  "copies.tabs.aria": "{count} copies of this movie",
+  "copies.tabs.best": "{label}, best quality",
+  "copies.tabs.row": "Copies",
+  "copies.tabs.keepOnly": "Keep only this one",
+  "copies.tabs.delete": "Delete this copy",
+  "copies.tabs.compare": "Compare",
 
   // The Compare copies page
   "copies.page.region": "Compare copies of {title}",

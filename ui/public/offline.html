@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)" />
+    <title>Can't reach CineVault</title>
+    <!-- Shown by the service worker when the server does not answer. Self-contained: the
+         window ground and text colours of the tokens, with nothing else to load. -->
+    <style>
+      :root {
+        color-scheme: dark light;
+        --ground: #121211;
+        --text: #ebe9e4;
+        --muted: #aaa8a2;
+        --accent: #cbb68a;
+        --on-accent: #121211;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --ground: #f2f1ee;
+          --text: #1a1a19;
+          --muted: #5d5c58;
+          --accent: #7a6438;
+          --on-accent: #f2f1ee;
+        }
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--ground);
+        color: var(--text);
+        font:
+          15px/1.5 system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      main {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        min-height: 100%;
+        padding: 24px 16px;
+        text-align: center;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      p {
+        margin: 0;
+        max-width: 40ch;
+        color: var(--muted);
+      }
+      button {
+        margin-top: 8px;
+        min-height: 44px;
+        padding: 0 20px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--accent);
+        color: var(--on-accent);
+        font: inherit;
+        font-weight: 600;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--text);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Can't reach CineVault</h1>
+      <p>
+        The server isn't answering. Check that the computer running CineVault is on and that you're
+        on its network, then try again.
+      </p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

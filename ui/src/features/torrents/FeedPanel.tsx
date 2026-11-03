@@ -18,7 +18,9 @@ import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
 import { CachedImage } from "../images/CachedImage";
 import { openRatingPage } from "../ratings/ratingPage";
+import { CompareBlock } from "./CompareBlock";
 import { titleLinks } from "./feedView";
+import { verdictOf } from "./ownedCopy";
 import { tierOf } from "./releaseSort";
 import { useTitleDetails } from "./titleQueries";
 import { openRelease } from "./torrentActions";
@@ -165,6 +167,9 @@ export function FeedPanel({
   const overview = known?.overview ?? hit?.overview ?? null;
   const imdbId = known?.imdbId ?? hit?.imdbId ?? row.imdbId;
   const inLibrary = known?.inLibrary ?? hit?.inLibrary ?? row.inLibrary;
+  // A library movie's copy, for "Compare with yours" (the verdict is the row's own).
+  const compared = row.kind === "movie" ? (known?.libraryCopies[0] ?? null) : null;
+  const verdict = verdictOf(row.release);
   const links = hit === null ? [] : titleLinks(kindOf(row), hit.tmdbId, imdbId);
   const others = siblings.filter((other) => other.release.id !== row.release.id);
   const sourceNames = row.release.sources
@@ -181,6 +186,8 @@ export function FeedPanel({
       }
       className={cx(
         "flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-solid border-line-section bg-surface-card",
+        // Narrow panes have no room beside the table: the panel lies over it, at most pane wide.
+        "@max-[860px]/pane:absolute @max-[860px]/pane:inset-y-0 @max-[860px]/pane:right-0 @max-[860px]/pane:z-10 @max-[860px]/pane:max-w-full @max-[860px]/pane:shadow-floating",
         entering && "cv-slide-up",
       )}
     >
@@ -296,6 +303,12 @@ export function FeedPanel({
             </Link>
           )}
         </p>
+      )}
+
+      {compared === null || verdict === null ? null : (
+        <div className="mx-5 mt-4">
+          <CompareBlock copy={compared} release={row.release} verdict={verdict} heading />
+        </div>
       )}
 
       {links.length === 0 ? null : (

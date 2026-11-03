@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { IconButton } from "../../components/IconButton";
 import { t } from "../../i18n/catalog";
@@ -9,6 +10,8 @@ interface TitleLineProps {
   kind: "movie" | "show";
   /** Takes the title away: the results go and the field is ready for another. */
   onChange: () => void;
+  /** Shown at the end of the line ("Add to Wishlist"). */
+  extra?: ReactNode;
 }
 
 /**
@@ -16,7 +19,7 @@ interface TitleLineProps {
  * from the suggestions, as a chip with an × to change it (spec `torrent-search` "Matched title
  * line"). The line is left out while no title is picked.
  */
-export function TitleLine({ name, kind, onChange }: TitleLineProps) {
+export function TitleLine({ name, kind, onChange, extra }: TitleLineProps) {
   // No title yet: no line at all, so the field and the chips sit 10px apart.
   if (name === "") return null;
   return (
@@ -37,6 +40,9 @@ export function TitleLine({ name, kind, onChange }: TitleLineProps) {
           onClick={onChange}
         />
       </span>
+      {extra === undefined ? null : (
+        <span className="ml-auto flex shrink-0 items-center">{extra}</span>
+      )}
     </div>
   );
 }
