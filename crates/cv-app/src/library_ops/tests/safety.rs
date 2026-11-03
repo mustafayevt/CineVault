@@ -549,6 +549,11 @@ fn a_title_with_an_unfinished_move_is_not_moved_again() {
         "{:?}",
         plan.rows[0].status
     );
+    // The dialog still shows how big the title is.
+    let folder = Path::new(&lab.movies.path).join("Heat (1995)");
+    let size: u64 = enumerate(&folder).unwrap().iter().map(|e| e.size).sum();
+    assert!(size >= 3 * 1024 * 1024);
+    assert_eq!(plan.rows[0].bytes, size);
 }
 
 #[test]

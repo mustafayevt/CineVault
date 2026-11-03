@@ -37,6 +37,14 @@ impl MoveFs for Shim {
         let writer = self.create(path, || self.inner().create_write(path))?;
         Ok(Box::new(ShimWrite(writer)))
     }
+
+    fn open_append(
+        &self,
+        path: &Path,
+    ) -> io::Result<Box<dyn crate::library_ops::move_engine::CopyWrite>> {
+        let writer = self.create(path, || self.inner().open_append(path))?;
+        Ok(Box::new(ShimWrite(writer)))
+    }
     fn keep_read_only(&self, from: &Path, to: &Path) -> io::Result<()> {
         self.inner().keep_read_only(from, to)
     }
@@ -351,6 +359,30 @@ impl MoveFs for SharedFaultFs {
             inner,
             corrupt,
             cancel,
+            record,
+        }))
+    }
+
+    fn open_append(
+        &self,
+        path: &Path,
+    ) -> io::Result<Box<dyn crate::library_ops::move_engine::CopyWrite>> {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let bare = name.strip_suffix(".cvpart").unwrap_or(&name).to_owned();
+        let record = self
+            .0
+            .faults
+            .lock()
+            .unwrap()
+            .record_writes
+            .clone()
+            .filter(|(target, _)| *target == bare)
+            .map(|(_, log)| log);
+        let inner = self.0.shim.open_append(path)?;
+        Ok(Box::new(Corrupting {
+            inner,
+            corrupt: false,
+            cancel: None,
             record,
         }))
     }

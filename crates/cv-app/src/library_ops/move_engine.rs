@@ -266,6 +266,12 @@ pub trait MoveFs: Fs + Send + Sync {
     fn open_read(&self, path: &Path) -> io::Result<Box<dyn Read + Send>>;
     /// Creates a new file; fails when one exists.
     fn create_write(&self, path: &Path) -> io::Result<Box<dyn CopyWrite>>;
+    /// Opens an existing file to write at its end (a half-written copy carried on). A disk that
+    /// cannot says `Unsupported`, and the file is copied again from the start.
+    fn open_append(&self, path: &Path) -> io::Result<Box<dyn CopyWrite>> {
+        let _ = path;
+        Err(io::ErrorKind::Unsupported.into())
+    }
     /// Gives the finished copy `to` the read-only flag of the original `from`.
     fn keep_read_only(&self, from: &Path, to: &Path) -> io::Result<()> {
         let _ = (from, to);
@@ -357,6 +363,15 @@ impl MoveFs for StdMoveFs {
             .write(true)
             .create_new(true)
             .open(StdFs::native(path))?;
+        Ok(Box::new(StdWrite(file)))
+    }
+
+    fn open_append(&self, path: &Path) -> io::Result<Box<dyn CopyWrite>> {
+        // Plain write access, not append mode: flushing to the disk needs it on Windows.
+        let mut file = std::fs::File::options()
+            .write(true)
+            .open(StdFs::native(path))?;
+        io::Seek::seek(&mut file, io::SeekFrom::End(0))?;
         Ok(Box::new(StdWrite(file)))
     }
 
@@ -1559,23 +1574,59 @@ impl<'a> MoveEngine<'a> {
                 .create_dir_all(parent)
                 .map_err(|e| Fail::Stop(reason_of(&e, parent, true)))?;
         }
-        // A leftover part of ours from an earlier run.
-        if self.meta(&part)?.is_some() {
-            self.fs
-                .remove_file(&part)
-                .map_err(|e| Fail::Stop(reason_of(&e, &part, true)))?;
-        }
-
-        let reader = self
+        let mut reader = self
             .fs
             .open_read(&src)
             .map_err(|e| Fail::Stop(reason_of(&e, &src, false)))?;
-        let mut writer = self
-            .fs
-            .create_write(&part)
-            .map_err(|e| Fail::Stop(reason_of(&e, &part, true)))?;
-        let (source_hash, copied) =
-            match self.pipe(reader, writer.as_mut(), &src, &part, rel, progress) {
+        let mut hasher = Sha256::new();
+        // A leftover part of ours from an earlier run is carried on when it holds the original's
+        // first bytes; otherwise it is removed and the file copied from the start.
+        let mut kept = 0;
+        let mut writer = None;
+        if let Some(existing) = self.meta(&part)? {
+            if !existing.is_dir
+                && existing.len <= src_meta.len
+                && self.part_matches(
+                    &part,
+                    existing.len,
+                    &src,
+                    &mut reader,
+                    &mut hasher,
+                    rel,
+                    progress,
+                )?
+            {
+                match self.fs.open_append(&part) {
+                    Ok(append) => {
+                        kept = existing.len;
+                        writer = Some(append);
+                    }
+                    Err(error) => {
+                        tracing::debug!(%error, path = %part.display(), "the part is copied again")
+                    }
+                }
+            }
+            if writer.is_none() {
+                self.fs
+                    .remove_file(&part)
+                    .map_err(|e| Fail::Stop(reason_of(&e, &part, true)))?;
+                reader = self
+                    .fs
+                    .open_read(&src)
+                    .map_err(|e| Fail::Stop(reason_of(&e, &src, false)))?;
+                hasher = Sha256::new();
+            }
+        }
+        let mut writer = match writer {
+            Some(writer) => writer,
+            None => self
+                .fs
+                .create_write(&part)
+                .map_err(|e| Fail::Stop(reason_of(&e, &part, true)))?,
+        };
+        self.bytes_done += kept;
+        let (source_hash, written) =
+            match self.pipe(reader, hasher, writer.as_mut(), &src, &part, rel, progress) {
                 Ok(done) => done,
                 Err(Piped::Canceled(fail)) => {
                     drop(writer);
@@ -1584,10 +1635,12 @@ impl<'a> MoveEngine<'a> {
                 }
                 Err(Piped::Failed(fail)) => {
                     drop(writer);
-                    // The partial file is ours; leave it for the roll back to remove.
+                    // The partial file is ours; leave it for a resume to carry on or the roll
+                    // back to remove.
                     return Err(fail);
                 }
             };
+        let copied = kept + written;
         // Flushed to the disk (`sync_all`) before it is read back.
         writer
             .finish(src_meta.modified_ms)
@@ -1646,13 +1699,38 @@ impl<'a> MoveEngine<'a> {
         Ok(done)
     }
 
-    /// Copies `reader` to `writer` through the pipeline: a reader thread reads and hashes the
-    /// chunks in order and hands them over a bounded channel; this thread writes them in that
-    /// order, counts the progress and stops at a pause or cancel. Returns the hash of what was
-    /// read and the bytes written.
+    /// Whether the part `part` (`len` bytes) left by an earlier run holds the original's first
+    /// `len` bytes. Those are read from `reader` into `hasher`, the hash of the whole original,
+    /// so the original is still read once.
+    #[allow(clippy::too_many_arguments)]
+    fn part_matches(
+        &mut self,
+        part: &Path,
+        len: u64,
+        src: &Path,
+        reader: &mut Box<dyn Read + Send>,
+        hasher: &mut Sha256,
+        rel: &str,
+        progress: ProgressFn<'_>,
+    ) -> Result<bool, Fail> {
+        self.report(progress, rel, MovePhase::Verifying);
+        let (part_hash, read) = self.hash_file(part, rel, progress)?;
+        if read != len {
+            return Ok(false);
+        }
+        let read = self.hash_into(&mut reader.take(len), hasher, src, rel, progress)?;
+        Ok(read == len && hasher.clone().finalize().as_slice() == part_hash.as_slice())
+    }
+
+    /// Copies `reader` to `writer` through the pipeline: a reader thread reads the chunks in
+    /// order, adds them to `hasher` and hands them over a bounded channel; this thread writes
+    /// them in that order, counts the progress and stops at a pause or cancel. Returns the hash
+    /// of everything `hasher` saw and the bytes written.
+    #[allow(clippy::too_many_arguments)]
     fn pipe(
         &mut self,
         mut reader: Box<dyn Read + Send>,
+        mut hasher: Sha256,
         writer: &mut dyn CopyWrite,
         src: &Path,
         part: &Path,
@@ -1664,7 +1742,6 @@ impl<'a> MoveEngine<'a> {
         let (empty_tx, empty_rx) = mpsc::channel::<Vec<u8>>();
         std::thread::scope(|scope| {
             let read_side = scope.spawn(move || -> Option<Vec<u8>> {
-                let mut hasher = Sha256::new();
                 let mut spare = PIPELINE_DEPTH + 1;
                 loop {
                     // A returned buffer, or a new one while fewer than the pipeline holds exist.
@@ -1773,6 +1850,19 @@ impl<'a> MoveEngine<'a> {
         progress: ProgressFn<'_>,
     ) -> Result<(Vec<u8>, u64), Fail> {
         let mut hasher = Sha256::new();
+        let total = self.hash_into(&mut reader, &mut hasher, path, rel, progress)?;
+        Ok((hasher.finalize().as_slice().to_vec(), total))
+    }
+
+    /// Adds what `reader` gives to `hasher`, in chunks. Returns the length read.
+    fn hash_into(
+        &mut self,
+        reader: &mut dyn Read,
+        hasher: &mut Sha256,
+        path: &Path,
+        rel: &str,
+        progress: ProgressFn<'_>,
+    ) -> Result<u64, Fail> {
         let mut buffer = vec![0_u8; self.fs.chunk_bytes().max(1)];
         let mut total = 0_u64;
         loop {
@@ -1788,7 +1878,7 @@ impl<'a> MoveEngine<'a> {
             self.work_done += read as u64;
             self.tick(progress, rel, MovePhase::Verifying);
         }
-        Ok((hasher.finalize().as_slice().to_vec(), total))
+        Ok(total)
     }
 
     /// Whether a copy that was done earlier still matches its original (a resume re-checks).
