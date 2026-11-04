@@ -1,5 +1,5 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { BookmarkCheck, BookmarkPlus, Check, Search, WifiOff, X } from "lucide-react";
+import { BookmarkCheck, BookmarkPlus, Check, ListFilter, Search, WifiOff, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "../../components/Button";
@@ -20,6 +20,7 @@ import type { FeedView } from "./feedView";
 import { LatestFeed } from "./LatestFeed";
 import { holdsTitle, showHoldings, showMarkOf, verdictOf } from "./ownedCopy";
 import type { ShowMark } from "./ownedCopy";
+import { isEmptyFilter, matchesFilter, parseReleaseFilter } from "./releaseFilter";
 import { ReleaseTable } from "./ReleaseTable";
 import {
   TIERS,
@@ -291,9 +292,24 @@ function TorrentsContent() {
     () => releases.releases.filter((release) => release.matching),
     [releases.releases],
   );
+  // The "Filter results" text belongs to one title, like the library chips.
+  const [typedFilter, setTypedFilter] = useState<{ title: string | undefined; text: string }>(
+    () => ({ title: search.title, text: "" }),
+  );
+  const filterText = typedFilter.title === param ? typedFilter.text : "";
+  const setFilterText = (text: string) => setTypedFilter({ title: param, text });
+  const textFilter = useMemo(() => parseReleaseFilter(filterText), [filterText]);
+  // The text narrows first, so the chip counts say what each chip would show.
+  const narrowed = useMemo(
+    () =>
+      isEmptyFilter(textFilter)
+        ? matching
+        : matching.filter((release) => matchesFilter(release.name, textFilter)),
+    [matching, textFilter],
+  );
   const [sort, setSort] = useRememberedSort();
   const [chosen, setChosen] = useState<Chosen>("all");
-  const counts = useMemo(() => tierCounts(matching), [matching]);
+  const counts = useMemo(() => tierCounts(narrowed), [narrowed]);
   // Before the first release arrives the chips are quiet: no "0" counts, nothing to pick.
   const hasResults = matching.length > 0;
   // What the library holds: the copy a movie's releases are compared with, a show's episodes.
@@ -314,22 +330,22 @@ function TorrentsContent() {
     }
     return out;
   }, [matching, holdings]);
-  const betterCount = matching.filter((release) => verdictOf(release) === "better").length;
-  const gapCount = [...marks.values()].filter((mark) => mark === "gap").length;
+  const betterCount = narrowed.filter((release) => verdictOf(release) === "better").length;
+  const gapCount = narrowed.filter((release) => marks.get(release.id) === "gap").length;
   const offerBetter =
     owned !== null || (holdings !== null && matching.some((r) => verdictOf(r) !== null));
   const offerGaps = holdings !== null;
   const betterOn = filters.has("better") && offerBetter;
   const gapsOn = filters.has("gaps") && offerGaps;
   const shown = useMemo(() => {
-    const kept = matching.filter(
+    const kept = narrowed.filter(
       (release) =>
         (chosen === "all" || tierOf(release) === chosen) &&
         (!betterOn || verdictOf(release) === "better") &&
         (!gapsOn || marks.get(release.id) === "gap"),
     );
     return sortReleases(kept, sort, (release) => sourceText(release, releases.sources));
-  }, [matching, chosen, betterOn, gapsOn, marks, sort, releases.sources]);
+  }, [narrowed, chosen, betterOn, gapsOn, marks, sort, releases.sources]);
   const nameExtra = useMemo(
     () =>
       holdings === null
@@ -420,14 +436,17 @@ function TorrentsContent() {
     body = (
       <Message role="status">
         <p className="m-0">
-          {betterOn || gapsOn
-            ? t("torrentsPage.noLibraryFilter")
-            : t("torrentsPage.noTier", { tier: chosen })}
+          {narrowed.length === 0
+            ? t("torrentsPage.noText", { text: filterText.trim() })
+            : betterOn || gapsOn
+              ? t("torrentsPage.noLibraryFilter")
+              : t("torrentsPage.noTier", { tier: chosen })}
         </p>
         <Button
           onClick={() => {
             setChosen("all");
             setFilters(NO_FILTERS);
+            setFilterText("");
           }}
         >
           {t("torrents.filters.clear")}
@@ -552,7 +571,7 @@ function TorrentsContent() {
           className={
             ref === null
               ? "hidden"
-              : "flex h-6 items-center gap-1.5 @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:gap-y-2"
+              : "flex h-(--h-field) items-center gap-1.5 @max-[640px]/pane:h-auto @max-[640px]/pane:flex-wrap @max-[640px]/pane:gap-y-2"
           }
         >
           <div
@@ -563,7 +582,7 @@ function TorrentsContent() {
             <Chip
               active={chosen === "all"}
               disabled={!hasResults}
-              {...(hasResults ? { count: format.number(matching.length) } : {})}
+              {...(hasResults ? { count: format.number(narrowed.length) } : {})}
               onClick={() => setChosen("all")}
             >
               {t("torrentsPage.chip.all")}
@@ -608,6 +627,36 @@ function TorrentsContent() {
               ) : null}
             </div>
           ) : null}
+          <Field
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            icon={ListFilter}
+            aria-label={t("torrentsPage.filter")}
+            placeholder={t("torrentsPage.filter")}
+            title={t("torrentsPage.filter.tip")}
+            disabled={!hasResults}
+            value={filterText}
+            className="ml-auto w-60 shrink-0 @max-[640px]/pane:ml-0 @max-[640px]/pane:w-full"
+            onChange={(event) => setFilterText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && filterText !== "") {
+                event.preventDefault();
+                event.stopPropagation();
+                setFilterText("");
+              }
+            }}
+            trailing={
+              filterText === "" ? null : (
+                <IconButton
+                  aria-label={t("torrentsPage.filter.clear")}
+                  icon={X}
+                  size="sm"
+                  onClick={() => setFilterText("")}
+                />
+              )
+            }
+          />
         </div>
       </div>
       {online ? null : (
