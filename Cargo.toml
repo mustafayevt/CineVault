@@ -55,7 +55,7 @@ icu_normalizer = "2.3"
 ureq = "3"
 sha2 = "0.11"
 # Password hashing for the browser server sign-in (cv-web).
-argon2 = "0.5"
+argon2 = "0.6"
 # Encrypted provider keys for the browser server (cv-app).
 chacha20poly1305 = "0.10"
 # Trusted reverse proxies for the browser server (cv-web).
