@@ -2,6 +2,12 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.2] - unreleased
+
+### Fixed
+
+- Scrape writes the provider's keywords as tags again, so newly added movies and shows get tags in the library and in their NFOs like the titles you already had. They are added to the tags a title already has, which stay. Tags is a new choice under the fields to scrape in Settings › Providers, on by default; clear it to leave tags alone. To fill in the tags of titles scraped before this version, Scrape them again.
+
 ## [1.6.1] - 2026-11-04
 
 ### Added

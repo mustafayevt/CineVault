@@ -617,9 +617,7 @@ impl MatchService {
                 .collect(),
             universal_fields: cv_domain::all_fields()
                 .into_iter()
-                .filter(|field| {
-                    field.is_scrapable() && !matches!(field, cv_domain::MetaField::Artwork(_))
-                })
+                .filter(|field| !matches!(field, cv_domain::MetaField::Artwork(_)))
                 .map(|field| field.key().to_owned())
                 .collect(),
         }

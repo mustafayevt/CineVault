@@ -14,6 +14,7 @@
 //! * with *do not overwrite*, a field is written only when the stored field is empty;
 //! * provider IDs are only ever added (missing keys), except the collection ID, which is the
 //!   [`MetaField::Collection`] field.
+//! * the provider's keywords are added to the stored tags, which are never removed.
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -148,13 +149,6 @@ impl MetaField {
                     .find(|(_, k)| *k == key)
                     .map(|(kind, _)| Self::Artwork(*kind))
             })
-    }
-
-    /// Whether a scrape may write this field. Tags are never scraped: a provider's keywords are
-    /// not tags, and the tags a title has (from its NFO or its edit page) stay as they are.
-    /// The field still exists for editing and locking.
-    pub fn is_scrapable(self) -> bool {
-        !matches!(self, Self::Tags)
     }
 
     /// Whether items of `kind` have this field.
@@ -522,7 +516,7 @@ fn has_value(item: &Item, field: MetaField) -> bool {
 }
 
 /// Copies the value of `field` from `from` to `to`, exactly (an empty source empties the
-/// target). Both items are of the same kind.
+/// target), except Tags, which are added to. Both items are of the same kind.
 fn copy_field(to: &mut Item, from: &Item, field: MetaField) {
     use MetaField as F;
     match field {
@@ -534,7 +528,12 @@ fn copy_field(to: &mut Item, from: &Item, field: MetaField) {
             .core
             .production_companies
             .clone_from(&from.core.production_companies),
-        F::Tags => to.core.tags.clone_from(&from.core.tags),
+        // The provider's keywords join the tags the title has (from its NFO or its edit page).
+        F::Tags => {
+            for tag in from.core.tags.iter() {
+                to.core.tags.add(tag);
+            }
+        }
         F::Rating => copy_scraped_ratings(to, from),
         F::Actors => copy_credits(to, from, true),
         F::Crew => copy_credits(to, from, false),
@@ -686,11 +685,7 @@ pub fn apply_scrape(
     }
     let kind = target.kind();
 
-    for field in options
-        .fields
-        .iter()
-        .filter(|f| f.applies_to(kind) && f.is_scrapable())
-    {
+    for field in options.fields.iter().filter(|f| f.applies_to(kind)) {
         if !has_value(scraped, field) {
             continue;
         }
@@ -1026,6 +1021,33 @@ mod tests {
         let episode = FieldSet::all_for(ItemKind::Episode);
         assert!(episode.contains(MetaField::Artwork(MediaFileType::Thumb)));
         assert!(!episode.contains(MetaField::Genres));
+    }
+
+    #[test]
+    fn keywords_are_added_to_the_stored_tags() {
+        let mut target = stored();
+        target.core.tags.add("Criterion");
+        let mut scraped = scraped();
+        scraped.core.tags.add("submarine");
+        scraped.core.tags.add("criterion");
+        let options = ScrapeOptions::only([MetaField::Tags]);
+
+        let outcome = apply_scrape(&mut target, &scraped, &options, &FieldSet::new());
+        assert_eq!(outcome.written, [MetaField::Tags]);
+        let tags: Vec<&str> = target.core.tags.iter().collect();
+        assert_eq!(tags, ["Criterion", "submarine"]);
+
+        // A change of match keeps the tags; "do not overwrite" leaves filled tags alone.
+        assert!(clear_for_relink(&mut target, &stored(), &options, &FieldSet::new()).is_empty());
+        assert_eq!(target.core.tags.iter().count(), 2);
+        let mut kept = stored();
+        kept.core.tags.add("Criterion");
+        let only_empty = ScrapeOptions {
+            do_not_overwrite: true,
+            ..options
+        };
+        apply_scrape(&mut kept, &scraped, &only_empty, &FieldSet::new());
+        assert_eq!(kept.core.tags.iter().collect::<Vec<_>>(), ["Criterion"]);
     }
 
     #[test]
