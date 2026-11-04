@@ -442,11 +442,10 @@ async fn a_scrape_with_default_settings_writes_the_nfo_and_every_artwork_type() 
     );
 }
 
-/// Provider keywords are never tags (spec metadata-providers): a title whose NFO has the tag
-/// "Criterion" keeps exactly that tag through a scrape, even when the scrape is asked for every
-/// field, and the rewritten NFO has no keyword.
+/// Provider keywords become tags (spec metadata-providers): a scrape adds them to the tags a
+/// title has, so the "Criterion" tag from its NFO stays and the rewritten NFO lists both.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_scrape_keeps_the_tags_of_the_nfo_and_never_imports_keywords() {
+async fn a_scrape_adds_the_keywords_to_the_tags_of_the_nfo() {
     let rig = rig();
     let (item, folder) = rig.movie();
     let mut stored = rig.lab.item(item);
@@ -456,13 +455,12 @@ async fn a_scrape_keeps_the_tags_of_the_nfo_and_never_imports_keywords() {
         .write(move |tx| cv_db::repo::update_item(tx, &stored))
         .unwrap();
 
-    // `start_scrape` asks for every field, "tags" included.
     rig.scrape(item, "kw").await;
 
     let nfo = fs::read_to_string(folder.join("Das Boot (1981).nfo")).unwrap();
-    assert_eq!(nfo.matches("<tag>").count(), 1, "{nfo}");
+    assert_eq!(nfo.matches("<tag>").count(), 5, "{nfo}");
     assert!(nfo.contains("<tag>Criterion</tag>"), "{nfo}");
-    assert!(!nfo.contains("submarine"), "{nfo}");
+    assert!(nfo.contains("<tag>submarine</tag>"), "{nfo}");
     let tags: Vec<String> = rig
         .lab
         .item(item)
@@ -471,7 +469,16 @@ async fn a_scrape_keeps_the_tags_of_the_nfo_and_never_imports_keywords() {
         .iter()
         .map(str::to_owned)
         .collect();
-    assert_eq!(tags, ["Criterion"]);
+    assert_eq!(
+        tags,
+        [
+            "Criterion",
+            "u-boat",
+            "submarine",
+            "world war ii",
+            "claustrophobia"
+        ]
+    );
 }
 
 /// A trailer a scrape found stays in the library and is written to the NFO as the plug-in address

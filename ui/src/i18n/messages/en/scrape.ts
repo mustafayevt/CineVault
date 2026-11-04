@@ -18,6 +18,7 @@ export const scrape = {
   "scrape.field.spoken_languages": "Spoken languages",
   "scrape.field.country": "Country",
   "scrape.field.studio": "Studios",
+  "scrape.field.tags": "Tags",
   "scrape.field.collection": "Collection",
   "scrape.field.actors": "Cast",
   "scrape.field.crew": "Crew",

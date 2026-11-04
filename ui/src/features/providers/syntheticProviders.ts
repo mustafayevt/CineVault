@@ -86,6 +86,7 @@ const UNIVERSAL_FIELDS = [
   "genres",
   "country",
   "studio",
+  "tags",
   "collection",
   "actors",
   "crew",
