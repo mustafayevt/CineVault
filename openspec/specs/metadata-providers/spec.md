@@ -82,18 +82,11 @@ Scraping SHALL use the "Metadata language" (default English) for titles, plots a
 - **THEN** the English plot is used and the Turkish title is kept if one exists
 
 ### Requirement: What a scrape writes
-A scrape SHALL write the fields of the kind's scrape field selection, by default every field a scrape may write: title, original title, tagline, plot, year, release date, status (shows), ratings, Top 250 rank, runtime, certification, genres, spoken languages (movies), country, studios, collection (movies), cast, crew, trailer and each artwork type. A field lock SHALL keep its field, and with "write only empty fields" on a filled field SHALL be kept. Provider IDs SHALL only be added.
+A scrape SHALL write the fields of the kind's scrape field selection, by default every field a scrape may write: title, original title, tagline, plot, year, release date, status (shows), ratings, Top 250 rank, runtime, certification, genres, spoken languages (movies), country, studios, tags, collection (movies), cast, crew, trailer and each artwork type. A field lock SHALL keep its field, and with "write only empty fields" on a filled field SHALL be kept. Provider IDs SHALL only be added.
 
 #### Scenario: Only empty fields
 - **WHEN** "write only empty fields" is on and a movie with a plot but no tagline is scraped
 - **THEN** the tagline is filled and the plot is unchanged
-
-### Requirement: Provider keywords are never tags
-A scrape SHALL NOT import a provider's keywords as tags, and no field selection SHALL offer tags. Tags a title already has from its NFO SHALL be kept unchanged by a scrape.
-
-#### Scenario: Keywords ignored
-- **WHEN** a movie whose TMDB entry has 20 keywords and whose NFO has the tag "Favourites" is scraped
-- **THEN** it still has exactly the tag "Favourites" and none of the keywords
 
 ### Requirement: Trailers come with the scrape
 A TMDB scrape SHALL store the provider's trailers and mark the preferred one (one in the request language, else the first), so the NFO references it. A YouTube trailer SHALL be written as `plugin://plugin.video.youtube/play/?video_id=<id>`.
@@ -157,3 +150,14 @@ When a web site (OFDb or fernsehserien.de) answers with a human check (HTTP 202 
 #### Scenario: OFDb asks for a human check
 - **WHEN** OFDb answers HTTP 202 during a scrape search
 - **THEN** the line reads "OFDb is not available right now.", other results are listed, and searches in the next ten minutes do not contact OFDb
+
+### Requirement: Provider keywords become tags
+A scrape whose field selection includes tags SHALL add the provider's keywords to the title's tags. Tags the title already has, from its NFO or earlier scrapes, SHALL be kept, and a keyword equal to one of them, ignoring case, SHALL NOT be added twice. A change of match SHALL keep the tags.
+
+#### Scenario: Keywords added
+- **WHEN** a movie whose TMDB entry has 20 keywords and whose NFO has the tag "Favourites" is scraped with the default field selection
+- **THEN** it has the tag "Favourites" and the 20 keywords, and its NFO lists all 21
+
+#### Scenario: Tags switched off
+- **WHEN** Tags is cleared in "Movie fields to scrape" and a movie is scraped
+- **THEN** its tags are unchanged
