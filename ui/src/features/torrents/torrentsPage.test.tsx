@@ -195,6 +195,55 @@ describe("the resolution chips", () => {
   });
 });
 
+describe("the results filter", () => {
+  const FILTERED = [
+    release({ id: "a1", name: "A.2160p.BluRay.REMUX.TrueHD.Atmos", resolution: "2160p" }),
+    release({ id: "a2", name: "B.2160p.WEB-DL.x265", resolution: "2160p" }),
+    release({ id: "b1", name: "C.1080p.BluRay.REMUX.DTS-HD", resolution: "1080p" }),
+    release({ id: "b2", name: "D.1080p.WEB.DL.x264", resolution: "1080p" }),
+  ];
+
+  it("narrows by words in the name and the chip counts follow it", async () => {
+    const user = userEvent.setup();
+    await renderTorrents("/torrents?title=movie:1", backendWith(FILTERED));
+    const chips = await screen.findByRole("group", { name: "Resolution" });
+    await waitFor(() =>
+      expect(within(chips).getByRole("button", { name: /^All\s*4/ })).toBeVisible(),
+    );
+    const filter = screen.getByRole("textbox", { name: "Filter results" });
+    await user.type(filter, "remux");
+    expect((await names()).sort()).toEqual([
+      "A.2160p.BluRay.REMUX.TrueHD.Atmos",
+      "C.1080p.BluRay.REMUX.DTS-HD",
+    ]);
+    expect(within(chips).getByRole("button", { name: /^All\s*2/ })).toBeVisible();
+    expect(within(chips).getByRole("button", { name: /^2160p\s*1/ })).toBeVisible();
+    // A dash leaves a word out; punctuation does not count.
+    await user.clear(filter);
+    await user.type(filter, "web-dl -x265");
+    expect(await names()).toEqual(["D.1080p.WEB.DL.x264"]);
+    // Esc clears the field and every release is back.
+    await user.keyboard("{Escape}");
+    expect(filter).toHaveValue("");
+    expect(await names()).toHaveLength(4);
+  });
+
+  it("says when nothing is left and Clear filters brings everything back", async () => {
+    const user = userEvent.setup();
+    await renderTorrents("/torrents?title=movie:1", backendWith(FILTERED));
+    const chips = await screen.findByRole("group", { name: "Resolution" });
+    await waitFor(() =>
+      expect(within(chips).getByRole("button", { name: /^All\s*4/ })).toBeVisible(),
+    );
+    const filter = screen.getByRole("textbox", { name: "Filter results" });
+    await user.type(filter, "xyz");
+    expect(await screen.findByText("No releases contain “xyz”.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(filter).toHaveValue("");
+    expect(await names()).toHaveLength(4);
+  });
+});
+
 describe("sorting the releases", () => {
   const releases = [
     release({ id: "a", name: "A", seeders: 5, size: 30_000_000_000, published: 3 }),
