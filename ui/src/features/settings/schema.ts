@@ -221,6 +221,7 @@ export const SCRAPE_FIELDS = {
     "spoken_languages",
     "country",
     "studio",
+    "tags",
     "collection",
     "actors",
     "crew",
@@ -252,6 +253,7 @@ export const SCRAPE_FIELDS = {
     "genres",
     "country",
     "studio",
+    "tags",
     "actors",
     "crew",
     "trailer",
@@ -275,6 +277,7 @@ export const SCRAPE_FIELDS = {
     "rating",
     "runtime",
     "studio",
+    "tags",
     "actors",
     "crew",
     "thumb",
@@ -284,9 +287,8 @@ export const SCRAPE_FIELDS = {
 export type ScrapeKind = keyof typeof SCRAPE_FIELDS;
 
 /**
- * The fields a scrape writes until the user chooses: all of them. Tags are not a scrape field: a
- * provider's keywords are never imported, and the tags a title has stay as they are
- * (`scrape_settings.rs`).
+ * The fields a scrape writes until the user chooses: all of them. Tags add the provider's keywords
+ * to the tags a title has (`scrape_settings.rs`).
  */
 function defaultScrapeFields(kind: ScrapeKind): string {
   return SCRAPE_FIELDS[kind].join(",");

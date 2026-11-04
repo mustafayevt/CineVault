@@ -204,7 +204,7 @@ fn diff_all(stored: &Item, incoming: &Item, locks: &FieldSet) -> Vec<FieldDiff> 
     let kind = stored.kind();
     all_fields()
         .into_iter()
-        .filter(|field| field.applies_to(kind) && field.is_scrapable())
+        .filter(|field| field.applies_to(kind))
         .filter_map(|field| diff_of(stored, incoming, locks, field))
         .collect()
 }
@@ -329,9 +329,7 @@ pub fn scrape_selection(
     preset: ScrapePreset,
     custom: &[String],
 ) -> ScrapeSelection {
-    let applicable = all_fields()
-        .into_iter()
-        .filter(|f| f.applies_to(kind) && f.is_scrapable());
+    let applicable = all_fields().into_iter().filter(|f| f.applies_to(kind));
     let keys = |fields: &mut dyn Iterator<Item = MetaField>| -> Vec<String> {
         fields.map(|f| f.key().to_owned()).collect()
     };

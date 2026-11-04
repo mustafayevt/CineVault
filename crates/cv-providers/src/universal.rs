@@ -164,10 +164,7 @@ impl UniversalProvider {
     fn needed(&self, kind: MediaKind) -> Vec<Shared> {
         let item_kind = item_kind(kind);
         let mut keys: Vec<&'static str> = Vec::new();
-        for field in all_fields()
-            .into_iter()
-            .filter(|f| f.applies_to(item_kind) && f.is_scrapable())
-        {
+        for field in all_fields().into_iter().filter(|f| f.applies_to(item_kind)) {
             for key in self.source_order(field) {
                 if !keys.contains(&key) {
                     keys.push(key);
@@ -297,10 +294,7 @@ impl UniversalProvider {
         let mut sources = BTreeMap::new();
 
         let item_kind = item_kind(kind);
-        for field in all_fields()
-            .into_iter()
-            .filter(|f| f.applies_to(item_kind) && f.is_scrapable())
-        {
+        for field in all_fields().into_iter().filter(|f| f.applies_to(item_kind)) {
             let only = ScrapeOptions::only([field]);
             for source in self.source_order(field) {
                 let Some(answer) = answers.get(source) else {

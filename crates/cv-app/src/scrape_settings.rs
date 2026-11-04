@@ -11,12 +11,10 @@
 //! | `tv.episode-order` | `aired` (default), `dvd` or `absolute` | the ordering a show starts in when it is first scraped |
 //! | `movies.collections.auto-group` | bool (default on) | put a scraped movie into its TMDB collection |
 //!
-//! The field keys are `cv_domain::MetaField::key`. A missing value means every field a scrape
-//! may write. Tags are not one of them: a provider's tags are its keywords (hundreds for a small
-//! library, "albuquerque, new mexico"), and they are never imported, so the tags a title has from
-//! its NFO stay as they are (`MetaField::is_scrapable`). A stored `tags` key is ignored, like any
-//! unknown key, and a key that does not belong to the kind is dropped. The same options apply to
-//! a rescrape of one item and to a batch scrape.
+//! The field keys are `cv_domain::MetaField::key`. A missing value means every field, Tags
+//! included: a scrape adds the provider's keywords to the tags a title has. An unknown key, or
+//! one that does not belong to the kind, is dropped. The same options apply to a rescrape of one
+//! item and to a batch scrape.
 
 use std::collections::BTreeMap;
 
@@ -52,27 +50,19 @@ impl Default for ScrapeSettings {
     }
 }
 
-/// The fields a scrape of `kind` writes when the user has not chosen: every field a scrape may
-/// write (never Tags).
+/// The fields a scrape of `kind` writes when the user has not chosen: every field.
 #[must_use]
 pub fn default_fields(kind: ItemKind) -> FieldSet {
-    scrapable(FieldSet::all_for(kind))
-}
-
-/// `fields` without the ones a scrape never writes.
-fn scrapable(fields: FieldSet) -> FieldSet {
-    fields.iter().filter(|f| f.is_scrapable()).collect()
+    FieldSet::all_for(kind)
 }
 
 fn fields(values: &Values, key: &str, kind: ItemKind) -> FieldSet {
     let all = FieldSet::all_for(kind);
     match values.get(key).and_then(Value::as_str) {
-        Some(text) => scrapable(
-            FieldSet::from_keys(text)
-                .iter()
-                .filter(|f| all.contains(*f))
-                .collect(),
-        ),
+        Some(text) => FieldSet::from_keys(text)
+            .iter()
+            .filter(|f| all.contains(*f))
+            .collect(),
         None => default_fields(kind),
     }
 }
@@ -130,7 +120,7 @@ mod tests {
 
     /// `schema.ts` pins the same lists (`scrapeFieldDefaults` in `scrape.test.ts`).
     #[test]
-    fn the_defaults_select_every_field_a_scrape_may_write() {
+    fn the_defaults_select_every_field() {
         let s = ScrapeSettings::default();
         assert!(!s.do_not_overwrite);
         assert!(s.auto_group_collections);
@@ -138,35 +128,44 @@ mod tests {
         assert_eq!(
             s.movie.to_keys(),
             "title,original_title,tagline,plot,year,release_date,rating,top250,runtime,\
-             certification,genres,spoken_languages,country,studio,collection,actors,crew,\
+             certification,genres,spoken_languages,country,studio,tags,collection,actors,crew,\
              trailer,poster,fanart,banner,clearart,disc,clearlogo,thumb,keyart,squareart,\
              extrafanart,extrathumb"
         );
         assert_eq!(
             s.show.to_keys(),
             "title,original_title,tagline,plot,year,release_date,status,rating,top250,runtime,\
-             certification,genres,country,studio,actors,crew,trailer,poster,fanart,banner,\
+             certification,genres,country,studio,tags,actors,crew,trailer,poster,fanart,banner,\
              clearart,disc,clearlogo,thumb,characterart,keyart,squareart,extrafanart"
         );
         assert_eq!(
             s.episode.to_keys(),
-            "title,original_title,plot,release_date,rating,runtime,studio,actors,crew,thumb"
+            "title,original_title,plot,release_date,rating,runtime,studio,tags,actors,crew,thumb"
         );
     }
 
     #[test]
-    fn tags_are_never_selected_even_when_a_stored_list_names_them() {
-        let s = ScrapeSettings::from_values(&values(&[(
-            "metadata.scrape-fields-movie",
-            json!("title,tags,genres"),
-        )]));
-        assert_eq!(s.movie.to_keys(), "title,genres");
+    fn tags_are_a_field_a_stored_list_can_name_or_leave_out() {
+        let s = ScrapeSettings::from_values(&values(&[
+            ("metadata.scrape-fields-movie", json!("title,tags,genres")),
+            ("metadata.scrape-fields-show", json!("title,genres")),
+        ]));
         assert!(
-            !s.options_for(ItemKind::Set)
+            s.options_for(ItemKind::Movie)
                 .fields
                 .contains(MetaField::Tags)
         );
-        assert!(!MetaField::Tags.is_scrapable());
+        assert!(
+            !s.options_for(ItemKind::Show)
+                .fields
+                .contains(MetaField::Tags)
+        );
+        assert!(
+            ScrapeSettings::default()
+                .options_for(ItemKind::Set)
+                .fields
+                .contains(MetaField::Tags)
+        );
     }
 
     #[test]
