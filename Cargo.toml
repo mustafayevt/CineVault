@@ -41,7 +41,7 @@ tokio-stream = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
-rusqlite = { version = "0.37", features = ["bundled", "functions"] }
+rusqlite = { version = "0.41", features = ["bundled", "functions"] }
 tempfile = "3"
 # Whether two paths are one file or folder (cv-app copies, cv-scan library folders); walkdir already uses it.
 same-file = "1"
