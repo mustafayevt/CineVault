@@ -283,28 +283,37 @@ impl Reader<'_> {
                 return (None, vec![problem]);
             }
         };
-        let mut files: Vec<Entry> = entries
-            .flatten()
-            .filter_map(|e| {
-                let file_name = e.file_name().to_string_lossy().into_owned();
-                if self.skip.is_builtin_skipped(&file_name) {
-                    return None;
-                }
-                let meta = e.metadata().ok().filter(fs::Metadata::is_file)?;
-                Some(entry_from(
-                    e.path(),
-                    join_rel(&rel, &file_name),
-                    file_name,
-                    false,
-                    Some(&meta),
-                ))
-            })
-            .collect();
+        // The folder stands for the disc's video, so it carries the size of everything in it
+        // (a Blu-ray keeps its streams in `BDMV/STREAM`).
+        let mut size = 0;
+        let mut files: Vec<Entry> = Vec::new();
+        for e in entries.flatten() {
+            if e.file_type().is_ok_and(|ft| ft.is_dir()) {
+                size += folder_size(&e.path(), 1);
+                continue;
+            }
+            let Some(meta) = e.metadata().ok().filter(fs::Metadata::is_file) else {
+                continue;
+            };
+            size += meta.len();
+            let file_name = e.file_name().to_string_lossy().into_owned();
+            if self.skip.is_builtin_skipped(&file_name) {
+                continue;
+            }
+            files.push(entry_from(
+                e.path(),
+                join_rel(&rel, &file_name),
+                file_name,
+                false,
+                Some(&meta),
+            ));
+        }
         files.sort_by_key(|f| f.name.to_lowercase());
         let has_video = files
             .iter()
             .any(|f| classify(&f.rel).file_type == MediaFileType::Video);
-        let dir = entry_of(path, rel, name, true);
+        let mut dir = entry_of(path, rel, name, true);
+        dir.size = size;
         (
             Some(Disc {
                 dir,
@@ -314,6 +323,21 @@ impl Reader<'_> {
             Vec::new(),
         )
     }
+}
+
+/// The size of every file below a folder inside a disc structure. Links are not followed.
+fn folder_size(path: &Path, depth: usize) -> u64 {
+    let Ok(entries) = fs::read_dir(path) else {
+        return 0;
+    };
+    entries
+        .flatten()
+        .map(|e| match e.file_type() {
+            Ok(ft) if ft.is_dir() && depth < MAX_DEPTH => folder_size(&e.path(), depth + 1),
+            Ok(ft) if ft.is_file() => e.metadata().map_or(0, |m| m.len()),
+            _ => 0,
+        })
+        .sum()
 }
 
 fn join_rel(parent: &str, name: &str) -> String {

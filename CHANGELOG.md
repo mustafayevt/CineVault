@@ -8,6 +8,10 @@ What changed in each version of CineVault, newest first, in plain words. The app
 
 - Torrents: a Filter results field at the right of the chips narrows a title's releases by words in their names, in any order (`remux atmos`); start a word with - to leave it out (`-x265`). The chip counts follow it, and Esc clears it.
 
+### Fixed
+
+- A movie kept as a Blu-ray or DVD folder (`BDMV`, `VIDEO_TS`) showed a size of 0 B on its page, in the library's size column and filters, and in the `${videoFilesize}` naming token. It now shows the size of the whole disc folder after the next Scan.
+
 ## [1.6.0] - 2026-11-03
 
 ### Added
