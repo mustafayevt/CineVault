@@ -102,7 +102,7 @@ unicode-normalization = "0.1"
 proptest = "1"
 # Managed indexer service (cv-torrent): the executable path of a process, to tell our own leftover
 # from a stranger, and a Windows job object that ends the child with the app (no unsafe of ours).
-sysinfo = { version = "0.39", default-features = false, features = ["disk", "system"] }
+sysinfo = { version = "0.40", default-features = false, features = ["disk", "system"] }
 # Reads the Recycle Bin settings of a volume (cv-app, Windows only; safe registry access).
 winreg = "0.56"
 win32job = "2"
