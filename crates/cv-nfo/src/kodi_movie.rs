@@ -9,7 +9,8 @@
 //! premiered watched playcount [lastplayed] genre* studio* credits* director* tag* actor*
 //! producer* [trailer] languages showlink* [dateadded] [lockdata] [fileinfo]
 //! [videoassettitle hasvideoversions] <unmanaged elements> <comment>
-//! source edition original_filename user_note english_title [crc32] crew* cv_locked
+//! source edition original_filename user_note english_title [crc32] [original_language
+//! localized_title video3d extrathumbs] crew* cv_locked
 //! ```
 //!
 //! Elements without a value are written empty (`<year/>`), except those marked optional.
@@ -223,10 +224,12 @@ pub(crate) fn private_tags(movie: &MovieNfo, options: &MovieNfoOptions, root: &m
     root.push(text("cv_locked", &movie.locked_fields.join(",")));
 }
 
-/// CineVault's additions among the private tags: the original language, the 3D flag and the
-/// extra thumbnails. Each is left out when it has no value.
+/// CineVault's additions among the private tags: the original language, the localized title kept
+/// while the original title is used, the 3D flag and the extra thumbnails. Each is left out when
+/// it has no value.
 fn extension_tags(movie: &MovieNfo, root: &mut Element) {
     push_text(root, "original_language", &movie.original_language);
+    push_text(root, "localized_title", &movie.localized_title);
     if movie.video_in_3d {
         root.push(Element::text("video3d", "true"));
     }

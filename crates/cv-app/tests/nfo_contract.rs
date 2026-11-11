@@ -43,6 +43,8 @@ fn core_contract(core: &ItemCore) -> Vec<(&'static str, Goes)> {
         ids: _,
         title: _,
         original_title: _,
+        use_original_title: _,
+        localized_title: _,
         original_language: _,
         year: _,
         plot: _,
@@ -73,6 +75,11 @@ fn core_contract(core: &ItemCore) -> Vec<(&'static str, Goes)> {
         ("ids", Nfo("uniqueid*, id, tmdbid")),
         ("title", Nfo("title")),
         ("original_title", Nfo("originaltitle")),
+        (
+            "use_original_title",
+            Nfo("title holds the original title, with localized_title beside it"),
+        ),
+        ("localized_title", Nfo("localized_title")),
         ("original_language", Nfo("original_language")),
         ("year", Nfo("year")),
         ("plot", Nfo("plot")),
@@ -729,6 +736,10 @@ fn a_movie_nfo_carries_every_field_of_the_library_item() {
 
     assert_eq!(nfo.title, c.title);
     assert_eq!(nfo.original_title, c.original_title);
+    assert_eq!(
+        nfo.localized_title, "",
+        "the movie keeps its localized title"
+    );
     assert_eq!(nfo.original_language, c.original_language);
     assert_eq!(nfo.year, u32::from(c.year));
     assert_eq!(nfo.plot, c.plot);
@@ -901,6 +912,8 @@ fn a_show_and_its_episode_carry_every_field_of_the_library() {
     show.core.path = dir.clone();
     show.core.original_title = "킹덤".into();
     show.core.original_language = "ko".into();
+    // The show uses its original title; the NFO keeps the localized one beside it.
+    assert!(show.choose_original_title(true));
     show.core.year = 2019;
     show.core.plot = "A crown prince faces a plague.".into();
     show.core.ids.set("tvdb", "355678");
@@ -996,7 +1009,10 @@ fn a_show_and_its_episode_carry_every_field_of_the_library() {
         unreachable!()
     };
     assert_eq!(nfo.title, show.core.title);
+    assert_eq!(nfo.title, "킹덤");
     assert_eq!(nfo.original_title, show.core.original_title);
+    assert_eq!(nfo.localized_title, "Kingdom");
+    assert_eq!(nfo.localized_title, show.core.localized_title);
     assert_eq!(nfo.original_language, show.core.original_language);
     assert_eq!(nfo.year, u32::from(show.core.year));
     assert_eq!(nfo.plot, show.core.plot);

@@ -81,6 +81,31 @@ impl Lab {
     }
 }
 
+impl Lab {
+    /// A Spanish movie "The Sleeping City" (original title "La Ciudad Dormida") in its folder.
+    fn foreign_movie(&self) -> (ItemId, PathBuf) {
+        let folder = self.root.path().join("Movies").join("Sleeping City (2019)");
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("Sleeping City (2019).mkv"), b"video").unwrap();
+        let mut item = Item::movie("The Sleeping City");
+        item.core.original_title = "La Ciudad Dormida".into();
+        item.core.original_language = "es".into();
+        item.core.year = 2019;
+        item.core.path = folder.to_string_lossy().into_owned();
+        item.core.ids.set("tmdb", "77");
+        item.core.media_files.push(MediaFile::new(
+            MediaFileType::Video,
+            folder.to_string_lossy(),
+            "Sleeping City (2019).mkv",
+        ));
+        (self.insert(item), folder)
+    }
+}
+
+fn foreign_nfo(folder: &std::path::Path) -> String {
+    fs::read_to_string(folder.join("Sleeping City (2019).nfo")).unwrap()
+}
+
 fn entries(changes: Vec<(&str, FieldValue)>) -> Vec<FieldEntry> {
     changes
         .into_iter()
@@ -847,4 +872,148 @@ fn a_movie_joins_and_leaves_a_collection_in_place_with_undo() {
     assert!(other.collections.is_empty());
     let refused = lab.save(set, vec![("collection", text("Heat Collection"))]);
     assert!(matches!(refused, Err(EditError::Invalid(_))), "{refused:?}");
+}
+
+#[test]
+fn the_title_choice_is_a_field_that_saves_rewrites_the_nfo_and_undoes() {
+    let lab = Lab::new();
+    let (id, folder) = lab.foreign_movie();
+    let snapshot = lab.service.load(id).unwrap();
+    let choice = snapshot
+        .fields
+        .iter()
+        .find(|f| f.key == "title_choice")
+        .unwrap();
+    assert_eq!(choice.value, text("localized"));
+    assert_eq!(choice.lock, None, "no scrape writes the choice");
+
+    let report = lab
+        .save(id, vec![("title_choice", text("original"))])
+        .unwrap();
+    assert_eq!(report.changed, vec!["title_choice".to_owned()]);
+    let item = lab.item(id);
+    assert_eq!(item.core.title, "La Ciudad Dormida");
+    assert_eq!(item.core.localized_title, "The Sleeping City");
+    let nfo = foreign_nfo(&folder);
+    assert!(nfo.contains("<title>La Ciudad Dormida</title>"), "{nfo}");
+    assert!(nfo.contains("<originaltitle>La Ciudad Dormida</originaltitle>"));
+    // The Title field still edits the localized title, which is kept.
+    assert_eq!(read_field(&item, "title"), Some(text("The Sleeping City")));
+
+    // Undo saves the previous values back.
+    lab.service
+        .save(id, report.previous, &NfoSettings::default())
+        .unwrap();
+    let item = lab.item(id);
+    assert!(!item.core.use_original_title);
+    assert_eq!(item.core.title, "The Sleeping City");
+    assert!(foreign_nfo(&folder).contains("<title>The Sleeping City</title>"));
+}
+
+#[test]
+fn the_choice_saved_with_new_titles_uses_them_whatever_the_order() {
+    let lab = Lab::new();
+    let (id, _) = lab.foreign_movie();
+    lab.save(
+        id,
+        vec![
+            ("title_choice", text("original")),
+            ("original_title", text("La Ciudad")),
+            ("title", text("The City")),
+        ],
+    )
+    .unwrap();
+    let item = lab.item(id);
+    assert!(item.core.use_original_title);
+    assert_eq!(item.core.title, "La Ciudad");
+    assert_eq!(item.core.localized_title, "The City");
+}
+
+#[test]
+fn the_original_title_cannot_be_chosen_without_one() {
+    let lab = Lab::new();
+    let (id, _) = lab.movie();
+    let refused = lab.save(id, vec![("title_choice", text("original"))]);
+    assert!(
+        matches!(&refused, Err(EditError::Invalid(e)) if e.key == "title_choice"),
+        "{refused:?}"
+    );
+    assert_eq!(lab.item(id).core.title, "Heat");
+    let mut episode = Item::episode(ItemId(1), "Pilot");
+    assert!(apply_change(&mut episode, "title_choice", &text("original")).is_err());
+}
+
+#[test]
+fn the_bulk_choice_changes_only_titles_that_have_another_original_title() {
+    let lab = Lab::new();
+    let (foreign, folder) = lab.foreign_movie();
+    let (heat, _) = lab.movie();
+    let gone = ItemId(9_999);
+
+    let report = lab
+        .service
+        .set_title_choice(vec![foreign, heat, gone], true, &NfoSettings::default())
+        .unwrap();
+    assert_eq!(report.changed, vec![foreign]);
+    assert_eq!(report.unchanged, 2);
+    assert!(report.nfo_problem.is_none(), "{:?}", report.nfo_problem);
+    assert!(report.nfo_files_written >= 1);
+    assert_eq!(lab.item(foreign).core.title, "La Ciudad Dormida");
+    assert!(foreign_nfo(&folder).contains("<title>La Ciudad Dormida</title>"));
+
+    // Asking again changes nothing; the other choice on the changed titles undoes it.
+    let again = lab
+        .service
+        .set_title_choice(vec![foreign], true, &NfoSettings::default())
+        .unwrap();
+    assert!(again.changed.is_empty());
+    let undo = lab
+        .service
+        .set_title_choice(report.changed, false, &NfoSettings::default())
+        .unwrap();
+    assert_eq!(undo.changed, vec![foreign]);
+    assert_eq!(lab.item(foreign).core.title, "The Sleeping City");
+    assert!(foreign_nfo(&folder).contains("<title>The Sleeping City</title>"));
+}
+
+#[test]
+fn a_locked_title_still_follows_its_owners_choice() {
+    let lab = Lab::new();
+    let (id, _) = lab.foreign_movie();
+    lab.service.set_item_locked(id, true).unwrap();
+    let report = lab
+        .service
+        .set_title_choice(vec![id], true, &NfoSettings::default())
+        .unwrap();
+    assert_eq!(report.changed, vec![id]);
+}
+
+#[test]
+fn the_titles_of_listed_languages_are_found_for_the_rule() {
+    let lab = Lab::new();
+    let (foreign, _) = lab.foreign_movie();
+    let (heat, _) = lab.movie();
+    let mut english = lab.item(heat);
+    english.core.original_language = "en".into();
+    english.core.original_title = "Heat".into();
+    lab.db
+        .write(move |tx| cv_db::repo::update_item(tx, &english))
+        .unwrap();
+
+    let found = lab
+        .service
+        .titles_in_languages(&["es".to_owned(), "fr".to_owned()])
+        .unwrap();
+    assert_eq!(found, vec![foreign]);
+    assert!(lab.service.titles_in_languages(&[]).unwrap().is_empty());
+    lab.service
+        .set_title_choice(found, true, &NfoSettings::default())
+        .unwrap();
+    assert!(
+        lab.service
+            .titles_in_languages(&["es".to_owned()])
+            .unwrap()
+            .is_empty(),
+        "a title already using its original title is not listed again"
+    );
 }

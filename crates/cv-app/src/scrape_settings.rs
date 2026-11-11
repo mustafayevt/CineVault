@@ -10,6 +10,7 @@
 //! | `metadata.scrape-do-not-overwrite` | bool (default off) | write only fields that are empty |
 //! | `tv.episode-order` | `aired` (default), `dvd` or `absolute` | the ordering a show starts in when it is first scraped |
 //! | `movies.collections.auto-group` | bool (default on) | put a scraped movie into its TMDB collection |
+//! | `metadata.original-title-languages` | comma-separated language codes (default none) | a movie or show in one of these original languages starts with its original title as its title, when it is scraped for the first time |
 //!
 //! The field keys are `cv_domain::MetaField::key`. A missing value means every field, Tags
 //! included: a scrape adds the provider's keywords to the tags a title has. An unknown key, or
@@ -29,6 +30,9 @@ pub const EPISODE_ORDER_KEY: &str = "tv.episode-order";
 /// The setting that switches automatic collection assignment after a scrape.
 pub const AUTO_GROUP_KEY: &str = "movies.collections.auto-group";
 
+/// The setting that lists the original languages whose titles keep their original title.
+pub const ORIGINAL_TITLE_LANGUAGES_KEY: &str = "metadata.original-title-languages";
+
 /// The scrape options of the three scraped kinds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScrapeSettings {
@@ -42,6 +46,9 @@ pub struct ScrapeSettings {
     /// `tv.episode-order`: the ordering a new show starts in. A show already scraped keeps the
     /// ordering it has; the picker on the show page changes one show.
     pub episode_order: EpisodeOrdering,
+    /// `metadata.original-title-languages`: two-letter codes of the original languages whose
+    /// movies and shows start with their original title as their title. Empty by default.
+    pub original_title_languages: Vec<String>,
 }
 
 impl Default for ScrapeSettings {
@@ -87,7 +94,20 @@ impl ScrapeSettings {
                 Some("absolute") => EpisodeOrdering::Absolute,
                 _ => EpisodeOrdering::Aired,
             },
+            original_title_languages: language_list(
+                values
+                    .get(ORIGINAL_TITLE_LANGUAGES_KEY)
+                    .and_then(Value::as_str)
+                    .unwrap_or(""),
+            ),
         }
+    }
+
+    /// Whether a title whose original language is `language` starts with its original title.
+    #[must_use]
+    pub fn keeps_original_title(&self, language: &str) -> bool {
+        let code = cv_domain::language_code(language);
+        !code.is_empty() && self.original_title_languages.contains(&code)
     }
 
     /// The options for scraping an item of `kind`. Sets and seasons write everything they have.
@@ -103,6 +123,21 @@ impl ScrapeSettings {
             do_not_overwrite: self.do_not_overwrite,
         }
     }
+}
+
+/// `fr, es` as `["fr", "es"]`: two-letter codes, without repeats or blanks.
+fn language_list(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for code in text
+        .split([',', ' ', ';'])
+        .map(cv_domain::language_code)
+        .filter(|code| !code.is_empty())
+    {
+        if !out.contains(&code) {
+            out.push(code);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -209,6 +244,24 @@ mod tests {
             let s = ScrapeSettings::from_values(&values(&[(EPISODE_ORDER_KEY, json!(text))]));
             assert_eq!(s.episode_order, want, "{text}");
         }
+    }
+
+    #[test]
+    fn the_original_title_languages_are_read_as_codes() {
+        assert!(
+            ScrapeSettings::default()
+                .original_title_languages
+                .is_empty()
+        );
+        let s = ScrapeSettings::from_values(&values(&[(
+            ORIGINAL_TITLE_LANGUAGES_KEY,
+            json!("fr, ES,fra,,pt-BR"),
+        )]));
+        assert_eq!(s.original_title_languages, ["fr", "es", "pt"]);
+        assert!(s.keeps_original_title("fr"));
+        assert!(s.keeps_original_title("spa"));
+        assert!(!s.keeps_original_title("en"));
+        assert!(!s.keeps_original_title(""));
     }
 
     #[test]

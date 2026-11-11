@@ -72,6 +72,7 @@ fn merge_common(item: &mut Item, nfo: &CommonFields<'_>) {
     let c = &mut item.core;
     set_text(&mut c.title, nfo.title);
     set_text(&mut c.original_title, nfo.original_title);
+    adopt_title_choice(c, nfo.localized_title);
     if let Ok(year) = u16::try_from(nfo.year)
         && year > 0
     {
@@ -89,10 +90,23 @@ fn merge_common(item: &mut Item, nfo: &CommonFields<'_>) {
     merge_ratings(item, nfo.ratings);
 }
 
+/// The file's title is the title in use. A `<localized_title>` beside a title that is the original
+/// title says the original title was chosen, and keeps the localized one; the original title stays
+/// chosen only while the title is the original title.
+fn adopt_title_choice(c: &mut cv_domain::ItemCore, localized: &str) {
+    let localized = localized.trim();
+    if !localized.is_empty() && c.title.trim() == c.original_title.trim() && localized != c.title {
+        c.use_original_title = true;
+        localized.clone_into(&mut c.localized_title);
+    }
+    c.settle_title_choice();
+}
+
 /// The fields every kind shares, borrowed from the model that was read.
 struct CommonFields<'a> {
     title: &'a str,
     original_title: &'a str,
+    localized_title: &'a str,
     year: u32,
     plot: &'a str,
     outline: &'a str,
@@ -114,6 +128,7 @@ pub fn merge_movie(item: &mut Item, nfo: &MovieNfo) {
         &CommonFields {
             title: &nfo.title,
             original_title: &nfo.original_title,
+            localized_title: &nfo.localized_title,
             year: nfo.year,
             plot: &nfo.plot,
             outline: &nfo.outline,
@@ -215,6 +230,7 @@ pub fn merge_show(item: &mut Item, nfo: &ShowNfo) {
         &CommonFields {
             title: &nfo.title,
             original_title: &nfo.original_title,
+            localized_title: &nfo.localized_title,
             year: nfo.year,
             plot: &nfo.plot,
             outline: &nfo.outline,
@@ -402,6 +418,49 @@ mod tests {
         nfo.ratings.insert(Rating::new("imdb", 8.3, 700_000, 10));
         nfo.artwork.poster = "https://img.example.test/p.jpg".into();
         nfo
+    }
+
+    #[test]
+    fn reading_back_its_own_nfo_keeps_the_original_title_in_use() {
+        let mut item = Item::movie("The Sleeping City");
+        item.core.original_title = "La Ciudad Dormida".into();
+        assert!(item.choose_original_title(true));
+        // The file CineVault wrote names the original title twice.
+        let written = MovieNfo {
+            title: "La Ciudad Dormida".into(),
+            original_title: "La Ciudad Dormida".into(),
+            ..MovieNfo::default()
+        };
+        merge_movie(&mut item, &written);
+        assert!(item.core.use_original_title);
+        assert_eq!(item.core.localized_title, "The Sleeping City");
+
+        // A file edited elsewhere to another title: that title is the one in use now.
+        let edited = MovieNfo {
+            title: "Sleeping City".into(),
+            original_title: "La Ciudad Dormida".into(),
+            ..MovieNfo::default()
+        };
+        merge_movie(&mut item, &edited);
+        assert!(!item.core.use_original_title);
+        assert_eq!(item.core.title, "Sleeping City");
+    }
+
+    #[test]
+    fn the_localized_title_in_the_file_restores_the_choice_in_a_new_library() {
+        // A library built again from the files: the item knows only what the scan read.
+        let mut item = Item::movie("La Ciudad Dormida");
+        let file = MovieNfo {
+            title: "La Ciudad Dormida".into(),
+            original_title: "La Ciudad Dormida".into(),
+            localized_title: "The Sleeping City".into(),
+            ..MovieNfo::default()
+        };
+        merge_movie(&mut item, &file);
+        assert!(item.core.use_original_title);
+        assert_eq!(item.core.localized_title, "The Sleeping City");
+        assert!(item.choose_original_title(false));
+        assert_eq!(item.core.title, "The Sleeping City");
     }
 
     #[test]

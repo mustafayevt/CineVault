@@ -374,6 +374,9 @@ fn private_tags(show: &ShowNfo, options: &MovieNfoOptions, root: &mut Element) {
         if !show.original_language.trim().is_empty() {
             root.push(text("original_language", show.original_language.trim()));
         }
+        if !show.localized_title.trim().is_empty() {
+            root.push(text("localized_title", show.localized_title.trim()));
+        }
         if show.year_end > 0 {
             root.push(text("year_end", &show.year_end.to_string()));
         }

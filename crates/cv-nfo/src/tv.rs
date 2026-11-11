@@ -204,6 +204,9 @@ pub struct ShowNfo {
     pub english_title: String,
     /// The original language as a language code (`ko`), empty when unknown.
     pub original_language: String,
+    /// The title in the metadata language while the original title is the title in use (then
+    /// `title` holds the original title); empty otherwise.
+    pub localized_title: String,
     /// The year the show ended, `0` when it runs on or is unknown.
     pub year_end: u32,
     /// First-aired year, `0` when unknown.

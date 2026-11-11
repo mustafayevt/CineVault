@@ -90,6 +90,9 @@ pub struct MovieNfo {
     pub english_title: String,
     /// The original language of the film as a language code (`ja`), empty when unknown.
     pub original_language: String,
+    /// The title in the metadata language while the original title is the title in use (then
+    /// `title` holds the original title); empty otherwise.
+    pub localized_title: String,
     /// The video is 3D (from the file name or the media info).
     pub video_in_3d: bool,
     /// Release year, `0` when unknown.

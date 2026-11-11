@@ -137,6 +137,7 @@ pub const SEASON_OVERVIEW_PREFIX: &str = "season_overview.";
 const MOVIE_KEYS: &[&str] = &[
     "title",
     "original_title",
+    "title_choice",
     "sort_title",
     "tagline",
     "plot",
@@ -168,6 +169,7 @@ const SET_KEYS: &[&str] = &["title", "sort_title", "plot", "tags"];
 const SHOW_KEYS: &[&str] = &[
     "title",
     "original_title",
+    "title_choice",
     "sort_title",
     "tagline",
     "plot",
@@ -485,8 +487,11 @@ fn season_text(show: &cv_domain::ShowFields, season: u32) -> Option<&SeasonText>
 pub fn read_field(item: &Item, key: &str) -> Option<FieldValue> {
     let core = &item.core;
     let value = match (key, &item.detail) {
-        ("title", _) => FieldValue::Text(core.title.clone()),
+        // The Title field is the title in the metadata language; `title_choice` says whether the
+        // original title is the one in use.
+        ("title", _) => FieldValue::Text(core.localized_title().to_owned()),
         ("original_title", _) => FieldValue::Text(core.original_title.clone()),
+        ("title_choice", _) => FieldValue::Text(title_choice_text(core.use_original_title).into()),
         ("plot", _) => FieldValue::Text(core.plot.clone()),
         ("outline", _) => FieldValue::Text(core.outline.clone()),
         ("note", _) => FieldValue::Text(core.note.clone()),
@@ -582,6 +587,19 @@ pub fn read_fields(item: &Item) -> Vec<FieldEntry> {
             Some(FieldEntry { key, value, lock })
         })
         .collect()
+}
+
+/// The key of the choice between the localized and the original title (movies and shows).
+pub const TITLE_CHOICE_KEY: &str = "title_choice";
+
+/// `original` or `localized`: the value of the `title_choice` field.
+#[must_use]
+pub fn title_choice_text(use_original: bool) -> &'static str {
+    if use_original {
+        "original"
+    } else {
+        "localized"
+    }
 }
 
 // ---- Applying a value -------------------------------------------------------------------------
@@ -901,9 +919,23 @@ pub fn apply_change(item: &mut Item, key: &str, value: &FieldValue) -> Result<()
         "title" => {
             let text = want_text(key, value)?;
             require_title(kind, key, text)?;
-            text.clone_into(&mut item.core.title);
+            item.core.set_localized_title(text);
         }
-        "original_title" => want_text(key, value)?.clone_into(&mut item.core.original_title),
+        "original_title" => item.core.set_original_title(want_text(key, value)?),
+        TITLE_CHOICE_KEY => match want_text(key, value)? {
+            "original" => {
+                if !item.core.use_original_title && !item.choose_original_title(true) {
+                    return Err(refuse(
+                        key,
+                        "there is no other original title to use; enter the original title first",
+                    ));
+                }
+            }
+            "localized" => {
+                item.choose_original_title(false);
+            }
+            _ => return Err(refuse(key, "choose the localized or the original title")),
+        },
         "plot" => want_text(key, value)?.clone_into(&mut item.core.plot),
         "outline" => want_text(key, value)?.clone_into(&mut item.core.outline),
         "note" => want_text(key, value)?.clone_into(&mut item.core.note),

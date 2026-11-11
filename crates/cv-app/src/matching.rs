@@ -443,9 +443,13 @@ pub(crate) fn apply_scraped_in(
         let Some(mut item) = get_item(tx, item_id)? else {
             return Err(DbError::ItemNotFound(item_id.0));
         };
+        let mut changed = keep_original_title_on_first_scrape(tx, &mut item, &settings.scrape)?;
         if item.core.last_scraper_id != provider_id || &item.core.last_scrape_language != language {
             item.core.last_scraper_id = provider_id.to_owned();
             item.core.last_scrape_language.clone_from(language);
+            changed = true;
+        }
+        if changed {
             update_item(tx, &item)?;
         }
         review::close_accepted(tx, item_id)?;
@@ -453,6 +457,31 @@ pub(crate) fn apply_scraped_in(
         record_scrape(tx, item_id, StepStatus::Done, "")?;
     }
     Ok(outcome)
+}
+
+/// A movie or show scraped for the first time (no scraper recorded yet) whose original language
+/// is one of `metadata.original-title-languages` starts with its original title as its title.
+/// A locked Title field keeps the title as it is. A title scraped before keeps its choice, so
+/// a re-Scrape never undoes what the owner chose. Returns whether the item changed.
+fn keep_original_title_on_first_scrape(
+    tx: &rusqlite::Connection,
+    item: &mut Item,
+    settings: &ScrapeSettings,
+) -> Result<bool, DbError> {
+    if !item.core.last_scraper_id.trim().is_empty()
+        || item.core.use_original_title
+        || !item.has_title_choice()
+        || !settings.keeps_original_title(&item.core.original_language)
+    {
+        return Ok(false);
+    }
+    let Some(id) = item.id else {
+        return Ok(false);
+    };
+    if repo::field_locks(tx, id)?.contains(cv_domain::MetaField::Title) {
+        return Ok(false);
+    }
+    Ok(item.choose_original_title(true))
 }
 
 /// The provider IDs the item has now.
