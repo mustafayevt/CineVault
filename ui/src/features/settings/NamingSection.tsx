@@ -6,6 +6,7 @@ import { Popover } from "../../components/Popover";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { Switch } from "../../components/Switch";
 import { t } from "../../i18n/catalog";
+import { ArtworkNamesRow } from "./ArtworkNamesRow";
 import { FormRow, SettingsSection } from "./FormParts";
 import {
   COLON_SETTING_KEY,
@@ -56,8 +57,8 @@ function Example({ text }: { text: string | null }) {
 /**
  * Settings, Naming (spec `renamer` "Naming templates in Settings" and "Colon in titles option"):
  * the Movie folder, Movie file and TV episode templates as mono text fields with a live example
- * under each, the token buttons under each field that insert at its cursor, the Style control that fills all three at once, and how a colon
- * in a title is written.
+ * under each, the token buttons under each field that insert at its cursor, the Style control that fills all three at once, how a colon
+ * in a title is written, and the artwork file names (`ArtworkNamesRow`).
  */
 export function NamingSection() {
   const naming = useNamingTemplates();
@@ -264,6 +265,7 @@ export function NamingSection() {
           }}
         />
       </FormRow>
+      <ArtworkNamesRow />
     </SettingsSection>
   );
 }

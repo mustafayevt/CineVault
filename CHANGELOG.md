@@ -7,6 +7,11 @@ What changed in each version of CineVault, newest first, in plain words. The app
 ### Added
 
 - A title whose files are missing now has a "Remove from library (keep files)" button right in the warning on its page (movies and TV shows), with a line saying why the title is kept: the drive may be offline or the files only moved. It is not shown when the library folder is just offline, since that title comes back by itself. In the Library's "Missing files or offline" list, the selection bar has a "Remove from library" button, so you can clear many titles at once.
+- Settings › Naming: Artwork file names. Pick a style (movie name in front, plain names, both, or Jellyfin), or Custom to choose the names of each artwork type yourself: poster, fanart, logo, landscape, disc art and the others, for movies and for shows, seasons and episodes. A type can have more than one name, such as `poster.jpg` and `folder.jpg`, so two media centres can read the same folder, and each row shows the files it gives for an example movie. In a folder that holds several movies the names with the movie name in front are always used. Rename moves the artwork you already have to the new names (with Undo), and old names go to the trash folder.
+
+### Fixed
+
+- Rename: with two names for one artwork type, the second copy is now part of the title, so the next Rename no longer reports a conflict in the title's own folder or copies the same image again.
 
 ## [1.6.2] - 2026-11-04
 
