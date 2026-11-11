@@ -435,6 +435,12 @@ impl OrganizeService {
             .filter_map(|r| r.id.parse::<i64>().ok().map(ItemId))
             .collect();
         self.forget_missing_files(&trashed);
+        let done: Vec<&BatchItem> = reports
+            .iter()
+            .filter(|r| r.status == ItemStatus::Done)
+            .filter_map(|r| planned.resolved.get(&r.id))
+            .collect();
+        self.list_copied_files(&done);
         let items = reports
             .into_iter()
             .map(|r| AppliedItem {
@@ -504,24 +510,90 @@ impl OrganizeService {
     /// Drops the files of `ids` that are no longer on disk (the leftovers an apply moved to the
     /// trash folder), so the next plan does not list them again. A video is never
     /// dropped: a missing video is the Missing flag's business. A rescan lists a file again when
-    /// an undo brings it back.
+    /// an undo brings it back. A show's seasons and episodes are looked at with it.
     fn forget_missing_files(&self, ids: &[ItemId]) {
         for &id in ids {
             let result = self.db.write(move |tx| {
-                let Some(mut item) = cv_db::repo::get_item(tx, id)? else {
-                    return Ok(());
-                };
-                let before = item.core.media_files.len();
-                item.core
-                    .media_files
-                    .retain(|f| f.kind == MediaFileType::Video || f.path().exists());
-                if item.core.media_files.len() != before {
-                    cv_db::repo::update_item(tx, &item)?;
+                // The title, and for a show its seasons and episodes (two levels below it).
+                let mut family = BTreeSet::from([id]);
+                for child in cv_db::repo::children_of(tx, id)? {
+                    family.insert(child);
+                    family.extend(cv_db::repo::children_of(tx, child)?);
+                }
+                for member in family {
+                    let Some(mut item) = cv_db::repo::get_item(tx, member)? else {
+                        continue;
+                    };
+                    let before = item.core.media_files.len();
+                    item.core
+                        .media_files
+                        .retain(|f| f.kind == MediaFileType::Video || f.path().exists());
+                    if item.core.media_files.len() != before {
+                        cv_db::repo::update_item(tx, &item)?;
+                    }
                 }
                 Ok(())
             });
             if let Err(error) = result {
                 tracing::warn!(item = id.0, %error, "the trashed files stayed listed");
+            }
+        }
+    }
+
+    /// Adds the copies an apply made to the files of their titles. A file that goes to several
+    /// names (artwork or an NFO under every name of the settings) is moved to the first and copied
+    /// to the others; each copy is a file of the title from then on, so the next plan finds it as
+    /// the title's own instead of a stranger in its folder. The owner is the title that lists the
+    /// moved file; a copy another title already lists is left to it.
+    fn list_copied_files(&self, items: &[&BatchItem]) {
+        for item in items {
+            for file in &item.files {
+                let Fate::Carried { to } = &file.fate else {
+                    continue;
+                };
+                let Some((first, rest)) = to.split_first() else {
+                    continue;
+                };
+                let copies: Vec<String> = rest
+                    .iter()
+                    .map(|rel| native_join(&item.root, rel))
+                    .filter(|path| std::path::Path::new(path).is_file())
+                    .collect();
+                if copies.is_empty() {
+                    continue;
+                }
+                let (source, kind) = (native_join(&item.root, first), file.kind);
+                let result = self.db.write(move |tx| {
+                    let Some(owner) = owner_of_file(tx, &source)? else {
+                        return Ok(());
+                    };
+                    let Some(mut title) = cv_db::repo::get_item(tx, ItemId(owner))? else {
+                        return Ok(());
+                    };
+                    let mut added = false;
+                    for copy in &copies {
+                        if owner_of_file(tx, copy)?.is_some() {
+                            continue;
+                        }
+                        let path = std::path::Path::new(copy);
+                        let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
+                            continue;
+                        };
+                        title.core.media_files.push(cv_domain::MediaFile::new(
+                            kind,
+                            dir.to_string_lossy(),
+                            name.to_string_lossy(),
+                        ));
+                        added = true;
+                    }
+                    if added {
+                        cv_db::repo::update_item(tx, &title)?;
+                    }
+                    Ok(())
+                });
+                if let Err(error) = result {
+                    tracing::warn!(item = %item.id, %error, "the copies of a file stayed unlisted");
+                }
             }
         }
     }
@@ -667,6 +739,7 @@ impl OrganizeService {
             batch_id: batch_id.to_owned(),
             ..UndoOutcome::default()
         };
+        let mut restored: Vec<ItemId> = Vec::new();
         for item in report.items {
             let title = item
                 .id
@@ -675,7 +748,12 @@ impl OrganizeService {
                 .and_then(|id| self.title_of(ItemId(id)))
                 .unwrap_or_default();
             match item.status {
-                UndoStatus::Restored => outcome.restored += 1,
+                UndoStatus::Restored => {
+                    outcome.restored += 1;
+                    if let Some(id) = item.id.as_deref().and_then(|id| id.parse::<i64>().ok()) {
+                        restored.push(ItemId(id));
+                    }
+                }
                 UndoStatus::NotRestorable(list) => {
                     for entry in list {
                         outcome.not_restorable.push(NotRestorable {
@@ -700,6 +778,9 @@ impl OrganizeService {
             .into_iter()
             .map(ItemId)
             .collect::<Vec<_>>();
+        // The copies the batch made are gone again: the titles that came back fully stop listing
+        // them (only those, so a title on a drive that is not there keeps its files).
+        self.forget_missing_files(&restored);
         self.note_changed(&touched);
         Ok(outcome)
     }

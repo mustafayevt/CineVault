@@ -49,7 +49,7 @@ use crate::options::{MultiEpisodeStyle, TvSettings};
 use crate::pattern::uses_original_filename;
 use crate::plan::{
     Fate, FolderChange, Op, Owner, PlanFile, PlannedFile, Problem, duplicate_destinations,
-    keep_subfolder, ops_of,
+    keep_names_already_held, keep_subfolder, ops_of,
 };
 use crate::render::{Namer, with_written_certification};
 
@@ -416,6 +416,9 @@ impl TvRenamer {
         for group in &groups {
             files.extend(ctx.plan_group_files(group, input.episodes));
         }
+        keep_names_already_held(&mut files, |planned| {
+            Some(ctx.path_only(&PlanFile::new(planned.from.clone(), planned.kind)))
+        });
 
         let left_behind = files.iter().any(|f| f.fate == Fate::LeftBehind);
         let folder_change = if new_folder == old_folder {

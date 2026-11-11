@@ -50,7 +50,7 @@ use crate::options::MovieSettings;
 use crate::pattern::{is_file_pattern_valid, is_folder_pattern_unique, uses_original_filename};
 use crate::plan::{
     Fate, FolderChange, Op, Owner, PlanFile, PlannedFile, Problem, duplicate_destinations,
-    keep_subfolder, ops_of,
+    keep_names_already_held, keep_subfolder, ops_of,
 };
 use crate::render::{Namer, with_written_certification};
 
@@ -271,7 +271,10 @@ impl MovieRenamer {
             art_shared: shared_destination || (fields.multi_movie_dir && !is_disc),
             unwanted: &self.unwanted,
         };
-        let files = ctx.plan_files();
+        let mut files = ctx.plan_files();
+        keep_names_already_held(&mut files, |planned| {
+            ctx.path_only(&PlanFile::new(planned.from.clone(), planned.kind))
+        });
 
         let left_behind = files.iter().any(|f| f.fate == Fate::LeftBehind);
         let folder_change = if new_folder == old_folder {

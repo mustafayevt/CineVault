@@ -205,6 +205,75 @@ pub enum Problem {
     EpisodePatternWithoutEpisode,
 }
 
+/// The artwork types that are one image under every name of their type (no index).
+fn is_named_art(kind: MediaFileType) -> bool {
+    matches!(
+        kind,
+        MediaFileType::Poster
+            | MediaFileType::Fanart
+            | MediaFileType::Banner
+            | MediaFileType::Clearart
+            | MediaFileType::Thumb
+            | MediaFileType::Clearlogo
+            | MediaFileType::Disc
+            | MediaFileType::Keyart
+            | MediaFileType::Squareart
+            | MediaFileType::Characterart
+            | MediaFileType::SeasonPoster
+            | MediaFileType::SeasonFanart
+            | MediaFileType::SeasonBanner
+            | MediaFileType::SeasonThumb
+    )
+}
+
+/// Settles the artwork types written under several names (`poster.jpg` and `folder.jpg`).
+///
+/// The newest file of a type goes to every name of the type, and the other files of the type go
+/// to the trash. A file of the type that already sits at another of those names (at its place in
+/// the new folder, `relocated`) is the same image under that name, because the artwork writer and
+/// Rename always write every name of a type together: it stays there instead, and the newest file
+/// is not copied over it. Files at names the type no longer uses still go to the trash. Without
+/// this, a type with several names would plan the same copies after every rename and its title
+/// would never be tidy.
+pub(crate) fn keep_names_already_held(
+    files: &mut [PlannedFile],
+    relocated: impl Fn(&PlannedFile) -> Option<String>,
+) {
+    for winner in 0..files.len() {
+        let (kind, owner) = (files[winner].kind, files[winner].owner);
+        if !is_named_art(kind) {
+            continue;
+        }
+        let secondary: Vec<String> = match &files[winner].fate {
+            Fate::Carried { to } if to.len() > 1 => to[1..].to_vec(),
+            _ => continue,
+        };
+        let mut held: Vec<String> = Vec::new();
+        for (index, file) in files.iter_mut().enumerate() {
+            if index == winner
+                || file.kind != kind
+                || file.owner != owner
+                || file.fate != Fate::Trash
+            {
+                continue;
+            }
+            let Some(at) = relocated(file) else {
+                continue;
+            };
+            if secondary.contains(&at) && !held.contains(&at) {
+                file.fate = Fate::Carried {
+                    to: vec![at.clone()],
+                };
+                held.push(at);
+            }
+        }
+        if let Fate::Carried { to } = &mut files[winner].fate {
+            let first = to.first().cloned();
+            to.retain(|name| Some(name) == first.as_ref() || !held.contains(name));
+        }
+    }
+}
+
 /// Builds the operations of a list of planned files: copies first, then the move, then the
 /// trash entries. Files that stay where they are produce no operation.
 pub(crate) fn ops_of(files: &[PlannedFile]) -> Vec<Op> {
