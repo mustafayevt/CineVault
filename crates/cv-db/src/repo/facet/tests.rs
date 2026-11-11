@@ -934,6 +934,16 @@ fn movie_cases() -> Vec<Case> {
             &["Charlie", "Echo"],
         ),
         (
+            F::MissingArtwork,
+            any(F::MissingArtwork, &["Clear logo"]),
+            &["Bravo", "Charlie", "Delta", "Echo"],
+        ),
+        (
+            F::MissingArtwork,
+            all(F::MissingArtwork, &["Poster", "Fan art", "Clear logo"]),
+            &["Charlie", "Delta", "Echo"],
+        ),
+        (
             F::MediaSource,
             any(F::MediaSource, &[web]),
             &["Bravo", "Delta"],
@@ -1453,6 +1463,16 @@ fn show_cases() -> Vec<Case> {
             &["Tango"],
         ),
         (
+            F::MissingArtwork,
+            any(F::MissingArtwork, &["Clear logo"]),
+            &["Tango", "Uniform"],
+        ),
+        (
+            F::MissingArtwork,
+            all(F::MissingArtwork, &["Poster", "Fan art", "Clear logo"]),
+            &["Tango"],
+        ),
+        (
             F::MissingMetadata,
             any(F::MissingMetadata, &["Plot"]),
             &["Tango", "Uniform"],
@@ -1964,6 +1984,74 @@ fn facet_values_count_items_per_value_and_follow_the_other_filters() {
     assert!(matches!(err, DbError::InvalidFilter(_)));
     let err = facet_values(&conn, ItemKind::Movie, F::Status, &Filter::All).unwrap_err();
     assert!(matches!(err, DbError::InvalidFilter(_)));
+}
+
+/// "Title" under Missing metadata is the literal empty check (a blank title counts too); a title
+/// that was never scraped has the name the scan parsed from its folder, so it is not "missing".
+#[test]
+fn missing_metadata_title_finds_empty_titles_only() {
+    let conn = memory_db();
+    for title in ["Scanned From Folder", "", "   "] {
+        insert_item(&conn, &Item::movie(title)).unwrap();
+        insert_item(&conn, &Item::show(title)).unwrap();
+    }
+    for kind in [ItemKind::Movie, ItemKind::Show] {
+        let missing = |condition: FacetCondition| {
+            let mut found = titles(&conn, kind, Filter::Facet(condition));
+            found.sort();
+            found
+        };
+        assert_eq!(
+            missing(any(F::MissingMetadata, &["Title"])),
+            ["", "   "],
+            "{kind:?}"
+        );
+        assert_eq!(
+            missing(any(F::MissingMetadata, &["Title"]).negate()),
+            ["Scanned From Folder"],
+            "{kind:?}"
+        );
+        // It combines with the other entries: both of these titles also have no plot.
+        assert_eq!(
+            missing(all(F::MissingMetadata, &["Title", "Plot"])).len(),
+            2,
+            "{kind:?}"
+        );
+        let values = facet_values(&conn, kind, F::MissingMetadata, &Filter::All).unwrap();
+        let count = |name: &str| values.iter().find(|v| v.value == name).map(|v| v.count);
+        assert_eq!(count("Title"), Some(2), "{kind:?}");
+        assert_eq!(count("Plot"), Some(3), "{kind:?}");
+    }
+}
+
+/// Needs-fixing counts: the values of Missing artwork count the titles that lack each type, and
+/// a show counts by its own artwork, not by its episodes'.
+#[test]
+fn missing_artwork_counts_follow_the_titles_own_artwork() {
+    let conn = memory_db();
+    show_library(&conn);
+    let values = facet_values(&conn, ItemKind::Show, F::MissingArtwork, &Filter::All).unwrap();
+    let count = |name: &str| values.iter().find(|v| v.value == name).map(|v| v.count);
+    assert_eq!(count("Poster"), Some(1));
+    assert_eq!(count("Fan art"), Some(2));
+    assert_eq!(count("Clear logo"), Some(2));
+    // Episode thumbs do not stand in for the show's own poster.
+    let zulu = insert_item(&conn, &Item::show("Zulu")).unwrap();
+    let mut pilot = episode(zulu, "Pilot");
+    pilot.core.media_files = vec![image(
+        MediaFileType::Thumb,
+        "/t/Zulu/Season 1",
+        "Zulu.S01E01-thumb.jpg",
+        1280,
+        720,
+    )];
+    insert_item(&conn, &pilot).unwrap();
+    let no_poster = Filter::Facet(any(F::MissingArtwork, &["Poster"]));
+    assert_eq!(titles(&conn, ItemKind::Show, no_poster), ["Tango", "Zulu"]);
+    // Narrowed by another chip, the counts follow it.
+    let comedy = Filter::Facet(any(F::Genre, &["comedy"]));
+    let narrowed = facet_values(&conn, ItemKind::Show, F::MissingArtwork, &comedy).unwrap();
+    assert!(narrowed.iter().all(|v| v.count == 1), "{narrowed:?}");
 }
 
 #[test]
