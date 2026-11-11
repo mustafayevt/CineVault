@@ -52,6 +52,7 @@
 
 use std::collections::BTreeMap;
 
+pub mod catalog;
 pub mod set;
 
 use cv_domain::MediaFileType;
