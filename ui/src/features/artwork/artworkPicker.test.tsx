@@ -388,13 +388,17 @@ describe("the artwork picker page", () => {
     renderPicker();
     await waitTiles(4);
     const chips = screen.getByRole("group", { name: "Language" });
-    const english = within(chips).getByRole("button", { name: /^English/ });
-    const count = Number(/(\d+)\s*$/.exec(english.textContent ?? "")?.[1]);
-    await user.click(english);
-    // The filtered grid can take more than the default second on a busy CI runner.
-    await waitFor(async () => expect((await tiles()).length).toBeLessThanOrEqual(count + 1), {
-      timeout: 5000,
-    });
+    const english = () => within(chips).getByRole("button", { name: /^English/ });
+    await user.click(english());
+    // The providers stream their images in batches, so the English count can still grow after
+    // the first tiles: it is read again on every try, against the grid as it is then.
+    await waitFor(
+      async () => {
+        const count = Number(/(\d+)\s*$/.exec(english().textContent ?? "")?.[1]);
+        expect((await tiles()).length).toBeLessThanOrEqual(count + 1);
+      },
+      { timeout: 5000 },
+    );
     for (const tile of await tiles()) {
       if (tile.getAttribute("data-current") === "true") continue;
       const labels = Array.from(tile.querySelectorAll("*")).map((node) => node.textContent);
