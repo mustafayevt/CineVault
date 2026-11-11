@@ -158,7 +158,9 @@ struct EndedStub<'a> {
 
 impl Drop for EndedStub<'_> {
     fn drop(&mut self) {
-        let mut system = System::new();
+        let Ok(mut system) = System::new() else {
+            return;
+        };
         let target = Pid::from_u32(self.pid);
         system.refresh_processes_specifics(
             ProcessesToUpdate::Some(&[target]),
@@ -185,7 +187,7 @@ async fn start(fixture: &Fixture) -> Result<Running, ServiceError> {
 }
 
 fn alive(pid: u32) -> bool {
-    let mut system = System::new();
+    let mut system = System::new().expect("process list");
     let target = Pid::from_u32(pid);
     system.refresh_processes_specifics(
         ProcessesToUpdate::Some(&[target]),

@@ -242,14 +242,21 @@ fn drive_key(text: &str) -> String {
 /// The volumes of this computer from the operating system, with a direct question for a share or
 /// mapped drive its list does not show.
 pub struct SystemVolumes {
-    disks: Mutex<Disks>,
+    /// `None` on a system whose disk list cannot be read: every path is then asked directly.
+    disks: Mutex<Option<Disks>>,
 }
 
 impl SystemVolumes {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            disks: Mutex::new(Disks::new_with_refreshed_list()),
+            disks: Mutex::new(Disks::new_with_refreshed_list().map_or_else(
+                |error| {
+                    tracing::warn!(%error, "the list of drives could not be read");
+                    None
+                },
+                Some,
+            )),
         }
     }
 }
@@ -269,10 +276,14 @@ fn network_file_system(name: &str) -> bool {
 
 impl Volumes for SystemVolumes {
     fn refresh(&self) {
-        self.disks
+        if let Some(disks) = self
+            .disks
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .refresh(true);
+            .as_mut()
+        {
+            disks.refresh(true);
+        }
     }
 
     fn locate(&self, path: &str) -> Option<Volume> {
@@ -281,8 +292,8 @@ impl Volumes for SystemVolumes {
         {
             let disks = self.disks.lock().unwrap_or_else(PoisonError::into_inner);
             let found = disks
-                .list()
                 .iter()
+                .flat_map(|disks| disks.iter())
                 .filter(|disk| cv_fs::paths::is_within(target, disk.mount_point()))
                 .max_by_key(|disk| disk.mount_point().as_os_str().len());
             if let Some(disk) = found {

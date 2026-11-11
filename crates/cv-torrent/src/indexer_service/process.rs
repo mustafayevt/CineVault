@@ -476,7 +476,14 @@ pub fn end_leftovers(data_dir: &Path, install_dir: &Path) -> Vec<u32> {
 
 /// Ends `pid` when it runs a program inside `install_dir`. Returns whether it did.
 fn end_if_ours(pid: u32, install_dir: &Path) -> bool {
-    let mut system = System::new();
+    // Without a process table there is no telling whose process it is, so it is left alone.
+    let mut system = match System::new() {
+        Ok(system) => system,
+        Err(error) => {
+            tracing::warn!(pid, %error, "left a process alone: the process list could not be read");
+            return false;
+        }
+    };
     let target = Pid::from_u32(pid);
     let kind = ProcessRefreshKind::nothing().with_exe(UpdateKind::Always);
     system.refresh_processes_specifics(ProcessesToUpdate::Some(&[target]), true, kind);
