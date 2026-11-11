@@ -72,7 +72,7 @@ export const movie = {
   "detail.play.failed": "Could not play {title}",
   "detail.files.missing": "The files for this title are missing",
   "detail.files.missingBody":
-    "CineVault keeps everything it knows about the title. Point it at the folder the files moved to, or review every title that lost its files.",
+    "CineVault keeps the title in case the drive is offline or the files were only moved. If they are gone for good, remove it from the library; nothing on disk is touched.",
   "detail.files.offline": "This title's library folder cannot be reached",
   "detail.files.offlineBody":
     "Check that the drive or network share is connected. The title comes back by itself when the folder does.",

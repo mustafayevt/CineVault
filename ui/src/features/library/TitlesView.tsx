@@ -232,6 +232,7 @@ export function TitlesView({ type, text, onClearText, fit = "wide" }: TitlesView
         count={selection.count}
         size={selectedBytes}
         onClear={selection.clear}
+        promoteRemove={state.filters.problems === "missing"}
       />
     </>
   );

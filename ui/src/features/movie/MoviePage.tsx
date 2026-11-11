@@ -142,7 +142,14 @@ function MovieView({ detail }: { detail: MovieDetail }) {
           card's extra height, so the cast follows the facts directly. */}
       <div className="relative grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] grid-rows-[auto_1fr] gap-x-7 px-(--inset) pt-1.5 @max-[860px]/pane:flex @max-[860px]/pane:flex-col @max-[860px]/pane:gap-6">
         <div className="col-start-1 row-start-1 flex min-w-0 flex-col gap-6">
-          {filesState === null ? null : <FilesNotice state={filesState} folder={detail.folder} />}
+          {filesState === null ? null : (
+            <FilesNotice
+              state={filesState}
+              folder={detail.folder}
+              id={detail.id}
+              title={detail.title}
+            />
+          )}
           {detail.plot === "" ? (
             <p className="cv-plot text-text-muted">{t("movie.plot.none")}</p>
           ) : (
