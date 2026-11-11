@@ -99,6 +99,12 @@ export const settings = {
     "Never rename or move your media files and folders. Scan, Scrape, NFO and artwork files keep working.",
   "settings.renamer.metadata-only.keywords":
     "metadata only, no rename, never rename, read only, download manager, keep names, move, scrape only",
+  "settings.renamer.after-scrape.title": "Rename after Scrape",
+  "settings.renamer.after-scrape.description":
+    "Rename a title by itself once its Scrape is written, with Undo. Titles in a conflict wait in Activity for you.",
+  "settings.renamer.after-scrape.offByMetadataOnly": "Off while Metadata only is on.",
+  "settings.renamer.after-scrape.keywords":
+    "rename after scrape, automatic rename, auto rename, rename automatically",
   "settings.files.deleted-mode.title": "Deleted and replaced files",
   "settings.files.deleted-mode.description":
     "Where Delete, a move's originals, rename leftovers and replaced artwork or NFO files go.",

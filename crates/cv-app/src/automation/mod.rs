@@ -15,6 +15,7 @@
 //! * [`ipc`]: the local channel by which a running app executes a command-line batch, so the
 //!   library keeps a single writer.
 
+mod after_scrape_rename;
 pub mod backend;
 pub mod engine;
 pub mod ipc;

@@ -16,6 +16,7 @@ vi.mock("../../bindings", () => ({
 }));
 
 import { commands } from "../../bindings";
+import { useToastStore } from "../toasts/toastStore";
 import { useNotificationStore } from "./notificationStore";
 import { openNoticeStream, resetNoticeStream } from "./useBackendNotices";
 
@@ -56,6 +57,26 @@ describe("backend notices", () => {
       detail: "3 failed · rate limit",
       source: "tmdb",
     });
+  });
+
+  it("says a rename that ran by itself in a toast with Undo, not in Activity", () => {
+    openNoticeStream();
+    lastChannel().onmessage({
+      severity: "info",
+      title: "Renamed 3 titles after Scrape",
+      detail: null,
+      source: "Rename after Scrape",
+      provider_key: null,
+      settings_link: null,
+      action: "undo_rename",
+      batch_id: "batch-9",
+      topic: null,
+      resolves: false,
+    });
+    const toast = useToastStore.getState().toasts.at(-1);
+    expect(toast?.message).toBe("Renamed 3 titles after Scrape");
+    expect(toast?.undo).toBeTypeOf("function");
+    expect(useNotificationStore.getState().items).toHaveLength(0);
   });
 
   it("leaves out detail and source the backend did not send", () => {

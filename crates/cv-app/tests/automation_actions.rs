@@ -776,6 +776,62 @@ async fn a_scrape_renames_nothing_even_with_a_leftover_automatic_setting() {
     assert!(files_in(&dir).len() >= before.len());
 }
 
+/// Rename after Scrape (spec renamer, "Rename after Scrape is opt-in"): with the switch on and
+/// the app's batch runner started, a scrape renames its title once the NFO and artwork are
+/// written, as one journaled batch, and the notice that says so carries that batch for Undo.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_scrape_renames_its_title_when_rename_after_scrape_is_on() {
+    let rig = Rig::new();
+    let _backend = CommandBackend::start(Arc::clone(&rig.engine));
+    let notices: Arc<std::sync::Mutex<Vec<cv_app::notices::AppNotice>>> = Arc::default();
+    {
+        let notices = Arc::clone(&notices);
+        rig.services.notices().subscribe(move |notice| {
+            notices.lock().unwrap().push(notice.clone());
+            true
+        });
+    }
+    rig.services
+        .settings()
+        .set(
+            cv_app::rename_settings::RENAME_AFTER_SCRAPE_KEY,
+            json!(true),
+        )
+        .unwrap();
+    let (_id, dir) = library_with_one_movie(&rig).await;
+
+    let organize = OrganizeService::new(Arc::clone(rig.services.db()));
+    assert!(
+        wait_until(|| !organize.journal().unwrap().is_empty()).await,
+        "no rename ran after the scrape"
+    );
+    assert!(
+        wait_until(|| !dir.exists()).await,
+        "the release-named folder was renamed"
+    );
+    let journal = organize.journal().unwrap();
+    assert_eq!(journal.len(), 1, "one batch for the scrape: {journal:?}");
+    assert!(
+        wait_until(|| notices
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|n| n.title == "Renamed 1 title after Scrape"))
+        .await,
+        "{:?}",
+        notices.lock().unwrap()
+    );
+    let done = notices
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|n| n.title == "Renamed 1 title after Scrape")
+        .cloned()
+        .unwrap();
+    assert_eq!(done.action, Some(cv_app::notices::NoticeAction::UndoRename));
+    assert_eq!(done.batch_id.as_deref(), Some(journal[0].batch_id.as_str()));
+}
+
 /// The live snapshot of the persistent job with the stored row id `row`.
 fn job_snapshot(rig: &Rig, row: i64) -> Option<cv_jobs::JobSnapshot> {
     let jobs = rig.services.jobs();

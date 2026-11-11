@@ -2,7 +2,9 @@
 //!
 //! The settings pick the steps (see [`super::AfterScrape`]); they run one after the other, in the
 //! order ratings, checksums. The artwork download has a hook of its own
-//! (`ScrapeFollowUp`). Nothing here renames: renaming is only ever done from Organize.
+//! (`ScrapeFollowUp`). With Rename after Scrape on, the title then joins the rename queue once
+//! its steps and its artwork download are over (see `rename_after`); nothing here renames by
+//! itself.
 //!
 //! The steps run in the background and never delay or fail the scrape. A step that cannot run
 //! (a tool is missing, a key is not set) leaves one notice per session, not one per title.
@@ -40,6 +42,10 @@ impl ActionsService {
                 let _ = download.await;
             }
             drop(working);
+            // The NFO and artwork are written by now, so the folder can move.
+            if crate::rename_settings::rename_after_scrape(&service.values()) {
+                service.rename_queue.push(item);
+            }
         });
     }
 

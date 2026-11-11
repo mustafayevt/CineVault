@@ -294,12 +294,15 @@ impl CommandBackend {
                 run_one(&worker_shared, job).await;
             }
         });
-        Arc::new(Self {
+        let backend = Arc::new(Self {
             shared,
             queue,
             counter: Mutex::new(0),
             worker,
-        })
+        });
+        // The titles a scrape was written into are renamed here when Rename after Scrape is on.
+        super::after_scrape_rename::install(&backend, backend.shared.engine.services());
+        backend
     }
 
     /// The finished runs, oldest first.
