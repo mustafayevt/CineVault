@@ -10,9 +10,9 @@
 ## 2. UI: scan one place and progress that moves
 
 - [x] 2.1 Scan backend and actions: `scanFolder`, `scanTitle`, toasts "Scanning <name>", errors to Activity. Verify: `scan.test.tsx`.
-- [x] 2.2 Drives card "Scan this folder" per library folder; Settings › Library folders "Scan this folder"; title pages "Scan again" in the ⋯ menu and in the files notice. Verify: `drivesPage.test.tsx`, `titleActions.test.tsx`, `filesNotice.test.tsx`, the Settings folders test.
-- [x] 2.3 Progress lines in titles (counting, working, time left) in the sidebar card and its list. Verify: `sidebar.test.tsx`, `progressLines` tests.
-- [x] 2.4 Activity "Running now". Verify: `runningNow.test.tsx`.
+- [x] 2.2 Drives card "Scan this folder" per library folder; Settings › Library folders "Scan this folder"; title pages "Scan again" in the ⋯ menu and in the files notice. Verify: `drivesPage.test.tsx`, `moviePage.test.tsx` (menu order), `filesNotice.test.tsx`, `settingsSections.test.tsx`.
+- [x] 2.3 Progress lines in titles (counting, working, time left) in the sidebar card and its list. Verify: `scanProgress.test.tsx`, `sidebar.test.tsx`.
+- [x] 2.4 Activity "Running now". Verify: `scanProgress.test.tsx` (Running now).
 
 ## 3. UI: rename feedback
 
