@@ -20,9 +20,10 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant, SystemTime};
 
 use argon2::Argon2;
-use argon2::password_hash::rand_core::{OsRng, RngCore};
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use argon2::password_hash::phc::PasswordHash;
+use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use axum::http::HeaderMap;
+use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
@@ -368,9 +369,10 @@ fn set_aside(path: &Path, why: &str) {
 }
 
 fn hash_password(password: &str) -> Result<AuthFile, AuthError> {
-    let salt = SaltString::generate(&mut OsRng);
+    // argon2id, v19, m=19456, t=2, p=1 and a random 16-byte salt from the system: the same PHC
+    // string earlier versions wrote, so a password file works in either direction.
     let hash = Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
+        .hash_password(password.as_bytes())
         .map_err(|error| AuthError::Hash(error.to_string()))?
         .to_string();
     Ok(AuthFile {
@@ -1289,6 +1291,11 @@ mod tests {
             "{}",
             file.hash
         );
+        // A 16-byte salt and a 32-byte hash, in unpadded base64.
+        let parts: Vec<&str> = file.hash.split('$').collect();
+        assert_eq!(parts.len(), 6, "{}", file.hash);
+        assert_eq!(parts[4].len(), 22, "{}", file.hash);
+        assert_eq!(parts[5].len(), 43, "{}", file.hash);
         assert!(verify_hash(&file.hash, GOOD));
     }
 
