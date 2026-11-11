@@ -361,17 +361,19 @@ pub(crate) fn write_condition(out: &mut Sql, words: &Words) {
     out.push("(");
     write_exact(out, "item", words);
     // The typo tolerance applies only when the exact search finds nothing in the library: the
-    // uncorrelated NOT EXISTS runs once per statement.
-    out.push(" OR (NOT EXISTS (SELECT 1 FROM item e WHERE e.trashed_entry IS NULL");
+    // uncorrelated NOT EXISTS runs once per statement. CASE makes that order binding: SQLite may
+    // evaluate the two sides of an AND in either order, and from 3.54 it calls the typo function
+    // on every row first, which made a plain search several times slower.
+    out.push(" OR (CASE WHEN NOT EXISTS (SELECT 1 FROM item e WHERE e.trashed_entry IS NULL");
     if let Some(kind) = kind {
         out.push(" AND e.kind = ");
         out.bind(super::codec::enum_text(&kind).unwrap_or_default());
     }
     out.push(" AND ");
     write_exact(out, "e", words);
-    out.push(") AND cv_search_fuzzy(item.search_title, item.search_alt, ");
+    out.push(") THEN cv_search_fuzzy(item.search_title, item.search_alt, ");
     out.bind(words.tokens.join(" "));
-    out.push("))");
+    out.push(") ELSE 0 END)");
     out.push(")");
 }
 
