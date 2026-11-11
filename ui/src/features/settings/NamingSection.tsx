@@ -108,6 +108,7 @@ export function NamingSection() {
     label: string,
     hint: string | undefined,
     example: string | null,
+    tip?: string,
   ) => (
     <FormRow label={label} labelId={`naming-${field}`} hint={hint} align="start">
       <div className="flex flex-col gap-1.5">
@@ -149,6 +150,9 @@ export function NamingSection() {
             </button>
           ))}
         </div>
+        {tip === undefined ? null : (
+          <p className="m-0 text-(length:--fs-12) text-text-muted">{tip}</p>
+        )}
       </div>
     </FormRow>
   );
@@ -243,6 +247,12 @@ export function NamingSection() {
         t("settingsPage.naming.movieFolder"),
         t("settingsPage.naming.movieFolder.hint"),
         examples.folder,
+        // {Title} follows each title's choice of title; {OriginalTitle} never does.
+        t("settingsPage.naming.titleTokens", {
+          title: "{Title}",
+          original: "{OriginalTitle}",
+          example: "{OriginalTitle} ({Year}) → La Ciudad Dormida (2019)",
+        }),
       )}
       {row(
         "movie_file",

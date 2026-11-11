@@ -571,6 +571,12 @@ const ALL_SETTINGS: readonly SettingDef[] = [
   setting("metadata.local-release-date", "providers", { type: "toggle" }, false),
   setting("metadata.fallback-language", "providers", { type: "choice", options: LANGUAGES }, "en"),
   setting(
+    "metadata.original-title-languages",
+    "providers",
+    { type: "text", placeholder: "fr, es" },
+    "",
+  ),
+  setting(
     "matching.auto-accept-threshold",
     "providers",
     { type: "number", min: 50, max: 100, step: 1, unit: "%", slider: true },

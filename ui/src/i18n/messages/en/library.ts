@@ -116,6 +116,12 @@ export const library = {
   "library.act.needSome": "Select a title first",
   "library.act.playShow": "Open the show to play an episode",
   "library.act.subject": "{count, plural, one {# title} other {# titles}}",
+  "library.act.useOriginal":
+    "{count, plural, one {Use original title} other {Use original title for # titles}}",
+  "library.act.useOriginal.short": "Use original title",
+  "library.act.useLocalized":
+    "{count, plural, one {Use localized title} other {Use localized title for # titles}}",
+  "library.act.useLocalized.short": "Use localized title",
   "library.view.label": "View",
   "library.stageChips.all": "All",
   "library.group.header": "{label} · {count}",

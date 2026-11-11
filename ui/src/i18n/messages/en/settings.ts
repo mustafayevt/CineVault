@@ -316,6 +316,11 @@ export const settings = {
   "settings.providers.prefer-original-title.description":
     "Show the title in its original language on cards, lists and detail pages, when the title has one.",
   "settings.providers.prefer-original-title.keywords": "native, foreign",
+  "settings.metadata.original-title-languages.title": "Keep the original title for these languages",
+  "settings.metadata.original-title-languages.description":
+    "A movie or TV show whose original language is one of these uses its original title in the library, the file names and the NFO from its first Scrape.",
+  "settings.metadata.original-title-languages.keywords":
+    "original title, localized, foreign, native, language, rename",
   "settings.metadata.nfo-format.title": "NFO format",
   "settings.metadata.nfo-format.description":
     "The flavour of the .nfo files written next to your media.",
@@ -631,6 +636,16 @@ export const settings = {
   "settingsPage.providers.language": "Metadata language",
   "settingsPage.providers.language.hint": "Titles, plots and artwork text",
   "settingsPage.providers.country": "Ratings country",
+  "settingsPage.providers.originalTitles": "Keep the original title",
+  "settingsPage.providers.originalTitles.hint":
+    "For titles in these original languages, from their first Scrape",
+  "settingsPage.providers.originalTitles.list": "Languages that keep their original title",
+  "settingsPage.providers.originalTitles.add": "Add a language",
+  "settingsPage.providers.originalTitles.remove": "Remove {language}",
+  "settingsPage.providers.originalTitles.apply": "Use for titles I have",
+  "settingsPage.providers.originalTitles.applied":
+    "{count, plural, =0 {Every title in these languages already uses its original title} one {Now using the original title for # title} other {Now using the original title for # titles}}",
+  "settingsPage.providers.originalTitles.failed": "Could not change the titles",
   "settingsPage.providers.countryOption": "Ratings: {country}",
   "settingsPage.keys.paste": "Paste your key",
   "settingsPage.keys.unavailable": "Keys can be set in the desktop app",
@@ -660,6 +675,8 @@ export const settings = {
   "settingsPage.naming.movieFile": "Movie file",
   "settingsPage.naming.movieFile.hint": "Extras and subtitles follow the main file",
   "settingsPage.naming.episode": "TV episode",
+  "settingsPage.naming.titleTokens":
+    "{title} is the title each movie uses: its localized title, or its original title when you chose that. {original} is always the original title: {example}.",
   "settingsPage.naming.colon": "Colon in titles",
   "settingsPage.naming.colon.remove": "Remove",
   "settingsPage.naming.colon.dash": "Use “ - ”",

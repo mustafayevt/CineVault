@@ -7,6 +7,7 @@ import type {
   EditSavedDto,
   EditValueDto,
   ItemEditDto,
+  TitleChoiceDto,
 } from "../../bindings";
 import { createSyntheticEditBackend } from "./syntheticEdit";
 
@@ -14,6 +15,8 @@ export type EditField = EditFieldDto;
 export type EditValue = EditValueDto;
 export type ItemEdit = ItemEditDto;
 export type EditSaved = EditSavedDto;
+/** What a change of the title choice did: the titles that changed, for Undo. */
+export type TitleChoice = TitleChoiceDto;
 
 /** The kinds of item the detail pages edit. A season is edited through its show. */
 export type EditKind = "movie" | "show" | "episode";
@@ -50,6 +53,13 @@ export interface EditBackend {
   setFieldLock: (target: EditTarget, lockKey: string, locked: boolean) => Promise<void>;
   /** Locks or unlocks the whole item. */
   setItemLock: (target: EditTarget, locked: boolean) => Promise<void>;
+  /**
+   * Uses the original title (`original`) or the localized title as the title of the movies and
+   * shows, and rewrites their NFO files. Titles without another original title stay as they are.
+   */
+  setTitleChoice: (ids: readonly string[], original: boolean) => Promise<TitleChoice>;
+  /** Uses the original title for every title whose original language Settings lists. */
+  applyOriginalTitleLanguages: () => Promise<TitleChoice>;
 }
 
 type Result<T> = { status: "ok"; data: T } | { status: "error"; error: EditCommandError };
@@ -70,6 +80,9 @@ const tauriEditBackend: EditBackend = {
   setItemLock: async ({ id }, locked) => {
     unwrap(await commands.setItemLock(id, locked));
   },
+  setTitleChoice: async (ids, original) =>
+    unwrap(await commands.setTitleChoice([...ids], original)),
+  applyOriginalTitleLanguages: async () => unwrap(await commands.useOriginalTitleForLanguages()),
 };
 
 let override: EditBackend | null = null;
