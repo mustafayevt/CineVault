@@ -1270,6 +1270,28 @@ mod tests {
             .collect()
     }
 
+    /// A password file written by CineVault 1.6 (argon2 0.5, `hash_password` above) must keep
+    /// signing in after any upgrade of the hashing crate, or every browser user is locked out.
+    const OLDER_PASSWORD: &str = "an older password hashed by argon2 0.5";
+    const OLDER_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$V8iKXGAxANC3ZlalQIgR2A$axkHzt952A+2DjNgDEOZnSludtIBWr6jnTzSz+pLNCI";
+
+    #[test]
+    fn a_password_hashed_by_an_earlier_version_still_verifies() {
+        assert!(verify_hash(OLDER_HASH, OLDER_PASSWORD));
+        assert!(!verify_hash(OLDER_HASH, "a different long password"));
+    }
+
+    #[test]
+    fn new_hashes_keep_the_same_algorithm_and_parameters() {
+        let file = hash_password(GOOD).unwrap();
+        assert!(
+            file.hash.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"),
+            "{}",
+            file.hash
+        );
+        assert!(verify_hash(&file.hash, GOOD));
+    }
+
     #[test]
     fn a_new_folder_opens_the_welcome_page() {
         let (_dir, auth) = auth();
