@@ -582,6 +582,18 @@ function ownedOf(row: LibraryRow, id: string): Owned | undefined {
       return list(row.audio_codec);
     case "status":
       return list(row.aired_status);
+    case "missing_artwork":
+      // The artwork types the Needs fixing menu asks about, as the database spells them.
+      return list(
+        row.has_poster ? null : "Poster",
+        row.has_fanart ? null : "Fan art",
+        row.has_logo ? null : "Clear logo",
+      );
+    case "missing_metadata":
+      return list(
+        row.card.title.trim() === "" ? "Title" : null,
+        row.plot_excerpt === "" ? "Plot" : null,
+      );
     case "top250_rank":
       return num(row.top250);
     case "rating_imdb":

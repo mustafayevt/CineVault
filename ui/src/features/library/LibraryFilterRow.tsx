@@ -1,15 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Copy, TriangleAlert, X } from "lucide-react";
+import { ChevronDown, Copy, TriangleAlert, Wrench, X } from "lucide-react";
 
 import { Chip } from "../../components/Chip";
-import { Menu, MenuRadioGroup, MenuRadioItem } from "../../components/Menu";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+} from "../../components/Menu";
+import { MenuItem } from "../../components/MenuItem";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
 import { useLifecycleCounts } from "../lifecycle/useLifecycleCounts";
 import { currentLibraryBackend } from "./libraryBackend";
-import type { LibraryKind } from "./libraryBackend";
-import type { LibraryFilters, ProblemChoice, QualityChoice, StageChoice } from "./libraryStore";
+import type { LibraryKind, LibraryQuery } from "./libraryBackend";
+import { FIX_FACETS } from "./libraryStore";
+import type {
+  FixChoice,
+  LibraryFilters,
+  ProblemChoice,
+  QualityChoice,
+  StageChoice,
+} from "./libraryStore";
 
 const STAGES: readonly StageChoice[] = ["all", "new", "scraped", "renamed"];
 const QUALITIES: readonly QualityChoice[] = ["any", "2160p", "1080p", "720p", "sd"];
@@ -42,9 +56,62 @@ const PROBLEM_LABEL = {
   missing: "library.problems.missing",
 } as const;
 
+/** The Needs fixing entries in menu order; "not-scraped" is the New stage, the rest are catalogue chips. */
+const FIX_ENTRIES: readonly (FixChoice | "not-scraped")[] = [
+  "not-scraped",
+  "poster",
+  "fanart",
+  "clearlogo",
+  "plot",
+  "title",
+];
+
+const FIX_LABEL = {
+  "not-scraped": "library.fix.notScraped",
+  poster: "library.fix.poster",
+  fanart: "library.fix.fanart",
+  clearlogo: "library.fix.clearlogo",
+  plot: "library.fix.plot",
+  title: "library.fix.title",
+} as const;
+
+/**
+ * How many titles of `query` miss each thing of the Needs fixing menu, by the catalogue's own
+ * counts (`missing_artwork` and `missing_metadata`). The query leaves the menu's own choices out,
+ * so every entry counts what picking it alone would list. Empty where the backend has no
+ * catalogue counts.
+ */
+function useFixCounts(query: LibraryQuery): ReadonlyMap<FixChoice, number> {
+  const counts = useQuery({
+    // Under "library", so everything that changes artwork or metadata refreshes it.
+    queryKey: ["library", "needs-fixing", query] as const,
+    queryFn: async () => {
+      const backend = currentLibraryBackend();
+      const read = backend.facetValues;
+      const result = new Map<FixChoice, number>();
+      if (read === undefined) return result;
+      const ids = [...new Set(Object.values(FIX_FACETS).map((facet) => facet.id))];
+      const lists = await Promise.all(ids.map(async (id) => [id, await read(query, id)] as const));
+      for (const [choice, { id, value }] of Object.entries(FIX_FACETS) as [
+        FixChoice,
+        (typeof FIX_FACETS)[FixChoice],
+      ][]) {
+        const values = lists.find(([listed]) => listed === id)?.[1] ?? [];
+        const found = values.find((entry) => entry.value.toLowerCase() === value.toLowerCase());
+        result.set(choice, found?.count ?? 0);
+      }
+      return result;
+    },
+    staleTime: 30_000,
+  });
+  return counts.data ?? new Map<FixChoice, number>();
+}
+
 interface LibraryFilterRowProps {
   kind: Exclude<LibraryKind, "collections">;
   filters: LibraryFilters;
+  /** The query the row sits over without its Needs fixing choices, for the menu's counts. */
+  countsQuery: LibraryQuery;
   onChange: (change: Partial<LibraryFilters>) => void;
   /** The typed search of the title bar (`?q=`); shown as a chip that clears it. */
   text: string;
@@ -55,7 +122,7 @@ interface LibraryFilterRowProps {
 
 /**
  * The filter row: the stage chips All, New, Scraped and Renamed with
- * their counts, then the Drive, Quality and Problems dropdown chips, the typed search as a chip,
+ * their counts, then the Drive, Quality, Problems and Needs fixing dropdown chips, the typed search as a chip,
  * and at the right the count and size of what is listed. 42px high on the 24px content inset, chips
  * 24px. On a tablet or a phone the chips scroll sideways inside their own row, out to the pane's
  * edges, and on a phone the count and size go under them.
@@ -63,6 +130,7 @@ interface LibraryFilterRowProps {
 export function LibraryFilterRow({
   kind,
   filters,
+  countsQuery,
   onChange,
   text,
   onClearText,
@@ -89,6 +157,23 @@ export function LibraryFilterRow({
 
   const problemCount =
     data === undefined ? undefined : data.not_matched + data.uncertain + data.missing;
+
+  const fixCounts = useFixCounts(countsQuery);
+  const notScraped = filters.stage === "new";
+  const fixOn = filters.fix.length + (notScraped ? 1 : 0);
+  const fixCountOf = (entry: FixChoice | "not-scraped"): number | undefined =>
+    entry === "not-scraped" ? data?.new : fixCounts.get(entry);
+  const toggleFix = (entry: FixChoice | "not-scraped") => {
+    if (entry === "not-scraped") {
+      onChange({ stage: notScraped ? "all" : "new" });
+    } else {
+      onChange({
+        fix: filters.fix.includes(entry)
+          ? filters.fix.filter((choice) => choice !== entry)
+          : [...filters.fix, entry],
+      });
+    }
+  };
 
   return (
     <div
@@ -202,6 +287,49 @@ export function LibraryFilterRow({
             {t("copies.chip")}
           </Chip>
         )}
+
+        <Menu
+          aria-label={t("library.fix.label")}
+          trigger={
+            <Chip
+              active={fixOn > 0}
+              icon={Wrench}
+              trailingIcon={ChevronDown}
+              {...(fixOn > 0 ? { count: format.number(fixOn) } : {})}
+              data-testid="needs-fixing-chip"
+            >
+              {t("library.fix.chip")}
+            </Chip>
+          }
+        >
+          {FIX_ENTRIES.map((entry) => {
+            const count = fixCountOf(entry);
+            return (
+              <MenuCheckboxItem
+                key={entry}
+                checked={entry === "not-scraped" ? notScraped : filters.fix.includes(entry)}
+                onCheckedChange={() => toggleFix(entry)}
+              >
+                {t(FIX_LABEL[entry])}
+                {count !== undefined && (
+                  <>
+                    {" "}
+                    <span className="ml-1 text-text-muted tabular-nums">
+                      {format.number(count)}
+                    </span>
+                  </>
+                )}
+              </MenuCheckboxItem>
+            );
+          })}
+          <MenuSeparator />
+          <MenuItem
+            disabled={fixOn === 0}
+            onSelect={() => onChange({ fix: [], ...(notScraped ? { stage: "all" } : {}) })}
+          >
+            {t("library.fix.clear")}
+          </MenuItem>
+        </Menu>
 
         {text !== "" && (
           <Chip
