@@ -778,6 +778,16 @@ export const commands = {
 	setFieldLock: (id: string, field: string, locked: boolean) => typedError<null, EditCommandError>(__TAURI_INVOKE("set_field_lock", { id, field, locked })),
 	/**  Locks or unlocks the whole item. */
 	setItemLock: (id: string, locked: boolean) => typedError<null, EditCommandError>(__TAURI_INVOKE("set_item_lock", { id, locked })),
+	/**
+	 *  Uses the original title (`original`) or the localized title as the title of the given movies
+	 *  and shows, and rewrites their NFO files. Titles without another original title are left alone.
+	 */
+	setTitleChoice: (ids: string[], original: boolean) => typedError<TitleChoiceDto, EditCommandError>(__TAURI_INVOKE("set_title_choice", { ids, original })),
+	/**
+	 *  Uses the original title for every movie and show whose original language is one of
+	 *  `metadata.original-title-languages`.
+	 */
+	useOriginalTitleForLanguages: () => typedError<TitleChoiceDto, EditCommandError>(__TAURI_INVOKE("use_original_title_for_languages")),
 	/**  The orderings a show can use and the one it uses now. */
 	getShowOrderings: (showId: string) => typedError<ShowOrderingsDto, EpisodeOrderCommandError>(__TAURI_INVOKE("get_show_orderings", { showId })),
 	/**
@@ -4091,6 +4101,16 @@ export type TemplateTokenDto = {
 	name: string,
 	/**  The model path it stands for, with any renderer. */
 	target: string,
+};
+
+/**  What a change of the title choice did. */
+export type TitleChoiceDto = {
+	/**  The titles whose title changed; the other choice on them undoes it. */
+	changed: string[],
+	/**  The titles left as they were: already set that way, or without another original title. */
+	unchanged: number,
+	/**  Why an NFO could not be written, when the library was changed but a file was not. */
+	nfo_problem: string | null,
 };
 
 /**  A title an Undo left as it is. */

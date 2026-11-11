@@ -14,8 +14,9 @@ use std::sync::{Arc, OnceLock};
 use cv_app::changes::ChangePart;
 use cv_app::edit::{
     EditError, EditService, EditSnapshot, FieldEntry, FieldValue, NumberValue, Pair, PersonValue,
-    RatingValue, SaveReport, TrailerValue,
+    RatingValue, SaveReport, TitleChoiceReport, TrailerValue,
 };
+use cv_app::scrape_settings::ScrapeSettings;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -364,6 +365,27 @@ impl From<SaveReport> for EditSavedDto {
     }
 }
 
+/// What a change of the title choice did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct TitleChoiceDto {
+    /// The titles whose title changed; the other choice on them undoes it.
+    pub changed: Vec<String>,
+    /// The titles left as they were: already set that way, or without another original title.
+    pub unchanged: u32,
+    /// Why an NFO could not be written, when the library was changed but a file was not.
+    pub nfo_problem: Option<String>,
+}
+
+impl From<TitleChoiceReport> for TitleChoiceDto {
+    fn from(report: TitleChoiceReport) -> Self {
+        Self {
+            changed: report.changed.iter().map(|id| id.0.to_string()).collect(),
+            unchanged: u32::try_from(report.unchanged).unwrap_or(u32::MAX),
+            nfo_problem: report.nfo_problem,
+        }
+    }
+}
+
 /// Why an edit command did not run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
 pub struct EditCommandError {
@@ -466,6 +488,77 @@ pub async fn save_item_edit(
         Ok(saved.into())
     })
     .await
+}
+
+/// Uses the original title (`original`) or the localized title as the title of the given movies
+/// and shows, rewrites their NFO files and marks their names for a new look by Rename. Titles
+/// without another original title are left as they are.
+pub async fn set_title_choice(
+    library: &LibraryState,
+    nfo: &NfoState,
+    edit: &EditState,
+    settings: &SettingsState,
+    ids: Vec<String>,
+    original: bool,
+) -> Result<TitleChoiceDto, EditCommandError> {
+    let ids = ids
+        .iter()
+        .map(|id| id_of(id))
+        .collect::<Result<Vec<_>, _>>()?;
+    let service = edit.service(library, nfo)?;
+    let nfo_settings = nfo_settings(settings);
+    let (hub, names) = (
+        library.changes().cloned(),
+        library.organize_state().cloned(),
+    );
+    blocking(move || {
+        let report = service.set_title_choice(ids, original, &nfo_settings)?;
+        announce(hub.as_ref(), names.as_ref(), &report.changed);
+        Ok(report.into())
+    })
+    .await
+}
+
+/// Uses the original title for every movie and show in the library whose original language is
+/// one of `metadata.original-title-languages`, as the rule does for titles scraped from now on.
+pub async fn use_original_title_for_languages(
+    library: &LibraryState,
+    nfo: &NfoState,
+    edit: &EditState,
+    settings: &SettingsState,
+) -> Result<TitleChoiceDto, EditCommandError> {
+    let service = edit.service(library, nfo)?;
+    let values = settings.service().snapshot().values;
+    let languages = ScrapeSettings::from_values(&values).original_title_languages;
+    let nfo_settings = nfo_settings(settings);
+    let (hub, names) = (
+        library.changes().cloned(),
+        library.organize_state().cloned(),
+    );
+    blocking(move || {
+        let ids = service.titles_in_languages(&languages)?;
+        let report = service.set_title_choice(ids, true, &nfo_settings)?;
+        announce(hub.as_ref(), names.as_ref(), &report.changed);
+        Ok(report.into())
+    })
+    .await
+}
+
+/// Tells open pages that the titles changed, and the names they should have with them.
+fn announce(
+    hub: Option<&Arc<cv_app::changes::ChangeHub>>,
+    names: Option<&Arc<cv_app::organize::OrganizeStateService>>,
+    ids: &[cv_domain::ItemId],
+) {
+    if ids.is_empty() {
+        return;
+    }
+    if let Some(hub) = hub {
+        hub.publish(ids, &[ChangePart::Details, ChangePart::Stage]);
+    }
+    if let Some(names) = names {
+        names.note_changed(ids);
+    }
 }
 
 /// Locks or unlocks one field against scraping and NFO re-reading. `field` is a lock key.

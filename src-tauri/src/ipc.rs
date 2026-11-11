@@ -324,6 +324,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             crate::edit_ipc::save_item_edit,
             crate::edit_ipc::set_field_lock,
             crate::edit_ipc::set_item_lock,
+            crate::edit_ipc::set_title_choice,
+            crate::edit_ipc::use_original_title_for_languages,
             crate::episode_order_ipc::get_show_orderings,
             crate::episode_order_ipc::set_show_ordering,
             crate::episode_scrape_ipc::search_show_episodes,
