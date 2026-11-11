@@ -55,13 +55,13 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="pill">New</span> Version <span data-version>1.5.0</span> for Windows and Linux</p>
+        <p class="eyebrow"><span class="pill">New</span> Version <span data-version>1.7.0</span> for Windows and Linux</p>
         <h1 id="hero-title">Every title<br>in its place.</h1>
         <p class="lede">A fast desktop library manager for your movies and TV shows. CineVault reads your folders, fills in details, ratings and artwork, writes complete NFO files for Kodi, Jellyfin and Emby, and tidies every name, with Undo for all of it.</p>
         <div class="cta">
           <a class="btn btn-lg" data-dl href="https://github.com/mustafayevt/CineVault/releases/latest/download/CineVault-setup-x64.exe">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75v11.5M7.25 10.5 12 15.25l4.75-4.75M4.75 19.25h14.5"/></svg>
-            <span class="btn-text"><span data-dl-label>Download for Windows</span><small data-dl-note>Version <span data-version>1.5.0</span>, <span data-size>18.5 MB</span></small></span>
+            <span class="btn-text"><span data-dl-label>Download for Windows</span><small data-dl-note>Version <span data-version>1.7.0</span>, <span data-size>18.5 MB</span></small></span>
           </a>
           <a class="btn btn-quiet btn-lg" href="#flow">See how it works</a>
         </div>
@@ -114,6 +114,7 @@
             <li>Automatic collections, with the films you are missing</li>
             <li>Problems filter for unmatched titles and missing files</li>
             <li>Copies filter for the same movie twice: compare them side by side and keep the better one</li>
+            <li>Needs fixing filter for titles with no poster, fan art, clear logo or plot, to fix them in one go</li>
           </ul>
         </div>
         <figure class="window reveal">
@@ -212,10 +213,11 @@
         <div class="feature-copy">
           <p class="kicker">Rename</p>
           <h2 id="f-rename">Tidy names, and nothing moves until you say so</h2>
-          <p>The preview strikes out the words that go and marks the ones that come, and a clash with another title is settled right on its row. Nothing is renamed until you apply it, and History can put it back.</p>
+          <p>The preview strikes out the words that go and marks the ones that come, and a clash with another title is settled right on its row. Nothing is renamed until you apply it, and History can put it back. Or switch on Rename after Scrape, and a title whose new names fit is renamed as soon as it is scraped, with Undo.</p>
           <ul class="facts">
             <li>A word-level preview of every folder and file</li>
             <li>Conflicts settled on their own row, held-back titles marked</li>
+            <li>Progress in the sidebar and a toast with Undo when it is done</li>
           </ul>
         </div>
         <figure class="window reveal">
@@ -232,7 +234,7 @@
         <div class="feature-copy">
           <p class="kicker">Naming styles</p>
           <h2 id="f-naming">Pick a style, or write your own</h2>
-          <p>In Settings, one Style control fills the movie folder, movie file and TV episode templates at once: Clean, Detailed, Media-server safe or Release info, which keeps the release group and tags of the download. Edit any template and it becomes your own; choosing a style over your own templates asks first. Prefer your own names? Metadata only writes NFOs and artwork and never renames.</p>
+          <p>In Settings, one Style control fills the movie folder, movie file and TV episode templates at once: Clean, Detailed, Media-server safe or Release info, which keeps the release group and tags of the download. Edit any template and it becomes your own; choosing a style over your own templates asks first. Prefer your own names? Metadata only writes NFOs and artwork and never renames. Each title can go by its original or its localized title, and you choose the file name of every artwork type, such as <code>poster.jpg</code>, <code>folder.jpg</code> or the movie's name in front.</p>
           <div class="strip" role="group" aria-label="Example: the folder Dune.Part.Two.2024.2160p.WEB-DL.DV.HDR10.TrueHD.Atmos.7.1-GRP renamed with a naming style">
             <div class="strip-row"><span class="strip-tag">before</span><code class="strip-from"><span>Dune</span><s>.</s><span>Part</span><s>.</s><span>Two</span><s>.2024.2160p.WEB-DL.DV.HDR10.TrueHD.Atmos.7.1-GRP</s></code></div>
             <div class="strip-row"><span class="strip-tag">after</span><code class="strip-to" data-style-out aria-live="polite">Dune - Part Two (2024)</code></div>
@@ -248,7 +250,7 @@
         <figure class="window reveal">
           <picture>
             <source srcset="img/naming-light.webp" media="(prefers-color-scheme: light)">
-            <img src="img/naming-dark.webp" width="1440" height="900" loading="lazy" alt="Settings, Naming: the Metadata only switch, the Style control with Clean, Detailed, Media-server safe and Release info, then the movie folder, movie file and TV episode templates, each with a live example and buttons for its fields, and the choice for colons in titles">
+            <img src="img/naming-dark.webp" width="1440" height="900" loading="lazy" alt="Settings, Naming: the Metadata only and Rename after Scrape switches, the Style control with Clean, Detailed, Media-server safe and Release info, then the movie folder, movie file and TV episode templates, each with a live example and buttons for its fields (Original title among them), and the choice for colons in titles">
           </picture>
         </figure>
       </div>
@@ -264,12 +266,13 @@
             <li>Copy, verify, then the originals to the Recycle Bin or Trash</li>
             <li>Quality and size of every title, per drive</li>
             <li>Offline drives keep their titles until they come back</li>
+            <li>Scan one folder or one title instead of the whole library, with progress in titles</li>
           </ul>
         </div>
         <figure class="window reveal">
           <picture>
             <source srcset="img/drives-light.webp" media="(prefers-color-scheme: light)">
-            <img src="img/drives-dark.webp" width="1440" height="900" loading="lazy" alt="The Drives page: four drives with their free space, one low on space and one offline, and the titles of the Media drive listed biggest first with quality, size and folder">
+            <img src="img/drives-dark.webp" width="1440" height="900" loading="lazy" alt="The Drives page: four drives with their free space, one low on space and one offline, a Scan this folder button next to each library folder, and the titles of the Media drive listed biggest first with quality, size and folder">
           </picture>
         </figure>
       </div>
@@ -389,7 +392,7 @@
     <div class="wrap">
       <header class="section-head">
         <p class="kicker">Download</p>
-        <h2 id="dl-title">Get CineVault <span data-version>1.5.0</span></h2>
+        <h2 id="dl-title">Get CineVault <span data-version>1.7.0</span></h2>
         <p class="section-lede">Free and open source. Updates arrive inside the app, signed with the project key.</p>
       </header>
       <div class="dl-grid">
