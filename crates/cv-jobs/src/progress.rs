@@ -121,6 +121,37 @@ pub struct JobSnapshot {
     /// ([`crate::ItemWork::result`]), such as `212 new` or `198 scraped`.
     #[serde(default)]
     pub result: Option<String>,
+    /// Finer progress the work reports in its own unit ([`crate::ItemControl::set_units`]), such
+    /// as the titles of a scan whose items are library folders. `None` for most jobs.
+    #[serde(default)]
+    pub units: Option<UnitProgress>,
+}
+
+/// Which part of its work a job that counts in its own units is in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnitPhase {
+    /// Still finding what there is to do: `total` grows, nothing is done yet.
+    Counting,
+    /// Working through the `total` units found.
+    Working,
+}
+
+/// Progress a job reports in its own unit, finer than its items: a scan has one item per library
+/// folder but reports the titles in them ("312 of 707 titles").
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UnitProgress {
+    pub phase: UnitPhase,
+    /// Units finished (always 0 while counting).
+    pub done: u64,
+    /// Units found so far while counting; units in all while working.
+    pub total: u64,
+    /// The unit, or while counting the folder, being read now.
+    #[serde(default)]
+    pub current: Option<String>,
+    /// Estimated seconds left, only once enough units were timed to say it.
+    #[serde(default)]
+    pub eta_secs: Option<f64>,
 }
 
 impl JobSnapshot {

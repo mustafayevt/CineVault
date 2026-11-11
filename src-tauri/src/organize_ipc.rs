@@ -179,7 +179,7 @@ pub async fn copy_label_to_drop(
 
 /// Runs the checked changes of the request and records one journal batch. The request is
 /// planned again first; a checked item that is not a clean change any more is not run and is
-/// listed in `not_run`.
+/// listed in `not_run`. Progress goes to `on_progress` after each title.
 #[tauri::command]
 #[specta::specta]
 pub async fn organize_apply(
@@ -188,8 +188,17 @@ pub async fn organize_apply(
     settings: State<'_, SettingsState>,
     request: OrganizeRequestDto,
     include: Vec<String>,
+    on_progress: tauri::ipc::Channel<RenameProgressDto>,
 ) -> Result<AppliedDto, OrganizeCommandError> {
-    cv_ipc::organize::organize_apply(&library, &organize, &settings, request, include).await
+    cv_ipc::organize::organize_apply(
+        &library,
+        &organize,
+        &settings,
+        request,
+        include,
+        crate::ipc_sink::sink(on_progress),
+    )
+    .await
 }
 
 /// The organize batches, newest first.

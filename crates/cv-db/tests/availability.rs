@@ -382,3 +382,53 @@ fn path_styles_recognise_their_own_absolute_paths() {
         assert!(!PathStyle::Posix.is_absolute(bad), "{bad}");
     }
 }
+
+/// Records every path it is asked about; every path exists.
+#[derive(Default)]
+struct Recording(std::sync::Mutex<Vec<String>>);
+
+impl FileProbe for Recording {
+    fn dir_exists(&self, path: &str) -> bool {
+        self.0.lock().unwrap().push(path.to_owned());
+        true
+    }
+    fn file_exists(&self, path: &str) -> bool {
+        self.0.lock().unwrap().push(path.to_owned());
+        true
+    }
+}
+
+#[test]
+fn a_scoped_plan_probes_and_changes_only_the_wanted_titles() {
+    let dir = tempfile::tempdir().unwrap();
+    let movies_root = dir.path().join("Movies");
+    let shows_root = dir.path().join("Shows");
+    let db = Database::open(dir.path().join("library.db")).unwrap();
+    let lib = populate(&db, &movies_root, &shows_root);
+    // Two folders go; only the first is asked about.
+    fs::remove_dir_all(movies_root.join("Movie 00 (2020)")).unwrap();
+    fs::remove_dir_all(movies_root.join("Movie 01 (2020)")).unwrap();
+    let wanted = lib.movies[0];
+    let plan = db
+        .read(|conn| {
+            repo::plan_availability_of(conn, &StdFileProbe, PathStyle::current(), &|id| {
+                id == wanted
+            })
+        })
+        .unwrap();
+    assert_eq!(plan.report.checked, 1);
+    assert_eq!(plan.changes.len(), 1);
+    assert_eq!(plan.changes[0].id, wanted);
+    assert_eq!(plan.changes[0].state, Availability::Missing);
+
+    let probe = Recording::default();
+    db.read(|conn| {
+        repo::plan_availability_of(conn, &probe, PathStyle::current(), &|id| id == wanted)
+    })
+    .unwrap();
+    let asked = probe.0.lock().unwrap().clone();
+    assert!(
+        asked.iter().all(|path| !path.contains("Movie 01")),
+        "another title's files were probed: {asked:?}"
+    );
+}

@@ -396,6 +396,7 @@ mod tests {
             elapsed_secs: 1.0,
             outcome: None,
             result: None,
+            units: None,
         }
     }
 

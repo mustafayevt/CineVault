@@ -6,11 +6,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
-use super::{ProblemKind, ScanProblem};
+use super::{ProblemKind, ScanProblem, WalkObserver};
 use crate::classify::{MediaFileType, classify, is_video_content};
 use crate::gate::{VolumeGate, gate_for};
 use crate::par::par_map;
-use crate::skip::SkipRules;
+use crate::skip::{LibraryKind, SkipRules};
 
 /// Folders nested deeper than this are not entered (a guard against link loops).
 const MAX_DEPTH: usize = 48;
@@ -50,6 +50,112 @@ pub(super) struct Dir {
     pub files: Vec<Entry>,
     pub dirs: Vec<Dir>,
     pub discs: Vec<Disc>,
+    /// The listing kept a file, folder or disc before a focus narrowed it (see [`Scope`]).
+    pub had_entries: bool,
+}
+
+/// What a walk reads and whom it tells how far it got.
+#[derive(Clone, Copy, Default)]
+pub(super) struct Scope<'a> {
+    /// The folder names, folded, from the root down to the one folder that is read whole (a
+    /// title's folder). Its ancestors are passed through without their own files, so only the
+    /// way down is listed. Empty reads the whole root.
+    pub focus: &'a [String],
+    /// Told about the titles of a whole-root walk ([`WalkObserver`]); not used with a focus.
+    pub observer: Option<&'a dyn WalkObserver>,
+}
+
+/// Whether a folder directly in a library folder groups titles instead of being one, as the
+/// walk and [`count_units`] count titles: a movie bucket (`A`, `1999`, `1990s`, `Horror`) or a
+/// TV A to Z folder.
+fn groups_titles(kind: LibraryKind, name: &str) -> bool {
+    match kind {
+        LibraryKind::Movies => super::movies::is_bucket_name(name),
+        LibraryKind::TvShows => name.chars().count() == 1,
+    }
+}
+
+/// Whether a loose video counts as a title: in a movie library, yes (each is a movie); in a TV
+/// library it belongs to no show.
+fn loose_videos_count(kind: LibraryKind) -> bool {
+    kind == LibraryKind::Movies
+}
+
+fn is_video_file(name: &str, path: &Path, skip: &SkipRules) -> bool {
+    !skip.is_builtin_skipped(name)
+        && is_video_content(path)
+        && classify(name).file_type == MediaFileType::Video
+}
+
+/// How many titles a whole walk of `root` reads, counted as the walk counts them for its
+/// progress: every folder directly in it is one, except a folder that groups titles, whose own
+/// folders (and, in a movie library, loose videos) count instead; in a movie library each loose
+/// video directly in the root is one too. Skipped and disc folders do not count. Only the root
+/// and those grouping folders are listed. `None` when the root cannot be listed.
+pub(super) fn count_units(root: &Path, skip: &SkipRules) -> Option<usize> {
+    let gate = gate_for(root);
+    let kind = skip.kind();
+    let listing = {
+        let _permit = gate.enter();
+        fs::read_dir(root).map(list).ok()?
+    };
+    if skip.folder_has_marker(
+        listing
+            .iter()
+            .filter(|(_, _, is_dir, ..)| !is_dir)
+            .map(|(n, ..)| n.as_str()),
+    ) {
+        return Some(0);
+    }
+    let mut units = 0;
+    for (name, path, is_dir, ..) in listing {
+        if !is_dir {
+            if loose_videos_count(kind) && is_video_file(&name, &path, skip) {
+                units += 1;
+            }
+            continue;
+        }
+        if skip.is_skipped_folder(&name, &path.to_string_lossy()) || is_disc_folder_name(&name) {
+            continue;
+        }
+        units += if groups_titles(kind, &name) {
+            count_group(&path, skip)
+        } else {
+            1
+        };
+    }
+    Some(units)
+}
+
+/// The titles of a folder that groups titles: its folders, and in a movie library its videos.
+fn count_group(path: &Path, skip: &SkipRules) -> usize {
+    let gate = gate_for(path);
+    let Ok(listing) = ({
+        let _permit = gate.enter();
+        fs::read_dir(path).map(list)
+    }) else {
+        return 0;
+    };
+    if skip.folder_has_marker(
+        listing
+            .iter()
+            .filter(|(_, _, is_dir, ..)| !is_dir)
+            .map(|(n, ..)| n.as_str()),
+    ) {
+        return 0;
+    }
+    let kind = skip.kind();
+    listing
+        .iter()
+        .filter(|(name, entry_path, is_dir, ..)| {
+            if *is_dir {
+                !skip.is_skipped_folder(name, &entry_path.to_string_lossy())
+                    && !is_disc_folder_name(name)
+            } else {
+                loose_videos_count(kind) && is_video_file(name, entry_path, skip)
+            }
+        })
+        .count()
 }
 
 /// True when the name ends in a disc folder name (`VIDEO_TS`, `BDMV`, `HVDVD_TS`).
@@ -72,6 +178,7 @@ pub(super) fn read_tree(
     skip: &SkipRules,
     threads: usize,
     problems: &mut Vec<ScanProblem>,
+    scope: Scope<'_>,
 ) -> Option<Dir> {
     if !root.is_dir() {
         problems.push(ScanProblem {
@@ -96,8 +203,12 @@ pub(super) fn read_tree(
         skip,
         links: Mutex::new(links),
         gate: gate_for(root),
+        focus: scope.focus,
+        // The titles of a focused walk are the focus itself; the caller counts it.
+        observer: scope.observer.filter(|_| scope.focus.is_empty()),
     };
-    let (dir, found) = reader.read_dir(root, name, String::new(), 0, threads.max(1));
+    let (dir, found) =
+        reader.read_dir(root, name, String::new(), 0, threads.max(1), Counting::Root);
     problems.extend(found);
     dir
 }
@@ -128,6 +239,21 @@ struct Pending {
     path: PathBuf,
     name: String,
     rel: String,
+    /// What the folder is for the progress of the walk.
+    counting: Counting,
+}
+
+/// What a folder is to the titles the walk counts ([`Scope::observer`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Counting {
+    /// The root: its folders and loose videos are the titles.
+    Root,
+    /// A folder in the root that groups titles: its folders and loose videos are the titles.
+    Group,
+    /// One title: read whole, then counted once.
+    Title,
+    /// Inside a title, or nobody listens.
+    Inside,
 }
 
 struct Reader<'a> {
@@ -136,6 +262,10 @@ struct Reader<'a> {
     links: Mutex<HashSet<PathBuf>>,
     /// Listings of the source's drive that may run at once, shared with other walks.
     gate: std::sync::Arc<VolumeGate>,
+    /// See [`Scope::focus`].
+    focus: &'a [String],
+    /// See [`Scope::observer`].
+    observer: Option<&'a dyn WalkObserver>,
 }
 
 /// One listed entry: name, path, is a folder, is a link, and the metadata of a file.
@@ -151,6 +281,7 @@ impl Reader<'_> {
         rel: String,
         depth: usize,
         budget: usize,
+        counting: Counting,
     ) -> (Option<Dir>, Vec<ScanProblem>) {
         let mut problems = Vec::new();
         let is_root = depth == 0;
@@ -193,6 +324,7 @@ impl Reader<'_> {
             files: Vec::new(),
             dirs: Vec::new(),
             discs: Vec::new(),
+            had_entries: false,
         };
         let mut pending: Vec<Pending> = Vec::new();
         for (file_name, entry_path, is_dir, is_link, meta) in listing {
@@ -241,20 +373,69 @@ impl Reader<'_> {
                 path: entry_path,
                 name: file_name,
                 rel: child_rel,
+                counting: Counting::Inside,
             });
+        }
+        dir.had_entries = !(dir.files.is_empty() && dir.discs.is_empty() && pending.is_empty());
+        if let Some(want) = self.focus.get(depth) {
+            // An ancestor of the focused folder: only the way down is read.
+            dir.files.clear();
+            dir.discs.clear();
+            pending.retain(|p| cv_fs::paths::fold_name(&p.name) == *want);
+        }
+        let observer = self
+            .observer
+            .filter(|_| matches!(counting, Counting::Root | Counting::Group));
+        if let Some(observer) = observer {
+            let kind = self.skip.kind();
+            let loose = if loose_videos_count(kind) {
+                dir.files
+                    .iter()
+                    .filter(|f| classify(&f.rel).file_type == MediaFileType::Video)
+                    .count()
+            } else {
+                0
+            };
+            for p in &mut pending {
+                p.counting = if counting == Counting::Root && groups_titles(kind, &p.name) {
+                    Counting::Group
+                } else {
+                    Counting::Title
+                };
+            }
+            let titles = pending
+                .iter()
+                .filter(|p| p.counting == Counting::Title)
+                .count();
+            observer.found(loose + titles);
+            // Loose videos are read with the listing.
+            observer.read(loose);
         }
 
         // Sub-folders are independent: read them side by side, sharing the thread budget.
         let workers = budget.min(pending.len()).max(1);
         let child_budget = (budget / workers).max(1);
         let children = par_map(&pending, workers, |p| {
-            self.read_dir(
+            let title = p.counting == Counting::Title;
+            if let Some(observer) = self.observer.filter(|_| title) {
+                observer.reading(&p.name);
+            }
+            let read = self.read_dir(
                 &p.path,
                 p.name.clone(),
                 p.rel.clone(),
                 depth + 1,
                 child_budget,
-            )
+                if p.counting == Counting::Group {
+                    Counting::Group
+                } else {
+                    Counting::Inside
+                },
+            );
+            if let Some(observer) = self.observer.filter(|_| title) {
+                observer.read(1);
+            }
+            read
         });
         for (child, found) in children {
             problems.extend(found);

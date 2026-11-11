@@ -217,6 +217,7 @@ fn snapshot(id: u64, state: JobState, done: usize, total: usize) -> JobSnapshot 
         elapsed_secs: 0.0,
         outcome: None,
         result: None,
+        units: None,
     }
 }
 

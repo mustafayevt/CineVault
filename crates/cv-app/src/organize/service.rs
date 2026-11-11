@@ -27,10 +27,10 @@ use super::copies::{group_of_movies, separate_copies};
 use super::examples::{episode_example, examples};
 use super::load::{Loaded, LoadedMovie, load, scope_ids};
 use super::model::{
-    Applied, AppliedItem, AppliedStatus, ApplyRequest, BusyTitle, Choice, CompanionCounts,
-    ConflictCode, ConflictRow, CopyNote, Counts, FileChange, JournalBatch, NotRestorable,
-    OrganizeError, PatternField, Preview, PreviewRequest, PreviewRow, ResolutionOption, RowKind,
-    RowStatus, TemplateProblem, UndoOutcome,
+    Applied, AppliedItem, AppliedStatus, ApplyProgress, ApplyRequest, BusyTitle, Choice,
+    CompanionCounts, ConflictCode, ConflictRow, CopyNote, Counts, FileChange, JournalBatch,
+    NotRestorable, OrganizeError, PatternField, Preview, PreviewRequest, PreviewRow,
+    ResolutionOption, RowKind, RowStatus, TemplateProblem, UndoOutcome,
 };
 
 /// Why a title that is not scraped yet is not planned, as the organize-state cache keeps it.
@@ -320,10 +320,28 @@ impl OrganizeService {
     /// Only what stops the whole batch: the library cannot be read or the journal cannot be
     /// written. A step that fails on the disk fails its item only.
     pub fn apply(&self, request: &ApplyRequest) -> Result<Applied, OrganizeError> {
-        self.apply_as(request, new_batch_id())
+        self.apply_with(request, &mut |_| {})
     }
 
-    fn apply_as(&self, request: &ApplyRequest, batch_id: String) -> Result<Applied, OrganizeError> {
+    /// [`Self::apply`], telling `on_progress` how far it got: once before the first title (0 of
+    /// the titles it runs) and after each title.
+    ///
+    /// # Errors
+    /// As [`Self::apply`].
+    pub fn apply_with(
+        &self,
+        request: &ApplyRequest,
+        on_progress: &mut dyn FnMut(&ApplyProgress),
+    ) -> Result<Applied, OrganizeError> {
+        self.apply_as(request, new_batch_id(), on_progress)
+    }
+
+    fn apply_as(
+        &self,
+        request: &ApplyRequest,
+        batch_id: String,
+        on_progress: &mut dyn FnMut(&ApplyProgress),
+    ) -> Result<Applied, OrganizeError> {
         // No rescan walks a folder while it moves (see `hold_library`).
         let _held = self.hold_library()?;
         // Nothing else writes into a title while it is renamed (see `title_guard`). The titles
@@ -421,8 +439,26 @@ impl OrganizeService {
         for (items, options) in &groups {
             Executor::new(fs.as_ref(), &mut journal, options.clone())?.mark_items(items)?;
         }
+        let total: usize = groups.iter().map(|(items, _)| items.len()).sum();
+        let mut done = 0;
+        on_progress(&ApplyProgress {
+            done,
+            total,
+            title: String::new(),
+        });
         for (items, options) in groups {
-            let report = run_batch(fs.as_ref(), &mut journal, options, &items)?;
+            let report = run_batch(fs.as_ref(), &mut journal, options, &items, &mut |item| {
+                done += 1;
+                on_progress(&ApplyProgress {
+                    done,
+                    total,
+                    title: planned
+                        .infos
+                        .get(&item.id)
+                        .map(|info| info.title.clone())
+                        .unwrap_or_default(),
+                });
+            })?;
             reports.extend(report);
         }
         if choice.erases() {
@@ -1309,8 +1345,11 @@ fn run_batch(
     journal: &mut dyn JournalStore,
     options: ExecOptions,
     items: &[BatchItem],
+    progress: &mut dyn FnMut(&cv_rename::exec::ItemReport),
 ) -> Result<Vec<cv_rename::exec::ItemReport>, OrganizeError> {
-    let report = Executor::new(fs, journal, options)?.run(items)?;
+    let report = Executor::new(fs, journal, options)?
+        .with_progress(|item| progress(item))
+        .run(items)?;
     Ok(report.items)
 }
 

@@ -299,6 +299,18 @@ pub fn plan_availability(
     probe: &dyn FileProbe,
     style: PathStyle,
 ) -> DbResult<AvailabilityPlan> {
+    plan_availability_of(conn, probe, style, &|_| true)
+}
+
+/// [`plan_availability`] for the items `wanted` keeps only: the others are not probed at all, so
+/// a scan of one library folder (or of one title) touches only its own files, never the disk of
+/// every title in the library. The report counts the items looked at.
+pub fn plan_availability_of(
+    conn: &Connection,
+    probe: &dyn FileProbe,
+    style: PathStyle,
+    wanted: &dyn Fn(ItemId) -> bool,
+) -> DbResult<AvailabilityPlan> {
     let candidates = conn
         .prepare(
             "SELECT id, kind, path, data_source, availability, availability_reason \
@@ -329,7 +341,7 @@ pub fn plan_availability(
         sources,
     };
     let mut plan = AvailabilityPlan::default();
-    for c in &candidates {
+    for c in candidates.iter().filter(|c| wanted(ItemId(c.id))) {
         let (state, reason) = verdict(conn, c, style, &mut cached)?;
         plan.report.checked += 1;
         plan.report.count(state);

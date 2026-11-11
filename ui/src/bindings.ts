@@ -93,6 +93,16 @@ export const commands = {
 	 *  are gone become Missing; nothing is deleted.
 	 */
 	rescanLibrary: () => typedError<RescanStartedDto, ScanCommandError>(__TAURI_INVOKE("rescan_library")),
+	/**
+	 *  "Scan this folder": rescans one library folder, as Rescan does for all of them. Titles in
+	 *  other library folders are not read.
+	 */
+	rescanFolder: (sourceId: number) => typedError<RescanStartedDto, ScanCommandError>(__TAURI_INVOKE("rescan_folder", { sourceId })),
+	/**
+	 *  "Scan again": rescans one title's folder only: its files, NFO and artwork, and whether they
+	 *  are gone or back. No other title is read or changed.
+	 */
+	rescanTitle: (id: string) => typedError<RescanStartedDto, ScanCommandError>(__TAURI_INVOKE("rescan_title", { id })),
 	/**  Lists the video files inside the library folders that belong to no title. */
 	findMissingFiles: () => typedError<MissingInSourceDto[], ScanCommandError>(__TAURI_INVOKE("find_missing_files")),
 	/**  Every library folder with whether it is reachable and what it holds, for the sidebar. */
@@ -390,9 +400,9 @@ export const commands = {
 	/**
 	 *  Runs the checked changes of the request and records one journal batch. The request is
 	 *  planned again first; a checked item that is not a clean change any more is not run and is
-	 *  listed in `not_run`.
+	 *  listed in `not_run`. Progress goes to `on_progress` after each title.
 	 */
-	organizeApply: (request: OrganizeRequestDto, include: string[]) => typedError<AppliedDto, OrganizeCommandError>(__TAURI_INVOKE("organize_apply", { request, include })),
+	organizeApply: (request: OrganizeRequestDto, include: string[], onProgress: Channel<RenameProgressDto>) => typedError<AppliedDto, OrganizeCommandError>(__TAURI_INVOKE("organize_apply", { request, include, onProgress })),
 	/**  The organize batches, newest first. */
 	organizeJournal: () => typedError<JournalBatchDto[], OrganizeCommandError>(__TAURI_INVOKE("organize_journal")),
 	/**  Takes a batch back in reverse. Items changed since are left alone and reported. */
@@ -2250,6 +2260,8 @@ export type JobProgress = {
 	 *  `198 scraped`, `artwork for 190`); `None` shows the job's name.
 	 */
 	result: string | null,
+	/**  A scan's progress in titles rather than in library folders; absent for other jobs. */
+	units?: JobUnitsDto | null,
 };
 
 /**  One message on the progress channel. */
@@ -2262,6 +2274,19 @@ export type JobProgressUpdate = {
 
 /**  Job lifecycle state as the UI sees it. */
 export type JobStateDto = "queued" | "running" | "paused" | "completed" | "failed" | "cancelled";
+
+/**  A job's progress in its own unit (the titles of a scan). */
+export type JobUnitsDto = {
+	phase: UnitPhaseDto,
+	/**  Titles read (0 while counting). */
+	done: number,
+	/**  Titles found so far while counting, in all while working. */
+	total: number,
+	/**  The title, or while counting the folder, being read now. */
+	current: string | null,
+	/**  Estimated seconds left; only once enough titles were timed. */
+	eta_secs: number | null,
+};
 
 /**  One batch of the journal. */
 export type JournalBatchDto = {
@@ -3571,6 +3596,16 @@ export type RemovedTitleDto = {
 	ignore_reason: string,
 };
 
+/**  How far a running rename got, after each title: the sidebar shows it as "Renaming 3 of 12". */
+export type RenameProgressDto = {
+	/**  Titles done, renamed or not. */
+	done: number,
+	/**  Titles the rename runs. */
+	total: number,
+	/**  The title that just finished; empty before the first. */
+	title: string,
+};
+
 /**  A rescan that was queued. */
 export type RescanStartedDto = {
 	/**  The job in the Activity drawer. */
@@ -4716,6 +4751,13 @@ export type UnfinishedBatchDto = {
 	 */
 	auto_resume: boolean,
 };
+
+/**  Which part of its work a scan is in. */
+export type UnitPhaseDto = 
+/**  Finding the titles: "Finding titles… 312 found". */
+"counting" | 
+/**  Reading them: "312 of 707 titles". */
+"working";
 
 /**  A Kodi add-on scraper that is listed but cannot run, with the reason. */
 export type UnsupportedAddonDto = {

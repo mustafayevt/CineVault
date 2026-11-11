@@ -55,7 +55,8 @@ use cv_domain::{DataSource, ItemId, SourceKind};
 use cv_jobs::{JobManager, StoreError};
 use cv_media::tools::ToolsManager;
 use cv_scan::rescan::job::{
-    RescanHandle, RescanTarget, rescan_targets, resume_rescans, submit_rescan,
+    RescanHandle, RescanTarget, job_name_of, rescan_targets, resume_rescans, submit_rescan,
+    submit_rescan_named,
 };
 use cv_scan::rescan::{RescanOptions, Skipped};
 use cv_scan::skip::{DEFAULT_USER_PATTERNS, LibraryKind, SkipRules};
@@ -177,6 +178,12 @@ pub enum ScanError {
     Db(#[from] DbError),
     #[error("The scan could not be queued: {0}")]
     Jobs(#[from] StoreError),
+    /// The title is in no library folder any more (its folder was removed from the library).
+    #[error(
+        "{0} is not in a library folder any more, so it cannot be scanned on its own. Scan the \
+         library instead."
+    )]
+    NoFolder(String),
 }
 
 /// A rescan that was queued.
@@ -420,6 +427,92 @@ impl ScanService {
         self.submit(vec![target]).map(Some)
     }
 
+    /// "Scan this folder": queues a rescan of one library folder, named after its label
+    /// ("Scanning Movies 4K"). `None` when the folder is no longer in the library.
+    ///
+    /// # Errors
+    /// As [`Self::rescan_all`].
+    pub fn scan_folder(&self, id: i64) -> Result<Option<RescanRun>, ScanError> {
+        let Some(source) = self.db.read(|conn| get_source(conn, id))? else {
+            return Ok(None);
+        };
+        let name = job_name_of(&folder_label(&source));
+        let target = RescanTarget::Source {
+            id: source.id,
+            kind: source.kind,
+            path: source.path,
+        };
+        self.reset_new_if_asked()?;
+        self.submit_named(vec![target], name).map(Some)
+    }
+
+    /// "Scan again" on a title page: queues a rescan of the title's own folder only, which reads
+    /// its files, NFO and artwork again, notices that they are gone or back, and leaves every
+    /// other title alone ([`cv_scan::rescan::rescan_folder`]). A movie that sits directly in its
+    /// library folder has no folder of its own, so the library folder is read. An episode or
+    /// season scans its show. `None` when the title is not in the library.
+    ///
+    /// # Errors
+    /// [`ScanError::NoFolder`] when the title's library folder was removed; else as
+    /// [`Self::rescan_all`].
+    pub fn rescan_title(&self, id: ItemId) -> Result<Option<RescanRun>, ScanError> {
+        let item = self.db.read(|conn| cv_db::repo::get_item(conn, id))?;
+        let Some(mut item) = item else {
+            return Ok(None);
+        };
+        if let Some(parent) = item.parent_id
+            && matches!(
+                item.kind(),
+                cv_domain::ItemKind::Season | cv_domain::ItemKind::Episode
+            )
+        {
+            match self.db.read(|conn| cv_db::repo::get_item(conn, parent))? {
+                Some(show) => item = show,
+                None => return Ok(None),
+            }
+        }
+        let title = if item.core.year > 0 {
+            format!("{} ({})", item.core.title, item.core.year)
+        } else {
+            item.core.title.clone()
+        };
+        let sources = self.db.read(|conn| list_sources(conn, None))?;
+        let wanted = match item.kind() {
+            cv_domain::ItemKind::Movie => SourceKind::Movie,
+            _ => SourceKind::Tv,
+        };
+        let fold = |path: &str| {
+            let mut text = cv_fs::paths::fold_name(&path.trim().replace('\\', "/"));
+            while text.len() > 1 && text.ends_with('/') {
+                text.pop();
+            }
+            text
+        };
+        let Some(source) = sources
+            .into_iter()
+            .find(|s| s.kind == wanted && fold(&s.path) == fold(&item.core.data_source))
+        else {
+            return Err(ScanError::NoFolder(title));
+        };
+        let folder = item.core.path.trim().to_owned();
+        let target = if folder.is_empty() || fold(&folder) == fold(&source.path) {
+            RescanTarget::Source {
+                id: source.id,
+                kind: source.kind,
+                path: source.path,
+            }
+        } else {
+            RescanTarget::Folder {
+                id: source.id,
+                kind: source.kind,
+                folder,
+                name: title.clone(),
+            }
+        };
+        self.submit_named(vec![target], job_name_of(&title))
+            .map(Some)
+    }
+
     /// With the "reset NEW on update" setting on, clears every NEW flag before an update of the
     /// data sources, so the flags afterwards mark what that update found.
     fn reset_new_if_asked(&self) -> Result<(), ScanError> {
@@ -444,6 +537,24 @@ impl ScanService {
         )?;
         self.follow_up(&handle);
         Ok(RescanRun { handle, sources })
+    }
+
+    fn submit_named(
+        &self,
+        targets: Vec<RescanTarget>,
+        name: String,
+    ) -> Result<RescanRun, ScanError> {
+        self.repair_date_added();
+        let handle = submit_rescan_named(
+            &self.jobs,
+            Arc::clone(&self.db),
+            self.rescan_options(),
+            targets,
+            SOURCE_PARALLELISM,
+            name,
+        )?;
+        self.follow_up(&handle);
+        Ok(RescanRun { handle, sources: 1 })
     }
 
     /// Starts again the rescans that a quit cut short. Returns how many.
@@ -663,7 +774,7 @@ impl ScanService {
                 RescanTarget::Source { path, .. } => !waiting.iter().any(|root| {
                     cv_fs::paths::is_within_with(path, root, cv_fs::paths::CASE_SENSITIVE)
                 }),
-                RescanTarget::Detached => true,
+                RescanTarget::Detached | RescanTarget::Folder { .. } => true,
             })
             .collect();
         if targets.is_empty() {
@@ -1018,6 +1129,21 @@ impl ScanService {
 /// scan reads it again.
 fn skip_topic(path: &str) -> String {
     format!("source-skipped:{path}")
+}
+
+/// A library folder as the sidebar names it: its label, else the last part of its path.
+fn folder_label(source: &DataSource) -> String {
+    let label = source.label.trim();
+    if !label.is_empty() {
+        return label.to_owned();
+    }
+    let trimmed = source.path.trim_end_matches(['/', '\\']);
+    let name = trimmed.rsplit(['/', '\\']).next().unwrap_or(trimmed);
+    if name.is_empty() {
+        source.path.clone()
+    } else {
+        name.to_owned()
+    }
 }
 
 fn skip_notice(source: &DataSource, skipped: Skipped) -> AppNotice {
