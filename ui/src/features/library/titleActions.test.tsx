@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ContextMenu } from "../../components/ContextMenu";
 import { restorePlatform, stubPlatform } from "../../test/platform";
@@ -22,6 +22,9 @@ import {
   fullLabel,
 } from "./titleActions";
 import { useSettingsStore } from "../settings/settingsStore";
+import { setLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
+import { createSyntheticLibraryOpsBackend } from "../library-ops/syntheticLibraryOps";
+import { useToastStore } from "../toasts/toastStore";
 import { useLibraryActions } from "./useLibraryActions";
 import type { TitleTarget } from "./useLibraryActions";
 
@@ -34,7 +37,13 @@ const target = (id: string, title: string, copies = 0): TitleTarget => ({
   copies,
 });
 
-function Page({ targets }: { targets: readonly TitleTarget[] }) {
+function Page({
+  targets,
+  promoteRemove = false,
+}: {
+  targets: readonly TitleTarget[];
+  promoteRemove?: boolean;
+}) {
   const actions = useLibraryActions(targets);
   return (
     <div>
@@ -45,20 +54,21 @@ function Page({ targets }: { targets: readonly TitleTarget[] }) {
         actions={actions}
         count={targets.length}
         size="186.2 GB"
+        promoteRemove={promoteRemove}
         onClear={() => undefined}
       />
     </div>
   );
 }
 
-async function renderPage(targets: readonly TitleTarget[]) {
+async function renderPage(targets: readonly TitleTarget[], promoteRemove = false) {
   const root = createRootRoute();
   const router = createRouter({
     routeTree: root.addChildren([
       createRoute({
         getParentRoute: () => root,
         path: "/",
-        component: () => <Page targets={targets} />,
+        component: () => <Page targets={targets} promoteRemove={promoteRemove} />,
       }),
       createRoute({
         getParentRoute: () => root,
@@ -78,7 +88,11 @@ const four = [target("1", "Heat"), target("2", "Alien"), target("3", "Dune"), ta
 const names = (items: HTMLElement[]) => items.map((item) => item.textContent?.trim() ?? "");
 
 beforeEach(() => stubPlatform("windows"));
-afterEach(() => restorePlatform());
+afterEach(() => {
+  restorePlatform();
+  setLibraryOpsBackend(null);
+  useToastStore.setState({ toasts: [], history: [] });
+});
 
 describe("the name of Delete", () => {
   it("says Delete on every platform, because Settings › Deleted files decides where it goes", () => {
@@ -212,6 +226,51 @@ describe("title actions", () => {
     await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
     await screen.findAllByRole("menuitem");
     expect(screen.queryByRole("menuitem", { name: /^Compare/ })).toBeNull();
+  });
+
+  it("keeps Remove from library under More in the usual view", async () => {
+    await renderPage(four);
+    const bar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    expect(within(bar).queryByRole("button", { name: "Remove from library" })).toBeNull();
+  });
+
+  it("puts Remove from library on the bar before Delete in the missing-files view, and removes every selected title in one call", async () => {
+    const user = userEvent.setup();
+    const ops = createSyntheticLibraryOpsBackend();
+    const removeFromLibrary = vi.spyOn(ops, "removeFromLibrary");
+    setLibraryOpsBackend(ops);
+    await renderPage(four, true);
+    const bar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    const buttons = within(bar)
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim());
+    expect(buttons).toEqual([
+      "Rename",
+      "Scrape",
+      "Artwork",
+      "Move",
+      "Remove from library",
+      "Delete",
+      "More",
+      "",
+    ]);
+
+    // It is on the bar, so it is not repeated under More.
+    await user.click(within(bar).getByRole("button", { name: "More" }));
+    expect(names(await screen.findAllByRole("menuitem"))).toEqual([
+      "Rewrite NFO",
+      "Reload media info",
+      "Edit details",
+      "Ignore this folder",
+    ]);
+    await user.keyboard("{Escape}");
+
+    await user.click(within(bar).getByRole("button", { name: "Remove from library" }));
+    await waitFor(() => expect(removeFromLibrary).toHaveBeenCalledTimes(1));
+    expect(removeFromLibrary).toHaveBeenCalledWith(["1", "2", "3", "4"], false);
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts[0]?.message).toContain("Removed 4 titles"),
+    );
   });
 
   it("shares icons, names and hints with the title page header", () => {

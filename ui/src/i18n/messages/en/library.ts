@@ -99,6 +99,7 @@ export const library = {
   "library.act.artwork.short": "Artwork",
   "library.act.move": "Move to…",
   "library.act.delete": "Delete",
+  "library.act.removeShort": "Remove from library",
   "library.act.needOne": "Select one title",
   "library.act.needSome": "Select a title first",
   "library.act.playShow": "Open the show to play an episode",

@@ -2,6 +2,12 @@
 
 What changed in each version of CineVault, newest first, in plain words. The app shows this file under Settings › Updates › Release notes, and after an update it shows the notes of the version you just got. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.7.0] - unreleased
+
+### Added
+
+- A title whose files are missing now has a "Remove from library (keep files)" button right in the warning on its page (movies and TV shows), with a line saying why the title is kept: the drive may be offline or the files only moved. It is not shown when the library folder is just offline, since that title comes back by itself. In the Library's "Missing files or offline" list, the selection bar has a "Remove from library" button, so you can clear many titles at once.
+
 ## [1.6.2] - 2026-11-04
 
 ### Fixed
