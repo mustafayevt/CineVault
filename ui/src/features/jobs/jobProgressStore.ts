@@ -65,3 +65,22 @@ export const useJobProgressStore = create<JobProgressState>((set) => ({
     })),
   clearFinished: () => set((state) => ({ jobs: state.jobs.filter((j) => !FINISHED.has(j.state)) })),
 }));
+
+/** Resolves with the job once it is over (completed, failed or cancelled). */
+export function whenJobEnds(id: number): Promise<JobProgress> {
+  const ended = (jobs: readonly JobProgress[]) =>
+    jobs.find((job) => job.id === id && FINISHED.has(job.state));
+  return new Promise((resolve) => {
+    const now = ended(useJobProgressStore.getState().jobs);
+    if (now !== undefined) {
+      resolve(now);
+      return;
+    }
+    const unsubscribe = useJobProgressStore.subscribe((state) => {
+      const job = ended(state.jobs);
+      if (job === undefined) return;
+      unsubscribe();
+      resolve(job);
+    });
+  });
+}

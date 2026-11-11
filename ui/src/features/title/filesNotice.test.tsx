@@ -17,6 +17,7 @@ import { setLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import { createSyntheticLibraryOpsBackend } from "../library-ops/syntheticLibraryOps";
 import { MoviePage } from "../movie/MoviePage";
 import { setRenameHistoryBackend } from "../movie/renamedFrom";
+import { setScanBackend, unavailableScanBackend } from "../scan/scanBackend";
 import { ShowPage } from "../show/ShowPage";
 import { restoreLayout, stubLayout } from "../../test/layout";
 import { restorePlatform, stubPlatform } from "../../test/platform";
@@ -95,6 +96,7 @@ afterEach(() => {
   setTvBackend(null);
   setLibraryOpsBackend(null);
   setRenameHistoryBackend(null);
+  setScanBackend(null);
   useToastStore.setState({ toasts: [], history: [] });
 });
 
@@ -165,5 +167,33 @@ describe("the files notice on a title page", () => {
     renderAt(`/tv/${SYNTHETIC_SHOW_ID}`);
     await screen.findByTestId("files-notice");
     expect(screen.queryByTestId("files-notice-remove")).toBeNull();
+  });
+
+  it.each(["missing", "offline"])(
+    "offers Scan again for the movie's folder when its files are %s",
+    async (availability) => {
+      useMovie(availability);
+      const scanTitle = vi.fn(() =>
+        Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" as const }),
+      );
+      setScanBackend({ ...unavailableScanBackend, available: true, scanTitle });
+      renderAt(`/movies/${SYNTHETIC_MOVIE_ID}`);
+      await userEvent.click(await screen.findByTestId("files-notice-scan"));
+      expect(scanTitle).toHaveBeenCalledWith(SYNTHETIC_MOVIE_ID);
+      await waitFor(() =>
+        expect(useToastStore.getState().toasts[0]?.message).toMatch(/^Scanning /),
+      );
+    },
+  );
+
+  it("offers Scan again on a TV show whose files are missing", async () => {
+    useShow("missing");
+    const scanTitle = vi.fn(() =>
+      Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" as const }),
+    );
+    setScanBackend({ ...unavailableScanBackend, available: true, scanTitle });
+    renderAt(`/tv/${SYNTHETIC_SHOW_ID}`);
+    await userEvent.click(await screen.findByRole("button", { name: /^Scan the folder of / }));
+    expect(scanTitle).toHaveBeenCalledWith(SYNTHETIC_SHOW_ID);
   });
 });

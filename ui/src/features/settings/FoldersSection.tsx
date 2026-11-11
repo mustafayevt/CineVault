@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Folder, Network, Plus } from "lucide-react";
+import { Folder, FolderSync, Network, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
+import { IconButton } from "../../components/IconButton";
 import { PathText } from "../../components/PathText";
 import { SectionLabel } from "../../components/SectionLabel";
 import { SegmentedControl } from "../../components/SegmentedControl";
@@ -17,7 +18,7 @@ import type { LibrarySource, SourceKind } from "../library-sources/sourcesBacken
 import { NetworkShareButton } from "../shares/NetworkShareButton";
 import { currentOnboardingBackend } from "../onboarding/onboardingBackend";
 import { useFolderDrop } from "../onboarding/useFolderDrop";
-import { runRescan } from "../scan/scanActions";
+import { runRescan, runScanFolder } from "../scan/scanActions";
 import { currentScanBackend } from "../scan/scanBackend";
 import type { SourceHealth } from "../scan/scanBackend";
 import { SOURCE_HEALTH_KEY, SOURCE_LABELS_KEY } from "../scan/useSourceHealth";
@@ -28,6 +29,12 @@ function messageOf(error: unknown): string {
 }
 
 const KINDS: readonly SourceKind[] = ["movie", "tv"];
+
+/** The name a folder's scan goes by: the last part of its path. */
+function sourceName(source: LibrarySource): string {
+  const parts = source.path.split(/[\\/]/).filter((part) => part !== "");
+  return parts.at(-1) ?? source.path;
+}
 
 /** The line under a folder: what it holds, where it is, and whether it is watched or offline. */
 function Info({ source, health }: { source: LibrarySource; health: SourceHealth | undefined }) {
@@ -123,6 +130,12 @@ function FolderRow({ source, kind, health, onKind, onRemove, onConnect }: Folder
             { value: "tv", label: t("settingsPage.folders.tv") },
           ]}
           onChange={onKind}
+        />
+        <IconButton
+          icon={FolderSync}
+          aria-label={t("settingsPage.folders.scanFor", { path: source.path })}
+          title={t("scan.folder")}
+          onClick={() => void runScanFolder(source.id, sourceName(source))}
         />
         <Button
           variant="ghost"

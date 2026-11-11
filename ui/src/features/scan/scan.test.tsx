@@ -9,7 +9,7 @@ import { EMPTY_SIDEBAR_DATA, useSidebarDataStore } from "../sidebar/sidebarData"
 import { settingDef } from "../settings/schema";
 import { useToastStore } from "../toasts/toastStore";
 import { setToolsBackend } from "../tools/toolsBackend";
-import { runRescan, useScanUiStore } from "./scanActions";
+import { runRescan, runScanFolder, runScanTitle, useScanUiStore } from "./scanActions";
 import { ScanRequestError, setScanBackend } from "./scanBackend";
 import type { RescanStarted, ScanBackend, SourceHealth } from "./scanBackend";
 import {
@@ -35,6 +35,25 @@ function health(overrides: Partial<SourceHealth> = {}): SourceHealth {
   };
 }
 
+function scanJob(overrides: Partial<JobProgress> & Pick<JobProgress, "id" | "name">): JobProgress {
+  return {
+    lane: "disk",
+    state: "running",
+    priority: "normal",
+    total: 1,
+    done: 0,
+    failed: 0,
+    rolled_back: 0,
+    current: [],
+    throughput_per_sec: null,
+    eta_secs: null,
+    elapsed_secs: 1,
+    outcome: null,
+    result: null,
+    ...overrides,
+  };
+}
+
 function fakeBackend(overrides: Partial<ScanBackend> = {}): ScanBackend {
   return {
     available: true,
@@ -42,6 +61,12 @@ function fakeBackend(overrides: Partial<ScanBackend> = {}): ScanBackend {
     findMissing: vi.fn(() => Promise.resolve([])),
     sourceHealth: vi.fn(() => Promise.resolve([health()])),
     readPendingMediaInfo: vi.fn(() => Promise.resolve("ready" as const)),
+    scanFolder: vi.fn(() =>
+      Promise.resolve({ job_id: 8, sources: 1, media_info: "ready" as const }),
+    ),
+    scanTitle: vi.fn(() =>
+      Promise.resolve({ job_id: 9, sources: 1, media_info: "ready" as const }),
+    ),
     ...overrides,
   };
 }
@@ -122,6 +147,75 @@ describe("runRescan", () => {
   it("explains that scanning needs the desktop app in a plain browser", async () => {
     setScanBackend({ ...fakeBackend(), available: false });
     await runRescan();
+    expect(useToastStore.getState().toasts[0]?.message).toBe(
+      "Scanning is available in the desktop app.",
+    );
+  });
+});
+
+describe("scanning one place", () => {
+  it("scans one library folder and names it in the toast", async () => {
+    const backend = fakeBackend();
+    setScanBackend(backend);
+    await runScanFolder(3, "Movies 4K");
+    expect(backend.scanFolder).toHaveBeenCalledWith(3);
+    expect(backend.rescan).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      "Scanning Movies 4K",
+    ]);
+  });
+
+  it("queues one scan when the button is pressed twice", async () => {
+    const backend = fakeBackend();
+    setScanBackend(backend);
+    await Promise.all([runScanFolder(3, "Movies 4K"), runScanFolder(3, "Movies 4K")]);
+    expect(backend.scanFolder).toHaveBeenCalledTimes(1);
+  });
+
+  it("scans a title again and is done when its job ends", async () => {
+    const backend = fakeBackend();
+    setScanBackend(backend);
+    let finished = false;
+    const scan = runScanTitle("42", "Example Movie").then(() => {
+      finished = true;
+    });
+    await waitFor(() => expect(backend.scanTitle).toHaveBeenCalledWith("42"));
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
+      "Scanning Example Movie",
+    ]);
+    expect(finished).toBe(false);
+    act(() => {
+      useJobProgressStore.getState().apply({
+        jobs: [scanJob({ id: 9, name: "Scanning Example Movie", state: "completed" })],
+        overall: { kind: "idle", percent: 0, active_jobs: 0 },
+      });
+    });
+    await scan;
+    expect(finished).toBe(true);
+  });
+
+  it("puts a refusal in Activity", async () => {
+    setScanBackend(
+      fakeBackend({
+        scanTitle: () =>
+          Promise.reject(
+            new ScanRequestError(
+              "no_folder",
+              "Example Movie is not in a library folder any more, so it cannot be scanned on its own. Scan the library instead.",
+            ),
+          ),
+      }),
+    );
+    await runScanTitle("42", "Example Movie");
+    const notice = useNotificationStore.getState().items[0];
+    expect(notice?.title).toBe("Could not start the scan");
+    expect(notice?.detail).toContain("not in a library folder");
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  it("says a browser cannot scan", async () => {
+    setScanBackend(fakeBackend({ available: false }));
+    await runScanFolder(3, "Movies 4K");
     expect(useToastStore.getState().toasts[0]?.message).toBe(
       "Scanning is available in the desktop app.",
     );

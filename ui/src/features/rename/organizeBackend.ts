@@ -1,6 +1,7 @@
-import { isTauri } from "@tauri-apps/api/core";
+import { Channel, isTauri } from "@tauri-apps/api/core";
 
 import { commands } from "../../bindings";
+
 import type {
   AppliedDto,
   JournalBatchDto,
@@ -10,6 +11,7 @@ import type {
   OrganizeRequestDto,
   PatternFieldDto,
   PatternsDto,
+  RenameProgressDto,
   TemplateFindingDto,
   TemplateTokenDto,
   UndoOutcomeDto,
@@ -41,7 +43,12 @@ export interface OrganizeBackend {
   tokens: (tv: boolean) => Promise<TemplateTokenDto[]>;
   checkTemplate: (field: PatternFieldDto, template: string) => Promise<TemplateFindingDto[]>;
   preview: (request: OrganizeRequestDto) => Promise<OrganizePreviewDto>;
-  apply: (request: OrganizeRequestDto, include: readonly string[]) => Promise<AppliedDto>;
+  /** Renames the checked titles; `onProgress` hears how far it got after each title. */
+  apply: (
+    request: OrganizeRequestDto,
+    include: readonly string[],
+    onProgress?: (progress: RenameProgressDto) => void,
+  ) => Promise<AppliedDto>;
   journal: () => Promise<JournalBatchDto[]>;
   undo: (batchId: string) => Promise<UndoOutcomeDto>;
 }
@@ -66,7 +73,11 @@ const tauriBackend: OrganizeBackend = {
   tokens: (tv) => commands.organizeTokens(tv),
   checkTemplate: (field, template) => commands.organizeCheckTemplate(field, template),
   preview: async (request) => unwrap(await commands.organizePreview(request)),
-  apply: async (request, include) => unwrap(await commands.organizeApply(request, [...include])),
+  apply: async (request, include, onProgress) => {
+    const channel = new Channel<RenameProgressDto>();
+    if (onProgress !== undefined) channel.onmessage = onProgress;
+    return unwrap(await commands.organizeApply(request, [...include], channel));
+  },
   journal: async () => unwrap(await commands.organizeJournal()),
   undo: async (batchId) => unwrap(await commands.organizeUndo(batchId)),
 };

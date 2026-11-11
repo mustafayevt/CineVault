@@ -12,6 +12,13 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Original or localized title, title by title. A movie or TV show whose original title differs from its title in your metadata language can now use either: choose "Title to use: Localized / Original" on its Edit details page, or select several titles and pick "Use original title" or "Use localized title" under More (also in the right-click menu), with Undo. The library, the title page, `${title}` in the file and folder names and the NFO all follow, and the other title is kept, so switching back is exact. Titles whose names change show Rename pending; nothing is renamed until you run Rename. A new Scrape keeps the choice.
 - Settings › Providers: Keep the original title. List the original languages whose movies and shows should keep their original title, such as French and Spanish; a title in one of them uses its original title from its first Scrape. "Use for titles I have" switches the matching titles already in your library at once, with Undo.
 - Settings › Naming has {OriginalTitle} (and {ShowOriginalTitle} for episodes) among the token buttons, with a line that explains it: {Title} follows each title's choice, {OriginalTitle} is always the original title.
+- Scan one place instead of every drive. Each library folder on the Drives page and in Settings › Library folders has a "Scan this folder" button, and a movie or TV show page has "Scan again" in its ⋯ menu and in the warning about missing files. Scan again reads only that title's folder (new or changed files, NFO, artwork and the video details of new files) and notices that its files are gone or back; no other title is touched. "Scan folders now" in the Library still scans everything.
+- A rename now shows its progress in the sidebar ("Renaming 3 of 12") and says when it is done with "Renamed 12 titles" and Undo, even if you left the Rename page. Titles that could not be renamed are listed in Activity › Needs attention with the reason and "Open in Rename" to try them again, and the toast says "Renamed 10 of 12 titles; 2 need attention" with a link to Activity.
+- Activity shows the work that is running at its top ("Running now"), with the same progress and Pause and Cancel as the sidebar.
+
+### Changed
+
+- Scan progress counts titles, not library folders, so it no longer sits at "0 of 8" for minutes. It first says "Finding titles… 312 found" with the folder it is reading, then "Scanning 312 of 707 titles" with the title it is reading, and once it has timed enough titles, about how long is left. A scan also checks only the files of the titles it reads, which makes scans of large libraries on network shares quicker.
 
 ### Fixed
 

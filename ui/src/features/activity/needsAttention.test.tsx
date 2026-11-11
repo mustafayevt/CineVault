@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { queryClient } from "../../queryClient";
 import { useMoveToStore } from "../move-to/moveToStore";
+import { OPEN_RENAME_ACTION } from "../rename/runRename";
+
+const navigate = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("../../router", () => ({ router: { navigate } }));
 import { useNotificationStore } from "../notifications/notificationStore";
 import type { AppNotification } from "../notifications/notificationStore";
 import { useToastStore } from "../toasts/toastStore";
@@ -236,6 +240,25 @@ describe("Needs attention", () => {
     );
     expect(within(section).queryByText("Artwork could not be saved")).toBeNull();
     await user.click(within(section).getByRole("button", { name: "Dismiss all" }));
+    expect(screen.queryByTestId("needs-attention")).toBeNull();
+  });
+
+  it("opens the titles a rename could not rename in Rename, to try them again", async () => {
+    useNotificationStore.getState().add({
+      severity: "error",
+      title: "2 titles could not be renamed",
+      detail: "Heat: the file is in use by another program\nAlien: access denied",
+      action: OPEN_RENAME_ACTION,
+      itemIds: ["4", "9"],
+    });
+    renderSection();
+    const section = await screen.findByRole("region", { name: "Needs attention" });
+    expect(within(section).getByText(/Alien: access denied/)).toBeVisible();
+    await userEvent.setup().click(within(section).getByRole("button", { name: "Open in Rename" }));
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({ to: "/rename", search: { ids: "4,9" } }),
+    );
+    // The preview is the retry, so the entry goes.
     expect(screen.queryByTestId("needs-attention")).toBeNull();
   });
 

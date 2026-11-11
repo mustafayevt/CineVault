@@ -32,6 +32,10 @@ export interface ScanBackend {
   readonly available: boolean;
   /** Queues a rescan of every library folder. */
   rescan: () => Promise<RescanStarted>;
+  /** "Scan this folder": queues a rescan of one library folder. */
+  scanFolder: (sourceId: number) => Promise<RescanStarted>;
+  /** "Scan again": queues a rescan of one title's own folder. */
+  scanTitle: (id: string) => Promise<RescanStarted>;
   /** The videos of every library folder that belong to no title. */
   findMissing: () => Promise<MissingInSource[]>;
   /** Every library folder with whether it is reachable and what it holds. */
@@ -52,6 +56,8 @@ function unwrap<T>(result: Result<T>): T {
 const tauriScanBackend: ScanBackend = {
   available: true,
   rescan: async () => unwrap(await commands.rescanLibrary()),
+  scanFolder: async (sourceId) => unwrap(await commands.rescanFolder(sourceId)),
+  scanTitle: async (id) => unwrap(await commands.rescanTitle(id)),
   findMissing: async () => unwrap(await commands.findMissingFiles()),
   sourceHealth: async () => unwrap(await commands.listSourceHealth()),
   readPendingMediaInfo: async () => unwrap(await commands.readPendingMediaInfo()),
@@ -61,6 +67,8 @@ const tauriScanBackend: ScanBackend = {
 export const unavailableScanBackend: ScanBackend = {
   available: false,
   rescan: () => Promise.resolve({ job_id: 0, sources: 0, media_info: "ready" }),
+  scanFolder: () => Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" }),
+  scanTitle: () => Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" }),
   findMissing: () => Promise.resolve([]),
   sourceHealth: () =>
     Promise.resolve([

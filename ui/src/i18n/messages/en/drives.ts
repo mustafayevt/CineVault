@@ -6,6 +6,18 @@ export const drives = {
   "scan.noFolders": "Add a library folder first, then scan.",
   "scan.couldNotStart": "Could not start the scan",
   "scan.heading": "Scanning",
+  "scan.startedOne": "Scanning {name}",
+  "scan.folder": "Scan this folder",
+  "scan.folderFor": "Scan this folder: {name}",
+  "scan.again": "Scan again",
+  "scan.againFor": "Scan the folder of {title} again",
+  // Progress in titles
+  "scan.progress.finding": "Finding titles… {count, plural, other {# found}}",
+  "scan.progress.found": "{count, plural, other {# found}}",
+  "scan.progress.titles": "{verb} {done} of {count, plural, one {# title} other {# titles}}",
+  "scan.progress.left.underMinute": "less than a minute left",
+  "scan.progress.left.minutes": "about {count} min left",
+  "scan.progress.left.hours": "about {hours} h {minutes} min left",
 
   // Settings page
   "sources.desktopOnly": "Library folders can be changed in the desktop app.",

@@ -258,11 +258,12 @@ describe("the Movie page artwork buttons", () => {
     expect(items.at(-1)?.className).toContain("text-danger");
     expect(screen.queryByRole("menuitem", { name: "Artwork…" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: /permanently/ })).toBeNull();
-    expect(items.slice(0, 4).map((item) => item.textContent)).toEqual([
+    expect(items.slice(0, 5).map((item) => item.textContent)).toEqual([
       "Edit details",
       "Show NFO",
       "Rewrite NFO",
       "Reload media info",
+      "Scan again",
     ]);
   });
 
@@ -271,7 +272,8 @@ describe("the Movie page artwork buttons", () => {
     const { router } = renderMovie();
     await user.click(await screen.findByRole("button", { name: /More actions/ }));
     const names = screen.getAllByRole("menuitem").map((item) => item.textContent);
-    expect(names.indexOf("Find a better copy")).toBe(names.indexOf("Reload media info") + 1);
+    expect(names.indexOf("Scan again")).toBe(names.indexOf("Reload media info") + 1);
+    expect(names.indexOf("Find a better copy")).toBe(names.indexOf("Scan again") + 1);
     expect(names.indexOf("Add to Wishlist")).toBe(names.indexOf("Find a better copy") + 1);
     expect(names.indexOf("Remove from library (keep files)")).toBe(
       names.indexOf("Add to Wishlist") + 1,

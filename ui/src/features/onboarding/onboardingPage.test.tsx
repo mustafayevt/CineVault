@@ -73,6 +73,8 @@ function backends(picks: string[]) {
     findMissing: () => Promise.resolve([]),
     sourceHealth: () => Promise.resolve([]),
     readPendingMediaInfo: () => Promise.resolve("ready"),
+    scanFolder: () => Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" }),
+    scanTitle: () => Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" }),
   };
   setSourcesBackend(sources);
   setOnboardingBackend(onboarding);

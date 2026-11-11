@@ -164,9 +164,16 @@ export const rename = {
   "renamePage.metadataOnly.open": "Open Settings",
   "renamePage.toast.done": "Renamed {count, plural, one {# title} other {# titles}}",
   "renamePage.toast.partly":
-    "{done}; {count, plural, one {# title} other {# titles}} could not be renamed",
+    "Renamed {done} of {total} titles; {count, plural, one {# needs attention} other {# need attention}}",
+  "renamePage.toast.noneDone":
+    "{count, plural, one {# title} other {# titles}} could not be renamed",
   "renamePage.toast.nothing": "Nothing was renamed",
   "renamePage.toast.couldNot": "The rename could not run",
+  "renamePage.notice.failed":
+    "{count, plural, one {# title} other {# titles}} could not be renamed",
+  "renamePage.notice.open": "Open in Rename",
+  "renamePage.progress.name": "Renaming {count, plural, one {# title} other {# titles}}",
+  "renamePage.progress.line": "Renaming {done} of {total}",
   "renamePage.undo.done":
     "Undone: {count, plural, one {# title is} other {# titles are}} named as before",
   "renamePage.undo.partly": "{done}; {left}",
