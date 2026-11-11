@@ -19,6 +19,8 @@ export interface SettingsState {
   load: () => Promise<void>;
   /** Changes a setting at once and saves it. Setting the default clears it. */
   set: (id: string, value: unknown) => void;
+  /** Changes several settings at once (`undefined` returns one to its default). */
+  setMany: (changes: Readonly<Record<string, unknown>>) => void;
   /** Returns settings to their defaults (or removes the other features' keys). */
   reset: (ids: readonly string[]) => void;
   /** Puts back values captured before a reset: the Undo of a reset. */
@@ -126,6 +128,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       }
     },
     set: (id, value) => apply({ [id]: value }, t("settings.saveFailed")),
+    setMany: (changes) => apply({ ...changes }, t("settings.saveFailed")),
     reset: (ids) =>
       apply(Object.fromEntries(ids.map((id) => [id, undefined])), t("settings.resetFailed")),
     restore: (previous) => apply({ ...previous }, t("settings.restoreFailed")),

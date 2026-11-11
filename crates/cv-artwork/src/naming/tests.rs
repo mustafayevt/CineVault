@@ -488,3 +488,49 @@ fn file_types_map_to_movie_types() {
         assert_eq!(MovieArt::parse(art.key()), Some(art));
     }
 }
+
+#[test]
+fn per_type_settings_name_the_files_of_a_movie_folder_and_keep_a_shared_folder_apart() {
+    // Names for two media centres at once: the poster under two plain names, the fanart as
+    // `backdrop`, the logo with the video name in front.
+    let names = ArtworkNames::from_values(&values(&[
+        (STYLE_KEY, json!("short")),
+        ("artwork.names.movie.poster", json!(["POSTER", "FOLDER"])),
+        ("artwork.names.movie.fanart", json!(["BACKDROP"])),
+        (
+            "artwork.names.movie.clearlogo",
+            json!(["FILENAME_CLEARLOGO"]),
+        ),
+    ]))
+    .movie;
+    let base = "Example Movie (2020)";
+    let single = |art| names.targets(art, base, "", FolderKind::Single);
+    assert_eq!(single(MovieArt::Poster), ["poster.jpg", "folder.jpg"]);
+    assert_eq!(single(MovieArt::Fanart), ["backdrop.jpg"]);
+    assert_eq!(
+        single(MovieArt::Clearlogo),
+        ["Example Movie (2020)-clearlogo.png"]
+    );
+    // The types left alone keep the names of the style.
+    assert_eq!(single(MovieArt::Thumb), ["landscape.jpg"]);
+
+    // In a folder of several movies a plain name would be shared: the name built on the video is
+    // used instead, for every type.
+    let shared = |art| names.targets(art, base, "", FolderKind::MultiMovie);
+    assert_eq!(
+        shared(MovieArt::Poster),
+        ["Example Movie (2020)-poster.jpg"]
+    );
+    assert_eq!(
+        shared(MovieArt::Fanart),
+        ["Example Movie (2020)-fanart.jpg"]
+    );
+    assert_eq!(
+        shared(MovieArt::Clearlogo),
+        ["Example Movie (2020)-clearlogo.png"]
+    );
+    assert_eq!(
+        shared(MovieArt::Thumb),
+        ["Example Movie (2020)-landscape.jpg"]
+    );
+}

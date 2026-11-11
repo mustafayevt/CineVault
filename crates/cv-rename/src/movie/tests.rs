@@ -317,6 +317,54 @@ fn artwork_goes_to_every_configured_name() {
 }
 
 #[test]
+fn artwork_already_under_every_name_stays_and_is_not_copied_again() {
+    // `poster.jpg` and `folder.jpg` are the one poster under both names of the settings: after
+    // the rename that wrote them, the next plan leaves both alone instead of trashing one and
+    // copying the other over it.
+    let settings = MovieSettings {
+        poster: vec!["POSTER".to_owned(), "FOLDER".to_owned()],
+        ..MovieSettings::default()
+    };
+    let files = vec![
+        file("old/heat.mkv", MediaFileType::Video),
+        file("old/poster.jpg", MediaFileType::Poster).modified(10),
+        file("old/folder.jpg", MediaFileType::Poster).modified(20),
+        file("old/cover.jpg", MediaFileType::Poster).modified(5),
+    ];
+    let plan = plan_with(settings, &heat(), &files, "old");
+    assert_eq!(to(&plan, "old/folder.jpg"), ["Heat (1995)/folder.jpg"]);
+    assert_eq!(to(&plan, "old/poster.jpg"), ["Heat (1995)/poster.jpg"]);
+    // A name the settings no longer use still goes to the trash.
+    assert_eq!(fate(&plan, "old/cover.jpg"), &Fate::Trash);
+    let poster_ops: Vec<_> = plan
+        .ops
+        .iter()
+        .filter(|op| op.file_type == MediaFileType::Poster)
+        .map(|op| op.kind)
+        .collect();
+    assert_eq!(poster_ops, [OpKind::Move, OpKind::Move, OpKind::Trash]);
+}
+
+#[test]
+fn a_missing_name_of_the_type_is_still_copied() {
+    let settings = MovieSettings {
+        poster: vec!["POSTER".to_owned(), "FOLDER".to_owned(), "COVER".to_owned()],
+        ..MovieSettings::default()
+    };
+    let files = vec![
+        file("old/heat.mkv", MediaFileType::Video),
+        file("old/poster.jpg", MediaFileType::Poster).modified(20),
+        file("old/folder.jpg", MediaFileType::Poster).modified(10),
+    ];
+    let plan = plan_with(settings, &heat(), &files, "old");
+    assert_eq!(
+        to(&plan, "old/poster.jpg"),
+        ["Heat (1995)/poster.jpg", "Heat (1995)/cover.jpg"]
+    );
+    assert_eq!(to(&plan, "old/folder.jpg"), ["Heat (1995)/folder.jpg"]);
+}
+
+#[test]
 fn an_empty_artwork_list_leaves_the_files_alone() {
     let mut settings = MovieSettings::default();
     settings.poster.clear();

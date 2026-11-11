@@ -121,7 +121,6 @@ const ADVANCED_IDS: ReadonlySet<string> = new Set([
   "providers.prefer-original-title",
   // Artwork
   "subtitles.language-style",
-  "metadata.artwork-names",
   "artwork.poster-size",
   "artwork.fanart-size",
   "artwork.other-resolutions",
@@ -720,18 +719,23 @@ const ALL_SETTINGS: readonly SettingDef[] = [
     ".txt, .url, .html, .sfv",
   ),
   setting("artwork.auto-select", "extras", { type: "toggle" }, true),
+  // Shown in Settings › Naming with the per-type names (`ArtworkNamesRow`); every style the
+  // backend reads is a legal value, including the ones the page shows only while stored.
   setting(
     "metadata.artwork-names",
-    "extras",
+    "naming",
     {
       type: "choice",
-      options: [
-        { value: "prefixed", label: "<name>-poster" },
-        { value: "short", label: "poster" },
-        { value: "emby", label: "Emby (poster, fanart)" },
-        { value: "jellyfin", label: "Jellyfin (poster, backdrop)" },
-        { value: "plex", label: "Plex (poster, fanart)" },
-      ],
+      options: translatedOptions("metadata.artwork-names", [
+        "prefixed",
+        "short",
+        "both",
+        "jellyfin",
+        "emby",
+        "kodi",
+        "xbmc",
+        "plex",
+      ]),
     },
     "prefixed",
   ),
