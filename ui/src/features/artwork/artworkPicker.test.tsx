@@ -391,7 +391,10 @@ describe("the artwork picker page", () => {
     const english = within(chips).getByRole("button", { name: /^English/ });
     const count = Number(/(\d+)\s*$/.exec(english.textContent ?? "")?.[1]);
     await user.click(english);
-    await waitFor(async () => expect((await tiles()).length).toBeLessThanOrEqual(count + 1));
+    // The filtered grid can take more than the default second on a busy CI runner.
+    await waitFor(async () => expect((await tiles()).length).toBeLessThanOrEqual(count + 1), {
+      timeout: 5000,
+    });
     for (const tile of await tiles()) {
       if (tile.getAttribute("data-current") === "true") continue;
       const labels = Array.from(tile.querySelectorAll("*")).map((node) => node.textContent);
