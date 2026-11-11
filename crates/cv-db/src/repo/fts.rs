@@ -18,7 +18,7 @@ const RANK_WEIGHTS: &str = "10.0, 6.0, 3.0, 1.0, 4.0, 3.0, 2.0";
 
 const INDEX_SELECT: &str = "
     SELECT i.id,
-           trim(i.title || ' ' || i.english_title),
+           trim(i.title || ' ' || i.english_title || ' ' || i.localized_title),
            i.original_title,
            i.sort_title,
            i.plot,

@@ -29,6 +29,8 @@ const COLUMNS: &[&str] = &[
     "title",
     "original_title",
     "original_language",
+    "use_original_title",
+    "localized_title",
     "english_title",
     "sort_title",
     "year",
@@ -257,6 +259,19 @@ fn column_params(item: &Item) -> DbResult<Vec<(String, Value)>> {
             "original_language",
             text(if matches!(item.kind(), ItemKind::Movie | ItemKind::Show) {
                 c.original_language.clone()
+            } else {
+                String::new()
+            }),
+        ),
+        // Only a movie or a show chooses between its localized and original title.
+        (
+            "use_original_title",
+            flag(item.has_title_choice() && c.use_original_title),
+        ),
+        (
+            "localized_title",
+            text(if item.has_title_choice() && c.use_original_title {
+                c.localized_title.clone()
             } else {
                 String::new()
             }),
@@ -562,6 +577,8 @@ fn read_item_row(row: &Row<'_>) -> DbResult<Item> {
         title: row.get("title")?,
         original_title: row.get("original_title")?,
         original_language: row.get("original_language")?,
+        use_original_title: row.get("use_original_title")?,
+        localized_title: row.get("localized_title")?,
         year: to_u16(row.get("year")?),
         plot: row.get("plot")?,
         outline: row.get("outline")?,

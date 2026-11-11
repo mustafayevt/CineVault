@@ -13,6 +13,7 @@ export interface NamingToken {
 /** The tokens of the movie templates, in the order of the buttons (spec `renamer`). */
 export const MOVIE_TOKENS: readonly NamingToken[] = [
   { label: "Title", engine: "title" },
+  { label: "OriginalTitle", engine: "originalTitle" },
   { label: "Year", engine: "year" },
   { label: "Resolution", engine: "videoFormat" },
   { label: "HDR", engine: "hdrformat" },
@@ -31,6 +32,7 @@ export const MOVIE_TOKENS: readonly NamingToken[] = [
 /** The tokens of the TV episode template. */
 export const EPISODE_TOKENS: readonly NamingToken[] = [
   { label: "Show", engine: "showTitle" },
+  { label: "ShowOriginalTitle", engine: "showOriginalTitle" },
   { label: "ShowYear", engine: "showYear" },
   { label: "Season", engine: "seasonNr" },
   { label: "Season00", engine: "seasonNr2" },

@@ -25,6 +25,8 @@ import { useSettingsStore } from "../settings/settingsStore";
 import { setLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
 import { createSyntheticLibraryOpsBackend } from "../library-ops/syntheticLibraryOps";
 import { useToastStore } from "../toasts/toastStore";
+import { setEditBackend } from "../edit/editBackend";
+import type { EditBackend, TitleChoice } from "../edit/editBackend";
 import { useLibraryActions } from "./useLibraryActions";
 import type { TitleTarget } from "./useLibraryActions";
 
@@ -91,6 +93,7 @@ beforeEach(() => stubPlatform("windows"));
 afterEach(() => {
   restorePlatform();
   setLibraryOpsBackend(null);
+  setEditBackend(null);
   useToastStore.setState({ toasts: [], history: [] });
 });
 
@@ -126,6 +129,8 @@ describe("title actions", () => {
       "Rewrite NFO",
       "Reload media info",
       "Edit details",
+      "Use original title for 4 titles",
+      "Use localized title for 4 titles",
       "Remove from library (keep files)",
       "Ignore this folder",
     ]);
@@ -146,6 +151,8 @@ describe("title actions", () => {
       "Rewrite NFO",
       "Reload media info",
       "Edit details",
+      "Use original title for 4 titles",
+      "Use localized title for 4 titles",
       "Remove from library (keep files)",
       "Ignore this folder",
       "DeleteDel",
@@ -261,6 +268,8 @@ describe("title actions", () => {
       "Rewrite NFO",
       "Reload media info",
       "Edit details",
+      "Use original title for 4 titles",
+      "Use localized title for 4 titles",
       "Ignore this folder",
     ]);
     await user.keyboard("{Escape}");
@@ -279,5 +288,75 @@ describe("title actions", () => {
     expect(HEADER_ORDER).toEqual(["play", "scrape", "rename", "move", "open-folder", "artwork"]);
     expect(TITLE_ACTIONS.rename.hint).toBe("F2");
     expect(TITLE_ACTIONS.delete.hint).toBe("Del");
+  });
+});
+
+describe("the title choice under More", () => {
+  /** An edit backend whose titles "1" and "3" have another original title. */
+  function choiceBackend() {
+    const calls: { ids: string[]; original: boolean }[] = [];
+    const answer = (ids: readonly string[]): TitleChoice => {
+      const changed = ids.filter((id) => id === "1" || id === "3");
+      return { changed, unchanged: ids.length - changed.length, nfo_problem: null };
+    };
+    const backend = {
+      setTitleChoice: (ids: readonly string[], original: boolean) => {
+        calls.push({ ids: [...ids], original });
+        return Promise.resolve(answer(ids));
+      },
+    } as unknown as EditBackend;
+    setEditBackend(backend);
+    return calls;
+  }
+
+  it("uses the original title of the selected titles and offers Undo for the ones that changed", async () => {
+    const user = userEvent.setup();
+    const calls = choiceBackend();
+    await renderPage(four);
+    const bar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    await user.click(within(bar).getByRole("button", { name: "More" }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Use original title for 4 titles" }),
+    );
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toEqual({ ids: ["1", "2", "3", "4"], original: true });
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts[0]?.message).toBe(
+        "Now using the original title for 2 titles. 2 titles had no other title to switch to.",
+      ),
+    );
+    const toast = useToastStore.getState().toasts[0];
+    expect(toast?.undo).toBeDefined();
+    await toast?.undo?.();
+    expect(calls[1]).toEqual({ ids: ["1", "3"], original: false });
+  });
+
+  it("names the one title and switches it back to its localized title", async () => {
+    const user = userEvent.setup();
+    const calls = choiceBackend();
+    await renderPage([target("1", "La Ciudad Dormida")]);
+    await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
+    await user.click(await screen.findByRole("menuitem", { name: "Use localized title" }));
+    await waitFor(() => expect(calls[0]).toEqual({ ids: ["1"], original: false }));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts[0]?.message).toBe(
+        "Now using the localized title for La Ciudad Dormida",
+      ),
+    );
+  });
+
+  it("says so when no selected title has another title", async () => {
+    const user = userEvent.setup();
+    choiceBackend();
+    await renderPage([target("2", "Heat")]);
+    await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
+    await user.click(await screen.findByRole("menuitem", { name: "Use original title" }));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts[0]?.message).toBe(
+        "Nothing changed: these titles already use that title, or have no other original title.",
+      ),
+    );
+    expect(useToastStore.getState().toasts[0]?.undo).toBeUndefined();
   });
 });

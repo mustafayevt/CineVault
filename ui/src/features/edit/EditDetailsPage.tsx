@@ -23,10 +23,18 @@ import {
   Row,
   TextAreaControl,
   TextControl,
+  TitleChoiceControl,
 } from "./EditControls";
 import { EditFootBar } from "./EditFootBar";
 import { SessionContext } from "./formContext";
-import { NUMBER_RULES, YEAR_RULE, seasonNameKey, seasonOverviewKey } from "./editModel";
+import {
+  NUMBER_RULES,
+  YEAR_RULE,
+  asText,
+  offersTitleChoice,
+  seasonNameKey,
+  seasonOverviewKey,
+} from "./editModel";
 import type { EditKind } from "./editBackend";
 import {
   allCountryNames,
@@ -68,6 +76,15 @@ function Form({ session, kind }: { session: EditSession; kind: EditKind }) {
   const slots = [...session.base.keys()]
     .filter((key) => key.startsWith("artwork."))
     .map((key) => key.slice("artwork.".length));
+  // The choice of title shows when there is another original title to choose; the Title field
+  // then holds the localized title, and says so.
+  const choosing =
+    has("title_choice") &&
+    offersTitleChoice(
+      asText(session.get("title")),
+      asText(session.get("original_title")),
+      asText(session.get("title_choice")),
+    );
   const seasons = [...session.base.keys()]
     .map((key) => /^season_name\.(\d+)$/.exec(key)?.[1])
     .filter((n): n is string => n !== undefined)
@@ -78,9 +95,19 @@ function Form({ session, kind }: { session: EditSession; kind: EditKind }) {
       {any("title", "original_title", "sort_title", "tagline") && (
         <Section title={t("editDetails.section.titles")}>
           <Row>
-            {has("title") && <TextControl fieldKey="title" label={t("edit.field.title")} />}
+            {has("title") && (
+              <TextControl
+                fieldKey="title"
+                label={t(choosing ? "edit.field.localized_title" : "edit.field.title")}
+              />
+            )}
             {has("original_title") && (
               <TextControl fieldKey="original_title" label={t("edit.field.original_title")} />
+            )}
+            {choosing && (
+              <div className="@pane-md:col-span-2">
+                <TitleChoiceControl />
+              </div>
             )}
             {has("sort_title") && (
               <TextControl fieldKey="sort_title" label={t("edit.field.sort_title")} />

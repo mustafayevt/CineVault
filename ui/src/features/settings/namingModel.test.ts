@@ -53,6 +53,28 @@ describe("naming templates as the field shows them", () => {
   });
 });
 
+describe("the original title tokens", () => {
+  it("offers {OriginalTitle} beside {Title} and keeps both apart both ways", () => {
+    const labels = MOVIE_TOKENS.map((token) => token.label);
+    expect(labels.slice(0, 3)).toEqual(["Title", "OriginalTitle", "Year"]);
+    expect(toEngine("{OriginalTitle} ({Year})", MOVIE_TOKENS)).toBe("${originalTitle} (${year})");
+    expect(toDisplay("${originalTitle} (${title})", MOVIE_TOKENS)).toBe(
+      "{OriginalTitle} ({Title})",
+    );
+    expect(toEngine("{Title}{ - OriginalTitle?}", MOVIE_TOKENS)).toBe(
+      "${title}${ - ,originalTitle,}",
+    );
+    expect(displayProblem("{OriginalTitle}", MOVIE_TOKENS)).toBeNull();
+  });
+
+  it("offers the show's original title for the TV template", () => {
+    expect(toEngine("{ShowOriginalTitle} - {Show}", EPISODE_TOKENS)).toBe(
+      "${showOriginalTitle} - ${showTitle}",
+    );
+    expect(toDisplay("${showOriginalTitle}", EPISODE_TOKENS)).toBe("{ShowOriginalTitle}");
+  });
+});
+
 describe("what makes a template invalid", () => {
   it("says a brace is not closed", () => {
     expect(displayProblem("{Title} ({Year", MOVIE_TOKENS)).toMatch(/not closed/);

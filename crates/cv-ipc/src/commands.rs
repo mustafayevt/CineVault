@@ -699,6 +699,11 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["showId", "ordering"],
     },
     CommandInfo {
+        name: "set_title_choice",
+        module: "edit",
+        args: &["ids", "original"],
+    },
+    CommandInfo {
         name: "set_watched",
         module: "curation",
         args: &["ids", "watched"],
@@ -916,6 +921,11 @@ pub const COMMANDS: &[CommandInfo] = &[
     CommandInfo {
         name: "update_blocking_jobs",
         module: "updates",
+        args: &[],
+    },
+    CommandInfo {
+        name: "use_original_title_for_languages",
+        module: "edit",
         args: &[],
     },
 ];

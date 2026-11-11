@@ -5,6 +5,7 @@ import { t } from "../../i18n/catalog";
 import { KeyField } from "../providers/KeyField";
 import { useProviderKeys } from "../providers/useProviderKeys";
 import { FormRow, SettingsSection } from "./FormParts";
+import { OriginalTitleLanguages } from "./OriginalTitleLanguages";
 import { COUNTRIES, LANGUAGES } from "./schema";
 import { useSetting, useSettingsStore } from "./settingsStore";
 
@@ -32,8 +33,9 @@ function GetKey({ href, label }: { href: string | undefined; label: string }) {
 
 /**
  * Settings, Providers (spec `app-shell` "Settings page"): the TMDB key and the optional OMDb,
- * MDBList, Fanart.tv and TheTVDB keys with their state and Test, and the metadata language and
- * ratings country. Changes apply at once.
+ * MDBList, Fanart.tv and TheTVDB keys with their state and Test, the metadata language and
+ * ratings country, and the original languages whose titles keep their original title. Changes
+ * apply at once.
  */
 export function ProvidersSection() {
   const keys = useProviderKeys();
@@ -171,6 +173,7 @@ export function ProvidersSection() {
           />
         </div>
       </FormRow>
+      <OriginalTitleLanguages />
     </SettingsSection>
   );
 }

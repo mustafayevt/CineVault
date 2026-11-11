@@ -341,6 +341,23 @@ mod tests {
     }
 
     #[test]
+    fn the_title_follows_the_title_choice_and_the_original_title_is_always_there() {
+        let mut item = dune();
+        item.core.title = "The Sleeping City".into();
+        item.core.original_title = "La Ciudad Dormida".into();
+        let template = "${title} | ${originalTitle}";
+        assert_eq!(
+            render(template, &item, None),
+            "The Sleeping City | La Ciudad Dormida"
+        );
+        assert!(item.choose_original_title(true));
+        assert_eq!(
+            render(template, &item, None),
+            "La Ciudad Dormida | La Ciudad Dormida"
+        );
+    }
+
+    #[test]
     fn parent_folder_is_relative_to_the_data_source() {
         let mut core = ItemCore {
             data_source: "D:\\Movies\\".into(),

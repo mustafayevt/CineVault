@@ -162,6 +162,7 @@ fn show_of(root: &Element) -> ShowNfo {
         note: text(root, "user_note").to_owned(),
         locked_fields: split_list(text(root, "cv_locked")),
         original_language: text(root, "original_language").to_owned(),
+        localized_title: text(root, "localized_title").trim().to_owned(),
         year_end: parse_year(text(root, "year_end")),
         ..ShowNfo::default()
     };

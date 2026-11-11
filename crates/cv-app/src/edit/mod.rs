@@ -36,8 +36,8 @@ use cv_domain::{FieldSet, Item, ItemId, ItemKind, MetaField};
 use rusqlite::Connection;
 
 pub use fields::{
-    FieldEntry, FieldError, FieldValue, NumberValue, Pair, PersonValue, RatingValue, TrailerValue,
-    lock_key, read_fields,
+    FieldEntry, FieldError, FieldValue, NumberValue, Pair, PersonValue, RatingValue,
+    TITLE_CHOICE_KEY, TrailerValue, lock_key, read_fields, title_choice_text,
 };
 
 use crate::nfo::{NfoScope, NfoService, NfoSettings};
@@ -143,6 +143,19 @@ pub struct SaveReport {
     pub nfo_problem: Option<String>,
 }
 
+/// What [`EditService::set_title_choice`] did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TitleChoiceReport {
+    /// The titles whose title changed, in the order asked.
+    pub changed: Vec<ItemId>,
+    /// The titles left as they were: already set that way, or without another original title.
+    pub unchanged: usize,
+    /// NFO files written for the changed titles.
+    pub nfo_files_written: u32,
+    /// Why an NFO could not be written, when the library was changed but a file was not.
+    pub nfo_problem: Option<String>,
+}
+
 /// Edits items and their locks.
 pub struct EditService {
     db: Arc<Database>,
@@ -192,9 +205,11 @@ impl EditService {
     pub fn save(
         &self,
         id: ItemId,
-        changes: Vec<FieldEntry>,
+        mut changes: Vec<FieldEntry>,
         nfo_settings: &NfoSettings,
     ) -> Result<SaveReport, EditError> {
+        // The choice of title goes last, so it sees the titles saved with it.
+        changes.sort_by_key(|change| change.key == TITLE_CHOICE_KEY);
         let outcome = self
             .db
             .write(move |tx| {
@@ -274,8 +289,84 @@ impl EditService {
         })
     }
 
+    /// Uses the original title (`original`) or the localized title as the title of each of the
+    /// movies and shows `ids`, in one transaction, then rewrites the NFO files of the titles that
+    /// changed. A title without a different original title, another kind, a title already set
+    /// that way or one no longer in the library is left as it is. Like a save on Edit details it
+    /// is the owner's own edit, so locks do not stop it. Calling it again with the other choice
+    /// on [`TitleChoiceReport::changed`] undoes it, since neither title is lost.
+    ///
+    /// # Errors
+    /// Fails, changing nothing, when the library cannot be written.
+    pub fn set_title_choice(
+        &self,
+        ids: Vec<ItemId>,
+        original: bool,
+        nfo_settings: &NfoSettings,
+    ) -> Result<TitleChoiceReport, EditError> {
+        let asked = ids.len();
+        let changed = self.db.write(move |tx| {
+            let mut changed = Vec::new();
+            for id in ids {
+                let Some(mut item) = get_item(tx, id)? else {
+                    continue;
+                };
+                if item.choose_original_title(original) {
+                    update_item(tx, &item)?;
+                    changed.push(id);
+                }
+            }
+            Ok(changed)
+        })?;
+        let (nfo_files_written, nfo_problem) = if changed.is_empty() {
+            (0, None)
+        } else {
+            self.rewrite_nfo_of(changed.clone(), nfo_settings)
+        };
+        Ok(TitleChoiceReport {
+            unchanged: asked.saturating_sub(changed.len()),
+            changed,
+            nfo_files_written,
+            nfo_problem,
+        })
+    }
+
+    /// The movies and shows in the library whose original language is one of `languages`
+    /// (two-letter codes) and that do not use their original title yet, by id.
+    ///
+    /// # Errors
+    /// Fails when the library cannot be read.
+    pub fn titles_in_languages(&self, languages: &[String]) -> Result<Vec<ItemId>, EditError> {
+        if languages.is_empty() {
+            return Ok(Vec::new());
+        }
+        let languages = languages.to_vec();
+        Ok(self.db.read(move |conn| {
+            let mut stmt = conn.prepare_cached(
+                "SELECT id, original_language FROM item \
+                 WHERE kind IN ('movie', 'show') AND use_original_title = 0 \
+                   AND original_language <> '' AND original_title <> '' \
+                   AND trashed_entry IS NULL \
+                 ORDER BY id",
+            )?;
+            let rows = stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+            let mut out = Vec::new();
+            for row in rows {
+                let (id, language) = row?;
+                if languages.contains(&cv_domain::language_code(&language)) {
+                    out.push(ItemId(id));
+                }
+            }
+            Ok(out)
+        })?)
+    }
+
     fn rewrite_nfo(&self, id: ItemId, settings: &NfoSettings) -> (u32, Option<String>) {
-        match self.nfo.rewrite(&NfoScope::Items(vec![id]), settings) {
+        self.rewrite_nfo_of(vec![id], settings)
+    }
+
+    fn rewrite_nfo_of(&self, ids: Vec<ItemId>, settings: &NfoSettings) -> (u32, Option<String>) {
+        match self.nfo.rewrite(&NfoScope::Items(ids), settings) {
             Ok(report) => {
                 let problem = report.units.iter().find_map(|unit| match &unit.status {
                     crate::nfo::UnitStatus::Failed { message } => Some(message.clone()),

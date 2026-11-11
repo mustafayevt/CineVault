@@ -1204,6 +1204,7 @@ impl MatchService {
             do_not_overwrite: request.do_not_overwrite,
             auto_group_collections: settings.scrape.auto_group_collections,
             episode_order: settings.scrape.episode_order,
+            original_title_languages: settings.scrape.original_title_languages.clone(),
         };
         settings.request = options.clone();
         let scrape_settings = settings.clone();

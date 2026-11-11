@@ -6,7 +6,9 @@ import {
   FileSearch,
   FileText,
   FolderOpen,
+  Globe,
   Image,
+  Languages,
   PenLine,
   Play,
   ScanSearch,
@@ -32,6 +34,8 @@ export type TitleActionId =
   | "rewrite-nfo"
   | "reload-media-info"
   | "edit"
+  | "use-original-title"
+  | "use-localized-title"
   | "remove"
   | "ignore"
   | "delete";
@@ -130,6 +134,18 @@ export const TITLE_ACTIONS: Readonly<Record<TitleActionId, TitleActionDef>> = {
     full: "title.menu.edit",
     single: true,
   },
+  "use-original-title": {
+    id: "use-original-title",
+    icon: Languages,
+    short: "library.act.useOriginal.short",
+    full: "library.act.useOriginal",
+  },
+  "use-localized-title": {
+    id: "use-localized-title",
+    icon: Globe,
+    short: "library.act.useLocalized.short",
+    full: "library.act.useLocalized",
+  },
   remove: {
     id: "remove",
     icon: Unlink,
@@ -166,6 +182,8 @@ export const MORE_ORDER: readonly TitleActionId[] = [
   "rewrite-nfo",
   "reload-media-info",
   "edit",
+  "use-original-title",
+  "use-localized-title",
   "remove",
   "ignore",
 ];
@@ -181,6 +199,8 @@ export const MENU_GROUPS: readonly (readonly TitleActionId[])[] = [
     "rewrite-nfo",
     "reload-media-info",
     "edit",
+    "use-original-title",
+    "use-localized-title",
     "remove",
     "ignore",
   ],

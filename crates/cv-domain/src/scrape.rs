@@ -422,7 +422,8 @@ fn slot(item: &Item, field: MetaField) -> Slot {
     use MetaField as F;
     let c = &item.core;
     match field {
-        F::Title => return Slot::Text(c.title.clone()),
+        // The provider's title is in the metadata language: the localized title.
+        F::Title => return Slot::Text(c.localized_title().to_owned()),
         F::OriginalTitle => return Slot::Text(c.original_title.clone()),
         F::Plot => return Slot::Text(c.plot.clone()),
         F::Year => return Slot::Number(u64::from(c.year)),
@@ -520,8 +521,9 @@ fn has_value(item: &Item, field: MetaField) -> bool {
 fn copy_field(to: &mut Item, from: &Item, field: MetaField) {
     use MetaField as F;
     match field {
-        F::Title => to.core.title.clone_from(&from.core.title),
-        F::OriginalTitle => to.core.original_title.clone_from(&from.core.original_title),
+        // The title in use follows the title choice (`ItemCore::choose_original_title`).
+        F::Title => to.core.set_localized_title(from.core.localized_title()),
+        F::OriginalTitle => to.core.set_original_title(&from.core.original_title),
         F::Plot => to.core.plot.clone_from(&from.core.plot),
         F::Year => to.core.year = from.core.year,
         F::Studio => to
@@ -945,6 +947,40 @@ mod tests {
             m.runtime_minutes = 120;
         }
         item
+    }
+
+    #[test]
+    fn a_rescrape_keeps_the_original_title_in_use_and_refreshes_the_localized_one() {
+        let mut target = Item::movie("The Sleeping City");
+        target.core.original_title = "La Ciudad Dormida".into();
+        assert!(target.choose_original_title(true));
+        let mut incoming = Item::movie("The Sleeping Town");
+        incoming.core.original_title = "La Ciudad Dormida".into();
+        let comparison = compare_field(&target, &incoming, MetaField::Title);
+        assert_eq!(comparison.current.as_deref(), Some("The Sleeping City"));
+        assert_eq!(comparison.change, FieldChange::Changed);
+
+        let outcome = apply_scrape(
+            &mut target,
+            &incoming,
+            &ScrapeOptions::all(ItemKind::Movie),
+            &FieldSet::new(),
+        );
+        assert!(outcome.written.contains(&MetaField::Title));
+        assert!(target.core.use_original_title);
+        assert_eq!(target.core.title, "La Ciudad Dormida");
+        assert_eq!(target.core.localized_title, "The Sleeping Town");
+
+        // A new original title from the provider becomes the title in use.
+        incoming.core.original_title = "La Ciudad Dormida (Remasterizada)".into();
+        apply_scrape(
+            &mut target,
+            &incoming,
+            &ScrapeOptions::only([MetaField::OriginalTitle]),
+            &FieldSet::new(),
+        );
+        assert_eq!(target.core.title, "La Ciudad Dormida (Remasterizada)");
+        assert_eq!(target.core.localized_title, "The Sleeping Town");
     }
 
     #[test]

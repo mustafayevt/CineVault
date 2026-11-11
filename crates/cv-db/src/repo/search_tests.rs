@@ -260,3 +260,14 @@ fn existing_libraries_get_their_keys_from_migration_101() {
     assert_eq!(search(&conn, "destin poulain"), ["Amélie"]);
     assert_eq!(search(&conn, "spiderman"), ["Spider-Man"]);
 }
+
+#[test]
+fn a_title_using_its_original_title_is_still_found_by_its_localized_one() {
+    let conn = memory_db();
+    let mut item = movie("The Sleeping City", 2019);
+    item.core.original_title = "La Ciudad Dormida".into();
+    assert!(item.choose_original_title(true));
+    insert_item(&conn, &item).unwrap();
+    finds(&conn, "ciudad dormida", "La Ciudad Dormida");
+    finds(&conn, "sleeping city", "La Ciudad Dormida");
+}

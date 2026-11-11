@@ -304,6 +304,41 @@ fn migration_106_adds_the_kept_copies_and_a_removed_title_takes_its_rows() {
     assert_eq!(left, vec![kept]);
 }
 
+#[test]
+fn migration_109_adds_the_title_choice_and_keeps_every_title_localized() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    conn.pragma_update(None, "foreign_keys", true).unwrap();
+    let before_109: Vec<Migration> = MIGRATIONS
+        .iter()
+        .copied()
+        .filter(|m| m.version < 109)
+        .collect();
+    schema::migrate_with(&mut conn, &before_109).unwrap();
+    let movie = insert_item(&conn, "movie", "The Sleeping City");
+
+    schema::migrate(&mut conn).unwrap();
+
+    let (title, original, localized): (String, i64, String) = conn
+        .query_row(
+            "SELECT title, use_original_title, localized_title FROM item WHERE id = ?1",
+            [movie],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        (title.as_str(), original, localized.as_str()),
+        ("The Sleeping City", 0, "")
+    );
+    assert!(
+        conn.execute(
+            "UPDATE item SET use_original_title = 2 WHERE id = ?1",
+            [movie]
+        )
+        .is_err(),
+        "the choice is a flag"
+    );
+}
+
 // ---- opening: WAL, pragmas, files ------------------------------------------------------------
 
 #[test]

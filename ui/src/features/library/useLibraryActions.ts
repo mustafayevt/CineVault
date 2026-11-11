@@ -11,6 +11,7 @@ import { playTitle } from "../playback/usePlay";
 import { requestDelete } from "../delete/deleteActions";
 import { useMetadataOnly } from "../settings/metadataOnly";
 import { removeTitlesFromLibrary } from "../title/removeTitles";
+import { setTitleChoice } from "../title/titleChoice";
 import { fullLabel, shortLabel, TITLE_ACTIONS } from "./titleActions";
 import type { TitleActionDef, TitleActionId } from "./titleActions";
 
@@ -155,6 +156,14 @@ export function useLibraryActions(targets: readonly TitleTarget[]): TitleActionS
           else void navigate({ to: "/tv/$showId/edit", params: { showId: single.id } });
         },
         disabledReason: needOne,
+      },
+      "use-original-title": {
+        onSelect: () => void setTitleChoice(ids, true, subjectOf(targets)),
+        disabledReason: none,
+      },
+      "use-localized-title": {
+        onSelect: () => void setTitleChoice(ids, false, subjectOf(targets)),
+        disabledReason: none,
       },
       remove: {
         onSelect: () => void removeTitlesFromLibrary(ids, false, subjectOf(targets)),
