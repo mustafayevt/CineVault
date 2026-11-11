@@ -1,7 +1,7 @@
 //! Forgiving title search: the folded search keys and the SQL that reads them.
 //!
 //! Every item keeps two folded keys, `item.search_title` (its title and English title) and
-//! `item.search_alt` (its original and sort title), written by [`write_keys`] whenever the item
+//! `item.search_alt` (its original, sort and kept localized title), written by [`write_keys`] whenever the item
 //! is saved and filled for existing libraries by migration 101. Folding ([`fold`]) lowercases,
 //! removes diacritics and apostrophes, turns `&` into `and`, turns every other punctuation mark
 //! into a space and writes Roman numerals from II to XX as numbers, so `Spider-Man`,
@@ -123,20 +123,23 @@ pub fn key_of(titles: &[&str]) -> String {
 
 /// Recomputes both keys of one item from its current titles.
 pub(crate) fn write_keys(conn: &Connection, id: i64) -> DbResult<()> {
-    let titles: Option<[String; 4]> = conn
+    let titles: Option<[String; 5]> = conn
         .prepare_cached(
-            "SELECT title, english_title, original_title, sort_title FROM item WHERE id = ?1",
+            "SELECT title, english_title, original_title, sort_title, localized_title \
+             FROM item WHERE id = ?1",
         )?
-        .query_row([id], |r| Ok([r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?]))
+        .query_row([id], |r| {
+            Ok([r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?])
+        })
         .ok();
-    let Some([title, english, original, sort]) = titles else {
+    let Some([title, english, original, sort, localized]) = titles else {
         return Ok(());
     };
     conn.prepare_cached("UPDATE item SET search_title = ?2, search_alt = ?3 WHERE id = ?1")?
         .execute(params![
             id,
             key_of(&[&title, &english]),
-            key_of(&[&original, &sort])
+            key_of(&[&original, &sort, &localized])
         ])?;
     Ok(())
 }
