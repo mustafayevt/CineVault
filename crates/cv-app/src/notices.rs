@@ -44,7 +44,8 @@ pub struct AppNotice {
     pub settings_link: Option<String>,
     /// What the user can do about it from Activity's Needs attention, besides reading it.
     pub action: Option<NoticeAction>,
-    /// The unfinished journal batch the notice is about (with [`NoticeAction::ResolveUnfinished`]).
+    /// The journal batch the notice is about: the unfinished one ([`NoticeAction::ResolveUnfinished`])
+    /// or the finished one it can undo ([`NoticeAction::UndoRename`]).
     pub batch_id: Option<String>,
     /// What the notice is about, such as `source:<folder>`: a later notice of the same topic
     /// replaces it, and [`AppNotice::resolved`] takes it away once it no longer holds.
@@ -60,6 +61,8 @@ pub enum NoticeAction {
     RetryImdbDataset,
     /// Resume an unfinished move or rename, or roll it back (the notice's `batch_id`).
     ResolveUnfinished,
+    /// Undo the rename that finished (the notice's `batch_id`): the toast of Rename after Scrape.
+    UndoRename,
 }
 
 impl NoticeAction {
@@ -69,6 +72,7 @@ impl NoticeAction {
         match self {
             Self::RetryImdbDataset => "retry_imdb_dataset",
             Self::ResolveUnfinished => "resolve_unfinished",
+            Self::UndoRename => "undo_rename",
         }
     }
 }

@@ -696,6 +696,7 @@ const ALL_SETTINGS: readonly SettingDef[] = [
   setting("metadata.nfo-clean", "naming", { type: "toggle" }, false),
   setting("renamer.keep-subfolders", "naming", { type: "toggle" }, true),
   setting("renamer.metadata-only", "naming", { type: "toggle" }, false),
+  setting("renamer.after-scrape", "naming", { type: "toggle" }, false),
   setting(
     "files.deleted-mode",
     "library",

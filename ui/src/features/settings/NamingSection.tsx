@@ -17,6 +17,9 @@ import {
 } from "./namingModel";
 import type { ColonStyle, NamingField } from "./namingModel";
 import { METADATA_ONLY_KEY, useMetadataOnly } from "./metadataOnly";
+
+/** The "Rename after Scrape" switch (spec `renamer`, off by default). */
+const RENAME_AFTER_SCRAPE_KEY = "renamer.after-scrape";
 import { useNamingTemplates } from "./useNamingTemplates";
 import type { NamingTemplates } from "./useNamingTemplates";
 import { useSettingsStore } from "./settingsStore";
@@ -64,6 +67,9 @@ export function NamingSection() {
   const naming = useNamingTemplates();
   const colon = colonStyleOf(useSettingsStore((state) => state.values[COLON_SETTING_KEY]));
   const metadataOnly = useMetadataOnly();
+  const renameAfterScrape = useSettingsStore(
+    (state) => state.values[RENAME_AFTER_SCRAPE_KEY] === true,
+  );
   // The preset waiting for the answer to "Replace your custom templates?".
   const [asking, setAsking] = useState<string | null>(null);
   const [styleProblem, setStyleProblem] = useState<string | null>(null);
@@ -169,6 +175,24 @@ export function NamingSection() {
           aria-labelledby="naming-metadata-only"
           onCheckedChange={(on) => {
             useSettingsStore.getState().set(METADATA_ONLY_KEY, on);
+          }}
+        />
+      </FormRow>
+      <FormRow
+        label={t("settings.renamer.after-scrape.title")}
+        hint={
+          metadataOnly
+            ? t("settings.renamer.after-scrape.offByMetadataOnly")
+            : t("settings.renamer.after-scrape.description")
+        }
+        labelId="naming-after-scrape"
+      >
+        <Switch
+          checked={renameAfterScrape && !metadataOnly}
+          disabled={metadataOnly}
+          aria-labelledby="naming-after-scrape"
+          onCheckedChange={(on) => {
+            useSettingsStore.getState().set(RENAME_AFTER_SCRAPE_KEY, on);
           }}
         />
       </FormRow>

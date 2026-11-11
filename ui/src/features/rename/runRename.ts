@@ -60,8 +60,11 @@ function undoMessage(outcome: UndoOutcomeDto): string {
     : t("renamePage.undo.partly", { done, left: t("renamePage.undo.left", { count: left }) });
 }
 
-/** Takes a rename back, through its History entry when it has one, else through its journal. */
-async function undoRename(batchId: string, client: QueryClient): Promise<void> {
+/**
+ * Takes a rename back, through its History entry when it has one, else through its journal, and
+ * says how it went. Also the Undo of a rename that ran by itself (Rename after Scrape).
+ */
+export async function undoRename(batchId: string, client: QueryClient): Promise<void> {
   const report = await undoBatchInHistory(batchId);
   const outcome =
     report === null

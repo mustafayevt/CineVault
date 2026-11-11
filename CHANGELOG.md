@@ -15,6 +15,7 @@ What changed in each version of CineVault, newest first, in plain words. The app
 - Scan one place instead of every drive. Each library folder on the Drives page and in Settings › Library folders has a "Scan this folder" button, and a movie or TV show page has "Scan again" in its ⋯ menu and in the warning about missing files. Scan again reads only that title's folder (new or changed files, NFO, artwork and the video details of new files) and notices that its files are gone or back; no other title is touched. "Scan folders now" in the Library still scans everything.
 - A rename now shows its progress in the sidebar ("Renaming 3 of 12") and says when it is done with "Renamed 12 titles" and Undo, even if you left the Rename page. Titles that could not be renamed are listed in Activity › Needs attention with the reason and "Open in Rename" to try them again, and the toast says "Renamed 10 of 12 titles; 2 need attention" with a link to Activity.
 - Activity shows the work that is running at its top ("Running now"), with the same progress and Pause and Cancel as the sidebar.
+- Settings › Naming: Rename after Scrape (off unless you turn it on). A movie or show is renamed by itself once its Scrape and artwork are written, when its new names fit without a conflict. Titles scraped together are renamed together, and a toast says "Renamed 12 titles after Scrape" with Undo wherever you are. Titles that cannot be renamed yet, such as a name taken by another title, stay as they are and wait in Activity with the reason. Metadata only still wins.
 
 ### Changed
 
