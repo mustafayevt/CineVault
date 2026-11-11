@@ -157,6 +157,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             crate::picker_ipc::open_folder,
             crate::picker_ipc::pick_files,
             crate::scan_ipc::rescan_library,
+            crate::scan_ipc::rescan_folder,
+            crate::scan_ipc::rescan_title,
             crate::scan_ipc::find_missing_files,
             crate::scan_ipc::list_source_health,
             crate::drives_ipc::drives_overview,

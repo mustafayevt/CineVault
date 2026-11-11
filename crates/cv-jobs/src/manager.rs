@@ -58,7 +58,7 @@ use crate::lane::{LaneId, Lanes};
 use crate::pipeline::StageError;
 use crate::progress::{
     FailureGroup, ItemRecord, ItemStatus, JobId, JobReport, JobSnapshot, JobState, Priority,
-    Tracker, group_failures,
+    Tracker, UnitProgress, group_failures,
 };
 use crate::store::{
     JobStore, Persist, StoreError, StoredJob, StoredNew, parse_lane, priority_from, priority_value,
@@ -157,13 +157,37 @@ struct Control {
     cancelled: bool,
 }
 
-/// Lets an item see pause and cancel requests while it runs.
-#[derive(Debug, Clone)]
+/// Lets an item see pause and cancel requests while it runs, and report the job's progress in
+/// its own units.
+#[derive(Clone)]
 pub struct ItemControl {
     rx: watch::Receiver<Control>,
+    core: Weak<Core>,
+}
+
+impl fmt::Debug for ItemControl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ItemControl")
+            .field("control", &*self.rx.borrow())
+            .finish_non_exhaustive()
+    }
 }
 
 impl ItemControl {
+    /// Replaces the job's progress in its own units ([`JobSnapshot::units`]) and publishes a
+    /// fresh snapshot. Works from any thread. Each call is one snapshot, so a caller that reports
+    /// often throttles itself; the progress feed sends a job at most ten times a second anyway.
+    /// Ignored once the job is over.
+    pub fn set_units(&self, units: UnitProgress) {
+        if let Some(core) = self.core.upgrade() {
+            core.mutate(|s| {
+                if s.terminal.is_none() {
+                    s.units = Some(units);
+                }
+            });
+        }
+    }
+
     /// True once the job was cancelled. Long items should poll this (or await
     /// [`ItemControl::cancelled`]) at safe points and return [`ItemError::Cancelled`].
     pub fn is_cancelled(&self) -> bool {
@@ -216,6 +240,18 @@ pub trait ItemWork: Send + Sync + 'static {
     fn result(&self) -> Option<String> {
         None
     }
+
+    /// Runs once when the job gets its slot, before the first item starts, with the items this
+    /// run will process (a resumed job's unfinished ones). A work that reports its own units
+    /// ([`ItemControl::set_units`]) counts them here. The default does nothing.
+    fn prepare(
+        &self,
+        items: &[&Self::Item],
+        control: &ItemControl,
+    ) -> impl Future<Output = ()> + Send {
+        let _ = (items, control);
+        async {}
+    }
 }
 
 fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -236,6 +272,8 @@ struct State {
     outcome: Option<String>,
     /// What the finished job produced; see [`ItemWork::result`].
     result: Option<String>,
+    /// The work's own units; see [`ItemControl::set_units`].
+    units: Option<UnitProgress>,
     tracker: Tracker,
 }
 
@@ -317,6 +355,14 @@ impl Core {
             elapsed_secs: t.elapsed().as_secs_f64(),
             outcome: state.outcome.clone(),
             result: state.result.clone(),
+            units: state.units.clone().map(|mut units| {
+                // A finished job has nothing left and nothing in hand.
+                if state.terminal.is_some() {
+                    units.eta_secs = None;
+                    units.current = None;
+                }
+                units
+            }),
         }
     }
 
@@ -697,6 +743,7 @@ impl JobManager {
             terminal: None,
             outcome: None,
             result: None,
+            units: None,
             tracker: Tracker::resumed(
                 launch.total,
                 launch.prior_done,
@@ -725,6 +772,7 @@ impl JobManager {
             elapsed_secs: 0.0,
             outcome: None,
             result: None,
+            units: None,
         };
         let (snapshot, _) = watch::channel(initial);
         let (settled, _) = watch::channel(launch.persist.is_none());
@@ -1005,6 +1053,15 @@ async fn drive<W: ItemWork>(run: Run<W>) {
         _ = rx.wait_for(|c| c.cancelled) => {}
     }
 
+    if !rx.borrow().cancelled {
+        let control = ItemControl {
+            rx: rx.clone(),
+            core: Arc::downgrade(&run.core),
+        };
+        let items: Vec<&W::Item> = run.pos.iter().map(|&p| &run.items[p]).collect();
+        run.work.prepare(&items, &control).await;
+    }
+
     let shared = Arc::new(Shared {
         core: Arc::clone(&run.core),
         lanes: run.inner.lanes.clone(),
@@ -1108,7 +1165,10 @@ async fn attempt<W: ItemWork>(
     mut rx: watch::Receiver<Control>,
 ) -> Option<ItemStatus> {
     let item = &shared.items[shared.pos[index]];
-    let control = ItemControl { rx: rx.clone() };
+    let control = ItemControl {
+        rx: rx.clone(),
+        core: Arc::downgrade(&shared.core),
+    };
     loop {
         // Hold off while paused; give up if cancelled.
         let cancelled = rx

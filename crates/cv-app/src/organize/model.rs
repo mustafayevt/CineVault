@@ -302,6 +302,15 @@ pub struct Applied {
     pub busy: Vec<BusyTitle>,
 }
 
+/// How far a running rename got: after each title, the titles done (renamed or not) of the
+/// titles it runs, and the title that just finished.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApplyProgress {
+    pub done: usize,
+    pub total: usize,
+    pub title: String,
+}
+
 /// A checked title an apply left out because it was busy, with the reason in plain words.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BusyTitle {

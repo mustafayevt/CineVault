@@ -7,7 +7,8 @@
 use std::sync::{Mutex, MutexGuard};
 
 use cv_jobs::{
-    JobManager, JobSnapshot, JobState, Overall, OverallKind, OverallTracker, Priority, ProgressTick,
+    JobManager, JobSnapshot, JobState, Overall, OverallKind, OverallTracker, Priority,
+    ProgressTick, UnitPhase, UnitProgress,
 };
 use serde::Serialize;
 use specta::Type;
@@ -69,6 +70,49 @@ pub struct JobProgress {
     /// Once the job is over, what it produced, as its step in the run history (`212 new`,
     /// `198 scraped`, `artwork for 190`); `None` shows the job's name.
     pub result: Option<String>,
+    /// A scan's progress in titles rather than in library folders; absent for other jobs.
+    #[serde(default)]
+    #[specta(optional)]
+    pub units: Option<JobUnitsDto>,
+}
+
+/// Which part of its work a scan is in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum UnitPhaseDto {
+    /// Finding the titles: "Finding titles… 312 found".
+    Counting,
+    /// Reading them: "312 of 707 titles".
+    Working,
+}
+
+/// A job's progress in its own unit (the titles of a scan).
+#[derive(Debug, Clone, PartialEq, Serialize, Type)]
+pub struct JobUnitsDto {
+    pub phase: UnitPhaseDto,
+    /// Titles read (0 while counting).
+    pub done: u32,
+    /// Titles found so far while counting, in all while working.
+    pub total: u32,
+    /// The title, or while counting the folder, being read now.
+    pub current: Option<String>,
+    /// Estimated seconds left; only once enough titles were timed.
+    pub eta_secs: Option<f64>,
+}
+
+impl From<&UnitProgress> for JobUnitsDto {
+    fn from(units: &UnitProgress) -> Self {
+        Self {
+            phase: match units.phase {
+                UnitPhase::Counting => UnitPhaseDto::Counting,
+                UnitPhase::Working => UnitPhaseDto::Working,
+            },
+            done: small(units.done),
+            total: small(units.total),
+            current: units.current.clone(),
+            eta_secs: units.eta_secs,
+        }
+    }
 }
 
 /// What the combined taskbar and dock progress shows.
@@ -134,6 +178,7 @@ impl From<&JobSnapshot> for JobProgress {
             elapsed_secs: s.elapsed_secs,
             outcome: s.outcome.clone(),
             result: s.result.clone(),
+            units: s.units.as_ref().map(JobUnitsDto::from),
         }
     }
 }

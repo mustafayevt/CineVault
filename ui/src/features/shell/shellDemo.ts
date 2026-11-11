@@ -35,10 +35,28 @@ function demoJob(
   };
 }
 
+/** `?shell-demo=scan`: a scan of eight folders that has read 312 of its 707 titles. */
+function demoScan(): JobProgress {
+  return demoJob({
+    id: 3,
+    name: "Scanning 8 folders",
+    total: 8,
+    done: 3,
+    current: ["Movies 4K"],
+    units: {
+      phase: "working",
+      done: 312,
+      total: 707,
+      current: "Example Movie (2020)",
+      eta_secs: 175,
+    },
+  });
+}
+
 /**
  * Fills the sidebar with the sample sidebar state in a plain browser when the address
- * carries `?shell-demo`: a scrape and a move running, with Pause and Cancel that act on the demo.
- * The desktop app never runs it.
+ * carries `?shell-demo`: a scrape and a move running, with Pause and Cancel that act on the demo
+ * (`?shell-demo=scan` puts a scan counted in titles first). The desktop app never runs it.
  */
 export function useShellDemo(): void {
   useEffect(() => {
@@ -57,8 +75,10 @@ export function useShellDemo(): void {
         return Promise.resolve(true);
       },
     });
+    const scan = new URLSearchParams(window.location.search).get(DEMO_PARAM) === "scan";
     useJobProgressStore.setState({
       jobs: [
+        ...(scan ? [demoScan()] : []),
         demoJob({
           id: 1,
           name: "Scraping 25 titles (TMDB)",

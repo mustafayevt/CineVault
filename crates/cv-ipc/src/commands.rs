@@ -416,7 +416,7 @@ pub const COMMANDS: &[CommandInfo] = &[
     CommandInfo {
         name: "organize_apply",
         module: "organize",
-        args: &["request", "include"],
+        args: &["request", "include", "onProgress"],
     },
     CommandInfo {
         name: "organize_check_template",
@@ -569,9 +569,19 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["kind", "ids"],
     },
     CommandInfo {
+        name: "rescan_folder",
+        module: "scan",
+        args: &["sourceId"],
+    },
+    CommandInfo {
         name: "rescan_library",
         module: "scan",
         args: &[],
+    },
+    CommandInfo {
+        name: "rescan_title",
+        module: "scan",
+        args: &["id"],
     },
     CommandInfo {
         name: "reset_settings",

@@ -4,11 +4,17 @@
 //! gone). Items run on the **disk** lane of the job manager, a few sources at a time, and each is
 //! saved in the job store, so after a crash or a quit [`resume_rescans`] finishes exactly the
 //! sources that had not completed. A source's rescan is one write transaction, so a cancel never
-//! leaves half a source behind.
+//! leaves half a source behind. An item can also be one title's folder inside a source
+//! ([`RescanTarget::Folder`], "Scan again" on a title page), read alone with
+//! [`super::rescan_folder`]'s rules.
+//!
+//! The job tells its progress in titles ([`super::progress`]): it first counts the titles of the
+//! folders it will read, then reports each title as the walks read it.
 
 use std::collections::HashSet;
 use std::fmt;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, mpsc};
+use std::time::Instant;
 
 use cv_db::Database;
 use cv_db::repo::data_sources::{get_source, list_sources};
@@ -19,7 +25,11 @@ use cv_jobs::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{RescanError, RescanOptions, RescanReport, refresh_detached, rescan_held_source};
+use super::progress::{COUNT_DEADLINE, ScanProgress};
+use super::{
+    RescanError, RescanOptions, RescanReport, RescanScope, count_source_titles, refresh_detached,
+    rescan_held_source_in,
+};
 
 /// The job kind a rescan is stored and resumed under.
 pub const RESCAN_JOB_KIND: &str = "library.rescan";
@@ -37,6 +47,28 @@ pub enum RescanTarget {
     },
     /// Items whose data source was removed or remapped away.
     Detached,
+    /// One folder inside a data source, a title's folder, read alone: its files, and its titles
+    /// found again or gone. Nothing else in the source is read or changed.
+    Folder {
+        /// The data source, by id; read again when the item runs.
+        id: i64,
+        kind: SourceKind,
+        /// The folder, a full path inside the source.
+        folder: String,
+        /// What Activity calls it: the title's name.
+        name: String,
+    },
+}
+
+impl RescanTarget {
+    /// The key of the target's titles in the job's progress.
+    fn key(&self) -> String {
+        match self {
+            Self::Source { id, .. } => format!("source:{id}"),
+            Self::Folder { id, folder, .. } => format!("folder:{id}:{folder}"),
+            Self::Detached => "detached".to_owned(),
+        }
+    }
 }
 
 impl fmt::Display for RescanTarget {
@@ -46,6 +78,7 @@ impl fmt::Display for RescanTarget {
             // never the internal kind or the whole path.
             Self::Source { path, .. } => f.write_str(folder_name(path)),
             Self::Detached => f.write_str("titles whose folder was removed"),
+            Self::Folder { name, .. } => f.write_str(name),
         }
     }
 }
@@ -84,6 +117,7 @@ pub struct RescanWork {
     db: Arc<Database>,
     options: Arc<RescanOptions>,
     reports: Arc<Mutex<Vec<RescanReport>>>,
+    progress: Arc<ScanProgress>,
 }
 
 fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -98,7 +132,19 @@ impl RescanWork {
             db,
             options: Arc::new(options),
             reports: Arc::new(Mutex::new(Vec::new())),
+            progress: Arc::default(),
         }
+    }
+
+    /// The job's progress in titles.
+    pub fn progress(&self) -> &ScanProgress {
+        &self.progress
+    }
+
+    fn connect(&self, control: &ItemControl) {
+        let control = control.clone();
+        self.progress
+            .connect(Arc::new(move |units| control.set_units(units)));
     }
 
     /// The reports of the sources that finished so far.
@@ -139,31 +185,118 @@ impl ItemWork for RescanWork {
         ))
     }
 
+    /// Counts the titles of every folder the job will read, side by side, for the first phase of
+    /// its progress; a folder that has not answered by [`COUNT_DEADLINE`] is counted by its walk.
+    async fn prepare(&self, items: &[&RescanTarget], control: &ItemControl) {
+        self.connect(control);
+        let (sender, receiver) = mpsc::channel::<(String, Option<usize>)>();
+        // The folders still being listed, by key, with the name the progress shows.
+        let mut listing: Vec<(String, String)> = Vec::new();
+        for target in items {
+            match target {
+                RescanTarget::Source { id, path, .. } => {
+                    let (db, options, id, key) = (
+                        Arc::clone(&self.db),
+                        Arc::clone(&self.options),
+                        *id,
+                        target.key(),
+                    );
+                    let sender = sender.clone();
+                    let entry = (key.clone(), folder_name(path).to_owned());
+                    // A listing of a dead network share can block for long; it is left behind.
+                    let spawned = std::thread::Builder::new()
+                        .name("cv-scan-count".to_owned())
+                        .spawn(move || {
+                            let titles = db
+                                .read(|conn| get_source(conn, id))
+                                .ok()
+                                .flatten()
+                                .and_then(|source| {
+                                    count_source_titles(&db, &source, &options).ok().flatten()
+                                });
+                            let _ = sender.send((key, titles));
+                        });
+                    if spawned.is_ok() {
+                        listing.push(entry);
+                    }
+                }
+                RescanTarget::Folder { .. } => self.progress.counted(&target.key(), 1),
+                RescanTarget::Detached => {}
+            }
+        }
+        drop(sender);
+        let progress = Arc::clone(&self.progress);
+        let control = control.clone();
+        let counting = tokio::task::spawn_blocking(move || {
+            let deadline = Instant::now() + COUNT_DEADLINE;
+            while let Some((_, name)) = listing.first() {
+                progress.listing(name);
+                if control.is_cancelled() {
+                    return;
+                }
+                let left = deadline.saturating_duration_since(Instant::now());
+                let Ok((key, titles)) = receiver.recv_timeout(left) else {
+                    return;
+                };
+                listing.retain(|(waiting, _)| *waiting != key);
+                if let Some(titles) = titles {
+                    progress.counted(&key, titles);
+                }
+            }
+        });
+        let _ = counting.await;
+        self.progress.start_working();
+    }
+
     async fn process(&self, item: &RescanTarget, control: &ItemControl) -> Result<(), ItemError> {
         let db = Arc::clone(&self.db);
         let options = Arc::clone(&self.options);
+        let progress = Arc::clone(&self.progress);
         let control = control.clone();
         let target = item.clone();
+        let key = item.key();
         let outcome =
             tokio::task::spawn_blocking(move || -> Result<Option<RescanReport>, RescanError> {
-                match target {
+                let cancelled = || control.is_cancelled();
+                let outcome = match &target {
                     RescanTarget::Source { id, .. } => {
                         // A Rescan button press and a file-watcher batch can queue two jobs for
                         // the same source; without the lock both would plan from the same stored
                         // state and add the same new titles twice. The second one waits and then
                         // finds the first one's work already stored.
-                        let _one_at_a_time = crate::lock::hold_sources([id]);
-                        let Some(source) = db.read(|conn| get_source(conn, id))? else {
+                        let _one_at_a_time = crate::lock::hold_sources([*id]);
+                        let Some(source) = db.read(|conn| get_source(conn, *id))? else {
+                            progress.finished(&key);
                             return Ok(None);
                         };
-                        rescan_held_source(&db, &source, &options, &|| control.is_cancelled())
-                            .map(Some)
+                        let observer = progress.observer(&key);
+                        let scope = RescanScope {
+                            focus: None,
+                            observer: Some(&observer),
+                        };
+                        rescan_held_source_in(&db, &source, &options, &cancelled, scope).map(Some)
                     }
-                    RescanTarget::Detached => {
-                        refresh_detached(&db)?;
-                        Ok(None)
+                    RescanTarget::Folder {
+                        id, folder, name, ..
+                    } => {
+                        let _one_at_a_time = crate::lock::hold_sources([*id]);
+                        let Some(source) = db.read(|conn| get_source(conn, *id))? else {
+                            progress.finished(&key);
+                            return Ok(None);
+                        };
+                        progress.reading_title(&key, name);
+                        let scope = RescanScope {
+                            focus: Some(folder),
+                            observer: None,
+                        };
+                        rescan_held_source_in(&db, &source, &options, &cancelled, scope).map(Some)
                     }
+                    RescanTarget::Detached => refresh_detached(&db).map(|_| None),
+                };
+                if outcome.is_ok() {
+                    progress.finished(&key);
                 }
+                outcome
             })
             .await;
         match outcome {
@@ -223,6 +356,13 @@ pub fn job_name(sources: usize) -> String {
     )
 }
 
+/// The name Activity shows for a scan of one place: `Scanning Movies 4K`, `Scanning Example
+/// Movie`.
+#[must_use]
+pub fn job_name_of(place: &str) -> String {
+    format!("Scanning {place}")
+}
+
 /// Queues a persistent rescan of `targets` on the disk lane, at most `parallel_sources` sources
 /// at a time. The manager needs a job store.
 pub fn submit_rescan(
@@ -232,13 +372,32 @@ pub fn submit_rescan(
     targets: Vec<RescanTarget>,
     parallel_sources: usize,
 ) -> Result<RescanHandle, StoreError> {
-    let work = RescanWork::new(db, options);
     // Named by the folders it reads; the pass over detached titles is not a folder.
     let folders = targets
         .iter()
-        .filter(|target| matches!(target, RescanTarget::Source { .. }))
+        .filter(|target| !matches!(target, RescanTarget::Detached))
         .count();
-    let spec = JobSpec::new(job_name(folders), LaneId::Disk).concurrency(parallel_sources);
+    submit_rescan_named(
+        manager,
+        db,
+        options,
+        targets,
+        parallel_sources,
+        job_name(folders),
+    )
+}
+
+/// [`submit_rescan`] under a name of the caller's ([`job_name_of`]).
+pub fn submit_rescan_named(
+    manager: &JobManager,
+    db: Arc<Database>,
+    options: RescanOptions,
+    targets: Vec<RescanTarget>,
+    parallel_sources: usize,
+    name: String,
+) -> Result<RescanHandle, StoreError> {
+    let work = RescanWork::new(db, options);
+    let spec = JobSpec::new(name, LaneId::Disk).concurrency(parallel_sources);
     let job = manager.submit_persistent(RESCAN_JOB_KIND, spec, work.clone(), targets)?;
     Ok(RescanHandle { job, work })
 }

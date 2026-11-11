@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SourceRequestError, setSourcesBackend } from "../library-sources/sourcesBackend";
 import type { LibrarySource, SourcesBackend } from "../library-sources/sourcesBackend";
@@ -18,7 +18,7 @@ import type { OnboardingBackend } from "../onboarding/onboardingBackend";
 import { setOrganizeBackend } from "../rename/organizeBackend";
 import { createSyntheticOrganizeBackend } from "../rename/syntheticOrganize";
 import { setProvidersBackend, unavailableBackend } from "../providers/providersBackend";
-import { setScanBackend } from "../scan/scanBackend";
+import { currentScanBackend, setScanBackend } from "../scan/scanBackend";
 import type { ScanBackend } from "../scan/scanBackend";
 import { useToastStore } from "../toasts/toastStore";
 import { setUpdatesBackend } from "../updates/updatesBackend";
@@ -135,6 +135,8 @@ function folders(initial: LibrarySource[], refuseKind?: string) {
         })),
       ),
     readPendingMediaInfo: () => Promise.resolve("ready"),
+    scanFolder: () => Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" }),
+    scanTitle: () => Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" }),
   };
   setSourcesBackend(backend);
   setScanBackend(scan);
@@ -218,6 +220,21 @@ describe("Settings, Library folders", () => {
       await entry?.undo?.();
     });
     expect(state.calls).toContain("add movie D:\\Movies");
+  });
+
+  it("scans one folder on its own", async () => {
+    const user = userEvent.setup();
+    folders(SAMPLE);
+    const scanFolder = vi.fn(() =>
+      Promise.resolve({ job_id: 4, sources: 1, media_info: "ready" as const }),
+    );
+    setScanBackend({ ...currentScanBackend(), available: true, scanFolder });
+    await renderSettings();
+    await user.click(await screen.findByRole("button", { name: "Scan this folder: E:\\TV" }));
+    expect(scanFolder).toHaveBeenCalledWith(2);
+    await waitFor(() => {
+      expect(toasts()).toContain("Scanning TV");
+    });
   });
 
   it("changes what a folder holds", async () => {
@@ -413,6 +430,8 @@ describe("Settings, Library folders on network shares", () => {
           health(3, "\\\\backup\\movies\\Classics", false, SHARE_OFFLINE),
         ]),
       readPendingMediaInfo: () => Promise.resolve("ready"),
+      scanFolder: () => Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" }),
+      scanTitle: () => Promise.resolve({ job_id: 0, sources: 1, media_info: "ready" }),
     });
   }
 

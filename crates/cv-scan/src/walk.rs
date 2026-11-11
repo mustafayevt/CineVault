@@ -360,8 +360,79 @@ pub fn scan_movie_sources(sources: &[DataSource], options: &WalkOptions) -> Scan
     report
 }
 
+/// Told how far a walk of a whole library folder got, in titles, for the progress of a scan.
+/// The walk reads folders on several threads, so the calls come from any of them.
+///
+/// A title is a folder directly in the library folder, or a loose video there in a movie
+/// library; a folder that groups titles (a movie bucket such as `A`, `1999` or `Horror`, a TV
+/// A to Z folder) counts its own folders instead. [`count_titles`] counts the same way.
+pub trait WalkObserver: Sync {
+    /// `count` more titles were found (a listing finished).
+    fn found(&self, count: usize);
+    /// The folder of a title is being read.
+    fn reading(&self, name: &str);
+    /// `count` titles were read.
+    fn read(&self, count: usize);
+}
+
+/// What a walk of one library folder reads.
+#[derive(Clone, Copy, Default)]
+pub struct WalkScope<'a> {
+    /// One folder inside the library folder to read alone (a title's folder), with the folders
+    /// above it passed through without their own files; `None` reads the whole library folder.
+    /// The titles found inside it are grouped exactly as a whole walk groups them.
+    pub focus: Option<&'a Path>,
+    /// Told how far a whole walk got; a walk with a focus tells nobody.
+    pub observer: Option<&'a dyn WalkObserver>,
+}
+
+/// The folded names from `root` down to `focus`; empty when `focus` is `root` or not inside it.
+fn focus_parts(root: &Path, focus: Option<&Path>) -> Vec<String> {
+    let Some(focus) = focus else {
+        return Vec::new();
+    };
+    let fold = |path: &Path| {
+        let mut text = cv_fs::paths::fold_name(&path.to_string_lossy().replace('\\', "/"));
+        while text.ends_with('/') {
+            text.pop();
+        }
+        text
+    };
+    let (root, focus) = (fold(root), fold(focus));
+    focus
+        .strip_prefix(&root)
+        .filter(|rest| rest.starts_with('/'))
+        .map(|rest| {
+            rest.split('/')
+                .filter(|part| !part.is_empty())
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// How many titles a walk of the library folder `root` reads, counted as [`WalkObserver`] hears
+/// them, for the first phase of a scan's progress. Lists only `root` and its folders that group
+/// titles. `None` when the folder cannot be listed or its drive is not mounted.
+pub fn count_titles(root: &Path, options: &WalkOptions) -> Option<usize> {
+    if !(options.drive_is_mounted)(root) {
+        return None;
+    }
+    tree::count_units(root, &options.skip)
+}
+
 /// Walks one movie data source. Movies come back sorted by folder, then title.
 pub fn scan_movie_source(root: &Path, source_id: Option<i64>, options: &WalkOptions) -> ScanReport {
+    scan_movie_source_in(root, source_id, options, WalkScope::default())
+}
+
+/// [`scan_movie_source`] of part of the library folder, or with an observer.
+pub fn scan_movie_source_in(
+    root: &Path,
+    source_id: Option<i64>,
+    options: &WalkOptions,
+    scope: WalkScope<'_>,
+) -> ScanReport {
     let mut problems = Vec::new();
     if drive_missing(root, options, &mut problems) {
         return ScanReport {
@@ -369,14 +440,24 @@ pub fn scan_movie_source(root: &Path, source_id: Option<i64>, options: &WalkOpti
             problems,
         };
     }
-    let Some(tree) = tree::read_tree(root, &options.skip, options.worker_threads(), &mut problems)
-    else {
+    let focus = focus_parts(root, scope.focus);
+    let tree_scope = tree::Scope {
+        focus: &focus,
+        observer: scope.observer,
+    };
+    let Some(tree) = tree::read_tree(
+        root,
+        &options.skip,
+        options.worker_threads(),
+        &mut problems,
+        tree_scope,
+    ) else {
         return ScanReport {
             movies: Vec::new(),
             problems,
         };
     };
-    if tree.files.is_empty() && tree.dirs.is_empty() && tree.discs.is_empty() {
+    if is_empty(&tree, &focus) {
         problems.push(ScanProblem {
             kind: ProblemKind::SourceEmpty,
             path: root.to_path_buf(),
@@ -417,6 +498,16 @@ pub fn scan_tv_sources(sources: &[DataSource], options: &WalkOptions) -> TvScanR
 /// Walks one TV data source. Shows come back sorted by folder, then title. Use
 /// [`WalkOptions::tv_defaults`] for the TV skip rules.
 pub fn scan_tv_source(root: &Path, source_id: Option<i64>, options: &WalkOptions) -> TvScanReport {
+    scan_tv_source_in(root, source_id, options, WalkScope::default())
+}
+
+/// [`scan_tv_source`] of part of the library folder, or with an observer.
+pub fn scan_tv_source_in(
+    root: &Path,
+    source_id: Option<i64>,
+    options: &WalkOptions,
+    scope: WalkScope<'_>,
+) -> TvScanReport {
     let mut problems = Vec::new();
     if drive_missing(root, options, &mut problems) {
         return TvScanReport {
@@ -424,14 +515,24 @@ pub fn scan_tv_source(root: &Path, source_id: Option<i64>, options: &WalkOptions
             problems,
         };
     }
-    let Some(tree) = tree::read_tree(root, &options.skip, options.worker_threads(), &mut problems)
-    else {
+    let focus = focus_parts(root, scope.focus);
+    let tree_scope = tree::Scope {
+        focus: &focus,
+        observer: scope.observer,
+    };
+    let Some(tree) = tree::read_tree(
+        root,
+        &options.skip,
+        options.worker_threads(),
+        &mut problems,
+        tree_scope,
+    ) else {
         return TvScanReport {
             shows: Vec::new(),
             problems,
         };
     };
-    if tree.files.is_empty() && tree.dirs.is_empty() && tree.discs.is_empty() {
+    if is_empty(&tree, &focus) {
         problems.push(ScanProblem {
             kind: ProblemKind::SourceEmpty,
             path: root.to_path_buf(),
@@ -448,6 +549,17 @@ pub fn scan_tv_source(root: &Path, source_id: Option<i64>, options: &WalkOptions
     TvScanReport {
         shows,
         problems: grouper.problems,
+    }
+}
+
+/// Whether the library folder held nothing at all: a disconnected drive looks like this. With a
+/// focus the root's own listing decides, so a title folder that is gone from a library folder
+/// that still holds others is no empty library folder.
+fn is_empty(tree: &tree::Dir, focus: &[String]) -> bool {
+    if focus.is_empty() {
+        tree.files.is_empty() && tree.dirs.is_empty() && tree.discs.is_empty()
+    } else {
+        !tree.had_entries
     }
 }
 

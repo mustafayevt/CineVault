@@ -12,6 +12,7 @@ export const activity = {
   "activity.attention.dismissAll": "Dismiss all",
   "activity.attention.dismissAllHint": "Clears the warnings; unfinished moves stay until resolved",
   "activity.history": "History",
+  "activity.running": "Running now",
 
   // An unfinished batch
   "activity.batch.move": "Move to {destination} did not finish",

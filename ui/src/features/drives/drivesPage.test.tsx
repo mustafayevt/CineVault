@@ -19,6 +19,7 @@ import { agoText, qualityShares, usedShare } from "./drivesModel";
 import type { DrivesOverview } from "./drivesModel";
 import { validateDrivesSearch } from "./drivesSearch";
 import { syntheticDrives } from "./syntheticDrives";
+import { setScanBackend, unavailableScanBackend } from "../scan/scanBackend";
 import { useToastStore } from "../toasts/toastStore";
 
 function renderDrives(at = "/drives") {
@@ -296,5 +297,28 @@ describe("the drive numbers", () => {
     await user.click(confirm);
     await waitFor(() => expect(emptied).toEqual(["D:"]));
     await waitFor(() => expect(within(media).queryByText("Trash folder")).toBeNull());
+  });
+
+  it("scans one library folder from its card without choosing the card", async () => {
+    const user = userEvent.setup();
+    const scanFolder = vi.fn(() =>
+      Promise.resolve({ job_id: 3, sources: 1, media_info: "ready" as const }),
+    );
+    setScanBackend({ ...unavailableScanBackend, available: true, scanFolder });
+    setDrivesBackend(backendOf(() => syntheticDrives()));
+    renderDrives();
+    const archive = await screen.findByRole("button", { name: "Show the titles on E: Archive" });
+    expect(archive).toHaveAttribute("aria-pressed", "false");
+    await user.click(within(archive).getByRole("button", { name: "Scan this folder: TV" }));
+    expect(scanFolder).toHaveBeenCalledWith(3);
+    expect(archive).toHaveAttribute("aria-pressed", "false");
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain(
+        "Scanning TV",
+      ),
+    );
+    // Every folder of a card has its own button, reachable with the keyboard.
+    expect(within(archive).getAllByRole("button", { name: /^Scan this folder: / })).toHaveLength(2);
+    setScanBackend(null);
   });
 });

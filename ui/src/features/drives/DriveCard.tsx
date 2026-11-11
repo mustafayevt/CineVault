@@ -1,13 +1,15 @@
-import { TriangleAlert } from "lucide-react";
+import { FolderSync, TriangleAlert } from "lucide-react";
 import type { KeyboardEvent } from "react";
 
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
+import { IconButton } from "../../components/IconButton";
 import { SpaceBar } from "../../components/SpaceBar";
 import { Tag } from "../../components/Tag";
 import { t } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { cx } from "../../lib/cx";
+import { runScanFolder } from "../scan/scanActions";
 import { binName } from "../shell/binName";
 import { detectPlatform } from "../shell/platform";
 import { agoText, nameParts, qualityShares, trashTotal, usedShare } from "./drivesModel";
@@ -50,8 +52,20 @@ const SEGMENT: Record<string, string> = {
   SD: "bg-track",
 };
 
+/** The name a folder's scan goes by: its label, else the last part of its path. */
+function folderName(folder: DriveFolder): string {
+  if (folder.label.trim() !== "") return folder.label;
+  const parts = folder.path.split(/[\\/]/).filter((part) => part !== "");
+  return parts.at(-1) ?? folder.path;
+}
+
+/**
+ * One library folder of the card: its path, count and size, and "Scan this folder", which scans
+ * that folder alone (spec `drives` "Drive cards"). The button does not choose the card.
+ */
 function FolderRow({ folder, offline }: { folder: DriveFolder; offline: boolean }) {
   const format = useFormat();
+  const name = folderName(folder);
   return (
     <div className="flex items-center gap-2 text-(length:--fs-13)">
       <span className="cv-selectable min-w-0 flex-1 truncate font-mono text-(length:--fs-12) text-text-2">
@@ -65,6 +79,19 @@ function FolderRow({ folder, offline }: { folder: DriveFolder; offline: boolean 
       <span className="w-[62px] text-right text-text-muted tabular-nums">
         {format.size(folder.bytes)}
       </span>
+      <IconButton
+        size="sm"
+        icon={FolderSync}
+        aria-label={t("scan.folderFor", { name })}
+        title={t("scan.folder")}
+        data-testid="scan-folder"
+        className="-my-1 -mr-1.5 shrink-0"
+        onClick={(event) => {
+          event.stopPropagation();
+          void runScanFolder(folder.sourceId, name);
+        }}
+        onKeyDown={(event) => event.stopPropagation()}
+      />
     </div>
   );
 }

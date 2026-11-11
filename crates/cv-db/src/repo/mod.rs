@@ -121,7 +121,8 @@ mod tests;
 
 pub use availability::{
     AvailabilityChange, AvailabilityPlan, AvailabilityReport, FileProbe, PathStyle, StdFileProbe,
-    apply_availability, get_availability, plan_availability, set_availability,
+    apply_availability, get_availability, plan_availability, plan_availability_of,
+    set_availability,
 };
 pub use facet::{
     FacetCondition, FacetValue, FilterDef, FilterId, FilterKind, NumOp, catalogue, facet_values,

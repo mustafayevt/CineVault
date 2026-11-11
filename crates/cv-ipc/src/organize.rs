@@ -988,15 +988,37 @@ impl From<Applied> for AppliedDto {
     }
 }
 
+/// How far a running rename got, after each title: the sidebar shows it as "Renaming 3 of 12".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct RenameProgressDto {
+    /// Titles done, renamed or not.
+    pub done: u32,
+    /// Titles the rename runs.
+    pub total: u32,
+    /// The title that just finished; empty before the first.
+    pub title: String,
+}
+
+impl From<&organize::ApplyProgress> for RenameProgressDto {
+    fn from(progress: &organize::ApplyProgress) -> Self {
+        Self {
+            done: u32::try_from(progress.done).unwrap_or(u32::MAX),
+            total: u32::try_from(progress.total).unwrap_or(u32::MAX),
+            title: progress.title.clone(),
+        }
+    }
+}
+
 /// Runs the checked changes of the request and records one journal batch. The request is
 /// planned again first; a checked item that is not a clean change any more is not run and is
-/// listed in `not_run`.
+/// listed in `not_run`. Progress goes to `on_progress`; a closed page does not stop the rename.
 pub async fn organize_apply(
     library: &LibraryState,
     organize: &OrganizeState,
     settings: &SettingsState,
     request: OrganizeRequestDto,
     include: Vec<String>,
+    on_progress: crate::sink::Sink<RenameProgressDto>,
 ) -> Result<AppliedDto, OrganizeCommandError> {
     if rename_settings::metadata_only(&settings.service().snapshot().values) {
         return Err(OrganizeCommandError {
@@ -1008,7 +1030,10 @@ pub async fn organize_apply(
     let preview = to_request(settings, request)?;
     blocking(move || {
         Ok(service
-            .apply(&organize::ApplyRequest { preview, include })?
+            .apply_with(
+                &organize::ApplyRequest { preview, include },
+                &mut |progress| on_progress(progress.into()),
+            )?
             .into())
     })
     .await
@@ -1180,9 +1205,16 @@ mod tests {
             },
             choices: Vec::new(),
         };
-        let refused = organize_apply(&library, &organize, &settings, request, Vec::new())
-            .await
-            .expect_err("refused");
+        let refused = organize_apply(
+            &library,
+            &organize,
+            &settings,
+            request,
+            Vec::new(),
+            std::sync::Arc::new(|_| {}),
+        )
+        .await
+        .expect_err("refused");
         assert_eq!(refused.code, "metadata_only");
         assert_eq!(refused.message, rename_settings::METADATA_ONLY_MESSAGE);
     }

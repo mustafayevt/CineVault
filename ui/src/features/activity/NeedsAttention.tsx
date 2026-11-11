@@ -13,6 +13,7 @@ import { useMoveToStore } from "../move-to/moveToStore";
 import { useNotificationStore } from "../notifications/notificationStore";
 import type { AppNotification } from "../notifications/notificationStore";
 import { fetchMissingRatings } from "../ratings/ratingSweep";
+import { OPEN_RENAME_ACTION, openRename } from "../rename/runRename";
 import { useNeedsAttention } from "./attentionModel";
 import { openProviderKey } from "./openActivity";
 import type { AttentionEntry } from "./attentionModel";
@@ -220,6 +221,18 @@ function NoticeRow({ notice }: { notice: AppNotification }) {
             }}
           >
             {t("activity.notice.retry")}
+          </Button>
+        ) : null}
+        {notice.action === OPEN_RENAME_ACTION && (notice.itemIds?.length ?? 0) > 0 ? (
+          <Button
+            size="sm"
+            onClick={() => {
+              // The preview is the retry: it shows the plan as the disk is now.
+              dismiss(notice.id);
+              openRename(notice.itemIds ?? []);
+            }}
+          >
+            {t("renamePage.notice.open")}
           </Button>
         ) : null}
         <Button

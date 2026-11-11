@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { TriangleAlert } from "lucide-react";
+import { FolderSync, TriangleAlert } from "lucide-react";
 
 import { Button } from "../../components/Button";
 import { Icon } from "../../components/Icon";
@@ -7,6 +7,7 @@ import { PathText } from "../../components/PathText";
 import { t } from "../../i18n/catalog";
 import type { FilesState } from "../detail/filesState";
 import { TITLE_ACTIONS } from "../library/titleActions";
+import { runScanTitle } from "../scan/scanActions";
 import { removeTitlesFromLibrary } from "./removeTitles";
 
 /**
@@ -14,9 +15,11 @@ import { removeTitlesFromLibrary } from "./removeTitles";
  * folder, and nothing else. Play says the same reason; Library's Problems filter lists every such
  * title. A warning is never colour alone: it has an icon and words.
  *
- * When the files are missing (not when the drive is offline, which fixes itself) it also says why
- * the title is kept and offers "Remove from library (keep files)", the same action as the ⋯ menu,
- * which then opens the Library like the menu does.
+ * Both offer "Scan again", which reads the title's folder at once, so files that are back (or a
+ * drive plugged in again) show without a scan of the whole library. When the files are missing
+ * (not when the drive is offline, which fixes itself) it also says why the title is kept and
+ * offers "Remove from library (keep files)", the same action as the ⋯ menu, which then opens the
+ * Library like the menu does.
  */
 export function FilesNotice({
   state,
@@ -57,8 +60,17 @@ export function FilesNotice({
             <PathText path={folder} />
           </span>
         )}
-        {missing ? (
-          <div className="mt-2">
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            icon={FolderSync}
+            aria-label={t("scan.againFor", { title })}
+            onClick={() => void runScanTitle(id, title)}
+            data-testid="files-notice-scan"
+          >
+            {t("scan.again")}
+          </Button>
+          {missing ? (
             <Button
               size="sm"
               icon={TITLE_ACTIONS["remove"].icon}
@@ -67,8 +79,8 @@ export function FilesNotice({
             >
               {t("title.menu.remove")}
             </Button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </div>
   );

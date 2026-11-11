@@ -294,6 +294,28 @@ fn apply_renames_only_the_checked_items_and_updates_the_library_paths() {
 }
 
 #[test]
+fn a_rename_tells_how_far_it_got_after_each_title() {
+    let lib = Lib::new();
+    let heat = lib.movie("heat.1995.1080p", "heat", "Heat", 1995);
+    let arrival = lib.movie("arrival.2016", "arrival", "Arrival", 2016);
+    let request = ApplyRequest {
+        preview: lib.request(Scope::Everything),
+        include: ids(&[heat, arrival]),
+    };
+    let mut heard = Vec::new();
+    let applied = lib
+        .service
+        .apply_with(&request, &mut |progress| heard.push(progress.clone()))
+        .unwrap();
+    assert_eq!(applied.done(), 2);
+    let counts: Vec<(usize, usize)> = heard.iter().map(|p| (p.done, p.total)).collect();
+    assert_eq!(counts, [(0, 2), (1, 2), (2, 2)]);
+    let mut titles: Vec<&str> = heard[1..].iter().map(|p| p.title.as_str()).collect();
+    titles.sort_unstable();
+    assert_eq!(titles, ["Arrival", "Heat"]);
+}
+
+#[test]
 fn a_title_whose_nfo_or_artwork_is_being_written_is_left_out_of_an_apply() {
     // Safety review 14.2: a manual Organize (or any apply) must not move a folder while a
     // scrape's follow-up still writes into it, or the write lands in a recreated old folder.

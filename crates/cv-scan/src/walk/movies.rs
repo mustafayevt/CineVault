@@ -322,7 +322,7 @@ fn name_of<'p>(pool: &'p [Option<Cls>], i: usize) -> &'p str {
     pool[i].as_ref().map_or("", |c| c.entry.name.as_str())
 }
 
-fn is_bucket_name(name: &str) -> bool {
+pub(super) fn is_bucket_name(name: &str) -> bool {
     BUCKET.is_match(name) || Genre::parse(name).is_some_and(|g| g.is_known())
 }
 

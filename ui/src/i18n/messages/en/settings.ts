@@ -728,6 +728,7 @@ export const settings = {
     "offline · {count, plural, one {# show} other {# shows}} kept",
   "settingsPage.folders.remove": "Remove",
   "settingsPage.folders.removeFor": "Remove {path}",
+  "settingsPage.folders.scanFor": "Scan this folder: {path}",
   "settingsPage.folders.removed":
     "{count, plural, =0 {Removed {path}} one {Removed {path} · # title stays, offline} other {Removed {path} · # titles stay, offline}}",
   "settingsPage.folders.add": "Add folder…",
