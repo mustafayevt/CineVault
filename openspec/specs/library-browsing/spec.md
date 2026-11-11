@@ -144,7 +144,7 @@ The yes-or-no fields `new`, `review`, `notmatched`, `renamepending`, `missing` a
 - **THEN** only titles whose files are missing or offline are listed
 
 ### Requirement: Filter row
-Under the toolbar a filter row SHALL show the stage chips "All", "New", "Scraped" and "Renamed" with their counts, then the dropdown chips "Drive: <value>" (All, or a library folder by its label with its title count), "Quality: <value>" (Any, 2160p, 1080p, 720p, SD) and "Problems <count>" in the warning tone, then the search chip, and at the right the count and total size of what is listed ("181 movies · 7.06 TB"). All of them SHALL combine.
+Under the toolbar a filter row SHALL show the stage chips "All", "New", "Scraped" and "Renamed" with their counts, then the dropdown chips "Drive: <value>" (All, or a library folder by its label with its title count), "Quality: <value>" (Any, 2160p, 1080p, 720p, SD), "Problems <count>" in the warning tone and "Needs fixing", then the search chip, and at the right the count and total size of what is listed ("181 movies · 7.06 TB"). All of them SHALL combine.
 
 #### Scenario: Drive filter
 - **WHEN** the user picks the library folder labelled "Archive" in the Drive menu
@@ -190,11 +190,15 @@ Outside a text field, F2 SHALL rename the selection and Delete SHALL delete it a
 - **THEN** the rename preview opens for those two movies
 
 ### Requirement: Floating selection bar
-While titles are selected, a floating bar SHALL appear at the bottom centre of the content with the count and total size ("4 selected · 186.2 GB"), then Rename, Scrape, Artwork, Move, Delete and More, with "Rewrite NFO", "Edit details", "Remove from library (keep files)" and "Ignore this folder" under More, and a way to clear the selection. Actions for one title (Edit details) SHALL say "Select one title" when several are selected.
+While titles are selected, a floating bar SHALL appear at the bottom centre of the content with the count and total size ("4 selected · 186.2 GB"), then Rename, Scrape, Artwork, Move, Delete and More, with "Rewrite NFO", "Edit details", "Remove from library (keep files)" and "Ignore this folder" under More, and a way to clear the selection. Actions for one title (Edit details) SHALL say "Select one title" when several are selected. While the Problems filter is "Missing files or offline", the bar SHALL show "Remove from library" as a button before Delete, and no longer list it under More.
 
 #### Scenario: Bar for four titles
 - **WHEN** four movies totalling 186.2 GB are selected
 - **THEN** the bar reads "4 selected · 186.2 GB" with Rename, Scrape, Artwork, Move, Delete and More
+
+#### Scenario: Remove titles that lost their files
+- **WHEN** the Problems filter is "Missing files or offline", four titles are selected and the user chooses "Remove from library" on the bar
+- **THEN** all four leave the library in one action, their files stay, and the toast says "Removed 4 titles from the library"
 
 ### Requirement: Title right-click menu
 The right-click menu of a title (or the menu key on the current one) SHALL list three groups: "Open" (Enter), "Play" and "Open folder"; then "Rename" (F2), "Scrape", "Artwork…", "Move to…", "Rewrite NFO", "Edit details", "Remove from library (keep files)" and "Ignore this folder"; then "Delete" (Del). With several titles selected the labels SHALL carry the count ("Rename 4 titles").
@@ -299,3 +303,55 @@ The Library toolbar SHALL show a "Reload media info" icon button right beside "S
 #### Scenario: Right-click
 - **WHEN** the user right-clicks a title and chooses "Reload media info"
 - **THEN** that title's file details are read again as a background job
+
+### Requirement: Needs fixing filter
+The "Needs fixing" menu SHALL offer the checkable entries "Not scraped", "No poster", "No fan art", "No clear logo", "No plot" and "No title", each with the number of titles of the current view it would list. Ticking entries SHALL list the titles missing all of them, keep the menu open, and combine with the other chips and the search. "Not scraped" SHALL be the New stage. The chip SHALL show how many entries are ticked, and "Clear Needs fixing" SHALL untick them.
+
+#### Scenario: One entry
+- **WHEN** 12 of 181 movies have no poster and the user ticks "No poster 12"
+- **THEN** only those 12 movies are listed, the footer says "12 movies" and the chip shows 1
+
+#### Scenario: Entries together
+- **WHEN** the user ticks "No poster" and "No clear logo"
+- **THEN** only the titles missing both are listed
+
+#### Scenario: With the search
+- **WHEN** the search holds "the" and the user ticks "No poster"
+- **THEN** only titles with "the" in a word of their name and no poster are listed, and the search chip stays
+
+#### Scenario: Fixing in a batch
+- **WHEN** an entry is ticked, the user presses Ctrl+A and chooses Artwork or Scrape on the selection bar
+- **THEN** the action opens for every listed title, not only the ones scrolled into view
+
+### Requirement: Needs fixing for TV shows
+The Needs fixing menu SHALL be offered in the TV shows library too, and a show SHALL count by its own facts: it is missing a poster, fan art or clear logo when the show itself has none, whatever its episodes and seasons have, and it is missing a plot or a title when its own is empty. A title that was never scraped has the name read from its folder or file, so "No title" lists only titles whose title is empty.
+
+#### Scenario: Show with its own poster
+- **WHEN** a show has a poster of its own and none of its episodes has a thumb, and the user ticks "No poster" in the TV shows library
+- **THEN** the show is not listed
+
+#### Scenario: Show without a poster of its own
+- **WHEN** a show has no poster of its own but its episodes have thumbs, and the user ticks "No poster"
+- **THEN** the show is listed
+
+### Requirement: Nothing to fix
+When an entry of the Needs fixing menu is ticked and no title is listed, the list SHALL say "Nothing to fix here" with "Clear Needs fixing", which unticks the entries and keeps the other filters and the search.
+
+#### Scenario: Nothing missing
+- **WHEN** no movie has an empty title and the user ticks "No title"
+- **THEN** the list says "Nothing to fix here" and "Clear Needs fixing" lists the movies again
+
+### Requirement: Switch selected titles between localized and original title
+The selection bar's More and the right-click menu SHALL offer "Use original title" and "Use localized title" for the selected movies or TV shows. Choosing one SHALL set the choice of every selected title that has another original title and rewrite their NFO files; titles whose names now differ SHALL show Rename pending, and nothing SHALL be renamed on its own. A toast SHALL say what changed and offer Undo, which switches back exactly the titles that changed. Locks SHALL NOT stop it.
+
+#### Scenario: Four titles, two with another original title
+- **WHEN** four movies are selected, two of them have an original title in another language, and the user chooses More › "Use original title for 4 titles"
+- **THEN** those two use their original title, their NFO files are rewritten, the toast says "Now using the original title for 2 titles. 2 titles had no other title to switch to." and Undo switches the two back
+
+#### Scenario: Nothing to switch
+- **WHEN** no selected title has another original title
+- **THEN** the toast says nothing changed and offers no Undo
+
+#### Scenario: Names follow through Rename
+- **WHEN** a scraped movie whose folder is named from `${title} (${year})` is switched to its original title
+- **THEN** it shows Rename pending, and its folder is renamed only when the user runs Rename
