@@ -635,6 +635,20 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
             .await
             .map_err(command_error)
             .and_then(to_value),
+        "rescan_folder" => {
+            let source_id: u32 = arg(args, "sourceId")?;
+            cv_ipc::scan::rescan_folder(&commands.scan, source_id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
+        "rescan_title" => {
+            let id: String = arg(args, "id")?;
+            cv_ipc::scan::rescan_title(&commands.scan, id)
+                .await
+                .map_err(command_error)
+                .and_then(to_value)
+        }
         "find_missing_files" => cv_ipc::scan::find_missing_files(&commands.scan)
             .await
             .map_err(command_error)
@@ -877,6 +891,30 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
                 .map_err(command_error)
                 .and_then(to_value)
         }
+        "set_title_choice" => {
+            let ids: Vec<String> = arg(args, "ids")?;
+            let original: bool = arg(args, "original")?;
+            cv_ipc::edit::set_title_choice(
+                library,
+                &commands.nfo,
+                &commands.edit,
+                &commands.settings,
+                ids,
+                original,
+            )
+            .await
+            .map_err(command_error)
+            .and_then(to_value)
+        }
+        "use_original_title_for_languages" => cv_ipc::edit::use_original_title_for_languages(
+            library,
+            &commands.nfo,
+            &commands.edit,
+            &commands.settings,
+        )
+        .await
+        .map_err(command_error)
+        .and_then(to_value),
         "set_item_lock" => {
             let id: String = arg(args, "id")?;
             let locked: bool = arg(args, "locked")?;
@@ -1637,12 +1675,15 @@ async fn run_command(state: &WebState, cmd: &str, args: &Value, client: &str) ->
         "organize_apply" => {
             let request: cv_ipc::organize::OrganizeRequestDto = arg(args, "request")?;
             let include: Vec<String> = arg(args, "include")?;
+            let stream = channel_arg(args, "onProgress")?;
+            let sink = channel_sink(state, client, stream);
             cv_ipc::organize::organize_apply(
                 library,
                 &commands.organize,
                 &commands.settings,
                 request,
                 include,
+                sink,
             )
             .await
             .map_err(command_error)

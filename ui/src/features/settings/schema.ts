@@ -121,7 +121,6 @@ const ADVANCED_IDS: ReadonlySet<string> = new Set([
   "providers.prefer-original-title",
   // Artwork
   "subtitles.language-style",
-  "metadata.artwork-names",
   "artwork.poster-size",
   "artwork.fanart-size",
   "artwork.other-resolutions",
@@ -572,6 +571,12 @@ const ALL_SETTINGS: readonly SettingDef[] = [
   setting("metadata.local-release-date", "providers", { type: "toggle" }, false),
   setting("metadata.fallback-language", "providers", { type: "choice", options: LANGUAGES }, "en"),
   setting(
+    "metadata.original-title-languages",
+    "providers",
+    { type: "text", placeholder: "fr, es" },
+    "",
+  ),
+  setting(
     "matching.auto-accept-threshold",
     "providers",
     { type: "number", min: 50, max: 100, step: 1, unit: "%", slider: true },
@@ -691,6 +696,7 @@ const ALL_SETTINGS: readonly SettingDef[] = [
   setting("metadata.nfo-clean", "naming", { type: "toggle" }, false),
   setting("renamer.keep-subfolders", "naming", { type: "toggle" }, true),
   setting("renamer.metadata-only", "naming", { type: "toggle" }, false),
+  setting("renamer.after-scrape", "naming", { type: "toggle" }, false),
   setting(
     "files.deleted-mode",
     "library",
@@ -720,18 +726,23 @@ const ALL_SETTINGS: readonly SettingDef[] = [
     ".txt, .url, .html, .sfv",
   ),
   setting("artwork.auto-select", "extras", { type: "toggle" }, true),
+  // Shown in Settings › Naming with the per-type names (`ArtworkNamesRow`); every style the
+  // backend reads is a legal value, including the ones the page shows only while stored.
   setting(
     "metadata.artwork-names",
-    "extras",
+    "naming",
     {
       type: "choice",
-      options: [
-        { value: "prefixed", label: "<name>-poster" },
-        { value: "short", label: "poster" },
-        { value: "emby", label: "Emby (poster, fanart)" },
-        { value: "jellyfin", label: "Jellyfin (poster, backdrop)" },
-        { value: "plex", label: "Plex (poster, fanart)" },
-      ],
+      options: translatedOptions("metadata.artwork-names", [
+        "prefixed",
+        "short",
+        "both",
+        "jellyfin",
+        "emby",
+        "kodi",
+        "xbmc",
+        "plex",
+      ]),
     },
     "prefixed",
   ),

@@ -127,15 +127,19 @@ Settings › Naming SHALL offer "Colon in titles" (`naming.colon`) with "Remove"
 - **THEN** the folder example reads `Example꞉ Part Two (2024)`
 
 ### Requirement: Naming templates in Settings
-Settings › Naming SHALL hold the templates "Movie folder", "Movie file" and "TV episode" as text fields in the mono face, each with a live "Example:" line from the library under it, and a row of token buttons that insert at the cursor of the field last used. Any other engine expression SHALL be shown and kept as written.
+Settings › Naming SHALL hold the templates "Movie folder", "Movie file" and "TV episode" as text fields in the mono face, each with a live "Example:" line from the library under it, and a row of token buttons that insert at the cursor of the field last used. Any other engine expression SHALL be shown and kept as written. Under the Movie folder buttons a line SHALL say that {Title} is the title each movie uses (its localized title, or its original title when that was chosen) and that {OriginalTitle} is always the original title, with an example.
 
 #### Scenario: Token buttons
 - **WHEN** the user looks at the token buttons
-- **THEN** the movie fields offer {Title}, {Year}, {Resolution}, {HDR}, {VideoCodec}, {AudioCodec}, {Channels}, {Edition}, {Source}, {Quality}, {ReleaseTags}, {ReleaseGroup}, {IMDb} and {TMDB}, and the episode field offers {Show}, {ShowYear}, {Season}, {Season00}, {Episode}, {Episode00}, {EpisodeTitle}, {Resolution}, {HDR}, {VideoCodec}, {AudioCodec}, {Source}, {Quality}, {ReleaseTags} and {ReleaseGroup}
+- **THEN** the movie fields offer {Title}, {OriginalTitle}, {Year}, {Resolution}, {HDR}, {VideoCodec}, {AudioCodec}, {Channels}, {Edition}, {Source}, {Quality}, {ReleaseTags}, {ReleaseGroup}, {IMDb} and {TMDB}, and the episode field offers {Show}, {ShowOriginalTitle}, {ShowYear}, {Season}, {Season00}, {Episode}, {Episode00}, {EpisodeTitle}, {Resolution}, {HDR}, {VideoCodec}, {AudioCodec}, {Source}, {Quality}, {ReleaseTags} and {ReleaseGroup}
 
 #### Scenario: Insert a token
 - **WHEN** the cursor is after `{Year})` in Movie file and the user clicks {Resolution}
 - **THEN** `{Resolution}` is inserted at the cursor and the example updates
+
+#### Scenario: Original title in a template
+- **WHEN** the Movie folder template is `{OriginalTitle} ({Year})` and a movie titled "The Sleeping City" has the original title "La Ciudad Dormida" from 2019
+- **THEN** the folder is named `La Ciudad Dormida (2019)`, whatever title the movie uses
 
 ### Requirement: Invalid templates are not saved
 A template SHALL be saved only when its braces match, every `{Name}` is a token and the engine accepts it. Otherwise the field SHALL say why and the last valid template SHALL stay in use.
@@ -152,7 +156,7 @@ The Rename page SHALL show the active folder and file templates in its header wi
 - **THEN** Settings opens at Naming
 
 ### Requirement: Companion files move together
-Applying a rename SHALL move or rename every file of the title together and the library paths SHALL follow without a rescan. Videos SHALL keep their stacking markers; readable NFOs and artwork SHALL take every name of the profile, and an `.nfo` CineVault cannot read as an NFO SHALL be set aside like other leftovers; subtitles, trailers, samples and sidecars SHALL be named after the new base name; every other file and sub-folder SHALL move with the folder.
+Applying a rename SHALL move or rename every file of the title together and the library paths SHALL follow without a rescan. Videos SHALL keep their stacking markers; readable NFOs and artwork SHALL take every name of the profile, and an `.nfo` CineVault cannot read as an NFO SHALL be set aside like other leftovers; subtitles, trailers, samples and sidecars SHALL be named after the new base name; every other file and sub-folder SHALL move with the folder. A copy a rename makes to give a file another of its names SHALL become a file of the title. An artwork file that already sits at another name of its type SHALL stay there, and the newest file of the type SHALL fill only the names nobody holds, so a type with several names has nothing left to rename after one rename.
 
 #### Scenario: Subtitle suffix kept
 - **WHEN** `old.eng.forced.srt` belongs to a movie renamed to `Example Movie (2020)`
@@ -165,6 +169,14 @@ Applying a rename SHALL move or rename every file of the title together and the 
 #### Scenario: Sidecars follow the video
 - **WHEN** a movie with a sample, a media-info XML, a BIF file and an extra outside a sub-folder is renamed
 - **THEN** they become `<base>-sample`, `<base>-mediainfo.xml`, `<base>.bif` and `<base>` plus what followed the old base name, while files in sub-folders keep their names
+
+#### Scenario: New artwork names
+- **WHEN** the poster names change from `<base>-poster` to `poster` and `folder` and a tidy movie is renamed
+- **THEN** the preview moves `<base>-poster.jpg` to `poster.jpg` and copies it to `folder.jpg`, and afterwards the movie is tidy
+
+#### Scenario: A name the type no longer uses
+- **WHEN** a movie has `poster.jpg` and `folder.jpg` and the poster names change to `poster` only
+- **THEN** a rename keeps `poster.jpg` and sets `folder.jpg` aside in the deleted-files destination, and Undo brings it back
 
 ### Requirement: Leftovers go to the deleted-files destination
 Files a rename makes redundant SHALL go where Settings › Deleted files says: the library folder's `.deletedByCineVault/<batch>/` with "Recycle Bin" (the default) or "Trash folder on each drive", the custom trash folder for files on its drive with "Custom trash folder…", and erased only with "Delete permanently". Empty folders left behind SHALL be removed. A library folder root and a folder holding another title's files SHALL never be removed.
@@ -228,11 +240,23 @@ No rename SHALL touch the disk until the user applies it. The Rename page (`/ren
 - **THEN** the page reads "Everything is named as your templates say"
 
 ### Requirement: Rename page footer and result
-The footer SHALL show "N of M selected", the conflict count and the primary "Rename N titles". After a rename a toast SHALL report the result ("Renamed N titles", or how many could not be renamed) with Undo.
+The footer SHALL show "N of M selected", the conflict count and the primary "Rename N titles". While a rename runs, the sidebar's progress card SHALL show "Renaming N of M" with the title just done. When it ends, a toast SHALL report the result wherever the user is by then, also after leaving the Rename page: "Renamed N titles" with Undo when every title was renamed; "Renamed N of M titles; K need attention" with Undo and "Open Activity" when some could not be; "M titles could not be renamed" as an error with "Open Activity" when none could. The titles that could not be renamed SHALL be listed in Activity › Needs attention, each with its reason, with "Open in Rename", which opens the rename preview of those titles.
 
 #### Scenario: Exclude one title
 - **WHEN** 64 titles are listed, the user unticks one and clicks "Rename 63 titles"
 - **THEN** that title is not renamed, the other 63 are, and the toast says "Renamed 63 titles" with Undo
+
+#### Scenario: Leaving the page during a rename
+- **WHEN** the user starts a rename of 12 titles and opens the Library before it ends
+- **THEN** the sidebar shows "Renaming 3 of 12" while it runs, and the toast "Renamed 12 titles" with Undo appears on the Library when it ends
+
+#### Scenario: Two titles fail
+- **WHEN** a rename of 12 titles cannot rename two because their files are in use by another program
+- **THEN** the toast says "Renamed 10 of 12 titles; 2 need attention" with Undo and "Open Activity", and Needs attention lists both titles with "the file is in use by another program" and "Open in Rename"
+
+#### Scenario: Try the failed titles again
+- **WHEN** the user chooses "Open in Rename" on that entry
+- **THEN** the Rename page opens with the preview of those two titles
 
 ### Requirement: Word-level rename diffs
 Each Rename row SHALL show the title with its year and library folder, then the folder and the main file as now → after pairs, with removed words struck through and added words highlighted. Whole words with their brackets SHALL change together, never split. "Show all N files" SHALL list every file as now → after pairs in place (set-aside files marked "to the trash"), and "Hide files" SHALL fold them.
@@ -361,3 +385,29 @@ While Metadata only is on, the sidebar's Rename entry and the Rename actions of 
 #### Scenario: Turned off again
 - **WHEN** the user turns Metadata only off
 - **THEN** Rename is offered again at once
+
+### Requirement: Rename after Scrape
+Settings › Naming SHALL offer "Rename after Scrape" (`renamer.after-scrape`, off by default). While it is on and Metadata only is off, a movie or TV show a scrape was written into SHALL be renamed by itself once its NFO and artwork are written, but only when its plan is a plain change: conflicts, locked titles and titles whose video details are not read yet stay as they are. While Metadata only is on, the switch SHALL be off and disabled.
+
+#### Scenario: A plain change is renamed after its scrape
+- **WHEN** Rename after Scrape is on and the user scrapes `heat.1995.1080p`, whose plan renames it to `Heat (1995)` without a conflict
+- **THEN** once its NFO and artwork are written the folder is renamed to `Heat (1995)`
+
+#### Scenario: Off by default
+- **WHEN** a title is scraped on a fresh install
+- **THEN** nothing is renamed and the title carries Rename pending
+
+#### Scenario: Metadata only wins
+- **WHEN** Rename after Scrape and Metadata only are both on and a title is scraped
+- **THEN** nothing is renamed, and Settings shows Rename after Scrape off and disabled
+
+### Requirement: Rename after Scrape batches and feedback
+Titles scraped close together (until no new one for 3 seconds) SHALL be renamed as one journaled batch per kind of title, shown as a job in Activity. When it is done, a toast SHALL say "Renamed N titles after Scrape" with Undo, on whatever page is open. Titles held back SHALL be listed in Activity › Needs attention ("N titles were not renamed after Scrape") with each reason, and a rename that could not run at all SHALL say why there.
+
+#### Scenario: One batch for a scrape of several titles
+- **WHEN** Rename after Scrape is on and the user scrapes 12 titles whose plans are plain changes
+- **THEN** one rename batch is journaled for them and one toast says "Renamed 12 titles after Scrape" with Undo
+
+#### Scenario: A conflict waits for the user
+- **WHEN** Rename after Scrape is on and a scraped title's new name is taken by another title
+- **THEN** that title keeps its names and Needs attention lists it with the conflict, while the other titles of the scrape are renamed

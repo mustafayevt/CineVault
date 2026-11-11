@@ -416,7 +416,7 @@ pub const COMMANDS: &[CommandInfo] = &[
     CommandInfo {
         name: "organize_apply",
         module: "organize",
-        args: &["request", "include"],
+        args: &["request", "include", "onProgress"],
     },
     CommandInfo {
         name: "organize_check_template",
@@ -569,9 +569,19 @@ pub const COMMANDS: &[CommandInfo] = &[
         args: &["kind", "ids"],
     },
     CommandInfo {
+        name: "rescan_folder",
+        module: "scan",
+        args: &["sourceId"],
+    },
+    CommandInfo {
         name: "rescan_library",
         module: "scan",
         args: &[],
+    },
+    CommandInfo {
+        name: "rescan_title",
+        module: "scan",
+        args: &["id"],
     },
     CommandInfo {
         name: "reset_settings",
@@ -697,6 +707,11 @@ pub const COMMANDS: &[CommandInfo] = &[
         name: "set_show_ordering",
         module: "episode_order",
         args: &["showId", "ordering"],
+    },
+    CommandInfo {
+        name: "set_title_choice",
+        module: "edit",
+        args: &["ids", "original"],
     },
     CommandInfo {
         name: "set_watched",
@@ -916,6 +931,11 @@ pub const COMMANDS: &[CommandInfo] = &[
     CommandInfo {
         name: "update_blocking_jobs",
         module: "updates",
+        args: &[],
+    },
+    CommandInfo {
+        name: "use_original_title_for_languages",
+        module: "edit",
         args: &[],
     },
 ];

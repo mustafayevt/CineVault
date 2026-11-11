@@ -1,4 +1,5 @@
 import { Channel } from "@tauri-apps/api/core";
+import { FolderPen } from "lucide-react";
 import { useEffect } from "react";
 
 import { commands } from "../../bindings";
@@ -6,6 +7,7 @@ import { t } from "../../i18n/catalog";
 import { queryClient } from "../../queryClient";
 import { openActivityAction } from "../activity/openActivity";
 import { UNFINISHED_KEY } from "../activity/recoveryBackend";
+import { refreshAfterRename, undoRename } from "../rename/runRename";
 import { showToast } from "../toasts/toastStore";
 import type { NoticeDto } from "../../bindings";
 import { notify, useNotificationStore } from "./notificationStore";
@@ -42,6 +44,18 @@ export function openNoticeStream(): void {
           action: openActivityAction(notice.batch_id),
           duration: null,
         });
+      }
+      if (notice.action === "undo_rename" && notice.batch_id !== null) {
+        // A rename that ran by itself (Rename after Scrape): said where the user is, with Undo.
+        const batchId = notice.batch_id;
+        showToast({
+          glyph: FolderPen,
+          message: notice.title,
+          undo: () => undoRename(batchId, queryClient),
+        });
+        void refreshAfterRename(queryClient);
+        // Said in the toast; the notification centre keeps no copy that could undo twice.
+        return;
       }
       notify({
         severity: notice.severity,

@@ -36,10 +36,20 @@
 //! - Items are changed from a fresh copy read inside the write transaction, so edits made while
 //!   the walk ran are not overwritten.
 //!
+//! # One folder of a source
+//!
+//! [`rescan_folder`] reads one folder inside a source, a title's folder, with the same walk and
+//! the same plan: the walk passes the folders above it through without their files, the plan
+//! compares only the stored titles (and their seasons and episodes) inside that folder and only
+//! the fingerprints below it, and availability is recomputed for those titles only. Titles
+//! anywhere else in the source, or in other sources, are not read, not compared and never
+//! marked missing. A folder that is gone while its source answers makes its titles Missing.
+//!
 //! # Jobs
 //!
 //! [`job`] runs one source per job item on the disk lane of the job manager, persistently, so
-//! an interrupted rescan resumes with the sources it had not finished.
+//! an interrupted rescan resumes with the sources it had not finished. Its progress is told in
+//! titles ([`progress`]).
 
 mod apply;
 mod build;
@@ -47,6 +57,7 @@ pub mod job;
 mod matcher;
 mod moved_shows;
 mod plan;
+pub mod progress;
 pub mod reasons;
 
 use std::collections::{HashMap, HashSet};
@@ -56,12 +67,15 @@ use cv_db::repo::availability::{AvailabilityReport, StdFileProbe};
 use cv_db::repo::data_sources::list_sources;
 use cv_db::repo::fingerprint::{StoredItem, library_snapshot, list_fingerprints};
 use cv_db::repo::{
-    AvailabilityChange, PathStyle, apply_availability, get_availability, plan_availability,
+    AvailabilityChange, PathStyle, apply_availability, get_availability, plan_availability_of,
 };
 use cv_db::{Database, DbError};
 use cv_domain::{Availability, DataSource, ItemId, ItemKind, SourceKind};
 
-use crate::walk::{ScanProblem, WalkOptions, nested_sources, scan_movie_source, scan_tv_source};
+use crate::walk::{
+    ScanProblem, WalkObserver, WalkOptions, WalkScope, nested_sources, scan_movie_source_in,
+    scan_tv_source_in,
+};
 
 pub use plan::{PlanStats, Relinked, RescanPlan, Skipped};
 
@@ -112,7 +126,7 @@ impl RescanOptions {
 /// Items whose availability a rescan changed.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AvailabilityOutcome {
-    /// Counts over every item of the library.
+    /// Counts over the items the refresh looked at (those of the source, or of the folder).
     pub report: AvailabilityReport,
     /// Items whose folder or video is gone: the "Missing files" state.
     pub became_missing: Vec<ItemId>,
@@ -164,6 +178,41 @@ impl RescanReport {
     }
 }
 
+/// What part of a source a rescan reads, and who hears how far it got.
+#[derive(Clone, Copy, Default)]
+pub struct RescanScope<'a> {
+    /// A folder inside the source (a title's folder) to read alone; `None`, or the source's own
+    /// folder, reads the whole source. A folder outside the source reads the whole source too.
+    pub focus: Option<&'a str>,
+    /// Told the titles a whole-source walk finds and reads.
+    pub observer: Option<&'a dyn WalkObserver>,
+}
+
+impl RescanScope<'_> {
+    /// The focus when it really narrows the walk: inside the source and not the source itself.
+    fn folder(&self, source: &DataSource) -> Option<&str> {
+        self.focus
+            .filter(|focus| is_under(focus, &source.path) && folded(focus) != folded(&source.path))
+    }
+}
+
+/// The stored items of `focus`: the movies and shows whose folder lies in it, with their seasons
+/// and episodes.
+fn within(items: Vec<StoredItem>, focus: &str) -> Vec<StoredItem> {
+    let top: HashSet<ItemId> = items
+        .iter()
+        .filter(|item| matches!(item.kind, ItemKind::Movie | ItemKind::Show))
+        .filter(|item| is_under(&item.path, focus))
+        .map(|item| item.id)
+        .collect();
+    items
+        .into_iter()
+        .filter(|item| {
+            top.contains(&item.id) || item.parent_id.is_some_and(|parent| top.contains(&parent))
+        })
+        .collect()
+}
+
 /// Walks a data source and plans what to write. Reads the database, writes nothing.
 ///
 /// `cancelled` is polled after the walk, the slow part.
@@ -173,8 +222,24 @@ pub fn plan_rescan(
     options: &RescanOptions,
     cancelled: &dyn Fn() -> bool,
 ) -> Result<RescanPlan, RescanError> {
+    plan_rescan_in(db, source, options, cancelled, RescanScope::default())
+}
+
+/// [`plan_rescan`] of part of the source ([`RescanScope`]).
+pub fn plan_rescan_in(
+    db: &Database,
+    source: &DataSource,
+    options: &RescanOptions,
+    cancelled: &dyn Fn() -> bool,
+    scope: RescanScope<'_>,
+) -> Result<RescanPlan, RescanError> {
     let root = std::path::Path::new(&source.path);
     let now = options.now();
+    let focus = scope.folder(source);
+    let walk_scope = WalkScope {
+        focus: focus.map(std::path::Path::new),
+        observer: scope.observer,
+    };
     // Another library folder inside this one is walked by its own library only.
     let all = db.read(|conn| list_sources(conn, None))?;
     let nested = nested_sources(source, &all);
@@ -186,22 +251,22 @@ pub fn plan_rescan(
     match source.kind {
         SourceKind::Movie => {
             let walk = options.movies.excluding(&skipped);
-            let report = scan_movie_source(root, Some(source.id), &walk);
+            let report = scan_movie_source_in(root, Some(source.id), &walk, walk_scope);
             if cancelled() {
                 return Err(RescanError::Cancelled);
             }
-            let (snapshot, fps, adopted) = load_state(db, source, &all, &nested)?;
+            let (snapshot, fps, adopted) = load_state(db, source, &all, &nested, focus)?;
             let mut plan = plan::plan_movies(source, report, &snapshot, fps, now);
             plan.adopted = adopted;
             Ok(plan)
         }
         SourceKind::Tv => {
             let walk = options.tv.excluding(&skipped);
-            let report = scan_tv_source(root, Some(source.id), &walk);
+            let report = scan_tv_source_in(root, Some(source.id), &walk, walk_scope);
             if cancelled() {
                 return Err(RescanError::Cancelled);
             }
-            let (snapshot, fps, adopted) = load_state(db, source, &all, &nested)?;
+            let (snapshot, fps, adopted) = load_state(db, source, &all, &nested, focus)?;
             let mut plan = plan::plan_tv(source, report, &snapshot, fps, now);
             plan.adopted = adopted;
             Ok(plan)
@@ -227,12 +292,15 @@ fn kinds_of(kind: SourceKind) -> &'static [ItemKind] {
 ///
 /// Only items of the source's own kinds count: a removed TV folder whose path is now a movie
 /// folder leaves shows behind that the movie folder must not treat as its own. The adopted
-/// items are in the snapshot too, so the walk pairs them with what it finds.
+/// items are in the snapshot too, so the walk pairs them with what it finds. With a `focus`,
+/// only the items and fingerprints inside that folder count: what the walk did not read is
+/// neither compared nor forgotten.
 fn load_state(
     db: &Database,
     source: &DataSource,
     all: &[DataSource],
     nested: &[String],
+    focus: Option<&str>,
 ) -> Result<State, DbError> {
     db.read(|conn| {
         let kinds = kinds_of(source.kind);
@@ -240,10 +308,16 @@ fn load_state(
             .into_iter()
             .filter(|item| kinds.contains(&item.kind))
             .collect();
-        let adopted = detached_under(conn, source, all, nested)?;
+        let mut adopted = detached_under(conn, source, all, nested)?;
+        let mut fingerprints = list_fingerprints(conn, &source.path)?;
+        if let Some(focus) = focus {
+            snapshot = within(snapshot, focus);
+            adopted = within(adopted, focus);
+            fingerprints.retain(|fp| is_under(&fp.path, focus));
+        }
         let ids: Vec<ItemId> = adopted.iter().map(|item| item.id).collect();
         snapshot.extend(adopted);
-        Ok((snapshot, list_fingerprints(conn, &source.path)?, ids))
+        Ok((snapshot, fingerprints, ids))
     })
 }
 
@@ -348,7 +422,15 @@ fn refresh_scope(
     scope: &Scope,
     superseded: &[(ItemId, String)],
 ) -> Result<AvailabilityOutcome, DbError> {
-    let plan = db.read(|conn| plan_availability(conn, &StdFileProbe, PathStyle::current()))?;
+    // Only the items in scope are probed: a scan of one folder never reads every title's files.
+    let wanted = |id: ItemId| match scope {
+        Scope::Source { ids, .. } => ids.contains(&id),
+        Scope::Detached { sources, owners } => owners
+            .get(&id)
+            .is_some_and(|(root, kind)| is_detached(root, *kind, sources)),
+    };
+    let plan =
+        db.read(|conn| plan_availability_of(conn, &StdFileProbe, PathStyle::current(), &wanted))?;
     let mut outcome = AvailabilityOutcome {
         report: plan.report,
         ..AvailabilityOutcome::default()
@@ -486,11 +568,65 @@ pub(crate) fn rescan_held_source(
     options: &RescanOptions,
     cancelled: &dyn Fn() -> bool,
 ) -> Result<RescanReport, RescanError> {
+    rescan_held_source_in(db, source, options, cancelled, RescanScope::default())
+}
+
+/// [`rescan_held_source`] of part of the source ([`RescanScope`]).
+pub(crate) fn rescan_held_source_in(
+    db: &Database,
+    source: &DataSource,
+    options: &RescanOptions,
+    cancelled: &dyn Fn() -> bool,
+    scope: RescanScope<'_>,
+) -> Result<RescanReport, RescanError> {
     let started = Instant::now();
-    let plan = plan_rescan(db, source, options, cancelled)?;
+    let plan = plan_rescan_in(db, source, options, cancelled, scope)?;
     let mut report = apply_rescan(db, plan, cancelled)?;
     report.elapsed = started.elapsed();
     Ok(report)
+}
+
+/// Rescans one folder inside a data source, a title's folder (see the module documentation):
+/// its files, the titles in it found again or gone, nothing elsewhere. The source is held as a
+/// whole rescan holds it.
+pub fn rescan_folder(
+    db: &Database,
+    source: &DataSource,
+    folder: &str,
+    options: &RescanOptions,
+) -> Result<RescanReport, RescanError> {
+    let _held = crate::lock::hold_sources([source.id]);
+    rescan_held_source_in(
+        db,
+        source,
+        options,
+        &|| false,
+        RescanScope {
+            focus: Some(folder),
+            observer: None,
+        },
+    )
+}
+
+/// How many titles a whole rescan of `source` reads, for the first phase of its progress
+/// ([`crate::walk::count_titles`]); the folders a rescan leaves out are left out here too.
+/// `None` when the folder cannot be listed.
+pub fn count_source_titles(
+    db: &Database,
+    source: &DataSource,
+    options: &RescanOptions,
+) -> Result<Option<usize>, DbError> {
+    let all = db.read(|conn| list_sources(conn, None))?;
+    let mut skipped = nested_sources(source, &all);
+    skipped.extend(db.read(cv_db::repo::rename_journal::left_behind_move_folders)?);
+    let walk = match source.kind {
+        SourceKind::Movie => options.movies.excluding(&skipped),
+        SourceKind::Tv => options.tv.excluding(&skipped),
+    };
+    Ok(crate::walk::count_titles(
+        std::path::Path::new(&source.path),
+        &walk,
+    ))
 }
 
 /// Recomputes the availability of items whose data source is no longer in the list (a removed

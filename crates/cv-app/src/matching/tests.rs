@@ -598,3 +598,109 @@ async fn an_ignored_title_gets_no_scrape_outcome_from_a_later_run() {
     ));
     assert_eq!(scrape_outcome(&lab, id), None);
 }
+
+/// A provider's movie in Spanish, with its title in the metadata language.
+fn sleeping_city(localized: &str) -> Item {
+    let mut item = Item::movie(localized);
+    item.core.original_title = "La Ciudad Dormida".to_owned();
+    item.core.original_language = "es".to_owned();
+    item.core.ids.set("tmdb", "77");
+    item
+}
+
+#[test]
+fn a_first_scrape_in_a_listed_language_starts_with_the_original_title() {
+    let mut lab = Lab::new();
+    lab.settings.scrape = ScrapeSettings::from_values(
+        &[(
+            crate::scrape_settings::ORIGINAL_TITLE_LANGUAGES_KEY.to_owned(),
+            serde_json::json!("fr,es"),
+        )]
+        .into_iter()
+        .collect(),
+    );
+    let listed = lab.movie("sleeping city");
+    apply_scraped(
+        &lab.db,
+        listed,
+        ItemKind::Movie,
+        sleeping_city("The Sleeping City"),
+        "tmdb",
+        &lab.settings,
+    )
+    .unwrap();
+    let item = lab.item(listed);
+    assert!(item.core.use_original_title);
+    assert_eq!(item.core.title, "La Ciudad Dormida");
+    assert_eq!(item.core.localized_title, "The Sleeping City");
+
+    // A language not in the list keeps the localized title.
+    let other = lab.movie("other");
+    let mut english = sleeping_city("The Sleeping City");
+    english.core.original_language = "en".to_owned();
+    apply_scraped(
+        &lab.db,
+        other,
+        ItemKind::Movie,
+        english,
+        "tmdb",
+        &lab.settings,
+    )
+    .unwrap();
+    assert!(!lab.item(other).core.use_original_title);
+}
+
+#[test]
+fn a_rescrape_honours_the_choice_the_title_has() {
+    let mut lab = Lab::new();
+    let id = lab.movie("sleeping city");
+    let settings = lab.settings.clone();
+    apply_scraped(
+        &lab.db,
+        id,
+        ItemKind::Movie,
+        sleeping_city("The Sleeping City"),
+        "tmdb",
+        &settings,
+    )
+    .unwrap();
+    assert!(!lab.item(id).core.use_original_title, "no language listed");
+    let mut chosen = lab.item(id);
+    assert!(chosen.choose_original_title(true));
+    lab.db.write(move |tx| update_item(tx, &chosen)).unwrap();
+
+    // The list now names the language, but a title scraped before keeps its own choice.
+    lab.settings.scrape.original_title_languages = vec!["es".to_owned()];
+    apply_scraped(
+        &lab.db,
+        id,
+        ItemKind::Movie,
+        sleeping_city("The Sleeping Town"),
+        "tmdb",
+        &lab.settings,
+    )
+    .unwrap();
+    let item = lab.item(id);
+    assert!(item.core.use_original_title);
+    assert_eq!(item.core.title, "La Ciudad Dormida");
+    assert_eq!(item.core.localized_title, "The Sleeping Town");
+
+    let mut back = item;
+    assert!(back.choose_original_title(false));
+    lab.db.write(move |tx| update_item(tx, &back)).unwrap();
+    apply_scraped(
+        &lab.db,
+        id,
+        ItemKind::Movie,
+        sleeping_city("The Sleeping Town"),
+        "tmdb",
+        &lab.settings,
+    )
+    .unwrap();
+    let item = lab.item(id);
+    assert!(
+        !item.core.use_original_title,
+        "the owner chose the localized title"
+    );
+    assert_eq!(item.core.title, "The Sleeping Town");
+}

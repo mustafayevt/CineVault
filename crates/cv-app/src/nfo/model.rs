@@ -111,6 +111,16 @@ fn crc32_of(file: &MediaFile) -> Option<String> {
 // ---- movies and sets ----------------------------------------------------------------------
 
 /// The movie model of a movie item. `set` is the movie set it belongs to, when it has one.
+/// The localized title the NFO keeps while the original title is the title in use; empty
+/// otherwise, so the files of every other title stay as they were.
+fn kept_localized_title(c: &cv_domain::ItemCore) -> String {
+    if c.use_original_title {
+        c.localized_title.clone()
+    } else {
+        String::new()
+    }
+}
+
 /// `None` when the item is not a movie.
 pub fn movie_model(item: &Item, set: Option<&Item>, options: &MovieNfoOptions) -> Option<MovieNfo> {
     let ItemDetail::Movie(m) = &item.detail else {
@@ -124,6 +134,7 @@ pub fn movie_model(item: &Item, set: Option<&Item>, options: &MovieNfoOptions) -
         sort_title: m.sort_title.clone(),
         english_title: m.english_title.clone(),
         original_language: c.original_language.clone(),
+        localized_title: kept_localized_title(c),
         video_in_3d: m.video_in_3d,
         year: u32::from(c.year),
         plot: c.plot.clone(),
@@ -431,6 +442,7 @@ pub fn show_model(tree: &ShowTree<'_>, options: &MovieNfoOptions) -> Option<Show
         sort_title: s.sort_title.clone(),
         english_title: s.english_title.clone(),
         original_language: c.original_language.clone(),
+        localized_title: kept_localized_title(c),
         year_end: u32::from(s.year_end),
         year: u32::from(c.year),
         plot: c.plot.clone(),

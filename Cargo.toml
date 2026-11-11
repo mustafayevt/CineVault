@@ -3,9 +3,9 @@ resolver = "3"
 members = ["crates/*", "src-tauri", "cli"]
 
 [workspace.package]
-version = "1.6.2"
+version = "1.7.0"
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.95"
 license = "Apache-2.0"
 publish = false
 
@@ -41,7 +41,7 @@ tokio-stream = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
-rusqlite = { version = "0.37", features = ["bundled", "functions"] }
+rusqlite = { version = "0.41", features = ["bundled", "functions"] }
 tempfile = "3"
 # Whether two paths are one file or folder (cv-app copies, cv-scan library folders); walkdir already uses it.
 same-file = "1"
@@ -55,7 +55,7 @@ icu_normalizer = "2.3"
 ureq = "3"
 sha2 = "0.11"
 # Password hashing for the browser server sign-in (cv-web).
-argon2 = "0.5"
+argon2 = "0.6"
 # Encrypted provider keys for the browser server (cv-app).
 chacha20poly1305 = "0.10"
 # Trusted reverse proxies for the browser server (cv-web).
@@ -102,7 +102,7 @@ unicode-normalization = "0.1"
 proptest = "1"
 # Managed indexer service (cv-torrent): the executable path of a process, to tell our own leftover
 # from a stranger, and a Windows job object that ends the child with the app (no unsafe of ours).
-sysinfo = { version = "0.39", default-features = false, features = ["disk", "system"] }
+sysinfo = { version = "0.40", default-features = false, features = ["disk", "system"] }
 # Reads the Recycle Bin settings of a volume (cv-app, Windows only; safe registry access).
 winreg = "0.56"
 win32job = "2"

@@ -6,6 +6,7 @@ import type { EditPairDto, EditPersonDto, EditRatingDto } from "../../bindings";
 import { Button } from "../../components/Button";
 import { Field } from "../../components/Field";
 import { IconButton } from "../../components/IconButton";
+import { SegmentedControl } from "../../components/SegmentedControl";
 import { Select } from "../../components/Select";
 import { Switch } from "../../components/Switch";
 import { t } from "../../i18n/catalog";
@@ -234,6 +235,43 @@ export function ChoiceControl({
         onValueChange={(next) => session.set(fieldKey, value.text(next))}
         className="w-full"
       />
+    </Labelled>
+  );
+}
+
+/** The values of the `title_choice` field. */
+export type TitleChoiceValue = "localized" | "original";
+
+/**
+ * "Title to use: Localized | Original" beside the Title and Original title fields. The line under
+ * it says which title the lists, the file names and the NFO use with the draft as it stands.
+ */
+export function TitleChoiceControl() {
+  const session = useSession();
+  const id = useId();
+  const choice: TitleChoiceValue =
+    asText(session.get("title_choice")) === "original" ? "original" : "localized";
+  const localized = asText(session.get("title"));
+  const original = asText(session.get("original_title"));
+  const inUse = (choice === "original" && original.trim() !== "" ? original : localized).trim();
+  return (
+    <Labelled label={t("edit.field.title_choice")} error={session.errors.title_choice} id={id}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <SegmentedControl<TitleChoiceValue>
+          aria-label={t("edit.field.title_choice")}
+          value={choice}
+          options={[
+            { value: "localized", label: t("edit.titleChoice.localized") },
+            { value: "original", label: t("edit.titleChoice.original") },
+          ]}
+          onChange={(next) => session.set("title_choice", value.text(next))}
+        />
+        {inUse === "" ? null : (
+          <span className="type-small min-w-0 text-text-muted">
+            {t("edit.titleChoice.hint", { title: inUse })}
+          </span>
+        )}
+      </div>
     </Labelled>
   );
 }

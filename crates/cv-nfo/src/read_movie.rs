@@ -20,7 +20,7 @@
 //! | artwork | `thumb` with an `aspect` (http and https URLs only), `fanart` |
 //! | trailer | `trailer`; the Kodi YouTube and HD-Trailers plug-in URLs become web links |
 //! | watched state | `watched`, `playcount`, `lastplayed`, `dateadded` |
-//! | CineVault's own tags | `source`, `edition`, `original_filename`, `user_note`, `crc32`, `cv_locked`, `original_language`, `video3d`, `extrathumbs/thumb` |
+//! | CineVault's own tags | `source`, `edition`, `original_filename`, `user_note`, `crc32`, `cv_locked`, `original_language`, `localized_title`, `video3d`, `extrathumbs/thumb` |
 //!
 //! A NextPVR `<recording>` gives the title, `description` as the plot, the certification
 //! (written in `<rating>`) and the genres. NFOs that are only a URL or an ID give a movie that
@@ -159,6 +159,7 @@ fn movie_of(root: &Element) -> MovieNfo {
     movie.edition = edition(root);
     movie.locked_fields = split_list(text(root, "cv_locked"));
     movie.original_language = text(root, "original_language").to_owned();
+    movie.localized_title = text(root, "localized_title").trim().to_owned();
     movie.video_in_3d = parse_bool(text(root, "video3d"));
     movie.artwork.extra_thumbs = kids(root, "extrathumbs")
         .flat_map(|list| kids(list, "thumb"))

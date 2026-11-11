@@ -43,7 +43,7 @@ pub use pipeline::{
 };
 pub use progress::{
     FailedItem, FailureGroup, ItemRecord, ItemStatus, JobId, JobReport, JobSnapshot, JobState,
-    Priority, group_failures,
+    Priority, UnitPhase, UnitProgress, group_failures,
 };
 pub use runtime::{runtime_handle, set_fallback_runtime, spawn};
 pub use store::{JobItemCounts, JobStore, StoreError, StoredJob, StoredJobItem};

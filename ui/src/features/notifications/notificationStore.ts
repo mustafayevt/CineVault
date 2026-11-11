@@ -16,6 +16,8 @@ export interface NotificationInput {
   action?: string;
   /** The unfinished move or rename the message is about (with the `resolve_unfinished` action). */
   batchId?: string;
+  /** The titles the message is about (with the `open_rename` action: the ones to rename again). */
+  itemIds?: readonly string[];
   /**
    * What the message is about (`source-skipped:<folder>`): a later message of the same topic
    * replaces it, and [`resolveTopic`] takes it away once it no longer holds.

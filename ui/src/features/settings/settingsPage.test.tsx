@@ -422,6 +422,24 @@ describe("Settings, Naming", () => {
     expect(useSettingsStore.getState().values["renamer.metadata-only"]).toBe(true);
   });
 
+  it("stores Rename after Scrape from its switch, and holds it off while Metadata only is on", async () => {
+    const user = userEvent.setup();
+    setProvidersBackend(recordingBackend());
+    await renderSettings();
+    await act(() => useSettingsStore.getState().load());
+    const toggle = screen.getByRole("switch", { name: "Rename after Scrape" });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    await settleSettingSaves();
+    expect(useSettingsStore.getState().values["renamer.after-scrape"]).toBe(true);
+    await user.click(screen.getByRole("switch", { name: "Metadata only" }));
+    await settleSettingSaves();
+    const held = screen.getByRole("switch", { name: "Rename after Scrape" });
+    expect(held).toBeDisabled();
+    expect(held).not.toBeChecked();
+    expect(screen.getByText("Off while Metadata only is on.")).toBeInTheDocument();
+  });
+
   it("stores the colon style and shows it in the example", async () => {
     const user = userEvent.setup();
     setProvidersBackend(recordingBackend());

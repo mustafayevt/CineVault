@@ -229,9 +229,15 @@ mod windows {
         {
             return list.clone();
         }
-        let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing());
+        // No volume list means no path is known to be on a local volume, as with an empty list.
+        let disks = match Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing()) {
+            Ok(disks) => disks,
+            Err(error) => {
+                tracing::warn!(%error, "the list of volumes could not be read");
+                return Vec::new();
+            }
+        };
         let list: Vec<LocalVolume> = disks
-            .list()
             .iter()
             .map(|disk| {
                 let mut mount = disk.mount_point().to_string_lossy().to_uppercase();

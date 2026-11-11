@@ -72,7 +72,7 @@ export const movie = {
   "detail.play.failed": "Could not play {title}",
   "detail.files.missing": "The files for this title are missing",
   "detail.files.missingBody":
-    "CineVault keeps everything it knows about the title. Point it at the folder the files moved to, or review every title that lost its files.",
+    "CineVault keeps the title in case the drive is offline or the files were only moved. If they are gone for good, remove it from the library; nothing on disk is touched.",
   "detail.files.offline": "This title's library folder cannot be reached",
   "detail.files.offlineBody":
     "Check that the drive or network share is connected. The title comes back by itself when the folder does.",
@@ -137,6 +137,11 @@ export const movie = {
   "edit.bar.saveLeave": "Save and leave",
   "edit.field.title": "Title",
   "edit.field.original_title": "Original title",
+  "edit.field.localized_title": "Localized title",
+  "edit.field.title_choice": "Title to use",
+  "edit.titleChoice.localized": "Localized",
+  "edit.titleChoice.original": "Original",
+  "edit.titleChoice.hint": "Lists, file and folder names and the NFO use “{title}”.",
   "edit.field.sort_title": "Sort title",
   "edit.field.tagline": "Tagline",
   "edit.field.plot": "Plot",
@@ -233,6 +238,14 @@ export const movie = {
   "title.menu.findMissing": "Find missing episodes",
   "title.menu.remove": "Remove from library (keep files)",
   "title.menu.ignore": "Ignore this folder",
+  "title.choice.original.done": "Now using the original title for {subject}",
+  "title.choice.localized.done": "Now using the localized title for {subject}",
+  "title.choice.someUnchanged":
+    "{count, plural, one {# title had} other {# titles had}} no other title to switch to.",
+  "title.choice.nothing":
+    "Nothing changed: these titles already use that title, or have no other original title.",
+  "title.choice.failed": "Could not change the title of {subject}",
+  "title.choice.nfoFailed": "Changed the title, but some NFO files could not be written",
   "title.remove.done":
     "Removed {title} from the library. Its files stay; the next scan adds it back.",
   "title.ignore.done": "Removed {title} and marked its folder so scans skip it.",

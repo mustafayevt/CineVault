@@ -99,6 +99,12 @@ export const settings = {
     "Never rename or move your media files and folders. Scan, Scrape, NFO and artwork files keep working.",
   "settings.renamer.metadata-only.keywords":
     "metadata only, no rename, never rename, read only, download manager, keep names, move, scrape only",
+  "settings.renamer.after-scrape.title": "Rename after Scrape",
+  "settings.renamer.after-scrape.description":
+    "Rename a title by itself once its Scrape is written, with Undo. Titles in a conflict wait in Activity for you.",
+  "settings.renamer.after-scrape.offByMetadataOnly": "Off while Metadata only is on.",
+  "settings.renamer.after-scrape.keywords":
+    "rename after scrape, automatic rename, auto rename, rename automatically",
   "settings.files.deleted-mode.title": "Deleted and replaced files",
   "settings.files.deleted-mode.description":
     "Where Delete, a move's originals, rename leftovers and replaced artwork or NFO files go.",
@@ -316,6 +322,11 @@ export const settings = {
   "settings.providers.prefer-original-title.description":
     "Show the title in its original language on cards, lists and detail pages, when the title has one.",
   "settings.providers.prefer-original-title.keywords": "native, foreign",
+  "settings.metadata.original-title-languages.title": "Keep the original title for these languages",
+  "settings.metadata.original-title-languages.description":
+    "A movie or TV show whose original language is one of these uses its original title in the library, the file names and the NFO from its first Scrape.",
+  "settings.metadata.original-title-languages.keywords":
+    "original title, localized, foreign, native, language, rename",
   "settings.metadata.nfo-format.title": "NFO format",
   "settings.metadata.nfo-format.description":
     "The flavour of the .nfo files written next to your media.",
@@ -450,8 +461,17 @@ export const settings = {
   "settings.artwork.auto-select.keywords": "poster, fanart, images, automatic",
   "settings.metadata.artwork-names.title": "Artwork file names",
   "settings.metadata.artwork-names.description":
-    "Prefixed names keep several movies in one folder apart.",
-  "settings.metadata.artwork-names.keywords": "poster, fanart, naming, folder.jpg",
+    "How posters, fanart and the other images are named. Several names for one type all get the same image.",
+  "settings.metadata.artwork-names.keywords":
+    "poster, fanart, naming, folder.jpg, backdrop, clearlogo, landscape, prefix, custom, media centre",
+  "settings.metadata.artwork-names.option.prefixed": "Movie name in front",
+  "settings.metadata.artwork-names.option.short": "Plain names",
+  "settings.metadata.artwork-names.option.both": "Both names",
+  "settings.metadata.artwork-names.option.jellyfin": "Jellyfin",
+  "settings.metadata.artwork-names.option.emby": "Emby",
+  "settings.metadata.artwork-names.option.kodi": "Kodi",
+  "settings.metadata.artwork-names.option.xbmc": "Kodi, extra fanart in a folder",
+  "settings.metadata.artwork-names.option.plex": "Plain names, episode thumbnails like the video",
   "settings.artwork.extra-fanart-enabled.title": "Download extra fanart",
   "settings.artwork.extra-fanart-enabled.description":
     "Save more background images next to each title. Not written for folders that hold several movies.",
@@ -622,6 +642,16 @@ export const settings = {
   "settingsPage.providers.language": "Metadata language",
   "settingsPage.providers.language.hint": "Titles, plots and artwork text",
   "settingsPage.providers.country": "Ratings country",
+  "settingsPage.providers.originalTitles": "Keep the original title",
+  "settingsPage.providers.originalTitles.hint":
+    "For titles in these original languages, from their first Scrape",
+  "settingsPage.providers.originalTitles.list": "Languages that keep their original title",
+  "settingsPage.providers.originalTitles.add": "Add a language",
+  "settingsPage.providers.originalTitles.remove": "Remove {language}",
+  "settingsPage.providers.originalTitles.apply": "Use for titles I have",
+  "settingsPage.providers.originalTitles.applied":
+    "{count, plural, =0 {Every title in these languages already uses its original title} one {Now using the original title for # title} other {Now using the original title for # titles}}",
+  "settingsPage.providers.originalTitles.failed": "Could not change the titles",
   "settingsPage.providers.countryOption": "Ratings: {country}",
   "settingsPage.keys.paste": "Paste your key",
   "settingsPage.keys.unavailable": "Keys can be set in the desktop app",
@@ -651,10 +681,46 @@ export const settings = {
   "settingsPage.naming.movieFile": "Movie file",
   "settingsPage.naming.movieFile.hint": "Extras and subtitles follow the main file",
   "settingsPage.naming.episode": "TV episode",
+  "settingsPage.naming.titleTokens":
+    "{title} is the title each movie uses: its localized title, or its original title when you chose that. {original} is always the original title: {example}.",
   "settingsPage.naming.colon": "Colon in titles",
   "settingsPage.naming.colon.remove": "Remove",
   "settingsPage.naming.colon.dash": "Use “ - ”",
   "settingsPage.naming.colon.lookalike": "Use “꞉”",
+  "settingsPage.artworkNames.custom": "Custom",
+  "settingsPage.artworkNames.movies": "Movies",
+  "settingsPage.artworkNames.tv": "TV shows",
+  "settingsPage.artworkNames.column.names": "Names",
+  "settingsPage.artworkNames.column.files": "Files",
+  "settingsPage.artworkNames.name": "<name>",
+  "settingsPage.artworkNames.keepOne": "Every type keeps at least one name",
+  "settingsPage.artworkNames.single": "{type} name",
+  "settingsPage.artworkNames.sharedNote":
+    "In a folder that holds several movies, the names with the movie name in front are always used, so their images never mix.",
+  "settingsPage.artworkNames.styleNote": "Choosing a style replaces these names.",
+  "settingsPage.artworkNames.renameHint":
+    "Rename moves the artwork you already have to the new names, and the next Scrape writes them.",
+  "settingsPage.artworkNames.replaced": "Replaced the custom artwork names with {name}",
+  "settingsPage.artworkNames.type.movie.poster": "Poster",
+  "settingsPage.artworkNames.type.movie.fanart": "Fanart",
+  "settingsPage.artworkNames.type.movie.banner": "Banner",
+  "settingsPage.artworkNames.type.movie.clearart": "Clear art",
+  "settingsPage.artworkNames.type.movie.thumb": "Landscape",
+  "settingsPage.artworkNames.type.movie.clearlogo": "Logo",
+  "settingsPage.artworkNames.type.movie.discart": "Disc art",
+  "settingsPage.artworkNames.type.movie.keyart": "Key art",
+  "settingsPage.artworkNames.type.movie.squareart": "Square art",
+  "settingsPage.artworkNames.type.movie.extra-fanart": "Extra fanart",
+  "settingsPage.artworkNames.type.tv.poster": "Show poster",
+  "settingsPage.artworkNames.type.tv.fanart": "Show fanart",
+  "settingsPage.artworkNames.type.tv.clearlogo": "Show logo",
+  "settingsPage.artworkNames.type.tv.discart": "Show disc art",
+  "settingsPage.artworkNames.type.tv.thumb": "Show landscape",
+  "settingsPage.artworkNames.type.tv.season-poster": "Season poster",
+  "settingsPage.artworkNames.type.tv.season-fanart": "Season fanart",
+  "settingsPage.artworkNames.type.tv.season-banner": "Season banner",
+  "settingsPage.artworkNames.type.tv.season-thumb": "Season landscape",
+  "settingsPage.artworkNames.type.tv.episode-thumb": "Episode thumbnail",
   "settingsPage.folders.title": "Library folders",
   "settingsPage.folders.movies": "Movies",
   "settingsPage.folders.tv": "TV shows",
@@ -668,6 +734,7 @@ export const settings = {
     "offline · {count, plural, one {# show} other {# shows}} kept",
   "settingsPage.folders.remove": "Remove",
   "settingsPage.folders.removeFor": "Remove {path}",
+  "settingsPage.folders.scanFor": "Scan this folder: {path}",
   "settingsPage.folders.removed":
     "{count, plural, =0 {Removed {path}} one {Removed {path} · # title stays, offline} other {Removed {path} · # titles stay, offline}}",
   "settingsPage.folders.add": "Add folder…",

@@ -198,6 +198,38 @@ fn a_fully_populated_movie_round_trips_through_the_database() {
 }
 
 #[test]
+fn the_title_choice_round_trips_and_belongs_to_movies_and_shows() {
+    let conn = memory_db();
+    let mut movie = Item::movie("The Sleeping City");
+    movie.core.original_title = "La Ciudad Dormida".into();
+    assert!(movie.choose_original_title(true));
+    let id = insert_item(&conn, &movie).unwrap();
+    let back = get_item(&conn, id).unwrap().unwrap();
+    assert!(back.core.use_original_title);
+    assert_eq!(back.core.title, "La Ciudad Dormida");
+    assert_eq!(back.core.localized_title, "The Sleeping City");
+
+    // Switching back is stored too, and nothing of either title is lost.
+    let mut back = back;
+    assert!(back.choose_original_title(false));
+    update_item(&conn, &back).unwrap();
+    let again = get_item(&conn, id).unwrap().unwrap();
+    assert!(!again.core.use_original_title);
+    assert_eq!(again.core.title, "The Sleeping City");
+    assert_eq!(again.core.original_title, "La Ciudad Dormida");
+
+    // An episode never stores a choice.
+    let show_id = insert_item(&conn, &Item::show("Dark")).unwrap();
+    let mut episode = Item::episode(show_id, "Secrets");
+    episode.core.use_original_title = true;
+    episode.core.localized_title = "Geheimnisse".into();
+    let episode_id = insert_item(&conn, &episode).unwrap();
+    let stored = get_item(&conn, episode_id).unwrap().unwrap();
+    assert!(!stored.core.use_original_title);
+    assert_eq!(stored.core.localized_title, "");
+}
+
+#[test]
 fn the_original_language_belongs_to_a_show_and_its_episodes_read_it() {
     let conn = memory_db();
     let mut show = Item::show("Dark");

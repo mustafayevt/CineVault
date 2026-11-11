@@ -202,3 +202,12 @@ export function isBlank(v: EditValue | undefined): boolean {
       return v.ratings.length === 0;
   }
 }
+
+/**
+ * Whether the title has a choice to offer: an original title that differs from the localized one.
+ * A title already set to its original title keeps the choice, so it can go back.
+ */
+export function offersTitleChoice(localized: string, original: string, choice: string): boolean {
+  const theOriginal = original.trim();
+  return choice === "original" || (theOriginal !== "" && theOriginal !== localized.trim());
+}

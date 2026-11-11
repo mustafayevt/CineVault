@@ -231,6 +231,7 @@ fn missing_metadata(s: &Sources) -> String {
         format!("NOT EXISTS (SELECT 1 FROM credit c WHERE c.item_id = i.id AND c.kind = '{kind}')")
     };
     union([
+        s.own("'Title' AS value", "trim(i.title) = ''"),
         s.own("'Plot' AS value", "i.plot = ''"),
         s.own("'Year' AS value", "i.year = 0"),
         s.own("'Runtime' AS value", "i.runtime_minutes = 0"),

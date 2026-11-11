@@ -62,6 +62,8 @@ cv-rename = { workspace = true, features = ["fault-injection"] }
 image.workspace = true
 rusqlite.workspace = true
 sha2.workspace = true
+# Paused time for the tests of the Rename after Scrape queue.
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true

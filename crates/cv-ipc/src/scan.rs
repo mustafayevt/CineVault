@@ -46,9 +46,44 @@ impl ScanState {
         })
     }
 
+    /// "Scan this folder": queues a rescan of one library folder. Must run inside the async
+    /// runtime.
+    pub fn rescan_folder(&self, source_id: u32) -> Result<RescanStartedDto, ScanCommandError> {
+        let service = self.get()?;
+        let run = service
+            .scan_folder(i64::from(source_id))?
+            .ok_or_else(|| ScanCommandError {
+                code: "not_found".to_owned(),
+                message: "That library folder is not in the library any more.".to_owned(),
+            })?;
+        Ok(started(&service, &run))
+    }
+
+    /// "Scan again": queues a rescan of one title's folder. Must run inside the async runtime.
+    pub fn rescan_title(&self, id: &str) -> Result<RescanStartedDto, ScanCommandError> {
+        let service = self.get()?;
+        let not_found = || ScanCommandError {
+            code: "not_found".to_owned(),
+            message: "That title is not in the library any more.".to_owned(),
+        };
+        let id = id.trim().parse::<i64>().map_err(|_| not_found())?;
+        let run = service
+            .rescan_title(cv_domain::ItemId(id))?
+            .ok_or_else(not_found)?;
+        Ok(started(&service, &run))
+    }
+
     /// Reads the media info that is pending. Must run inside the async runtime.
     pub fn read_pending_media_info(&self) -> Result<MediaInfoStatusDto, ScanCommandError> {
         Ok(self.get()?.request_media_info().into())
+    }
+}
+
+fn started(service: &ScanService, run: &cv_app::scanning::RescanRun) -> RescanStartedDto {
+    RescanStartedDto {
+        job_id: u32::try_from(run.handle.job.id().0).unwrap_or(u32::MAX),
+        sources: u32::try_from(run.sources).unwrap_or(u32::MAX),
+        media_info: service.media_info_status().into(),
     }
 }
 
@@ -94,7 +129,11 @@ pub struct ScanCommandError {
 impl From<ScanError> for ScanCommandError {
     fn from(error: ScanError) -> Self {
         Self {
-            code: "storage".to_owned(),
+            code: match error {
+                ScanError::NoFolder(_) => "no_folder",
+                ScanError::Db(_) | ScanError::Jobs(_) => "storage",
+            }
+            .to_owned(),
             message: error.to_string(),
         }
     }
@@ -196,6 +235,24 @@ pub async fn rescan_library(state: &ScanState) -> Result<RescanStartedDto, ScanC
     state.rescan()
 }
 
+/// "Scan this folder": rescans one library folder, as Rescan does for all of them. Titles in
+/// other library folders are not read.
+pub async fn rescan_folder(
+    state: &ScanState,
+    source_id: u32,
+) -> Result<RescanStartedDto, ScanCommandError> {
+    state.rescan_folder(source_id)
+}
+
+/// "Scan again": rescans one title's folder only: its files, NFO and artwork, and whether they
+/// are gone or back. No other title is read or changed.
+pub async fn rescan_title(
+    state: &ScanState,
+    id: String,
+) -> Result<RescanStartedDto, ScanCommandError> {
+    state.rescan_title(&id)
+}
+
 /// Lists the video files inside the library folders that belong to no title.
 pub async fn find_missing_files(
     state: &ScanState,
@@ -242,5 +299,24 @@ mod tests {
         let error = state.rescan().expect_err("no services");
         assert_eq!(error.code, "storage");
         assert!(error.message.contains("could not open the library"));
+        assert_eq!(
+            state.rescan_folder(1).expect_err("no services").code,
+            "storage"
+        );
+        assert_eq!(
+            state.rescan_title("1").expect_err("no services").code,
+            "storage"
+        );
+    }
+
+    #[test]
+    fn a_title_without_a_library_folder_has_its_own_code() {
+        let error = ScanCommandError::from(ScanError::NoFolder("Example Movie (2020)".into()));
+        assert_eq!(error.code, "no_folder");
+        assert!(
+            error
+                .message
+                .starts_with("Example Movie (2020) is not in a library folder")
+        );
     }
 }

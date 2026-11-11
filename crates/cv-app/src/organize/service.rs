@@ -27,10 +27,10 @@ use super::copies::{group_of_movies, separate_copies};
 use super::examples::{episode_example, examples};
 use super::load::{Loaded, LoadedMovie, load, scope_ids};
 use super::model::{
-    Applied, AppliedItem, AppliedStatus, ApplyRequest, BusyTitle, Choice, CompanionCounts,
-    ConflictCode, ConflictRow, CopyNote, Counts, FileChange, JournalBatch, NotRestorable,
-    OrganizeError, PatternField, Preview, PreviewRequest, PreviewRow, ResolutionOption, RowKind,
-    RowStatus, TemplateProblem, UndoOutcome,
+    Applied, AppliedItem, AppliedStatus, ApplyProgress, ApplyRequest, BusyTitle, Choice,
+    CompanionCounts, ConflictCode, ConflictRow, CopyNote, Counts, FileChange, JournalBatch,
+    NotRestorable, OrganizeError, PatternField, Preview, PreviewRequest, PreviewRow,
+    ResolutionOption, RowKind, RowStatus, TemplateProblem, UndoOutcome,
 };
 
 /// Why a title that is not scraped yet is not planned, as the organize-state cache keeps it.
@@ -320,10 +320,28 @@ impl OrganizeService {
     /// Only what stops the whole batch: the library cannot be read or the journal cannot be
     /// written. A step that fails on the disk fails its item only.
     pub fn apply(&self, request: &ApplyRequest) -> Result<Applied, OrganizeError> {
-        self.apply_as(request, new_batch_id())
+        self.apply_with(request, &mut |_| {})
     }
 
-    fn apply_as(&self, request: &ApplyRequest, batch_id: String) -> Result<Applied, OrganizeError> {
+    /// [`Self::apply`], telling `on_progress` how far it got: once before the first title (0 of
+    /// the titles it runs) and after each title.
+    ///
+    /// # Errors
+    /// As [`Self::apply`].
+    pub fn apply_with(
+        &self,
+        request: &ApplyRequest,
+        on_progress: &mut dyn FnMut(&ApplyProgress),
+    ) -> Result<Applied, OrganizeError> {
+        self.apply_as(request, new_batch_id(), on_progress)
+    }
+
+    fn apply_as(
+        &self,
+        request: &ApplyRequest,
+        batch_id: String,
+        on_progress: &mut dyn FnMut(&ApplyProgress),
+    ) -> Result<Applied, OrganizeError> {
         // No rescan walks a folder while it moves (see `hold_library`).
         let _held = self.hold_library()?;
         // Nothing else writes into a title while it is renamed (see `title_guard`). The titles
@@ -421,8 +439,26 @@ impl OrganizeService {
         for (items, options) in &groups {
             Executor::new(fs.as_ref(), &mut journal, options.clone())?.mark_items(items)?;
         }
+        let total: usize = groups.iter().map(|(items, _)| items.len()).sum();
+        let mut done = 0;
+        on_progress(&ApplyProgress {
+            done,
+            total,
+            title: String::new(),
+        });
         for (items, options) in groups {
-            let report = run_batch(fs.as_ref(), &mut journal, options, &items)?;
+            let report = run_batch(fs.as_ref(), &mut journal, options, &items, &mut |item| {
+                done += 1;
+                on_progress(&ApplyProgress {
+                    done,
+                    total,
+                    title: planned
+                        .infos
+                        .get(&item.id)
+                        .map(|info| info.title.clone())
+                        .unwrap_or_default(),
+                });
+            })?;
             reports.extend(report);
         }
         if choice.erases() {
@@ -435,6 +471,12 @@ impl OrganizeService {
             .filter_map(|r| r.id.parse::<i64>().ok().map(ItemId))
             .collect();
         self.forget_missing_files(&trashed);
+        let done: Vec<&BatchItem> = reports
+            .iter()
+            .filter(|r| r.status == ItemStatus::Done)
+            .filter_map(|r| planned.resolved.get(&r.id))
+            .collect();
+        self.list_copied_files(&done);
         let items = reports
             .into_iter()
             .map(|r| AppliedItem {
@@ -504,24 +546,90 @@ impl OrganizeService {
     /// Drops the files of `ids` that are no longer on disk (the leftovers an apply moved to the
     /// trash folder), so the next plan does not list them again. A video is never
     /// dropped: a missing video is the Missing flag's business. A rescan lists a file again when
-    /// an undo brings it back.
+    /// an undo brings it back. A show's seasons and episodes are looked at with it.
     fn forget_missing_files(&self, ids: &[ItemId]) {
         for &id in ids {
             let result = self.db.write(move |tx| {
-                let Some(mut item) = cv_db::repo::get_item(tx, id)? else {
-                    return Ok(());
-                };
-                let before = item.core.media_files.len();
-                item.core
-                    .media_files
-                    .retain(|f| f.kind == MediaFileType::Video || f.path().exists());
-                if item.core.media_files.len() != before {
-                    cv_db::repo::update_item(tx, &item)?;
+                // The title, and for a show its seasons and episodes (two levels below it).
+                let mut family = BTreeSet::from([id]);
+                for child in cv_db::repo::children_of(tx, id)? {
+                    family.insert(child);
+                    family.extend(cv_db::repo::children_of(tx, child)?);
+                }
+                for member in family {
+                    let Some(mut item) = cv_db::repo::get_item(tx, member)? else {
+                        continue;
+                    };
+                    let before = item.core.media_files.len();
+                    item.core
+                        .media_files
+                        .retain(|f| f.kind == MediaFileType::Video || f.path().exists());
+                    if item.core.media_files.len() != before {
+                        cv_db::repo::update_item(tx, &item)?;
+                    }
                 }
                 Ok(())
             });
             if let Err(error) = result {
                 tracing::warn!(item = id.0, %error, "the trashed files stayed listed");
+            }
+        }
+    }
+
+    /// Adds the copies an apply made to the files of their titles. A file that goes to several
+    /// names (artwork or an NFO under every name of the settings) is moved to the first and copied
+    /// to the others; each copy is a file of the title from then on, so the next plan finds it as
+    /// the title's own instead of a stranger in its folder. The owner is the title that lists the
+    /// moved file; a copy another title already lists is left to it.
+    fn list_copied_files(&self, items: &[&BatchItem]) {
+        for item in items {
+            for file in &item.files {
+                let Fate::Carried { to } = &file.fate else {
+                    continue;
+                };
+                let Some((first, rest)) = to.split_first() else {
+                    continue;
+                };
+                let copies: Vec<String> = rest
+                    .iter()
+                    .map(|rel| native_join(&item.root, rel))
+                    .filter(|path| std::path::Path::new(path).is_file())
+                    .collect();
+                if copies.is_empty() {
+                    continue;
+                }
+                let (source, kind) = (native_join(&item.root, first), file.kind);
+                let result = self.db.write(move |tx| {
+                    let Some(owner) = owner_of_file(tx, &source)? else {
+                        return Ok(());
+                    };
+                    let Some(mut title) = cv_db::repo::get_item(tx, ItemId(owner))? else {
+                        return Ok(());
+                    };
+                    let mut added = false;
+                    for copy in &copies {
+                        if owner_of_file(tx, copy)?.is_some() {
+                            continue;
+                        }
+                        let path = std::path::Path::new(copy);
+                        let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
+                            continue;
+                        };
+                        title.core.media_files.push(cv_domain::MediaFile::new(
+                            kind,
+                            dir.to_string_lossy(),
+                            name.to_string_lossy(),
+                        ));
+                        added = true;
+                    }
+                    if added {
+                        cv_db::repo::update_item(tx, &title)?;
+                    }
+                    Ok(())
+                });
+                if let Err(error) = result {
+                    tracing::warn!(item = %item.id, %error, "the copies of a file stayed unlisted");
+                }
             }
         }
     }
@@ -667,6 +775,7 @@ impl OrganizeService {
             batch_id: batch_id.to_owned(),
             ..UndoOutcome::default()
         };
+        let mut restored: Vec<ItemId> = Vec::new();
         for item in report.items {
             let title = item
                 .id
@@ -675,7 +784,12 @@ impl OrganizeService {
                 .and_then(|id| self.title_of(ItemId(id)))
                 .unwrap_or_default();
             match item.status {
-                UndoStatus::Restored => outcome.restored += 1,
+                UndoStatus::Restored => {
+                    outcome.restored += 1;
+                    if let Some(id) = item.id.as_deref().and_then(|id| id.parse::<i64>().ok()) {
+                        restored.push(ItemId(id));
+                    }
+                }
                 UndoStatus::NotRestorable(list) => {
                     for entry in list {
                         outcome.not_restorable.push(NotRestorable {
@@ -700,6 +814,9 @@ impl OrganizeService {
             .into_iter()
             .map(ItemId)
             .collect::<Vec<_>>();
+        // The copies the batch made are gone again: the titles that came back fully stop listing
+        // them (only those, so a title on a drive that is not there keeps its files).
+        self.forget_missing_files(&restored);
         self.note_changed(&touched);
         Ok(outcome)
     }
@@ -1228,8 +1345,11 @@ fn run_batch(
     journal: &mut dyn JournalStore,
     options: ExecOptions,
     items: &[BatchItem],
+    progress: &mut dyn FnMut(&cv_rename::exec::ItemReport),
 ) -> Result<Vec<cv_rename::exec::ItemReport>, OrganizeError> {
-    let report = Executor::new(fs, journal, options)?.run(items)?;
+    let report = Executor::new(fs, journal, options)?
+        .with_progress(|item| progress(item))
+        .run(items)?;
     Ok(report.items)
 }
 

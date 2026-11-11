@@ -159,6 +159,46 @@ describe("Edit details", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/movies/1"));
   });
 
+  it("offers the title choice once there is another original title, and saves it", async () => {
+    const save = spyBackend();
+    const user = userEvent.setup();
+    renderEdit();
+    await screen.findByRole("textbox", { name: "Title" });
+    // The fixture has no other original title: there is no choice to offer.
+    expect(screen.queryByRole("group", { name: "Title to use" })).toBeNull();
+
+    await user.type(
+      screen.getByRole("textbox", { name: "Original title" }),
+      "Dune : Deuxième partie",
+    );
+    // The Title field now says it holds the localized title.
+    expect(await screen.findByRole("textbox", { name: "Localized title" })).toHaveValue(
+      "Dune: Part Two",
+    );
+    const choice = screen.getByRole("group", { name: "Title to use" });
+    expect(within(choice).getByRole("button", { name: "Localized" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      screen.getByText("Lists, file and folder names and the NFO use “Dune: Part Two”."),
+    ).toBeInTheDocument();
+    await user.click(within(choice).getByRole("button", { name: "Original" }));
+    expect(
+      screen.getByText("Lists, file and folder names and the NFO use “Dune : Deuxième partie”."),
+    ).toBeInTheDocument();
+
+    const bar = await screen.findByTestId("edit-foot-bar");
+    expect(within(bar).getByText("2 changes")).toBeInTheDocument();
+    await user.click(within(bar).getByRole("button", { name: /Save/ }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    const changes = save.mock.calls[0]?.[1] ?? [];
+    expect(Object.fromEntries(changes.map((change) => [change.key, change.value]))).toEqual({
+      original_title: { type: "text", value: "Dune : Deuxième partie" },
+      title_choice: { type: "text", value: "original" },
+    });
+  });
+
   it("edits a show with its seasons and status", async () => {
     spyBackend();
     renderEdit("/tv/1/edit");

@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ContextMenu } from "../../components/ContextMenu";
 import { restorePlatform, stubPlatform } from "../../test/platform";
@@ -22,6 +22,11 @@ import {
   fullLabel,
 } from "./titleActions";
 import { useSettingsStore } from "../settings/settingsStore";
+import { setLibraryOpsBackend } from "../library-ops/libraryOpsBackend";
+import { createSyntheticLibraryOpsBackend } from "../library-ops/syntheticLibraryOps";
+import { useToastStore } from "../toasts/toastStore";
+import { setEditBackend } from "../edit/editBackend";
+import type { EditBackend, TitleChoice } from "../edit/editBackend";
 import { useLibraryActions } from "./useLibraryActions";
 import type { TitleTarget } from "./useLibraryActions";
 
@@ -34,7 +39,13 @@ const target = (id: string, title: string, copies = 0): TitleTarget => ({
   copies,
 });
 
-function Page({ targets }: { targets: readonly TitleTarget[] }) {
+function Page({
+  targets,
+  promoteRemove = false,
+}: {
+  targets: readonly TitleTarget[];
+  promoteRemove?: boolean;
+}) {
   const actions = useLibraryActions(targets);
   return (
     <div>
@@ -45,20 +56,21 @@ function Page({ targets }: { targets: readonly TitleTarget[] }) {
         actions={actions}
         count={targets.length}
         size="186.2 GB"
+        promoteRemove={promoteRemove}
         onClear={() => undefined}
       />
     </div>
   );
 }
 
-async function renderPage(targets: readonly TitleTarget[]) {
+async function renderPage(targets: readonly TitleTarget[], promoteRemove = false) {
   const root = createRootRoute();
   const router = createRouter({
     routeTree: root.addChildren([
       createRoute({
         getParentRoute: () => root,
         path: "/",
-        component: () => <Page targets={targets} />,
+        component: () => <Page targets={targets} promoteRemove={promoteRemove} />,
       }),
       createRoute({
         getParentRoute: () => root,
@@ -78,7 +90,12 @@ const four = [target("1", "Heat"), target("2", "Alien"), target("3", "Dune"), ta
 const names = (items: HTMLElement[]) => items.map((item) => item.textContent?.trim() ?? "");
 
 beforeEach(() => stubPlatform("windows"));
-afterEach(() => restorePlatform());
+afterEach(() => {
+  restorePlatform();
+  setLibraryOpsBackend(null);
+  setEditBackend(null);
+  useToastStore.setState({ toasts: [], history: [] });
+});
 
 describe("the name of Delete", () => {
   it("says Delete on every platform, because Settings › Deleted files decides where it goes", () => {
@@ -112,6 +129,8 @@ describe("title actions", () => {
       "Rewrite NFO",
       "Reload media info",
       "Edit details",
+      "Use original title for 4 titles",
+      "Use localized title for 4 titles",
       "Remove from library (keep files)",
       "Ignore this folder",
     ]);
@@ -132,6 +151,8 @@ describe("title actions", () => {
       "Rewrite NFO",
       "Reload media info",
       "Edit details",
+      "Use original title for 4 titles",
+      "Use localized title for 4 titles",
       "Remove from library (keep files)",
       "Ignore this folder",
       "DeleteDel",
@@ -214,11 +235,128 @@ describe("title actions", () => {
     expect(screen.queryByRole("menuitem", { name: /^Compare/ })).toBeNull();
   });
 
+  it("keeps Remove from library under More in the usual view", async () => {
+    await renderPage(four);
+    const bar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    expect(within(bar).queryByRole("button", { name: "Remove from library" })).toBeNull();
+  });
+
+  it("puts Remove from library on the bar before Delete in the missing-files view, and removes every selected title in one call", async () => {
+    const user = userEvent.setup();
+    const ops = createSyntheticLibraryOpsBackend();
+    const removeFromLibrary = vi.spyOn(ops, "removeFromLibrary");
+    setLibraryOpsBackend(ops);
+    await renderPage(four, true);
+    const bar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    const buttons = within(bar)
+      .getAllByRole("button")
+      .map((b) => b.textContent?.trim());
+    expect(buttons).toEqual([
+      "Rename",
+      "Scrape",
+      "Artwork",
+      "Move",
+      "Remove from library",
+      "Delete",
+      "More",
+      "",
+    ]);
+
+    // It is on the bar, so it is not repeated under More.
+    await user.click(within(bar).getByRole("button", { name: "More" }));
+    expect(names(await screen.findAllByRole("menuitem"))).toEqual([
+      "Rewrite NFO",
+      "Reload media info",
+      "Edit details",
+      "Use original title for 4 titles",
+      "Use localized title for 4 titles",
+      "Ignore this folder",
+    ]);
+    await user.keyboard("{Escape}");
+
+    await user.click(within(bar).getByRole("button", { name: "Remove from library" }));
+    await waitFor(() => expect(removeFromLibrary).toHaveBeenCalledTimes(1));
+    expect(removeFromLibrary).toHaveBeenCalledWith(["1", "2", "3", "4"], false);
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts[0]?.message).toContain("Removed 4 titles"),
+    );
+  });
+
   it("shares icons, names and hints with the title page header", () => {
     // The page header reads the same list: its six buttons exist in the registry.
     for (const id of HEADER_ORDER) expect(TITLE_ACTIONS[id].icon).toBeDefined();
     expect(HEADER_ORDER).toEqual(["play", "scrape", "rename", "move", "open-folder", "artwork"]);
     expect(TITLE_ACTIONS.rename.hint).toBe("F2");
     expect(TITLE_ACTIONS.delete.hint).toBe("Del");
+  });
+});
+
+describe("the title choice under More", () => {
+  /** An edit backend whose titles "1" and "3" have another original title. */
+  function choiceBackend() {
+    const calls: { ids: string[]; original: boolean }[] = [];
+    const answer = (ids: readonly string[]): TitleChoice => {
+      const changed = ids.filter((id) => id === "1" || id === "3");
+      return { changed, unchanged: ids.length - changed.length, nfo_problem: null };
+    };
+    const backend = {
+      setTitleChoice: (ids: readonly string[], original: boolean) => {
+        calls.push({ ids: [...ids], original });
+        return Promise.resolve(answer(ids));
+      },
+    } as unknown as EditBackend;
+    setEditBackend(backend);
+    return calls;
+  }
+
+  it("uses the original title of the selected titles and offers Undo for the ones that changed", async () => {
+    const user = userEvent.setup();
+    const calls = choiceBackend();
+    await renderPage(four);
+    const bar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    await user.click(within(bar).getByRole("button", { name: "More" }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Use original title for 4 titles" }),
+    );
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toEqual({ ids: ["1", "2", "3", "4"], original: true });
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts[0]?.message).toBe(
+        "Now using the original title for 2 titles. 2 titles had no other title to switch to.",
+      ),
+    );
+    const toast = useToastStore.getState().toasts[0];
+    expect(toast?.undo).toBeDefined();
+    await toast?.undo?.();
+    expect(calls[1]).toEqual({ ids: ["1", "3"], original: false });
+  });
+
+  it("names the one title and switches it back to its localized title", async () => {
+    const user = userEvent.setup();
+    const calls = choiceBackend();
+    await renderPage([target("1", "La Ciudad Dormida")]);
+    await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
+    await user.click(await screen.findByRole("menuitem", { name: "Use localized title" }));
+    await waitFor(() => expect(calls[0]).toEqual({ ids: ["1"], original: false }));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts[0]?.message).toBe(
+        "Now using the localized title for La Ciudad Dormida",
+      ),
+    );
+  });
+
+  it("says so when no selected title has another title", async () => {
+    const user = userEvent.setup();
+    choiceBackend();
+    await renderPage([target("2", "Heat")]);
+    await user.pointer({ target: screen.getByTestId("area"), keys: "[MouseRight]" });
+    await user.click(await screen.findByRole("menuitem", { name: "Use original title" }));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts[0]?.message).toBe(
+        "Nothing changed: these titles already use that title, or have no other original title.",
+      ),
+    );
+    expect(useToastStore.getState().toasts[0]?.undo).toBeUndefined();
   });
 });

@@ -16,7 +16,7 @@ import { LibraryFilterRow } from "./LibraryFilterRow";
 import { LibrarySelectionBar } from "./LibrarySelectionBar";
 import { LibraryTable } from "./LibraryTable";
 import { currentLibraryBackend } from "./libraryBackend";
-import { filterChips, problemChips, titleQuery, useLibraryStore } from "./libraryStore";
+import { filterChips, fixFacets, problemChips, titleQuery, useLibraryStore } from "./libraryStore";
 import type { TitleType } from "./libraryStore";
 import { PosterGrid } from "./PosterGrid";
 import { TitleContextMenu } from "./TitleContextMenu";
@@ -52,7 +52,15 @@ export function TitlesView({ type, text, onClearText, fit = "wide" }: TitlesView
     () => [...filterChips(state.filters), ...typed.chips],
     [state.filters, typed.chips],
   );
+  // The Needs fixing choices are catalogue chips of the same query, so they combine with every
+  // other filter, the search and "All problems".
+  const facets = useMemo(() => fixFacets(state.filters.fix), [state.filters.fix]);
   const query = useMemo(
+    () => titleQuery(type, state.sort, baseChips, typed.text, ratingSource, facets),
+    [type, state.sort, baseChips, typed.text, ratingSource, facets],
+  );
+  // The same titles without the Needs fixing choices: what the menu counts its entries in.
+  const countsQuery = useMemo(
     () => titleQuery(type, state.sort, baseChips, typed.text, ratingSource),
     [type, state.sort, baseChips, typed.text, ratingSource],
   );
@@ -60,10 +68,17 @@ export function TitlesView({ type, text, onClearText, fit = "wide" }: TitlesView
     () =>
       state.filters.problems === "all"
         ? problemChips("all").map((chips) =>
-            titleQuery(type, state.sort, [...baseChips, ...chips], typed.text, ratingSource),
+            titleQuery(
+              type,
+              state.sort,
+              [...baseChips, ...chips],
+              typed.text,
+              ratingSource,
+              facets,
+            ),
           )
         : null,
-    [state.filters.problems, type, state.sort, baseChips, typed.text, ratingSource],
+    [state.filters.problems, type, state.sort, baseChips, typed.text, ratingSource, facets],
   );
   // One problem filter is a chip of the one query; "All problems" is the union of the three.
   const single = useMemo(() => {
@@ -114,7 +129,9 @@ export function TitlesView({ type, text, onClearText, fit = "wide" }: TitlesView
   }, [type, selectedIds, keys]);
   useEffect(() => clearReloadScope, []);
 
-  const filtered = baseChips.length > 0 || typed.text !== "" || state.filters.problems !== "any";
+  const fixing = state.filters.fix.length > 0;
+  const filtered =
+    baseChips.length > 0 || typed.text !== "" || state.filters.problems !== "any" || fixing;
   const everything = useQuery({
     queryKey: ["library", "size-total", kind] as const,
     queryFn: () => currentLibraryBackend().sizeTotal?.(kind) ?? Promise.resolve(null),
@@ -157,7 +174,17 @@ export function TitlesView({ type, text, onClearText, fit = "wide" }: TitlesView
     [selection.count, actions],
   );
 
-  const empty: ReactNode = filtered ? (
+  const empty: ReactNode = fixing ? (
+    <div className="flex flex-col items-start gap-2 py-8" data-testid="nothing-to-fix">
+      <p className="m-0 text-(length:--fs-14) font-(weight:--fw-600) text-text">
+        {t("library.fix.emptyTitle")}
+      </p>
+      <p className="m-0 text-text-2">{t("library.fix.emptyBody")}</p>
+      <Button variant="default" onClick={() => setFilters(type, { fix: [] })}>
+        {t("library.fix.emptyReset")}
+      </Button>
+    </div>
+  ) : filtered ? (
     <div className="flex flex-col items-start gap-2 py-8">
       <p className="m-0 text-(length:--fs-14) font-(weight:--fw-600) text-text">
         {t("library.filtered.title")}
@@ -194,6 +221,7 @@ export function TitlesView({ type, text, onClearText, fit = "wide" }: TitlesView
       <LibraryFilterRow
         kind={kind}
         filters={state.filters}
+        countsQuery={countsQuery}
         onChange={(change) => setFilters(type, change)}
         text={text}
         onClearText={onClearText}
@@ -232,6 +260,7 @@ export function TitlesView({ type, text, onClearText, fit = "wide" }: TitlesView
         count={selection.count}
         size={selectedBytes}
         onClear={selection.clear}
+        promoteRemove={state.filters.problems === "missing"}
       />
     </>
   );

@@ -102,6 +102,7 @@ function movieSeed(): Seed[] {
   return [
     ["title", text(d.title)],
     ["original_title", text(d.original_title)],
+    ["title_choice", text("localized")],
     ["sort_title", empty()],
     ["tagline", text(d.tagline)],
     ["plot", text(d.plot)],
@@ -156,6 +157,7 @@ function showSeed(): Seed[] {
   return [
     ["title", text(d.title)],
     ["original_title", text(d.original_title)],
+    ["title_choice", text("localized")],
     ["sort_title", empty()],
     ["tagline", text(d.tagline)],
     ["plot", text(d.plot)],
@@ -218,6 +220,11 @@ function refusal(field: EditField): string | null {
   const v = field.value;
   if (field.key === "title" && v.type === "text" && v.value.trim() === "") {
     return "A title is required.";
+  }
+  if (field.key === "title_choice" && v.type === "text") {
+    if (v.value !== "localized" && v.value !== "original") {
+      return "Choose the localized or the original title.";
+    }
   }
   if (field.key === "year" && v.type === "number" && v.value !== null) {
     if (!Number.isInteger(v.value) || v.value < 1800 || v.value > 2200) {
@@ -314,5 +321,10 @@ export function createSyntheticEditBackend(): EditBackend {
       Promise.resolve().then(() => {
         find(target).itemLocked = locked;
       }),
+    // The fixture titles all have another original title, so every one asked changes.
+    setTitleChoice: (ids) =>
+      Promise.resolve({ changed: [...ids], unchanged: 0, nfo_problem: null }),
+    applyOriginalTitleLanguages: () =>
+      Promise.resolve({ changed: [], unchanged: 0, nfo_problem: null }),
   };
 }

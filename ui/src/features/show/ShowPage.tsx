@@ -164,7 +164,14 @@ function ShowView({ detail }: { detail: ShowDetail }) {
         }
       />
       <div className="flex max-w-[908px] flex-col gap-4 px-(--inset) pb-[22px]">
-        {filesState === null ? null : <FilesNotice state={filesState} folder={detail.folder} />}
+        {filesState === null ? null : (
+          <FilesNotice
+            state={filesState}
+            folder={detail.folder}
+            id={detail.id}
+            title={detail.title}
+          />
+        )}
         {detail.plot === "" ? null : (
           <p className="m-0 max-w-[860px] text-(length:--fs-14) leading-[1.6] text-text-2">
             {detail.plot}

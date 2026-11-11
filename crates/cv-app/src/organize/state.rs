@@ -348,4 +348,24 @@ mod tests {
         values.insert("renamer.active-profile".to_owned(), Value::from("detailed"));
         assert_ne!(clean, profile_key(&current_profile(&values)));
     }
+
+    #[test]
+    fn new_artwork_names_make_every_title_checked_again() {
+        // Settings › Naming › Artwork file names is part of the profile: changing it makes the
+        // cached states stale, so titles whose artwork has the old names read as pending.
+        let mut values = BTreeMap::new();
+        let before = profile_key(&current_profile(&values));
+        values.insert(
+            "artwork.names.movie.poster".to_owned(),
+            serde_json::json!(["POSTER", "FOLDER"]),
+        );
+        let custom = profile_key(&current_profile(&values));
+        assert_ne!(before, custom);
+        // Custom names that equal the style's own lists change nothing.
+        values.insert(
+            "artwork.names.movie.poster".to_owned(),
+            serde_json::json!(["FILENAME_POSTER"]),
+        );
+        assert_eq!(before, profile_key(&current_profile(&values)));
+    }
 }

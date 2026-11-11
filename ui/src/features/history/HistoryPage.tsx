@@ -24,6 +24,7 @@ import { t } from "../../i18n/catalog";
 import type { MessageKey } from "../../i18n/catalog";
 import { useFormat } from "../../i18n/useFormat";
 import { NeedsAttention } from "../activity/NeedsAttention";
+import { RunningNow } from "../activity/RunningNow";
 import { notify } from "../notifications/notificationStore";
 import { binName } from "../shell/binName";
 import { detectPlatform } from "../shell/platform";
@@ -346,6 +347,7 @@ export function HistoryPage({ focusBatch = null }: HistoryPageProps) {
   return (
     <section aria-label={t("activity.region")} className="flex h-full min-h-0 flex-col">
       <h1 className="sr-only">{t("activity.region")}</h1>
+      <RunningNow />
       <NeedsAttention focusBatch={focusBatch} />
       <h2 className="sr-only">{t("activity.history")}</h2>
       <div className="px-6 @max-[640px]/pane:px-4">

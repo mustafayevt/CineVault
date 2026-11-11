@@ -7,6 +7,7 @@
 //! | `renamer.cleanup-unwanted` | bool (default off) | move unwanted files to the trash folder after a rename, and allow the clean-up action |
 //! | `renamer.unwanted-patterns` | text (default `.txt, .url, .html, .sfv`) | the unwanted files: extensions or regular expressions on the file name, separated by commas |
 //! | `naming.colon` | `remove`, `dash` or `lookalike` (unset follows the profile, which writes `dash` unless a custom profile says otherwise) | how a colon in a title is written in names (Settings, Naming): dropped, ` - `, or the look-alike character U+A789 |
+//! | `renamer.after-scrape` | bool (default off) | "Rename after Scrape" (Settings, Naming): a title a scrape was written into is renamed by itself once its NFO and artwork are written, when its plan is a plain change; conflicts and held titles are left for Rename. Ignored while "Metadata only" is on |
 //! | `renamer.metadata-only` | bool (default off) | "Metadata only" (Settings, Naming): nothing renames or moves a title's files or folders; [`metadata_only`] is checked by every rename and move before it plans anything for the disk |
 //! | `renamer.keep-subfolders` | bool (default on) | "Keep sub-folders": a folder pattern of one segment renders inside the folder that holds the title now (`Movies/Amadeus` stays in `Movies`); a pattern with `/` still renders under the library folder |
 //!
@@ -67,6 +68,8 @@ pub const METADATA_ONLY_KEY: &str = "renamer.metadata-only";
 /// Why a rename or a move is refused while "Metadata only" is on.
 pub const METADATA_ONLY_MESSAGE: &str =
     "Metadata only is on in Settings › Naming, so files and folders are not renamed or moved.";
+/// The key of the "Rename after Scrape" switch.
+pub const RENAME_AFTER_SCRAPE_KEY: &str = "renamer.after-scrape";
 /// The key of the library-wide "Keep sub-folders" switch.
 pub const KEEP_SUBFOLDERS_KEY: &str = "renamer.keep-subfolders";
 /// The key of how the language is written in subtitle file names (`ISO2`, `ISO3T`, `ISO3B`,
@@ -237,6 +240,17 @@ pub fn metadata_only(values: &Values) -> bool {
         .get(METADATA_ONLY_KEY)
         .and_then(Value::as_bool)
         .unwrap_or(false)
+}
+
+/// Whether a title is renamed by itself after its scrape: "Rename after Scrape" is on and
+/// "Metadata only" is off. Off unless the switch is turned on.
+#[must_use]
+pub fn rename_after_scrape(values: &Values) -> bool {
+    values
+        .get(RENAME_AFTER_SCRAPE_KEY)
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        && !metadata_only(values)
 }
 
 /// What the colon is written as for the `naming.colon` choice: nothing (`remove`), `-` (`dash`,
@@ -570,6 +584,19 @@ mod tests {
     use super::*;
     use cv_nfo::MovieNfoNaming;
     use serde_json::json;
+
+    #[test]
+    fn rename_after_scrape_is_off_unless_turned_on_and_metadata_only_wins() {
+        let mut values = Values::new();
+        assert!(!rename_after_scrape(&values));
+        values.insert(RENAME_AFTER_SCRAPE_KEY.to_owned(), json!(true));
+        assert!(rename_after_scrape(&values));
+        values.insert(METADATA_ONLY_KEY.to_owned(), json!(true));
+        assert!(!rename_after_scrape(&values));
+        values.insert(METADATA_ONLY_KEY.to_owned(), json!(false));
+        values.insert(RENAME_AFTER_SCRAPE_KEY.to_owned(), json!("yes"));
+        assert!(!rename_after_scrape(&values));
+    }
 
     #[test]
     fn keep_subfolders_is_on_unless_turned_off() {

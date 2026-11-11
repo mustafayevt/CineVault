@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CineVault changelog</title>
-<meta name="description" content="What changed in each version of CineVault, from 1.6.2 on, in plain words.">
+<meta name="description" content="What changed in each version of CineVault, from 1.7.0 on, in plain words.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)">
@@ -16,7 +16,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="CineVault">
 <meta property="og:title" content="CineVault changelog">
-<meta property="og:description" content="What changed in each version of CineVault, from 1.6.2 on, in plain words.">
+<meta property="og:description" content="What changed in each version of CineVault, from 1.7.0 on, in plain words.">
 <meta property="og:url" content="https://mustafayevt.github.io/CineVault/changelog.html">
 <meta property="og:image" content="https://mustafayevt.github.io/CineVault/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -52,6 +52,32 @@
       <h1>What's new in CineVault</h1>
       <p class="section-lede">What changed in each version, newest first.</p>
     </header>
+    <article class="log-entry" id="v1.7.0">
+      <div class="log-meta"><h2>1.7.0</h2><time datetime="2026-11-12">12 November 2026</time></div>
+      <div class="log-body">
+<h3>Added</h3>
+<ul>
+<li>A title whose files are missing now has a &quot;Remove from library (keep files)&quot; button right in the warning on its page (movies and TV shows), with a line saying why the title is kept: the drive may be offline or the files only moved. It is not shown when the library folder is just offline, since that title comes back by itself. In the Library's &quot;Missing files or offline&quot; list, the selection bar has a &quot;Remove from library&quot; button, so you can clear many titles at once.</li>
+<li>Settings › Naming: Artwork file names. Pick a style (movie name in front, plain names, both, or Jellyfin), or Custom to choose the names of each artwork type yourself: poster, fanart, logo, landscape, disc art and the others, for movies and for shows, seasons and episodes. A type can have more than one name, such as <code>poster.jpg</code> and <code>folder.jpg</code>, so two media centres can read the same folder, and each row shows the files it gives for an example movie. In a folder that holds several movies the names with the movie name in front are always used. Rename moves the artwork you already have to the new names (with Undo), and old names go to the trash folder.</li>
+<li>A new &quot;Needs fixing&quot; chip in the Library's filter row (movies and TV shows) finds the titles that still miss something, so you no longer open them one by one. Tick Not scraped, No poster, No fan art, No clear logo, No plot or No title, each with the number of titles it would list, and the list shows the titles missing all that you ticked. It combines with the other filters and the search. Press Ctrl+A and use Scrape or Artwork on the selection bar to fix them in one go. When nothing is missing the list says &quot;Nothing to fix here&quot;. A TV show counts by its own artwork, not its episodes'.</li>
+<li>Original or localized title, title by title. A movie or TV show whose original title differs from its title in your metadata language can now use either: choose &quot;Title to use: Localized / Original&quot; on its Edit details page, or select several titles and pick &quot;Use original title&quot; or &quot;Use localized title&quot; under More (also in the right-click menu), with Undo. The library, the title page, <code>${title}</code> in the file and folder names and the NFO all follow, and the other title is kept, so switching back is exact. Titles whose names change show Rename pending; nothing is renamed until you run Rename. A new Scrape keeps the choice.</li>
+<li>Settings › Providers: Keep the original title. List the original languages whose movies and shows should keep their original title, such as French and Spanish; a title in one of them uses its original title from its first Scrape. &quot;Use for titles I have&quot; switches the matching titles already in your library at once, with Undo.</li>
+<li>Settings › Naming has {OriginalTitle} (and {ShowOriginalTitle} for episodes) among the token buttons, with a line that explains it: {Title} follows each title's choice, {OriginalTitle} is always the original title.</li>
+<li>Scan one place instead of every drive. Each library folder on the Drives page and in Settings › Library folders has a &quot;Scan this folder&quot; button, and a movie or TV show page has &quot;Scan again&quot; in its ⋯ menu and in the warning about missing files. Scan again reads only that title's folder (new or changed files, NFO, artwork and the video details of new files) and notices that its files are gone or back; no other title is touched. &quot;Scan folders now&quot; in the Library still scans everything.</li>
+<li>A rename now shows its progress in the sidebar (&quot;Renaming 3 of 12&quot;) and says when it is done with &quot;Renamed 12 titles&quot; and Undo, even if you left the Rename page. Titles that could not be renamed are listed in Activity › Needs attention with the reason and &quot;Open in Rename&quot; to try them again, and the toast says &quot;Renamed 10 of 12 titles; 2 need attention&quot; with a link to Activity.</li>
+<li>Activity shows the work that is running at its top (&quot;Running now&quot;), with the same progress and Pause and Cancel as the sidebar.</li>
+<li>Settings › Naming: Rename after Scrape (off unless you turn it on). A movie or show is renamed by itself once its Scrape and artwork are written, when its new names fit without a conflict. Titles scraped together are renamed together, and a toast says &quot;Renamed 12 titles after Scrape&quot; with Undo wherever you are. Titles that cannot be renamed yet, such as a name taken by another title, stay as they are and wait in Activity with the reason. Metadata only still wins.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li>Scan progress counts titles, not library folders, so it no longer sits at &quot;0 of 8&quot; for minutes. It first says &quot;Finding titles… 312 found&quot; with the folder it is reading, then &quot;Scanning 312 of 707 titles&quot; with the title it is reading, and once it has timed enough titles, about how long is left. A scan also checks only the files of the titles it reads, which makes scans of large libraries on network shares quicker.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Rename: with two names for one artwork type, the second copy is now part of the title, so the next Rename no longer reports a conflict in the title's own folder or copies the same image again.</li>
+</ul>
+      </div>
+    </article>
     <article class="log-entry" id="v1.6.2">
       <div class="log-meta"><h2>1.6.2</h2><time datetime="2026-11-04">4 November 2026</time></div>
       <div class="log-body">

@@ -19,6 +19,28 @@ pub async fn rescan_library(
     cv_ipc::scan::rescan_library(&state).await
 }
 
+/// "Scan this folder": rescans one library folder, as Rescan does for all of them. Titles in
+/// other library folders are not read.
+#[tauri::command]
+#[specta::specta]
+pub async fn rescan_folder(
+    state: State<'_, ScanState>,
+    source_id: u32,
+) -> Result<RescanStartedDto, ScanCommandError> {
+    cv_ipc::scan::rescan_folder(&state, source_id).await
+}
+
+/// "Scan again": rescans one title's folder only: its files, NFO and artwork, and whether they
+/// are gone or back. No other title is read or changed.
+#[tauri::command]
+#[specta::specta]
+pub async fn rescan_title(
+    state: State<'_, ScanState>,
+    id: String,
+) -> Result<RescanStartedDto, ScanCommandError> {
+    cv_ipc::scan::rescan_title(&state, id).await
+}
+
 /// Lists the video files inside the library folders that belong to no title.
 #[tauri::command]
 #[specta::specta]

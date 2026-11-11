@@ -130,8 +130,16 @@ pub struct ItemCore {
     /// Root path of the data source the item lives in.
     pub data_source: String,
     pub ids: ProviderIds,
+    /// The title CineVault uses everywhere: lists, title pages, `${title}` in the naming
+    /// templates, the NFO `<title>`. The original title while [`Self::use_original_title`] is on.
     pub title: String,
     pub original_title: String,
+    /// The title chosen to be the original title (movies and shows only): `title` then holds the
+    /// original title and the title in the metadata language is kept in `localized_title`.
+    pub use_original_title: bool,
+    /// The title in the metadata language, kept while [`Self::use_original_title`] is on so that
+    /// switching back restores it. Empty otherwise.
+    pub localized_title: String,
     /// The production's own language as a lower-case ISO 639-1 code (`en`, `fr`), empty when
     /// unknown. Kept for movies and shows; an episode reads its show's.
     pub original_language: String,
@@ -158,6 +166,86 @@ pub struct ItemCore {
     pub rename_history: Option<RenameHistory>,
     /// Cast and crew, in display order.
     pub credits: Vec<Credit>,
+}
+
+impl ItemCore {
+    /// The title in the metadata language: the title, or the one kept aside while the original
+    /// title is used.
+    #[must_use]
+    pub fn localized_title(&self) -> &str {
+        if self.use_original_title {
+            &self.localized_title
+        } else {
+            &self.title
+        }
+    }
+
+    /// Sets the title in the metadata language. While the original title is used it is kept
+    /// aside and the title stays the original one.
+    pub fn set_localized_title(&mut self, title: &str) {
+        if self.use_original_title {
+            title.clone_into(&mut self.localized_title);
+        } else {
+            title.clone_into(&mut self.title);
+        }
+    }
+
+    /// Sets the original title. While it is used as the title the title follows it; an empty
+    /// original title switches back to the localized title, so the title is never emptied.
+    pub fn set_original_title(&mut self, original: &str) {
+        original.clone_into(&mut self.original_title);
+        if !self.use_original_title {
+            return;
+        }
+        if original.trim().is_empty() {
+            self.choose_original_title(false);
+        } else {
+            original.clone_into(&mut self.title);
+        }
+    }
+
+    /// Whether there is an original title to choose: one that differs from the title in the
+    /// metadata language.
+    #[must_use]
+    pub fn offers_original_title(&self) -> bool {
+        let original = self.original_title.trim();
+        !original.is_empty() && original != self.localized_title().trim()
+    }
+
+    /// Uses the original title as the title (`true`) or goes back to the localized title
+    /// (`false`). Neither value is lost: the one not in use is kept. Returns whether the choice
+    /// changed; choosing the original title of a title without a different one changes nothing.
+    pub fn choose_original_title(&mut self, original: bool) -> bool {
+        if original == self.use_original_title {
+            return false;
+        }
+        if original {
+            if !self.offers_original_title() {
+                return false;
+            }
+            self.localized_title = std::mem::take(&mut self.title);
+            self.title.clone_from(&self.original_title);
+            self.use_original_title = true;
+        } else {
+            let localized = std::mem::take(&mut self.localized_title);
+            if !localized.trim().is_empty() {
+                self.title = localized;
+            }
+            self.use_original_title = false;
+        }
+        true
+    }
+
+    /// For writers that set the title as a whole (reading an NFO): when the title is no longer
+    /// the original title, the choice ends and the title stays as written.
+    pub fn settle_title_choice(&mut self) {
+        if self.use_original_title
+            && (self.original_title.trim().is_empty() || self.title != self.original_title)
+        {
+            self.use_original_title = false;
+            self.localized_title.clear();
+        }
+    }
 }
 
 /// A movie that belongs to a set but is not in the library.
@@ -376,12 +464,91 @@ impl Item {
     pub fn kind(&self) -> ItemKind {
         self.detail.kind()
     }
+
+    /// Whether the item can carry a choice of title: movies and shows.
+    #[must_use]
+    pub fn has_title_choice(&self) -> bool {
+        matches!(self.kind(), ItemKind::Movie | ItemKind::Show)
+    }
+
+    /// [`ItemCore::choose_original_title`] for a movie or a show; other kinds never use the
+    /// original title.
+    pub fn choose_original_title(&mut self, original: bool) -> bool {
+        if original && !self.has_title_choice() {
+            return false;
+        }
+        self.core.choose_original_title(original)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{CreditKind, EpisodeNumber, EpisodeOrdering, Rating, id_key, rating_key};
+
+    fn sleeping_city() -> Item {
+        let mut item = Item::movie("The Sleeping City");
+        item.core.original_title = "La Ciudad Dormida".into();
+        item
+    }
+
+    #[test]
+    fn choosing_the_original_title_keeps_the_localized_one() {
+        let mut item = sleeping_city();
+        assert!(item.core.offers_original_title());
+        assert!(item.choose_original_title(true));
+        assert_eq!(item.core.title, "La Ciudad Dormida");
+        assert_eq!(item.core.localized_title(), "The Sleeping City");
+        assert!(!item.choose_original_title(true), "already chosen");
+        assert!(item.choose_original_title(false));
+        assert_eq!(item.core.title, "The Sleeping City");
+        assert_eq!(item.core.localized_title, "");
+        assert!(!item.core.use_original_title);
+    }
+
+    #[test]
+    fn a_title_without_another_original_title_has_no_choice() {
+        let mut same = Item::movie("Heat");
+        same.core.original_title = "Heat".into();
+        assert!(!same.core.offers_original_title());
+        assert!(!same.choose_original_title(true));
+        let mut none = Item::movie("Heat");
+        assert!(!none.choose_original_title(true));
+        let mut episode = Item::episode(ItemId(1), "Pilot");
+        episode.core.original_title = "Piloto".into();
+        assert!(
+            !episode.choose_original_title(true),
+            "only movies and shows choose"
+        );
+    }
+
+    #[test]
+    fn writers_keep_the_choice_consistent() {
+        let mut item = sleeping_city();
+        item.choose_original_title(true);
+        item.core.set_localized_title("The Sleeping Town");
+        assert_eq!(item.core.title, "La Ciudad Dormida");
+        assert_eq!(item.core.localized_title, "The Sleeping Town");
+        item.core.set_original_title("La Ciudad Dormida 2");
+        assert_eq!(item.core.title, "La Ciudad Dormida 2");
+        // An emptied original title never empties the title: the localized one comes back.
+        item.core.set_original_title("");
+        assert!(!item.core.use_original_title);
+        assert_eq!(item.core.title, "The Sleeping Town");
+    }
+
+    #[test]
+    fn a_title_written_as_a_whole_ends_the_choice_when_it_is_not_the_original() {
+        let mut item = sleeping_city();
+        item.choose_original_title(true);
+        item.core.settle_title_choice();
+        assert!(item.core.use_original_title, "still the original title");
+        item.core.title = "Something Else".into();
+        item.core.settle_title_choice();
+        assert!(!item.core.use_original_title);
+        assert_eq!(item.core.title, "Something Else");
+        assert_eq!(item.core.localized_title, "");
+    }
 
     fn populated_core() -> ItemCore {
         let mut core = ItemCore {

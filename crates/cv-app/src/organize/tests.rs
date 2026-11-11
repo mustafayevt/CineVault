@@ -294,6 +294,28 @@ fn apply_renames_only_the_checked_items_and_updates_the_library_paths() {
 }
 
 #[test]
+fn a_rename_tells_how_far_it_got_after_each_title() {
+    let lib = Lib::new();
+    let heat = lib.movie("heat.1995.1080p", "heat", "Heat", 1995);
+    let arrival = lib.movie("arrival.2016", "arrival", "Arrival", 2016);
+    let request = ApplyRequest {
+        preview: lib.request(Scope::Everything),
+        include: ids(&[heat, arrival]),
+    };
+    let mut heard = Vec::new();
+    let applied = lib
+        .service
+        .apply_with(&request, &mut |progress| heard.push(progress.clone()))
+        .unwrap();
+    assert_eq!(applied.done(), 2);
+    let counts: Vec<(usize, usize)> = heard.iter().map(|p| (p.done, p.total)).collect();
+    assert_eq!(counts, [(0, 2), (1, 2), (2, 2)]);
+    let mut titles: Vec<&str> = heard[1..].iter().map(|p| p.title.as_str()).collect();
+    titles.sort_unstable();
+    assert_eq!(titles, ["Arrival", "Heat"]);
+}
+
+#[test]
 fn a_title_whose_nfo_or_artwork_is_being_written_is_left_out_of_an_apply() {
     // Safety review 14.2: a manual Organize (or any apply) must not move a folder while a
     // scrape's follow-up still writes into it, or the write lands in a recreated old folder.
@@ -2021,4 +2043,179 @@ fn a_title_whose_video_details_are_not_read_renames_when_the_names_use_no_media_
         .unwrap();
     assert_eq!(applied.done(), 1, "{applied:?}");
     assert!(lib.exists("Killers of the Flower Moon (2023)/Killers of the Flower Moon (2023).mkv"));
+}
+
+// ---- artwork file names ---------------------------------------------------------------------
+
+/// A preview of everything, planned with the profile the settings `pairs` give, as Rename plans.
+fn request_with(pairs: &[(&str, serde_json::Value)]) -> PreviewRequest {
+    let values: BTreeMap<String, serde_json::Value> = pairs
+        .iter()
+        .map(|(key, value)| ((*key).to_owned(), value.clone()))
+        .collect();
+    PreviewRequest {
+        scope: Scope::Everything,
+        profile: crate::rename_settings::active_profile_from_values(&values),
+        choices: BTreeMap::new(),
+    }
+}
+
+fn moves_of(preview: &Preview) -> Vec<(String, Vec<String>)> {
+    preview
+        .rows
+        .iter()
+        .flat_map(|row| row.files.iter())
+        .map(|f| (f.from.clone(), f.to.clone()))
+        .collect()
+}
+
+/// Settings › Naming › Artwork file names changed: Rename plans the artwork a tidy title already
+/// has to the new names, the apply moves it (undoably), and a name the type no longer uses goes to
+/// the trash folder, never erased.
+#[test]
+fn new_artwork_names_rename_the_artwork_a_tidy_title_already_has() {
+    let lib = Lib::new();
+    let heat = lib.movie("Heat (1995)", "Heat (1995)", "Heat", 1995);
+    let mut item = lib.item(heat);
+    lib.put("Heat (1995)/Heat (1995)-fanart.jpg");
+    item.core.media_files.push(MediaFile::new(
+        MediaFileType::Fanart,
+        item.core.path.clone(),
+        "Heat (1995)-fanart.jpg",
+    ));
+    lib.db.write(move |tx| update_item(tx, &item)).unwrap();
+
+    // With the names of a fresh install the title is tidy.
+    let fresh = lib.service.preview(&request_with(&[])).unwrap();
+    assert!(fresh.rows.is_empty(), "{fresh:?}");
+    assert_eq!(fresh.counts.tidy, 1);
+
+    // Custom names: the poster under two plain names, the fanart as `backdrop`.
+    let custom = request_with(&[
+        ("metadata.artwork-names", serde_json::json!("prefixed")),
+        (
+            "artwork.names.movie.poster",
+            serde_json::json!(["POSTER", "FOLDER"]),
+        ),
+        (
+            "artwork.names.movie.fanart",
+            serde_json::json!(["BACKDROP"]),
+        ),
+    ]);
+    let preview = lib.service.preview(&custom).unwrap();
+    let moves = moves_of(&preview);
+    assert!(
+        moves.contains(&(
+            "Heat (1995)/Heat (1995)-poster.jpg".to_owned(),
+            vec![
+                "Heat (1995)/poster.jpg".to_owned(),
+                "Heat (1995)/folder.jpg".to_owned()
+            ]
+        )),
+        "{moves:?}"
+    );
+    assert!(
+        moves.contains(&(
+            "Heat (1995)/Heat (1995)-fanart.jpg".to_owned(),
+            vec!["Heat (1995)/backdrop.jpg".to_owned()]
+        )),
+        "{moves:?}"
+    );
+    let applied = lib
+        .service
+        .apply(&ApplyRequest {
+            preview: custom.clone(),
+            include: ids(&[heat]),
+        })
+        .unwrap();
+    assert_eq!(applied.done(), 1, "{applied:?}");
+    for name in [
+        "poster.jpg",
+        "folder.jpg",
+        "backdrop.jpg",
+        "Heat (1995).mkv",
+    ] {
+        assert!(lib.exists(&format!("Heat (1995)/{name}")), "{name}");
+    }
+    assert!(!lib.exists("Heat (1995)/Heat (1995)-poster.jpg"));
+    assert!(!lib.exists("Heat (1995)/Heat (1995)-fanart.jpg"));
+    let again = lib.service.preview(&custom).unwrap();
+    assert!(again.rows.is_empty(), "nothing is left to do: {again:?}");
+
+    // Back to one poster name: the second file is a leftover and goes to the trash folder.
+    let plain = request_with(&[
+        ("metadata.artwork-names", serde_json::json!("short")),
+        (
+            "artwork.names.movie.fanart",
+            serde_json::json!(["BACKDROP"]),
+        ),
+    ]);
+    let preview = lib.service.preview(&plain).unwrap();
+    assert_eq!(
+        preview.rows.iter().map(|row| row.trashed).sum::<u32>(),
+        1,
+        "{preview:?}"
+    );
+    let applied = lib
+        .service
+        .apply(&ApplyRequest {
+            preview: plain,
+            include: ids(&[heat]),
+        })
+        .unwrap();
+    assert_eq!(applied.done(), 1, "{applied:?}");
+    assert!(lib.exists("Heat (1995)/poster.jpg"));
+    assert!(!lib.exists("Heat (1995)/folder.jpg"));
+    let trashed: Vec<String> = walk(&lib.root)
+        .into_iter()
+        .filter(|path| path.contains(".deletedByCineVault"))
+        .collect();
+    assert_eq!(trashed.len(), 1, "the old name is set aside: {trashed:?}");
+
+    // Undo puts the names back.
+    let outcome = lib.service.undo(&applied.batch_id.unwrap()).unwrap();
+    assert!(outcome.is_complete(), "{outcome:?}");
+    assert!(lib.exists("Heat (1995)/poster.jpg"));
+    assert!(lib.exists("Heat (1995)/folder.jpg"));
+    let files = lib.item(heat).core.media_files;
+    assert!(
+        files.iter().all(|f| f.path().exists()),
+        "every listed file is on disk: {files:?}"
+    );
+}
+
+/// Undoing the rename that made a copy takes the copy out of the title's files again.
+#[test]
+fn undoing_a_rename_drops_the_copies_it_made_from_the_title() {
+    let lib = Lib::new();
+    let heat = lib.movie("Heat (1995)", "Heat (1995)", "Heat", 1995);
+    let request = request_with(&[(
+        "artwork.names.movie.poster",
+        serde_json::json!(["FILENAME_POSTER", "FOLDER"]),
+    )]);
+    let applied = lib
+        .service
+        .apply(&ApplyRequest {
+            preview: request,
+            include: ids(&[heat]),
+        })
+        .unwrap();
+    assert_eq!(applied.done(), 1, "{applied:?}");
+    let listed = |name: &str| {
+        lib.item(heat)
+            .core
+            .media_files
+            .iter()
+            .any(|f| f.filename == name)
+    };
+    assert!(listed("folder.jpg"), "the copy is a file of the title");
+
+    let outcome = lib.service.undo(&applied.batch_id.unwrap()).unwrap();
+    assert!(outcome.is_complete(), "{outcome:?}");
+    assert!(!lib.exists("Heat (1995)/folder.jpg"));
+    assert!(
+        !listed("folder.jpg"),
+        "the undone copy is no file of the title"
+    );
+    assert!(listed("Heat (1995)-poster.jpg"));
 }

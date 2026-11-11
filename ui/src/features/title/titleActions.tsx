@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { BookmarkPlus, Download, FileText } from "lucide-react";
+import { BookmarkPlus, Download, FileText, FolderSync } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo } from "react";
 
@@ -13,6 +13,7 @@ import { reloadMediaInfo } from "../mediainfo/reloadMediaInfo";
 import { runNfoAction, selectionScope } from "../nfo/nfoActions";
 import { openMoveTo } from "../move-to/moveToStore";
 import { playTitle } from "../playback/usePlay";
+import { runScanTitle } from "../scan/scanActions";
 import { useMetadataOnly } from "../settings/metadataOnly";
 import { removeTitlesFromLibrary } from "./removeTitles";
 
@@ -24,6 +25,7 @@ export type MenuActionId =
   | "show-nfo"
   | "rewrite-nfo"
   | "reload-media-info"
+  | "scan-again"
   | "find-torrents"
   | "wishlist"
   | "remove"
@@ -61,7 +63,7 @@ export interface TitleActionsInput {
 
 /**
  * The actions of a title page: the six header buttons and the ⋯ menu (Edit details, Show NFO,
- * Rewrite NFO, Reload media info, Remove from library, Ignore, then Delete… last), built once so the Movie page
+ * Rewrite NFO, Reload media info, Scan again, Remove from library, Ignore, then Delete… last), built once so the Movie page
  * and the show page say the same things in the same order. Their icons, names and order come from
  * the one list in `features/library/titleActions.ts`, which the Library's selection bar and
  * right-click menu read too.  */
@@ -151,6 +153,13 @@ export function useTitleActions(input: TitleActionsInput): TitleActions {
           label: shortLabel("reload-media-info"),
           icon: TITLE_ACTIONS["reload-media-info"].icon,
           onSelect: () => void reloadMediaInfo([id]),
+        },
+        {
+          // Reads this title's own folder again: new files, NFO, artwork, gone or back.
+          id: "scan-again",
+          label: t("scan.again"),
+          icon: FolderSync,
+          onSelect: () => void runScanTitle(id, title),
         },
         ...(tmdbId === null
           ? []

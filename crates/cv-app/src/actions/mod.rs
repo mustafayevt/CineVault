@@ -27,6 +27,7 @@ mod cleanup;
 mod downloads;
 mod media;
 mod ratings;
+mod rename_after;
 mod settings;
 
 use std::collections::HashSet;
@@ -44,6 +45,8 @@ use crate::changes::{ChangeHub, ChangePart, Changes};
 use crate::lifecycle::{RatingsGuard, Working, WorkingGuard};
 use crate::notices::NoticeHub;
 use crate::step_outcomes::StepStatus;
+use rename_after::RenameQueue;
+pub use rename_after::RenameRunner;
 
 pub use ratings::{DatasetRetry, RatingSources};
 pub use settings::{AfterScrape, CHECKSUMS_AFTER_SCRAPE_KEY};
@@ -177,6 +180,8 @@ pub struct ActionsService {
     working: Mutex<Option<Arc<Working>>>,
     /// Announces the ratings that were stored, and the start and end of a fetch.
     changes: Changes,
+    /// The titles waiting to be renamed after their scrape (`renamer.after-scrape`).
+    rename_queue: Arc<RenameQueue>,
 }
 
 impl ActionsService {
@@ -202,8 +207,15 @@ impl ActionsService {
             gate: Semaphore::new(AFTER_SCRAPE_PARALLEL),
             working: Mutex::new(None),
             changes: Changes::default(),
+            rename_queue: Arc::new(RenameQueue::default()),
             db,
         })
+    }
+
+    /// Sets who renames the titles a scrape was written into, when Rename after Scrape is on:
+    /// the app's batch runner, once it has started.
+    pub fn set_rename_runner(&self, runner: RenameRunner) {
+        self.rename_queue.set_runner(runner);
     }
 
     /// Connects the service to the hub that announces what changed to open pages.

@@ -6,7 +6,7 @@ import type { JobProgress } from "../../bindings";
  * jobs apart by these words, and a batch started through the API (`Scraping movies from the
  * API`) has no count, so it is neither.
  */
-const SCAN = /^Scanning \d/;
+const SCAN = /^Scanning /;
 const SCRAPE = /^Scraping \d/;
 
 /** Housekeeping the sidebar progress card leaves out. */
@@ -20,7 +20,7 @@ export function isMediaInfoJob(job: Pick<JobProgress, "name">): boolean {
   return MEDIA_INFO.test(job.name);
 }
 
-/** A scan of library folders. */
+/** A scan: of library folders ("Scanning 4 folders"), of one ("Scanning Movies 4K") or of a title. */
 export function isScanJob(job: Pick<JobProgress, "name">): boolean {
   return SCAN.test(job.name);
 }

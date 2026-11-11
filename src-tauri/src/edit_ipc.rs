@@ -37,6 +37,34 @@ pub async fn save_item_edit(
     cv_ipc::edit::save_item_edit(&library, &nfo, &edit, &settings, id, changes).await
 }
 
+/// Uses the original title (`original`) or the localized title as the title of the given movies
+/// and shows, and rewrites their NFO files. Titles without another original title are left alone.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_title_choice(
+    library: State<'_, LibraryState>,
+    nfo: State<'_, NfoState>,
+    edit: State<'_, EditState>,
+    settings: State<'_, SettingsState>,
+    ids: Vec<String>,
+    original: bool,
+) -> Result<TitleChoiceDto, EditCommandError> {
+    cv_ipc::edit::set_title_choice(&library, &nfo, &edit, &settings, ids, original).await
+}
+
+/// Uses the original title for every movie and show whose original language is one of
+/// `metadata.original-title-languages`.
+#[tauri::command]
+#[specta::specta]
+pub async fn use_original_title_for_languages(
+    library: State<'_, LibraryState>,
+    nfo: State<'_, NfoState>,
+    edit: State<'_, EditState>,
+    settings: State<'_, SettingsState>,
+) -> Result<TitleChoiceDto, EditCommandError> {
+    cv_ipc::edit::use_original_title_for_languages(&library, &nfo, &edit, &settings).await
+}
+
 /// Locks or unlocks one field against scraping and NFO re-reading. `field` is a lock key.
 #[tauri::command]
 #[specta::specta]
